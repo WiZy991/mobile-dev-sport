@@ -1,0 +1,45 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Клиенты{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Клиенты</h1>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Имя</th>
+                    <th>Email</th>
+                    <th>Телефон</th>
+                    <th>Бонусы</th>
+                    <th>Создан</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for client in clients %}
+                    <tr>
+                        <td>{{ client.id }}</td>
+                        <td>{{ client.name }}</td>
+                        <td>{{ client.email }}</td>
+                        <td>{{ client.phone }}</td>
+                        <td>{{ client.bonusPoints }}</td>
+                        <td>{{ client.createdAt|date('d.m.Y H:i') }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary">
+                            Пока нет ни одного клиента.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+

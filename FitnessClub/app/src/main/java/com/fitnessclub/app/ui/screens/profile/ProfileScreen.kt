@@ -1,0 +1,688 @@
+package com.fitnessclub.app.ui.screens.profile
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.fitnessclub.app.data.model.Subscription
+import com.fitnessclub.app.data.model.SubscriptionStatus
+import com.fitnessclub.app.ui.theme.*
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileScreen(
+    viewModel: ProfileViewModel,
+    modifier: Modifier = Modifier,
+    onLogout: () -> Unit,
+    onNavigateToQrCode: () -> Unit = {},
+    onNavigateToSubscriptionPlans: () -> Unit = {},
+    onNavigateToReferral: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToEditProfile: () -> Unit = {}
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    var showFreezeDialog by remember { mutableStateOf<String?>(null) }
+    
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ProfileEvent.LoggedOut -> onLogout()
+            }
+        }
+    }
+    
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        TopAppBar(
+            title = {
+                Text(
+                    text = "Профиль",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            actions = {
+                IconButton(onClick = { showLogoutDialog = true }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                        contentDescription = "Выйти",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                titleContentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        )
+        
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (uiState.isLoadingSubscriptions) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // User info card
+                item {
+                    UserInfoCard(
+                        name = uiState.user?.name ?: "Загрузка...",
+                        email = uiState.user?.email ?: "",
+                        phone = uiState.user?.phone ?: "",
+                        bonusPoints = uiState.user?.bonusPoints ?: 0,
+                        onEditClick = onNavigateToEditProfile
+                    )
+                }
+                
+                // Quick actions
+                item {
+                    QuickActionsRow(
+                        onQrCodeClick = onNavigateToQrCode,
+                        onBuySubscriptionClick = onNavigateToSubscriptionPlans,
+                        onReferralClick = onNavigateToReferral,
+                        onNotificationsClick = onNavigateToNotifications
+                    )
+                }
+                
+                // Subscriptions section
+                item {
+                    Text(
+                        text = "Мои абонементы",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                
+                if (uiState.subscriptions.isEmpty() && !uiState.isLoadingSubscriptions) {
+                    item {
+                        EmptySubscriptionsCard(onBuyClick = onNavigateToSubscriptionPlans)
+                    }
+                } else {
+                    items(uiState.subscriptions) { subscription ->
+                        SubscriptionCard(
+                            subscription = subscription,
+                            onFreezeClick = { showFreezeDialog = subscription.id },
+                            onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) }
+                        )
+                    }
+                }
+                
+                // Menu items
+                item {
+                    Text(
+                        text = "Настройки",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                
+                item {
+                    MenuCard(
+                        onNotificationsClick = onNavigateToNotifications,
+                        onSettingsClick = onNavigateToSettings
+                    )
+                }
+            }
+        }
+    }
+    
+    // Logout confirmation dialog
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Выйти из аккаунта?") },
+            text = { Text("Вы уверены, что хотите выйти?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.logout()
+                        showLogoutDialog = false
+                    }
+                ) {
+                    Text("Выйти", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+    
+    // Freeze dialog
+    showFreezeDialog?.let { subscriptionId ->
+        FreezeDialog(
+            onDismiss = { showFreezeDialog = null },
+            onConfirm = { days ->
+                viewModel.freezeSubscription(subscriptionId, days)
+                showFreezeDialog = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun QuickActionsRow(
+    onQrCodeClick: () -> Unit,
+    onBuySubscriptionClick: () -> Unit,
+    onReferralClick: () -> Unit,
+    onNotificationsClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        QuickActionButton(
+            icon = Icons.Default.QrCode2,
+            label = "QR-код",
+            onClick = onQrCodeClick
+        )
+        QuickActionButton(
+            icon = Icons.Default.ShoppingCart,
+            label = "Купить",
+            onClick = onBuySubscriptionClick
+        )
+        QuickActionButton(
+            icon = Icons.Default.People,
+            label = "Друзьям",
+            onClick = onReferralClick
+        )
+        QuickActionButton(
+            icon = Icons.Default.Notifications,
+            label = "Уведомления",
+            onClick = onNotificationsClick
+        )
+    }
+}
+
+@Composable
+private fun QuickActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        FilledIconButton(
+            onClick = onClick,
+            modifier = Modifier.size(56.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun UserInfoCard(
+    name: String,
+    email: String,
+    phone: String,
+    bonusPoints: Int,
+    onEditClick: () -> Unit = {}
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Edit button
+            IconButton(
+                onClick = onEditClick,
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Редактировать",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = name.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Email,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = email,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Phone,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = phone,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            HorizontalDivider()
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Bonus points
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = Warning,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "$bonusPoints бонусов",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionCard(
+    subscription: Subscription,
+    onFreezeClick: () -> Unit,
+    onUnfreezeClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = subscription.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                SubscriptionStatusChip(status = subscription.status)
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Dates
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Начало",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = subscription.startDate.substring(0, 10),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Окончание",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = subscription.endDate.substring(0, 10),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            
+            // Visits info if limited
+            subscription.visitsLeft?.let { visitsLeft ->
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                LinearProgressIndicator(
+                    progress = { (subscription.visitsUsed.toFloat() / (subscription.visitsTotal ?: 1)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Text(
+                    text = "Осталось посещений: $visitsLeft из ${subscription.visitsTotal}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            // Freeze info
+            if (subscription.freezeDaysTotal > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Дней заморозки: ${subscription.freezeDaysLeft} из ${subscription.freezeDaysTotal}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            // Action buttons
+            if (subscription.status == SubscriptionStatus.ACTIVE && subscription.freezeDaysLeft > 0) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                OutlinedButton(
+                    onClick = onFreezeClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AcUnit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Заморозить")
+                }
+            }
+            
+            if (subscription.status == SubscriptionStatus.FROZEN) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Button(
+                    onClick = onUnfreezeClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Разморозить")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionStatusChip(status: SubscriptionStatus) {
+    val (backgroundColor, textColor, text) = when (status) {
+        SubscriptionStatus.ACTIVE -> Triple(
+            Success.copy(alpha = 0.1f),
+            Success,
+            "Активен"
+        )
+        SubscriptionStatus.FROZEN -> Triple(
+            AccentBlue.copy(alpha = 0.1f),
+            AccentBlue,
+            "Заморожен"
+        )
+        SubscriptionStatus.EXPIRED -> Triple(
+            Error.copy(alpha = 0.1f),
+            Error,
+            "Истёк"
+        )
+        SubscriptionStatus.PENDING -> Triple(
+            Warning.copy(alpha = 0.1f),
+            Warning,
+            "Ожидание"
+        )
+    }
+    
+    Surface(
+        color = backgroundColor,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = textColor,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun EmptySubscriptionsCard(onBuyClick: () -> Unit = {}) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Default.CardMembership,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "У вас нет активных абонементов",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(onClick = onBuyClick) {
+                Text("Купить абонемент")
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuCard(
+    onNotificationsClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {}
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column {
+            MenuItem(
+                icon = Icons.Default.Notifications,
+                title = "Уведомления",
+                onClick = onNotificationsClick
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            MenuItem(
+                icon = Icons.Default.Settings,
+                title = "Настройки",
+                onClick = onSettingsClick
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            MenuItem(
+                icon = Icons.Default.Help,
+                title = "Помощь",
+                onClick = { }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            MenuItem(
+                icon = Icons.Default.Info,
+                title = "О приложении",
+                onClick = { }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MenuItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun FreezeDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    var days by remember { mutableStateOf("7") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Заморозить абонемент") },
+        text = {
+            Column {
+                Text("Укажите количество дней заморозки:")
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = days,
+                    onValueChange = { days = it.filter { c -> c.isDigit() } },
+                    label = { Text("Дни") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    days.toIntOrNull()?.let { onConfirm(it) }
+                }
+            ) {
+                Text("Заморозить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        }
+    )
+}

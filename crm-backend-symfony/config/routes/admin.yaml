@@ -1,0 +1,8 @@
+admin_dashboard:
+  path: /admin
+  controller: App\Controller\Admin\AdminController::dashboard
+
+admin_section:
+  path: /admin/{section}
+  controller: App\Controller\Admin\AdminController::section
+

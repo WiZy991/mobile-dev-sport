@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Фитнес Клуб</string>
+
+    <!-- Auth -->
+    <string name="login">Войти</string>
+    <string name="register">Регистрация</string>
+    <string name="email">Email</string>
+    <string name="password">Пароль</string>
+    <string name="phone">Телефон</string>
+    <string name="name">Имя</string>
+    <string name="forgot_password">Забыли пароль?</string>
+    <string name="no_account">Нет аккаунта?</string>
+    <string name="have_account">Уже есть аккаунт?</string>
+
+    <!-- Navigation -->
+    <string name="schedule">Расписание</string>
+    <string name="my_trainings">Мои тренировки</string>
+    <string name="profile">Профиль</string>
+    <string name="subscriptions">Абонементы</string>
+
+    <!-- Schedule -->
+    <string name="group_training">Групповая тренировка</string>
+    <string name="personal_training">Персональная тренировка</string>
+    <string name="book_training">Записаться</string>
+    <string name="cancel_booking">Отменить запись</string>
+    <string name="spots_left">Осталось мест: %d</string>
+
+    <!-- Profile -->
+    <string name="my_subscriptions">Мои абонементы</string>
+    <string name="bonus_points">Бонусные баллы</string>
+    <string name="freeze_subscription">Заморозить</string>
+    <string name="extend_subscription">Продлить</string>
+    <string name="logout">Выйти</string>
+    <string name="settings">Настройки</string>
+
+    <!-- Common -->
+    <string name="loading">Загрузка...</string>
+    <string name="error">Ошибка</string>
+    <string name="retry">Повторить</string>
+    <string name="cancel">Отмена</string>
+    <string name="confirm">Подтвердить</string>
+    <string name="save">Сохранить</string>
+</resources>

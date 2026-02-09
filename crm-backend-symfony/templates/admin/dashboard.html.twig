@@ -1,0 +1,89 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Дашборд{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Дашборд</h1>
+        <span class="text-secondary small">Сегодня {{ "now"|date("d.m.Y") }}</span>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Активные клиенты</div>
+                <div class="h4 mb-0">{{ stats.clients }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Открытые лиды</div>
+                <div class="h4 mb-0">{{ stats.leads }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Тренировки сегодня</div>
+                <div class="h4 mb-0">{{ stats.trainingsToday }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Выручка за день</div>
+                <div class="h4 mb-0">
+                    {% if stats.revenueToday %}
+                        {{ stats.revenueToday|number_format(0, '', ' ') }} ₽
+                    {% else %}
+                        0 ₽
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 content-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Задачи</h2>
+            {% if tasks is defined and tasks|length > 0 %}
+                <span class="badge bg-danger">{{ tasks|length }} новых</span>
+            {% else %}
+                <span class="text-secondary small">Нет открытых задач</span>
+            {% endif %}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Тема</th>
+                    <th>Клиент</th>
+                    <th>Срок</th>
+                    <th>Статус</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if tasks is defined and tasks|length > 0 %}
+                    {% for task in tasks %}
+                        <tr>
+                            <td>{{ task.title }}</td>
+                            <td>{{ task.clientName }}</td>
+                            <td>{{ task.dueAt|date('d.m.Y H:i') }}</td>
+                            <td>
+                                <span class="badge-status bg-warning text-dark">
+                                    {{ task.status }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-secondary">
+                            Открытых задач нет.
+                        </td>
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+

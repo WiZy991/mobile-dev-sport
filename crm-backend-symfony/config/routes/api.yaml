@@ -1,0 +1,95 @@
+api_auth_login:
+  path: /api/v1/auth/login
+  controller: App\Controller\Api\AuthController::login
+  methods: [POST]
+
+api_auth_register:
+  path: /api/v1/auth/register
+  controller: App\Controller\Api\AuthController::register
+  methods: [POST]
+
+api_auth_refresh:
+  path: /api/v1/auth/refresh
+  controller: App\Controller\Api\AuthController::refresh
+  methods: [POST]
+
+api_auth_logout:
+  path: /api/v1/auth/logout
+  controller: App\Controller\Api\AuthController::logout
+  methods: [POST]
+
+api_user_profile_get:
+  path: /api/v1/user/profile
+  controller: App\Controller\Api\UserController::profile
+  methods: [GET]
+
+api_user_profile_update:
+  path: /api/v1/user/profile
+  controller: App\Controller\Api\UserController::updateProfile
+  methods: [PUT]
+
+api_trainings_list:
+  path: /api/v1/trainings
+  controller: App\Controller\Api\TrainingController::list
+  methods: [GET]
+
+api_trainings_show:
+  path: /api/v1/trainings/{id}
+  controller: App\Controller\Api\TrainingController::show
+  methods: [GET]
+
+api_bookings_list:
+  path: /api/v1/bookings
+  controller: App\Controller\Api\BookingController::list
+  methods: [GET]
+
+api_bookings_book:
+  path: /api/v1/trainings/{id}/book
+  controller: App\Controller\Api\BookingController::book
+  methods: [POST]
+
+api_bookings_waiting_list:
+  path: /api/v1/trainings/{id}/waiting-list
+  controller: App\Controller\Api\BookingController::waitingList
+  methods: [POST]
+
+api_bookings_cancel:
+  path: /api/v1/bookings/{id}
+  controller: App\Controller\Api\BookingController::cancel
+  methods: [DELETE]
+
+api_subscriptions_list:
+  path: /api/v1/subscriptions
+  controller: App\Controller\Api\SubscriptionController::list
+  methods: [GET]
+
+api_subscriptions_plans:
+  path: /api/v1/subscriptions/plans
+  controller: App\Controller\Api\SubscriptionController::plans
+  methods: [GET]
+
+api_subscriptions_freeze:
+  path: /api/v1/subscriptions/{id}/freeze
+  controller: App\Controller\Api\SubscriptionController::freeze
+  methods: [POST]
+
+api_subscriptions_unfreeze:
+  path: /api/v1/subscriptions/{id}/unfreeze
+  controller: App\Controller\Api\SubscriptionController::unfreeze
+  methods: [POST]
+
+api_trainers_list:
+  path: /api/v1/trainers
+  controller: App\Controller\Api\TrainerController::list
+  methods: [GET]
+
+api_trainers_show:
+  path: /api/v1/trainers/{id}
+  controller: App\Controller\Api\TrainerController::show
+  methods: [GET]
+
+api_user_push_token:
+  path: /api/v1/user/push-token
+  controller: App\Controller\Api\PushTokenController::register
+  methods: [POST]
+
