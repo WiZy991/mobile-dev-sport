@@ -2,71 +2,113 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\Training;
+use App\Entity\User;
+use App\Entity\Booking;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route('/api/v1/trainings')]
 class TrainingController extends AbstractController
 {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+    ) {}
+
     #[Route('', name: 'api_trainings_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        // TODO: заменить на данные из БД (фильтры по дате/типу)
-        return $this->json(json_decode($this->mockScheduleResponse(), true));
+        $repo = $this->em->getRepository(Training::class);
+
+        // Простая выдача всех тренировок; фильтры по дате/типу можно добавить позже
+        $trainings = $repo->findAll();
+
+        // Временно берём первого пользователя как "текущего"
+        /** @var User|null $user */
+        $user = $this->em->getRepository(User::class)->findOneBy([]);
+        $currentUserId = $user?->getId();
+
+        // Подтягиваем бронирования текущего пользователя, чтобы отметить is_booked
+        $bookedTrainingIds = [];
+        if ($currentUserId !== null) {
+            $bookingRepo = $this->em->getRepository(Booking::class);
+            /** @var Booking[] $userBookings */
+            $userBookings = $bookingRepo->findBy([
+                'user' => $user,
+            ]);
+
+            foreach ($userBookings as $booking) {
+                if ($booking->getStatus() !== 'cancelled') {
+                    $bookedTrainingIds[$booking->getTraining()->getId()] = true;
+                }
+            }
+        }
+
+        $data = array_map(
+            fn (Training $t) => self::serializeTraining(
+                $t,
+                $currentUserId,
+                isset($bookedTrainingIds[$t->getId()])
+            ),
+            $trainings
+        );
+
+        return $this->json($data);
     }
 
     #[Route('/{id}', name: 'api_trainings_show', methods: ['GET'])]
     public function show(string $id): JsonResponse
     {
-        // TODO: вернуть конкретную тренировку по id из БД
-        return $this->json(json_decode($this->mockTrainingDetailsResponse(), true));
+        $numericId = str_starts_with($id, 'training-') ? (int) substr($id, 9) : (int) $id;
+
+        /** @var Training|null $training */
+        $training = $this->em->getRepository(Training::class)->find($numericId);
+
+        if (!$training) {
+            return $this->json(['error' => 'Not found'], 404);
+        }
+
+        return $this->json(self::serializeTraining($training, null, false));
     }
 
-    private function mockScheduleResponse(): string
+    private static function serializeTraining(Training $t, ?int $currentUserId, bool $isBooked): array
     {
-        return <<<'JSON'
-[
-  {
-    "id": "training-1",
-    "name": "Йога для начинающих",
-    "description": "Мягкая практика йоги для новичков. Развитие гибкости, укрепление мышц и расслабление.",
-    "type": "group",
-    "trainer": {"id": "trainer-1", "name": "Мария Иванова", "photo_url": null, "specialization": "Йога", "rating": 4.8},
-    "start_time": "2026-02-05T09:00:00",
-    "end_time": "2026-02-05T10:00:00",
-    "duration_minutes": 60,
-    "room": "Зал йоги",
-    "max_participants": 15,
-    "current_participants": 8,
-    "is_booked": false,
-    "intensity": "low",
-    "image_url": null
-  }
-]
-JSON;
-    }
+        $start = $t->getStartAt();
+        $end = $t->getEndAt();
 
-    private function mockTrainingDetailsResponse(): string
-    {
-        return <<<'JSON'
-{
-  "id": "training-1",
-  "name": "Йога для начинающих",
-  "description": "Мягкая практика йоги для новичков. Развитие гибкости, укрепление мышц и расслабление. На занятии вы освоите базовые асаны и дыхательные техники.",
-  "type": "group",
-  "trainer": {"id": "trainer-1", "name": "Мария Иванова", "photo_url": null, "specialization": "Йога", "rating": 4.8},
-  "start_time": "2026-02-05T09:00:00",
-  "end_time": "2026-02-05T10:00:00",
-  "duration_minutes": 60,
-  "room": "Зал йоги",
-  "max_participants": 15,
-  "current_participants": 8,
-  "is_booked": false,
-  "intensity": "low",
-  "image_url": null
-}
-JSON;
+        $trainer = $t->getTrainer();
+
+        return [
+            'id' => 'training-' . $t->getId(),
+            'name' => $t->getName(),
+            'description' => $t->getDescription(),
+            'type' => $t->getType(),
+            'trainer' => $trainer ? [
+                'id' => 'trainer-' . $trainer->getId(),
+                'name' => $trainer->getName(),
+                'photo_url' => $trainer->getPhotoUrl(),
+                'specialization' => $trainer->getSpecialization(),
+                'rating' => $trainer->getRating(),
+            ] : [
+                'id' => null,
+                'name' => $t->getTrainerName(),
+                'photo_url' => null,
+                'specialization' => null,
+                'rating' => null,
+            ],
+            'start_time' => $start->format('Y-m-d\TH:i:s'),
+            'end_time' => $end->format('Y-m-d\TH:i:s'),
+            'duration_minutes' => ($end->getTimestamp() - $start->getTimestamp()) / 60,
+            'room' => $t->getRoom(),
+            'max_participants' => $t->getMaxParticipants(),
+            'current_participants' => $t->getCurrentParticipants(),
+            'is_booked' => $isBooked,
+            'intensity' => null,
+            'image_url' => null,
+        ];
     }
 }
 

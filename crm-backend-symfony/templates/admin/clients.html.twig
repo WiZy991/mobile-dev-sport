@@ -23,7 +23,11 @@
                 <tbody>
                 {% for client in clients %}
                     <tr>
-                        <td>{{ client.id }}</td>
+                        <td>
+                            <a href="{{ path('admin_client_show', {id: client.id}) }}" class="link-light text-decoration-none">
+                                {{ client.id }}
+                            </a>
+                        </td>
                         <td>{{ client.name }}</td>
                         <td>{{ client.email }}</td>
                         <td>{{ client.phone }}</td>

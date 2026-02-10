@@ -6,3 +6,53 @@ admin_section:
   path: /admin/{section}
   controller: App\Controller\Admin\AdminController::section
 
+admin_client_new:
+  path: /admin/clients/new
+  controller: App\Controller\Admin\AdminController::createClient
+  methods: [POST]
+
+admin_client_show:
+  path: /admin/clients/{id}
+  controller: App\Controller\Admin\AdminController::showClient
+  methods: [GET]
+
+admin_lead_new:
+  path: /admin/leads/new
+  controller: App\Controller\Admin\AdminController::createLead
+  methods: [POST]
+
+admin_lead_status:
+  path: /admin/leads/{id}/status
+  controller: App\Controller\Admin\AdminController::changeLeadStatus
+  methods: [POST]
+
+admin_lead_convert:
+  path: /admin/leads/{id}/convert
+  controller: App\Controller\Admin\AdminController::convertLeadToClient
+  methods: [POST]
+
+admin_task_new:
+  path: /admin/tasks/new
+  controller: App\Controller\Admin\AdminController::createTask
+  methods: [POST]
+
+admin_sale_new:
+  path: /admin/sales/new
+  controller: App\Controller\Admin\AdminController::createSale
+  methods: [POST]
+
+admin_training_new:
+  path: /admin/trainings/new
+  controller: App\Controller\Admin\AdminController::createTraining
+  methods: [POST]
+
+admin_staff_new:
+  path: /admin/staff/new
+  controller: App\Controller\Admin\AdminController::createStaff
+  methods: [POST]
+
+admin_subscription_issue:
+  path: /admin/subscriptions/issue
+  controller: App\Controller\Admin\AdminController::issueSubscription
+  methods: [POST]
+

@@ -1,0 +1,51 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Посещения{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Посещения</h1>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Клиент</th>
+                    <th>Тренировка</th>
+                    <th>Статус</th>
+                    <th>Дата записи</th>
+                    <th>Начало</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for visit in visits %}
+                    <tr>
+                        <td>{{ visit.id }}</td>
+                        <td>
+                            {% if visit.user %}
+                                {{ visit.user.name }} ({{ visit.user.phone }})
+                            {% else %}
+                                {{ visit.clientName }}
+                            {% endif %}
+                        </td>
+                        <td>{{ visit.training.name }}</td>
+                        <td>{{ visit.status }}</td>
+                        <td>{{ visit.bookedAt|date('d.m.Y H:i') }}</td>
+                        <td>{{ visit.training.startAt|date('d.m.Y H:i') }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary">
+                            Пока нет ни одного посещения.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+

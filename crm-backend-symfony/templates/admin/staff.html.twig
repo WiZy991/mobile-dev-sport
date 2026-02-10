@@ -1,0 +1,63 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block body %}
+<div class="content-header">
+    <h1 class="h4 mb-0">Персонал</h1>
+</div>
+
+<div class="content-card mb-3">
+    <form method="post" action="{{ path('admin_staff_new') }}" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small text-secondary">Имя</label>
+            <input type="text" name="name" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-secondary">Специализация</label>
+            <input type="text" name="specialization" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-secondary">Рейтинг</label>
+            <input type="number" step="0.1" name="rating" class="form-control form-control-sm" min="0" max="5">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-secondary">Фото (URL)</label>
+            <input type="url" name="photo_url" class="form-control form-control-sm">
+        </div>
+        <div class="col-12 col-md-2 mt-2 mt-md-0">
+            <button type="submit" class="btn btn-sm btn-primary w-100">Добавить тренера</button>
+        </div>
+    </form>
+</div>
+
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="table table-sm table-dark align-middle mb-0">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Имя</th>
+                <th>Специализация</th>
+                <th>Рейтинг</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for t in trainers %}
+                <tr>
+                    <td>{{ t.id }}</td>
+                    <td>{{ t.name }}</td>
+                    <td>{{ t.specialization ?? '—' }}</td>
+                    <td>{{ t.rating is not null ? t.rating : '—' }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4" class="text-center text-secondary">
+                        Персонал пока не добавлен.
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

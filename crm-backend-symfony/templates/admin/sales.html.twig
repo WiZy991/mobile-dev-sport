@@ -1,0 +1,49 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Продажи{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Продажи</h1>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Клиент</th>
+                    <th>Товар / услуга</th>
+                    <th>Кол-во</th>
+                    <th>Цена</th>
+                    <th>Сумма</th>
+                    <th>Оплата</th>
+                    <th>Дата</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for sale in sales %}
+                    <tr>
+                        <td>{{ sale.id }}</td>
+                        <td>{{ sale.clientName }}</td>
+                        <td>{{ sale.productName }}</td>
+                        <td>{{ sale.quantity }}</td>
+                        <td>{{ sale.price|number_format(0, '', ' ') }} ₽</td>
+                        <td>{{ sale.total|number_format(0, '', ' ') }} ₽</td>
+                        <td>{{ sale.paymentMethod }}</td>
+                        <td>{{ sale.createdAt|date('d.m.Y H:i') }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-secondary">
+                            Пока нет ни одной продажи.
+                        </td>
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+

@@ -1,0 +1,45 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Задачи{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Задачи</h1>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Тема</th>
+                    <th>Клиент</th>
+                    <th>Тип</th>
+                    <th>Статус</th>
+                    <th>Срок</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for task in tasks %}
+                    <tr>
+                        <td>{{ task.id }}</td>
+                        <td>{{ task.title }}</td>
+                        <td>{{ task.clientName ?? '—' }}</td>
+                        <td>{{ task.type }}</td>
+                        <td>{{ task.status }}</td>
+                        <td>{{ task.dueAt ? task.dueAt|date('d.m.Y H:i') : '—' }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary">
+                            Пока нет ни одной задачи.
+                        </td>
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+

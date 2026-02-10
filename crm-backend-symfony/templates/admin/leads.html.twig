@@ -1,0 +1,139 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Лиды{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Лиды</h1>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-primary small fw-semibold text-uppercase">Новый лид</span>
+            <span class="text-secondary small">
+                Воронка: Новый → Пробное назначено → Пробное прошло → Клиент / Неактивен
+            </span>
+        </div>
+        <form method="post" action="{{ path('admin_lead_new') }}">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary">Имя</label>
+                    <input type="text" name="name" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary">Телефон</label>
+                    <input type="text" name="phone" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary">Email</label>
+                    <input type="email" name="email" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-secondary">Комментарий</label>
+                    <input type="text" name="comment" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-sm btn-primary w-100">Добавить</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Имя</th>
+                    <th>Телефон</th>
+                    <th>Email</th>
+                    <th>Статус</th>
+                    <th>Создан</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for lead in leads %}
+                    <tr>
+                        <td>{{ lead.id }}</td>
+                        <td>{{ lead.name }}</td>
+                        <td>{{ lead.phone }}</td>
+                        <td>{{ lead.email ?? '—' }}</td>
+                        <td>
+                            {# Нормализуем старые статусы (in_progress / won / lost) в новую воронку #}
+                            {% set normalized = {
+                                'new':'new',
+                                'in_progress':'trial_scheduled',
+                                'won':'converted',
+                                'lost':'inactive'
+                            }[lead.status] ?? lead.status %}
+
+                            {% set label = {
+                                'new':'Новый',
+                                'trial_scheduled':'Пробное назначено',
+                                'trial_visited':'Пробное прошло',
+                                'converted':'Клиент',
+                                'inactive':'Неактивен'
+                            }[normalized] ?? normalized %}
+
+                            {% set badgeClass = {
+                                'new':'bg-secondary',
+                                'trial_scheduled':'bg-info',
+                                'trial_visited':'bg-primary',
+                                'converted':'bg-success',
+                                'inactive':'bg-dark'
+                            }[normalized] ?? 'bg-secondary' %}
+
+                            <span class="badge {{ badgeClass }}">{{ label }}</span>
+                        </td>
+                        <td>{{ lead.createdAt|date('d.m.Y H:i') }}</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm" role="group">
+                                {% if normalized == 'new' %}
+                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}">
+                                        <input type="hidden" name="status" value="trial_scheduled">
+                                        <button type="submit" class="btn btn-outline-info btn-sm">Назначить пробное</button>
+                                    </form>
+                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="ms-1">
+                                        <input type="hidden" name="status" value="inactive">
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Неактуально</button>
+                                    </form>
+                                {% elseif normalized == 'trial_scheduled' %}
+                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}">
+                                        <input type="hidden" name="status" value="trial_visited">
+                                        <button type="submit" class="btn btn-outline-primary btn-sm">Пришёл</button>
+                                    </form>
+                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="ms-1">
+                                        <input type="hidden" name="status" value="inactive">
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Не пришёл</button>
+                                    </form>
+                                {% elseif normalized == 'trial_visited' %}
+                                    <form method="post" action="{{ path('admin_lead_convert', {id: lead.id}) }}">
+                                        <button type="submit" class="btn btn-success btn-sm">Оформить абонемент</button>
+                                    </form>
+                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="ms-1">
+                                        <input type="hidden" name="status" value="inactive">
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Не купил</button>
+                                    </form>
+                                {% elseif normalized == 'converted' %}
+                                    <span class="badge bg-success">Клиент</span>
+                                {% else %}
+                                    <span class="text-secondary small">Нет активных действий</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary">
+                            Пока нет ни одного лида.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+

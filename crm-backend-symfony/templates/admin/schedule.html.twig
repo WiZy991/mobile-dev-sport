@@ -1,0 +1,82 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block body %}
+<div class="content-header">
+  <h1 class="h4 mb-0">Расписание</h1>
+</div>
+
+<div class="content-card mb-3">
+  <form method="post" action="{{ path('admin_training_new') }}" class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small text-secondary">Название</label>
+      <input type="text" name="name" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary">Тренер</label>
+      <select name="trainer_id" class="form-select form-select-sm">
+        <option value="">Без тренера</option>
+        {% for tr in trainers %}
+          <option value="{{ tr.id }}">{{ tr.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary">Начало</label>
+      <input type="datetime-local" name="start_at" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary">Конец</label>
+      <input type="datetime-local" name="end_at" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-1">
+      <label class="form-label small text-secondary">Зал</label>
+      <input type="text" name="room" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-1">
+      <label class="form-label small text-secondary">Мест</label>
+      <input type="number" name="max_participants" class="form-control form-control-sm" value="10" min="0">
+    </div>
+    <div class="col-md-1">
+      <button type="submit" class="btn btn-sm btn-primary w-100">
+        Добавить
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="content-card">
+  <table class="table table-sm table-dark align-middle mb-0">
+    <thead>
+    <tr>
+      <th>ID</th>
+      <th>Название</th>
+      <th>Тренер</th>
+      <th>Начало</th>
+      <th>Конец</th>
+      <th>Мест</th>
+      <th>Записано</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for t in trainings %}
+      <tr>
+        <td>{{ t.id }}</td>
+        <td>{{ t.name }}</td>
+        <td>{{ t.trainerName ?? '—' }}</td>
+        <td>{{ t.startAt|date('d.m.Y H:i') }}</td>
+        <td>{{ t.endAt|date('d.m.Y H:i') }}</td>
+        <td>{{ t.maxParticipants }}</td>
+        <td>{{ t.currentParticipants }}</td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="7" class="text-center text-secondary">
+          Пока нет тренировок.
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+

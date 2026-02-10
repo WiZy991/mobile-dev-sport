@@ -1,0 +1,57 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Самообслуживание{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Самообслуживание — вход по QR</h1>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Дата</th>
+                    <th>Клиент</th>
+                    <th>Устройство</th>
+                    <th>Результат</th>
+                    <th>Причина</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.createdAt|date('d.m.Y H:i:s') }}</td>
+                        <td>
+                            {% if log.user %}
+                                {{ log.user.name }} ({{ log.user.phone }})
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ log.deviceId ?? '—' }}</td>
+                        <td>
+                            {% if log.result == 'granted' %}
+                                <span class="badge bg-success">Разрешён</span>
+                            {% else %}
+                                <span class="badge bg-danger">Отклонён</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.reason ?? '—' }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary">
+                            Логов входа по QR пока нет.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+

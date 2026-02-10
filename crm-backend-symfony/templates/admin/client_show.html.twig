@@ -1,0 +1,112 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Клиент {{ client.name }}{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Клиент: {{ client.name }}</h1>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="content-card mb-3">
+                <div class="text-secondary small mb-2">Профиль</div>
+                <div class="mb-1"><strong>ID:</strong> {{ client.id }}</div>
+                <div class="mb-1"><strong>Email:</strong> {{ client.email }}</div>
+                <div class="mb-1"><strong>Телефон:</strong> {{ client.phone }}</div>
+                <div class="mb-1"><strong>Бонусы:</strong> {{ client.bonusPoints }}</div>
+                <div class="mb-1"><strong>Создан:</strong> {{ client.createdAt|date('d.m.Y H:i') }}</div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="content-card mb-3">
+                <div class="mb-2 text-primary small fw-semibold text-uppercase">Абонементы</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-dark align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>План</th>
+                            <th>Статус</th>
+                            <th>Период</th>
+                            <th>Посещений</th>
+                            <th>Заморозка</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for sub in subscriptions %}
+                            <tr>
+                                <td>{{ sub.id }}</td>
+                                <td>{{ sub.plan.name }}</td>
+                                <td>{{ sub.status }}</td>
+                                <td>
+                                    {{ sub.startDate|date('d.m.Y') }}
+                                    {% if sub.endDate %}
+                                        — {{ sub.endDate|date('d.m.Y') }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if sub.visitsTotal is not null %}
+                                        {{ sub.visitsUsed ?? 0 }} / {{ sub.visitsTotal }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if sub.freezeDaysTotal is not null %}
+                                        {{ sub.freezeDaysUsed ?? 0 }} / {{ sub.freezeDaysTotal }} дн.
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-secondary">
+                                    У клиента пока нет абонементов.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card mt-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Записи на тренировки</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Тренировка</th>
+                    <th>Статус</th>
+                    <th>Дата записи</th>
+                    <th>Время тренировки</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for b in bookings %}
+                    <tr>
+                        <td>{{ b.id }}</td>
+                        <td>{{ b.training.name }}</td>
+                        <td>{{ b.status }}</td>
+                        <td>{{ b.bookedAt|date('d.m.Y H:i') }}</td>
+                        <td>{{ b.training.startAt|date('d.m.Y H:i') }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary">
+                            Клиент пока не записывался на тренировки.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+
