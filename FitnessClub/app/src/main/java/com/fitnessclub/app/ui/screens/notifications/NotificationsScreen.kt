@@ -33,6 +33,7 @@ enum class NotificationType {
     TRAINING_REMINDER,
     BOOKING_CONFIRMED,
     BOOKING_CANCELLED,
+    SPOT_FREED,
     SCHEDULE_CHANGE,
     PROMO,
     SUBSCRIPTION,
@@ -215,6 +216,7 @@ private fun getNotificationIconAndColor(type: NotificationType): Pair<ImageVecto
         NotificationType.TRAINING_REMINDER -> Icons.Default.FitnessCenter to AccentOrange
         NotificationType.BOOKING_CONFIRMED -> Icons.Default.CheckCircle to Success
         NotificationType.BOOKING_CANCELLED -> Icons.Default.Cancel to Error
+        NotificationType.SPOT_FREED -> Icons.Default.EventAvailable to Success
         NotificationType.SCHEDULE_CHANGE -> Icons.Default.Schedule to Warning
         NotificationType.PROMO -> Icons.Default.LocalOffer to Primary
         NotificationType.SUBSCRIPTION -> Icons.Default.CardMembership to AccentBlue

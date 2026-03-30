@@ -15,7 +15,7 @@ class MockInterceptor : Interceptor {
     
     companion object {
         // Set to true to use mock data, false to use real API
-        const val USE_MOCK = false
+        const val USE_MOCK = false  // Backend API готов к работе
     }
     
     private val jsonMediaType = "application/json".toMediaType()
@@ -36,6 +36,7 @@ class MockInterceptor : Interceptor {
             path.endsWith("/auth/logout") && method == "POST" -> mockLogoutResponse()
             
             // User endpoints
+            path.endsWith("/user/stats") && method == "GET" -> mockUserStatsResponse()
             path.endsWith("/user/profile") && method == "GET" -> mockProfileResponse()
             path.endsWith("/user/profile") && method == "PUT" -> mockProfileUpdateResponse()
             
@@ -50,14 +51,41 @@ class MockInterceptor : Interceptor {
             path.endsWith("/bookings") && method == "GET" -> mockBookingsResponse()
             
             // Subscriptions endpoints
+            path.endsWith("/subscriptions/purchase") && method == "POST" -> mockPurchaseResponse()
             path.contains("/subscriptions") && path.contains("/freeze") && method == "POST" -> mockFreezeResponse()
             path.contains("/subscriptions") && path.contains("/unfreeze") && method == "POST" -> mockUnfreezeResponse()
             path.endsWith("/subscriptions/plans") && method == "GET" -> mockSubscriptionPlansResponse()
             path.endsWith("/subscriptions") && method == "GET" -> mockSubscriptionsResponse()
             
+            // Products
+            path.contains("/products") && path.contains("/purchase") && method == "POST" -> mockProductPurchaseResponse()
+            path.endsWith("/products") && method == "GET" -> mockProductsResponse()
+            
+            // Club info
+            path.endsWith("/club/occupancy") && method == "GET" -> mockOccupancyResponse()
+            path.endsWith("/club/info") && method == "GET" -> mockClubInfoResponse()
+            
             // Trainers endpoints
             path.matches(Regex(".*/trainers/[^/]+$")) && method == "GET" -> mockTrainerDetailsResponse()
             path.endsWith("/trainers") && method == "GET" -> mockTrainersResponse()
+            
+            // Feedback
+            path.endsWith("/feedback") && method == "POST" -> """{"success": true, "id": "feedback-1"}"""
+            
+            // Guest passes
+            path.endsWith("/guest-passes") && method == "POST" -> mockGuestPassCreateResponse()
+            path.endsWith("/guest-passes") && method == "GET" -> "[]"
+            
+            // Notifications
+            path.endsWith("/notifications/read-all") && method == "POST" -> """{"success": true}"""
+            path.matches(Regex(".*/notifications/[^/]+/read$")) && method == "POST" -> """{"success": true}"""
+            path.endsWith("/notifications") && method == "GET" -> mockNotificationsResponse()
+            
+            // Lockers
+            path.endsWith("/lockers/release") && method == "POST" -> """{"success": true}"""
+            path.matches(Regex(".*/lockers/[^/]+/book$")) && method == "POST" -> mockLockerBookResponse()
+            path.endsWith("/lockers/my-booking") && method == "GET" -> "null"
+            path.endsWith("/lockers") && method == "GET" -> mockLockersResponse()
             
             else -> """{"error": "Unknown endpoint: $path", "method": "$method"}"""
         }
@@ -110,6 +138,18 @@ class MockInterceptor : Interceptor {
     }
     
     private fun mockLogoutResponse(): String = """{"success": true}"""
+    
+    private fun mockUserStatsResponse(): String = """
+    {
+        "total_visits": 12,
+        "streak_days": 3,
+        "achievements": [
+            {"id": "first_visit", "name": "Первое посещение", "description": "Добро пожаловать в зал!", "unlocked": true},
+            {"id": "regular", "name": "Регулярный посетитель", "description": "5 посещений", "unlocked": true},
+            {"id": "streak_3", "name": "Серия 3 дня", "description": "3 дня подряд", "unlocked": true}
+        ]
+    }
+    """.trimIndent()
     
     private fun mockProfileResponse(): String = """
     {
@@ -504,6 +544,58 @@ class MockInterceptor : Interceptor {
     ]
     """.trimIndent()
     
+    private fun mockPurchaseResponse(): String = """
+    {
+        "id": "sub-new",
+        "name": "Безлимит на месяц",
+        "description": "Неограниченное посещение",
+        "type": "unlimited",
+        "start_date": "2026-02-10",
+        "end_date": "2026-03-12",
+        "status": "active",
+        "visits_total": null,
+        "visits_used": 0,
+        "freeze_days_total": 14,
+        "freeze_days_used": 0,
+        "is_frozen": false,
+        "price": 5000.0
+    }
+    """.trimIndent()
+    
+    private fun mockProductPurchaseResponse(): String = """
+    {"success": true, "sale_id": 1, "product": "Товар", "quantity": 1, "total": 350.0}
+    """.trimIndent()
+
+    private fun mockProductsResponse(): String = """
+    [
+        {"id": "product-1", "name": "Йога", "description": "Групповое занятие йогой", "price": 350.0, "category": "service"},
+        {"id": "product-2", "name": "Персональная тренировка", "description": "Индивидуальная тренировка с тренером", "price": 2000.0, "category": "service"},
+        {"id": "product-3", "name": "Полотенце", "description": "С логотипом клуба", "price": 800.0, "category": "goods"}
+    ]
+    """.trimIndent()
+    
+    private fun mockOccupancyResponse(): String = """
+    {
+        "current": 47,
+        "max_capacity": 100,
+        "percentage": 47,
+        "status": "low"
+    }
+    """.trimIndent()
+    
+    private fun mockClubInfoResponse(): String = """
+    {
+        "name": "FitnessClub",
+        "address": "г. Москва, ул. Примерная, д. 1",
+        "phone": "+7 (495) 123-45-67",
+        "email": "info@fitnessclub.ru",
+        "working_hours": "Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00",
+        "amenities": ["Тренажёрный зал", "Бассейн", "Йога", "Групповые занятия"],
+        "latitude": 55.7558,
+        "longitude": 37.6173
+    }
+    """.trimIndent()
+    
     private fun mockTrainersResponse(): String = """
     [
         {"id": "trainer-1", "name": "Мария Иванова", "photo_url": null, "specialization": "Йога, Растяжка", "rating": 4.8},
@@ -523,4 +615,65 @@ class MockInterceptor : Interceptor {
         "rating": 4.8
     }
     """.trimIndent()
+    
+    private fun mockNotificationsResponse(): String = """
+    [
+        {"id": "notification-1", "type": "training_reminder", "title": "Напоминание о тренировке", "message": "Йога для начинающих начнётся через 1 час в Зале йоги", "created_at": "2026-02-10T09:00:00", "is_read": false, "reference_id": "training-1"},
+        {"id": "notification-2", "type": "spot_freed", "title": "Освободилось место!", "message": "Освободилось место на тренировку «Силовая тренировка» (10.02.2026 11:00). Запишитесь, пока место свободно!", "created_at": "2026-02-10T08:30:00", "is_read": false, "reference_id": "training-2"},
+        {"id": "notification-3", "type": "booking_confirmed", "title": "Запись подтверждена", "message": "Вы записаны на Силовую тренировку завтра в 11:00", "created_at": "2026-02-09T14:00:00", "is_read": true, "reference_id": null}
+    ]
+    """.trimIndent()
+    
+    private fun mockLockersResponse(): String = """
+    [
+        {"id": "locker-1", "number": "1", "status": "available"},
+        {"id": "locker-2", "number": "2", "status": "occupied"},
+        {"id": "locker-3", "number": "3", "status": "available"},
+        {"id": "locker-4", "number": "4", "status": "available"},
+        {"id": "locker-5", "number": "5", "status": "available"},
+        {"id": "locker-6", "number": "6", "status": "occupied"},
+        {"id": "locker-7", "number": "7", "status": "available"},
+        {"id": "locker-8", "number": "8", "status": "available"},
+        {"id": "locker-9", "number": "9", "status": "available"},
+        {"id": "locker-10", "number": "10", "status": "available"},
+        {"id": "locker-11", "number": "11", "status": "available"},
+        {"id": "locker-12", "number": "12", "status": "available"},
+        {"id": "locker-13", "number": "13", "status": "available"},
+        {"id": "locker-14", "number": "14", "status": "available"},
+        {"id": "locker-15", "number": "15", "status": "available"},
+        {"id": "locker-16", "number": "16", "status": "available"},
+        {"id": "locker-17", "number": "17", "status": "available"},
+        {"id": "locker-18", "number": "18", "status": "available"},
+        {"id": "locker-19", "number": "19", "status": "available"},
+        {"id": "locker-20", "number": "20", "status": "available"}
+    ]
+    """.trimIndent()
+    
+    private fun mockLockerBookResponse(): String {
+        val token = UUID.randomUUID().toString().replace("-", "")
+        return """
+        {
+            "id": "locker-booking-1",
+            "locker": {"id": "locker-1", "number": "1", "status": "occupied"},
+            "started_at": "2026-02-10T10:00:00",
+            "ends_at": "2026-02-10T14:00:00",
+            "qr_token": "$token",
+            "qr_code_data": "FITNESSCLUB:LOCKER:1:$token"
+        }
+        """.trimIndent()
+    }
+    
+    private fun mockGuestPassCreateResponse(): String {
+        val token = UUID.randomUUID().toString().replace("-", "")
+        return """
+        {
+            "id": "guest-pass-1",
+            "guest_name": null,
+            "status": "active",
+            "created_at": "2026-02-10T12:00:00",
+            "used_at": null,
+            "qr_code_data": "FITNESSCLUB:GUEST:1:$token"
+        }
+        """.trimIndent()
+    }
 }

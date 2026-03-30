@@ -2,9 +2,12 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\PromoCode;
+use App\Entity\Sale;
 use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
 use App\Entity\User;
+use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,12 +19,13 @@ class SubscriptionController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly CurrentUserResolver $userResolver,
     ) {}
 
     #[Route('', name: 'api_subscriptions_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        $user = $this->em->getRepository(User::class)->findOneBy([]); // временно текущий пользователь
+        $user = $this->userResolver->resolve($request);
         if (!$user) {
             return $this->json([]);
         }
@@ -48,6 +52,107 @@ class SubscriptionController extends AbstractController
         }, $subs);
 
         return $this->json($data);
+    }
+
+    #[Route('/purchase', name: 'api_subscriptions_purchase', methods: ['POST'])]
+    public function purchase(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $planIdRaw = $data['plan_id'] ?? $data['planId'] ?? '';
+        $promoCodeRaw = trim((string) ($data['promo_code'] ?? $data['promoCode'] ?? ''));
+
+        $planId = null;
+        if (str_starts_with($planIdRaw, 'plan-')) {
+            $planId = (int) substr($planIdRaw, 5);
+        } else {
+            $planId = (int) $planIdRaw;
+        }
+
+        /** @var SubscriptionPlan|null $plan */
+        $plan = $this->em->getRepository(SubscriptionPlan::class)->find($planId);
+        if (!$plan) {
+            return $this->json(['error' => 'Plan not found'], 404);
+        }
+
+        $price = $plan->getPrice();
+        $discountAmount = 0.0;
+        $promo = null;
+
+        if ($promoCodeRaw !== '') {
+            $promo = $this->em->getRepository(PromoCode::class)->findOneBy(['code' => strtoupper($promoCodeRaw)]);
+            if ($promo && $promo->isValid()) {
+                if ($promo->getDiscountPercent() !== null) {
+                    $discountAmount = round($price * $promo->getDiscountPercent() / 100, 2);
+                } elseif ($promo->getDiscountAmount() !== null) {
+                    $discountAmount = min($promo->getDiscountAmount(), $price);
+                }
+                $price = max(0, $price - $discountAmount);
+                $promo->incrementUsedCount();
+            } else {
+                $promo = null;
+                $discountAmount = 0;
+            }
+        }
+
+        $sub = new Subscription();
+        $sub->setUser($user)
+            ->setPlan($plan)
+            ->setStatus('active')
+            ->setVisitsUsed(0);
+
+        $start = new \DateTimeImmutable();
+        $sub->setStartDate($start);
+
+        if ($plan->getDurationDays()) {
+            $end = $start->modify('+' . $plan->getDurationDays() . ' days');
+            $sub->setEndDate($end);
+        }
+        if ($plan->getVisitsCount()) {
+            $sub->setVisitsTotal($plan->getVisitsCount());
+        }
+        if ($plan->getType() === 'personal') {
+            $sub->setFreezeDaysTotal(0);
+            $sub->setFreezeDaysUsed(0);
+        } else {
+            $sub->setFreezeDaysTotal(14);
+            $sub->setFreezeDaysUsed(0);
+        }
+        if ($promo) {
+            $sub->setPromoCode($promo);
+        }
+
+        $this->em->persist($sub);
+        $this->em->flush();
+
+        // Создаём продажу для отображения в CRM
+        $sale = (new Sale())
+            ->setUser($user)
+            ->setClientName($user->getName())
+            ->setProductName('Абонемент: ' . $plan->getName())
+            ->setQuantity(1)
+            ->setPrice($price)
+            ->setTotal($price)
+            ->setPaymentMethod('card') // покупка в приложении
+            ->setSubscription($sub);
+        if ($promo) {
+            $sale->setPromoCode($promo);
+            $sale->setDiscountAmount($discountAmount);
+        }
+        $this->em->persist($sale);
+        $this->em->flush();
+
+        $result = $this->serializeSubscription($sub);
+        $result['final_price'] = $price;
+        if ($discountAmount > 0) {
+            $result['discount_amount'] = $discountAmount;
+            $result['original_price'] = $plan->getPrice();
+        }
+        return $this->json($result, 201);
     }
 
     #[Route('/plans', name: 'api_subscriptions_plans', methods: ['GET'])]

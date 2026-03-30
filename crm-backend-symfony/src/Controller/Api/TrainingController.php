@@ -2,9 +2,10 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\Booking;
 use App\Entity\Training;
 use App\Entity\User;
-use App\Entity\Booking;
+use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,6 +17,7 @@ class TrainingController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly CurrentUserResolver $userResolver,
     ) {}
 
     #[Route('', name: 'api_trainings_list', methods: ['GET'])]
@@ -23,12 +25,31 @@ class TrainingController extends AbstractController
     {
         $repo = $this->em->getRepository(Training::class);
 
-        // Простая выдача всех тренировок; фильтры по дате/типу можно добавить позже
-        $trainings = $repo->findAll();
+        $dateFilter = $request->query->get('date');
+        $typeFilter = $request->query->get('type');
 
-        // Временно берём первого пользователя как "текущего"
-        /** @var User|null $user */
-        $user = $this->em->getRepository(User::class)->findOneBy([]);
+        if ($dateFilter) {
+            try {
+                $date = new \DateTimeImmutable($dateFilter);
+                $start = $date->setTime(0, 0);
+                $end = $start->modify('+1 day');
+                $trainings = $repo->findBy(
+                    [],
+                    ['startAt' => 'ASC']
+                );
+                $trainings = array_filter($trainings, fn (Training $t) => $t->getStartAt() >= $start && $t->getStartAt() < $end);
+            } catch (\Throwable) {
+                $trainings = $repo->findBy([], ['startAt' => 'ASC']);
+            }
+        } else {
+            $trainings = $repo->findBy([], ['startAt' => 'ASC']);
+        }
+
+        if ($typeFilter !== null && $typeFilter !== '') {
+            $trainings = array_filter($trainings, fn (Training $t) => $t->getType() === $typeFilter);
+        }
+
+        $user = $this->userResolver->resolve($request);
         $currentUserId = $user?->getId();
 
         // Подтягиваем бронирования текущего пользователя, чтобы отметить is_booked

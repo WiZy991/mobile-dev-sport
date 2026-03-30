@@ -5,10 +5,16 @@
 {% block body %}
     <div class="content-header">
         <h1 class="h4 mb-0">Услуги и товары</h1>
+        <span class="text-secondary small me-2">Активные показываются в магазине приложения</span>
+        <div class="btn-group btn-group-sm">
+            <a href="{{ path('admin_section', {section: 'services'}) }}" class="btn {{ categoryFilter == '' ? 'btn-primary' : 'btn-outline-secondary' }}">Все</a>
+            <a href="{{ path('admin_section', {section: 'services'}) }}?category=service" class="btn {{ categoryFilter == 'service' ? 'btn-primary' : 'btn-outline-secondary' }}">Услуги</a>
+            <a href="{{ path('admin_section', {section: 'services'}) }}?category=goods" class="btn {{ categoryFilter == 'goods' ? 'btn-primary' : 'btn-outline-secondary' }}">Товары</a>
+        </div>
     </div>
 
     <div class="content-card mb-3">
-        <form method="post">
+        <form method="post" action="{{ path('admin_section', {section: 'services'}) }}{% if categoryFilter %}{{ '?' ~ 'category=' ~ categoryFilter }}{% endif %}">
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label small text-secondary">Название</label>
@@ -46,6 +52,7 @@
                     <th>Категория</th>
                     <th>Цена</th>
                     <th>Статус</th>
+                    <th></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -56,18 +63,55 @@
                         <td>{{ product.category == 'service' ? 'Услуга' : 'Товар' }}</td>
                         <td>{{ product.price|number_format(0, '', ' ') }} ₽</td>
                         <td>
-                            <span class="badge-status {{ product.isActive ? 'bg-success' : 'bg-secondary' }}">
+                            <span class="badge {{ product.isActive ? 'bg-success' : 'bg-secondary' }}">
                                 {{ product.isActive ? 'Активен' : 'Выключен' }}
                             </span>
+                            <form method="post" action="{{ path('admin_product_toggle', {id: product.id}) }}" class="d-inline ms-1">
+                                <button type="submit" class="btn btn-sm btn-outline-{{ product.isActive ? 'warning' : 'success' }}">
+                                    {{ product.isActive ? 'Выключить' : 'Включить' }}
+                                </button>
+                            </form>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#edit-product-{{ product.id }}">Изменить</button>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="edit-product-{{ product.id }}">
+                        <td colspan="6" class="bg-dark py-2">
+                            <form method="post" action="{{ path('admin_product_update', {id: product.id}) }}" class="row g-2 align-items-end">
+                                <div class="col-md-3">
+                                    <input type="text" name="name" class="form-control form-control-sm" value="{{ product.name }}" required placeholder="Название">
+                                </div>
+                                <div class="col-md-2">
+                                    <input type="text" name="description" class="form-control form-control-sm" value="{{ product.description ?? '' }}" placeholder="Описание">
+                                </div>
+                                <div class="col-md-2">
+                                    <input type="number" step="0.01" name="price" class="form-control form-control-sm" value="{{ product.price }}" required placeholder="Цена">
+                                </div>
+                                <div class="col-md-2">
+                                    <select name="category" class="form-select form-select-sm">
+                                        <option value="service" {{ product.category == 'service' ? 'selected' : '' }}>Услуга</option>
+                                        <option value="goods" {{ product.category == 'goods' ? 'selected' : '' }}>Товар</option>
+                                    </select>
+                                </div>
+                                {% if product.category == 'goods' %}
+                                <div class="col-md-1">
+                                    <input type="number" name="quantity" class="form-control form-control-sm" value="{{ product.quantity ?? '' }}" min="0" placeholder="Остаток">
+                                </div>
+                                {% endif %}
+                                <div class="col-md-1">
+                                    <button type="submit" class="btn btn-sm btn-success">Сохранить</button>
+                                </div>
+                            </form>
                         </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="5" class="text-center text-secondary">
+                        <td colspan="6" class="text-center text-secondary">
                             Пока нет ни одной услуги/товара.
                         </td>
                     </tr>
-                {% endif %}
+                {% endfor %}
                 </tbody>
             </table>
         </div>

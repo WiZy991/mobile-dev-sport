@@ -38,23 +38,58 @@
                 <th>Имя</th>
                 <th>Специализация</th>
                 <th>Рейтинг</th>
+                <th></th>
             </tr>
             </thead>
             <tbody>
             {% for t in trainers %}
                 <tr>
                     <td>{{ t.id }}</td>
-                    <td>{{ t.name }}</td>
+                    <td>
+                        {{ t.name }}
+                        <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="btn btn-sm btn-outline-secondary ms-1 py-0" title="Расписание">📅</a>
+                    </td>
                     <td>{{ t.specialization ?? '—' }}</td>
                     <td>{{ t.rating is not null ? t.rating : '—' }}</td>
-                </tr>
-            {% else %}
-                <tr>
-                    <td colspan="4" class="text-center text-secondary">
-                        Персонал пока не добавлен.
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#edit-trainer-{{ t.id }}">Изменить</button>
+                        <form method="post" action="{{ path('admin_trainer_delete', {id: t.id}) }}" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить тренера?')">Удалить</button>
+                        </form>
                     </td>
                 </tr>
-            {% endfor %}
+                <tr class="collapse" id="edit-trainer-{{ t.id }}">
+                        <td colspan="5" class="bg-dark py-2">
+                            <form method="post" action="{{ path('admin_trainer_update', {id: t.id}) }}" class="row g-2 align-items-end">
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Имя</label>
+                                    <input type="text" name="name" class="form-control form-control-sm" value="{{ t.name }}" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Специализация</label>
+                                    <input type="text" name="specialization" class="form-control form-control-sm" value="{{ t.specialization ?? '' }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Рейтинг</label>
+                                    <input type="number" step="0.1" name="rating" class="form-control form-control-sm" value="{{ t.rating ?? '' }}" min="0" max="5">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Фото (URL)</label>
+                                    <input type="url" name="photo_url" class="form-control form-control-sm" value="{{ t.photoUrl ?? '' }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-sm btn-success">Сохранить</button>
+                                </div>
+                            </form>
+                        </td>
+                </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary">
+                            Персонал пока не добавлен.
+                        </td>
+                    </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>

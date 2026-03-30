@@ -22,6 +22,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.BorderStroke
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.ui.theme.*
 
@@ -120,16 +121,19 @@ fun ReferralScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = AccentOrange
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = "Ваш реферальный код",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                     
                     Spacer(modifier = Modifier.height(12.dp))
@@ -138,26 +142,35 @@ fun ReferralScreen(
                         text = uiState.referralCode,
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Primary
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.95f)
                     )
                     
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedButton(
                             onClick = {
                                 clipboardManager.setText(AnnotatedString(uiState.referralCode))
                                 showCopiedSnackbar = true
-                            }
+                            },
+                            modifier = Modifier.height(48.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary)
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Копировать")
                         }
                         
-                        Button(
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        FilledTonalIconButton(
                             onClick = {
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
@@ -165,11 +178,14 @@ fun ReferralScreen(
                                         "Присоединяйся к FitnessClub! Используй мой промокод ${uiState.referralCode} при регистрации и получи скидку! ${uiState.referralLink}")
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, "Поделиться"))
-                            }
+                            },
+                            modifier = Modifier.size(48.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f),
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Поделиться")
+                            Icon(Icons.Default.Share, contentDescription = "Поделиться")
                         }
                     }
                 }
@@ -352,12 +368,18 @@ private fun StatItem(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
         }
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.widthIn(min = 52.dp)
         )
     }
 }

@@ -3,8 +3,10 @@
 namespace App\Controller\Api;
 
 use App\Entity\Booking;
+use App\Entity\Notification;
 use App\Entity\Training;
 use App\Entity\User;
+use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,13 +18,13 @@ class BookingController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly CurrentUserResolver $userResolver,
     ) {}
 
     #[Route('/bookings', name: 'api_bookings_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        // Временно берём первого пользователя как "текущего"
-        $user = $this->em->getRepository(User::class)->findOneBy([]);
+        $user = $this->userResolver->resolve($request);
 
         $criteria = $user ? ['user' => $user] : [];
 
@@ -47,8 +49,7 @@ class BookingController extends AbstractController
 
         $clientName = (string) ($request->request->get('client_name') ?: 'Мобильный клиент');
 
-        /** @var User|null $user */
-        $user = $this->em->getRepository(User::class)->findOneBy([]);
+        $user = $this->userResolver->resolve($request);
 
         $booking = (new Booking())
             ->setTraining($training)
@@ -80,8 +81,7 @@ class BookingController extends AbstractController
 
         $clientName = (string) ($request->request->get('client_name') ?: 'Мобильный клиент');
 
-        /** @var User|null $user */
-        $user = $this->em->getRepository(User::class)->findOneBy([]);
+        $user = $this->userResolver->resolve($request);
 
         $booking = (new Booking())
             ->setTraining($training)
@@ -96,27 +96,55 @@ class BookingController extends AbstractController
     }
 
     #[Route('/bookings/{id}', name: 'api_bookings_cancel', methods: ['DELETE'])]
-    public function cancel(string $id): JsonResponse
+    public function cancel(string $id, Request $request): JsonResponse
     {
         $numericId = str_starts_with($id, 'booking-') ? (int) substr($id, 8) : (int) $id;
 
         /** @var Booking|null $booking */
         $booking = $this->em->getRepository(Booking::class)->find($numericId);
 
-        if ($booking) {
-            // если отменяем подтверждённую бронь — уменьшаем счётчик участников
-            if ($booking->getStatus() === 'confirmed') {
-                $training = $booking->getTraining();
-                $training->setCurrentParticipants(
-                    max(0, $training->getCurrentParticipants() - 1)
-                );
-                $this->em->persist($training);
-            }
-
-            $booking->setStatus('cancelled');
-            $this->em->persist($booking);
-            $this->em->flush();
+        if (!$booking) {
+            return $this->json(['error' => 'Booking not found'], 404);
         }
+
+        $user = $this->userResolver->resolve($request);
+        if ($user && $booking->getUser() && $booking->getUser()->getId() !== $user->getId()) {
+            return $this->json(['error' => 'Forbidden'], 403);
+        }
+
+        $training = $booking->getTraining();
+
+        if ($booking->getStatus() === 'confirmed') {
+            $training->setCurrentParticipants(
+                max(0, $training->getCurrentParticipants() - 1)
+            );
+            $this->em->persist($training);
+
+            // Notify users on waiting list that a spot opened
+            $waitingBookings = $this->em->getRepository(Booking::class)->findBy(
+                ['training' => $training, 'status' => 'waiting'],
+                ['id' => 'ASC'],
+                5
+            );
+            $trainingName = $training->getName();
+            $startTime = $training->getStartAt()->format('d.m.Y H:i');
+            foreach ($waitingBookings as $wb) {
+                $wu = $wb->getUser();
+                if ($wu && $wu->getId() !== $booking->getUser()?->getId()) {
+                    $notif = (new Notification())
+                        ->setUser($wu)
+                        ->setType(Notification::TYPE_SPOT_FREED)
+                        ->setTitle('Освободилось место!')
+                        ->setBody("Освободилось место на тренировку «{$trainingName}» ({$startTime}). Запишитесь, пока место свободно!")
+                        ->setReferenceId('training-' . $training->getId());
+                    $this->em->persist($notif);
+                }
+            }
+        }
+
+        $booking->setStatus('cancelled');
+        $this->em->persist($booking);
+        $this->em->flush();
 
         return $this->json(['success' => true]);
     }

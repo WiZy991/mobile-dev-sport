@@ -28,6 +28,10 @@ class Task
     #[ORM\Column(type: 'string', length: 150, nullable: true)]
     private ?string $clientName = null;
 
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?User $client = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -53,6 +57,14 @@ class Task
     public function getClientName(): ?string { return $this->clientName; }
     public function setClientName(?string $clientName): self { $this->clientName = $clientName; return $this; }
 
+    public function getClient(): ?User { return $this->client; }
+    public function setClient(?User $client): self { $this->client = $client; return $this; }
+
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+
+    public function isOverdue(): bool
+    {
+        return $this->dueAt !== null && $this->dueAt < new \DateTimeImmutable() && $this->status !== 'done';
+    }
 }
 

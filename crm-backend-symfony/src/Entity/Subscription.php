@@ -2,6 +2,9 @@
 
 namespace App\Entity;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use App\Entity\Sale;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
@@ -42,9 +45,24 @@ class Subscription
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $freezeDaysUsed = null;
 
+    #[ORM\ManyToOne(targetEntity: PromoCode::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?PromoCode $promoCode = null;
+
+    /** @var Collection<int, Sale> */
+    #[ORM\OneToMany(targetEntity: Sale::class, mappedBy: 'subscription')]
+    private Collection $sales;
+
     public function __construct()
     {
         $this->startDate = new \DateTimeImmutable();
+        $this->sales = new ArrayCollection();
+    }
+
+    /** @return Collection<int, Sale> */
+    public function getSales(): Collection
+    {
+        return $this->sales;
     }
 
     public function getId(): ?int
@@ -150,5 +168,8 @@ class Subscription
         $this->freezeDaysUsed = $freezeDaysUsed;
         return $this;
     }
+
+    public function getPromoCode(): ?PromoCode { return $this->promoCode; }
+    public function setPromoCode(?PromoCode $promo): self { $this->promoCode = $promo; return $this; }
 }
 

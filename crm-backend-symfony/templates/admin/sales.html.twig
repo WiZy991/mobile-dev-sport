@@ -5,6 +5,28 @@
 {% block body %}
     <div class="content-header">
         <h1 class="h4 mb-0">Продажи</h1>
+        <div>
+            <a href="{{ path('admin_sales_export') }}?date_from={{ dateFrom|default('') }}&date_to={{ dateTo|default('') }}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNewSale">
+                + Новая продажа
+            </button>
+        </div>
+    </div>
+
+    <div class="content-card mb-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">С</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ dateFrom ?? '' }}">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">По</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ dateTo ?? '' }}">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Фильтр</button>
+            </div>
+        </form>
     </div>
 
     <div class="content-card">
@@ -18,7 +40,9 @@
                     <th>Кол-во</th>
                     <th>Цена</th>
                     <th>Сумма</th>
+                    <th>Промо</th>
                     <th>Оплата</th>
+                    <th>Абонемент</th>
                     <th>Дата</th>
                 </tr>
                 </thead>
@@ -26,24 +50,109 @@
                 {% for sale in sales %}
                     <tr>
                         <td>{{ sale.id }}</td>
-                        <td>{{ sale.clientName }}</td>
+                        <td>{{ sale.user ? sale.user.name : sale.clientName }}</td>
                         <td>{{ sale.productName }}</td>
                         <td>{{ sale.quantity }}</td>
                         <td>{{ sale.price|number_format(0, '', ' ') }} ₽</td>
-                        <td>{{ sale.total|number_format(0, '', ' ') }} ₽</td>
+                        <td>
+                            {{ sale.total|number_format(0, '', ' ') }} ₽
+                            {% if sale.discountAmount > 0 %}
+                                <span class="text-success small">(−{{ sale.discountAmount|number_format(0, '', ' ') }})</span>
+                            {% endif %}
+                        </td>
+                        <td>{% if sale.promoCode %}<code class="small">{{ sale.promoCode.code }}</code>{% else %}—{% endif %}</td>
                         <td>{{ sale.paymentMethod }}</td>
+                        <td>{% if sale.subscription %}<a href="{{ path('admin_section', {section: 'subscriptions'}) }}#sub-{{ sale.subscription.id }}" class="link-light">#{{ sale.subscription.id }}</a>{% else %}—{% endif %}</td>
                         <td>{{ sale.createdAt|date('d.m.Y H:i') }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="8" class="text-center text-secondary">
+                        <td colspan="10" class="text-center text-secondary">
                             Пока нет ни одной продажи.
                         </td>
                     </tr>
-                {% endif %}
+                {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+
+    {# Модальное окно "Новая продажа" #}
+    <div class="modal fade" id="modalNewSale" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary">
+                <div class="modal-header">
+                    <h5 class="modal-title small text-primary fw-semibold">Новая продажа</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{{ path('admin_sale_new') }}">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small text-secondary">Клиент</label>
+                                <select name="user_id" class="form-select form-select-sm">
+                                    <option value="">— Выберите клиента —</option>
+                                    {% for u in users|default([]) %}
+                                        <option value="{{ u.id }}">{{ u.name }}{% if u.email %} ({{ u.email }}){% endif %}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" name="client_name" class="form-control form-control-sm mt-1" placeholder="Или введите имя вручную">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-secondary">Услуга / товар</label>
+                                <select name="product_id" class="form-select form-select-sm" id="saleProductSelect">
+                                    <option value="">— Выберите из каталога —</option>
+                                    {% for p in products|default([]) %}
+                                        <option value="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.price }}">{{ p.name }} — {{ p.price|number_format(0, '', ' ') }} ₽</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" name="product_name" class="form-control form-control-sm mt-1" id="saleProductName" placeholder="Или введите вручную" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-secondary">Кол-во</label>
+                                <input type="number" name="quantity" class="form-control form-control-sm" value="1" min="1">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-secondary">Цена, ₽</label>
+                                <input type="number" step="0.01" name="price" class="form-control form-control-sm" id="salePrice" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-secondary">Оплата</label>
+                                <select name="payment_method" class="form-select form-select-sm">
+                                    <option value="cash">Наличные</option>
+                                    <option value="card">Карта</option>
+                                    <option value="bonus">Бонусы</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-secondary">Промокод</label>
+                                <input type="text" name="promo_code" class="form-control form-control-sm" placeholder="SUMMER20">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-sm btn-primary">Провести продажу</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('saleProductSelect')?.addEventListener('change', function() {
+            const opt = this.options[this.selectedIndex];
+            const nameInput = document.getElementById('saleProductName');
+            const priceInput = document.getElementById('salePrice');
+            if (opt.value && opt.dataset.name) {
+                nameInput.value = opt.dataset.name;
+                priceInput.value = opt.dataset.price;
+                nameInput.removeAttribute('required');
+            } else {
+                nameInput.value = '';
+                nameInput.setAttribute('required', 'required');
+            }
+        });
+    </script>
 {% endblock %}
 

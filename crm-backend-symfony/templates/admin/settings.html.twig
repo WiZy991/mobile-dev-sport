@@ -1,0 +1,44 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Настройки{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Настройки</h1>
+    </div>
+
+    <div class="content-card">
+        <div class="mb-3 text-primary small fw-semibold text-uppercase">О системе</div>
+        <div class="row g-2">
+            <div class="col-12">
+                <div class="text-secondary">CRM FitnessClub</div>
+                <div class="small">Версия 1.0 · Бесконтактный фитнес-клуб</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card mt-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Настройки</div>
+        <div class="d-flex flex-column gap-2 mb-3">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a href="{{ path('admin_settings_club') }}" class="btn btn-sm btn-outline-primary">Настройки клуба</a>
+                <span class="text-secondary small">Адрес, телефон, часы работы для приложения</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a href="{{ path('admin_section', {section: 'documents'}) }}" class="btn btn-sm btn-outline-secondary">Документы</a>
+                <span class="text-secondary small">PDF-шаблоны договоров, анкет</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a href="{{ path('admin_section', {section: 'promocodes'}) }}" class="btn btn-sm btn-outline-secondary">Промокоды</a>
+                <span class="text-secondary small">Скидки и акции</span>
+            </div>
+        </div>
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Быстрые ссылки</div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ path('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Дашборд</a>
+            <a href="{{ path('admin_section', {section: 'clients'}) }}" class="btn btn-sm btn-outline-secondary">Клиенты</a>
+            <a href="{{ path('admin_section', {section: 'leads'}) }}" class="btn btn-sm btn-outline-secondary">Лиды</a>
+            <a href="{{ path('admin_section', {section: 'analytics'}) }}" class="btn btn-sm btn-outline-secondary">Аналитика</a>
+        </div>
+    </div>
+{% endblock %}

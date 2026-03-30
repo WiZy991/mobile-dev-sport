@@ -27,13 +27,24 @@ sealed class Screen(val route: String) {
     data object Referral : Screen("referral")
     data object Notifications : Screen("notifications")
     data object Settings : Screen("settings")
+    data object Help : Screen("help")
+    data object About : Screen("about")
     
     // Club & Trainers
     data object ClubInfo : Screen("club_info")
+    data object ClubDetails : Screen("club/{clubId}") {
+        fun createRoute(clubId: String) = "club/$clubId"
+    }
+    data object Clubs : Screen("clubs")
+    data object Lockers : Screen("lockers")
+    data object GuestPass : Screen("guest_pass")
+    data object Documents : Screen("documents")
+    data object PurchaseHistory : Screen("purchase_history")
     data object Trainers : Screen("trainers")
     data object PersonalTraining : Screen("personal_training")
 }
 
 object NavArgs {
     const val TRAINING_ID = "trainingId"
+    const val CLUB_ID = "clubId"
 }

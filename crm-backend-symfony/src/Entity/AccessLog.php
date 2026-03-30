@@ -23,6 +23,9 @@ class AccessLog
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $deviceId = null;
 
+    #[ORM\Column(type: 'string', length: 10)]
+    private string $eventType = 'entry'; // entry, exit
+
     #[ORM\Column(type: 'string', length: 20)]
     private string $result = 'denied'; // granted, denied
 
@@ -72,6 +75,17 @@ class AccessLog
     public function setDeviceId(?string $deviceId): self
     {
         $this->deviceId = $deviceId;
+        return $this;
+    }
+
+    public function getEventType(): string
+    {
+        return $this->eventType;
+    }
+
+    public function setEventType(string $eventType): self
+    {
+        $this->eventType = $eventType;
         return $this;
     }
 

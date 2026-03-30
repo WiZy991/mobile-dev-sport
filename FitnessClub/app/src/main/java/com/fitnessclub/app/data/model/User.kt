@@ -21,6 +21,9 @@ data class User(
     @SerializedName("bonus_points")
     val bonusPoints: Int = 0,
     
+    @SerializedName("date_of_birth")
+    val dateOfBirth: String? = null,
+    
     @SerializedName("created_at")
     val createdAt: String? = null
 )

@@ -1,0 +1,72 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Поиск{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Поиск по CRM</h1>
+    </div>
+
+    <form method="get" action="{{ path('admin_search') }}" class="content-card mb-3">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control" placeholder="Введите имя, телефон, email..." value="{{ q }}" required minlength="2">
+            <button type="submit" class="btn btn-primary">Найти</button>
+        </div>
+    </form>
+
+    {% if q %}
+        <div class="row g-3">
+            {% if results.clients|length > 0 %}
+                <div class="col-md-4">
+                    <div class="content-card">
+                        <div class="mb-2 text-primary small fw-semibold text-uppercase">Клиенты ({{ results.clients|length }})</div>
+                        <ul class="list-unstyled mb-0 small">
+                            {% for u in results.clients %}
+                                <li class="mb-2">
+                                    <a href="{{ path('admin_client_show', {id: u.id}) }}" class="link-light text-decoration-none">{{ u.name }}</a>
+                                    <span class="text-secondary">— {{ u.phone }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            {% endif %}
+            {% if results.leads|length > 0 %}
+                <div class="col-md-4">
+                    <div class="content-card">
+                        <div class="mb-2 text-primary small fw-semibold text-uppercase">Лиды ({{ results.leads|length }})</div>
+                        <ul class="list-unstyled mb-0 small">
+                            {% for l in results.leads %}
+                                <li class="mb-2">
+                                    <a href="{{ path('admin_section', {section: 'leads'}) }}#lead-{{ l.id }}" class="link-light text-decoration-none">{{ l.name }}</a>
+                                    <span class="text-secondary">— {{ l.phone }}, {{ l.status }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            {% endif %}
+            {% if results.tasks|length > 0 %}
+                <div class="col-md-4">
+                    <div class="content-card">
+                        <div class="mb-2 text-primary small fw-semibold text-uppercase">Задачи ({{ results.tasks|length }})</div>
+                        <ul class="list-unstyled mb-0 small">
+                            {% for t in results.tasks %}
+                                <li class="mb-2">
+                                    <a href="{{ path('admin_section', {section: 'tasks'}) }}?client_id={{ t.client ? t.client.id : '' }}" class="link-light text-decoration-none">{{ t.title }}</a>
+                                    <span class="text-secondary">— {{ t.status }}{% if t.client %}, {{ t.client.name }}{% endif %}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if results.clients|length == 0 and results.leads|length == 0 and results.tasks|length == 0 %}
+            <div class="content-card">
+                <p class="text-secondary mb-0">По запросу «{{ q }}» ничего не найдено.</p>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

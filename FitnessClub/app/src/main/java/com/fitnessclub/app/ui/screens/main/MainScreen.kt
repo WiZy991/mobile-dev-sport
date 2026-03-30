@@ -1,13 +1,29 @@
 package com.fitnessclub.app.ui.screens.main
 
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.fitnessclub.app.ui.navigation.Screen
@@ -16,8 +32,15 @@ import com.fitnessclub.app.ui.screens.mytrainings.MyTrainingsScreen
 import com.fitnessclub.app.ui.screens.mytrainings.MyTrainingsViewModel
 import com.fitnessclub.app.ui.screens.profile.ProfileScreen
 import com.fitnessclub.app.ui.screens.profile.ProfileViewModel
+import com.fitnessclub.app.ui.screens.qrcode.QrCodeViewModel
 import com.fitnessclub.app.ui.screens.schedule.ScheduleScreen
 import com.fitnessclub.app.ui.screens.schedule.ScheduleViewModel
+import com.fitnessclub.app.ui.theme.AppShapes
+import com.fitnessclub.app.ui.theme.Primary
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
+import android.graphics.Bitmap
+import android.graphics.Color
 
 data class BottomNavItem(
     val title: String,
@@ -32,7 +55,20 @@ fun MainScreen(
     navController: NavHostController,
     startTab: Int = 0
 ) {
-    var selectedTab by remember { mutableIntStateOf(startTab) }
+    val currentRoute = navController.currentBackStackEntry?.destination?.route
+    var selectedTab by remember(startTab) { mutableStateOf(startTab) }
+    LaunchedEffect(currentRoute) {
+        val tab = when (currentRoute) {
+            Screen.Home.route -> 0
+            Screen.Schedule.route -> 1
+            Screen.MyTrainings.route -> 2
+            Screen.Profile.route -> 3
+            else -> null
+        }
+        if (tab != null) selectedTab = tab
+    }
+    var showQrSheet by remember { mutableStateOf(false) }
+    val qrViewModel: QrCodeViewModel = hiltViewModel()
     
     val navItems = listOf(
         BottomNavItem(
@@ -62,8 +98,31 @@ fun MainScreen(
     )
     
     Scaffold(
+        floatingActionButton = {
+            if (selectedTab == 0) {
+                FloatingActionButton(
+                    onClick = { showQrSheet = true },
+                    containerColor = Primary,
+                    shape = AppShapes.medium,
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 6.dp,
+                        pressedElevation = 4.dp,
+                        hoveredElevation = 8.dp,
+                        focusedElevation = 6.dp
+                    )
+                ) {
+                    Icon(Icons.Default.QrCode2, contentDescription = "Вход в зал")
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ) {
                 navItems.forEachIndexed { index, item ->
                     NavigationBarItem(
                         icon = {
@@ -75,9 +134,22 @@ fun MainScreen(
                                 contentDescription = item.title
                             )
                         },
-                        label = { Text(item.title) },
+                        label = {
+                            Text(
+                                item.title,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
                         selected = selectedTab == index,
-                        onClick = { selectedTab = index }
+                        onClick = {
+                            selectedTab = index
+                            navController.navigate(item.route) {
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
             }
@@ -86,12 +158,19 @@ fun MainScreen(
         when (selectedTab) {
             0 -> {
                 HomeScreen(
-                    onNavigateToSchedule = { selectedTab = 1 },
+                    onNavigateToSchedule = { navController.navigate(Screen.Schedule.route) },
                     onNavigateToPersonalTraining = { navController.navigate(Screen.PersonalTraining.route) },
                     onNavigateToShop = { navController.navigate(Screen.Shop.route) },
                     onNavigateToTrainers = { navController.navigate(Screen.Trainers.route) },
-                    onNavigateToClubInfo = { navController.navigate(Screen.ClubInfo.route) },
-                    onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) }
+                    onNavigateToClubInfo = { navController.navigate(Screen.Clubs.route) },
+                    onNavigateToLockers = { navController.navigate(Screen.Lockers.route) },
+                    onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
+                    onNavigateToQrCode = { navController.navigate(Screen.QrCode.route) },
+                    onNavigateToTrainingDetails = { trainingId ->
+                        navController.navigate(Screen.TrainingDetails.createRoute(trainingId))
+                    },
+                    onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
+                    onNavigateToReferral = { navController.navigate(Screen.Referral.route) }
                 )
             }
             1 -> {
@@ -121,7 +200,7 @@ fun MainScreen(
                     modifier = Modifier.padding(paddingValues),
                     onLogout = {
                         navController.navigate(Screen.Login.route) {
-                            popUpTo(0) { inclusive = true }
+                            popUpTo(Screen.Home.route) { inclusive = true }
                         }
                     },
                     onNavigateToQrCode = {
@@ -133,6 +212,9 @@ fun MainScreen(
                     onNavigateToReferral = {
                         navController.navigate(Screen.Referral.route)
                     },
+                    onNavigateToGuestPass = {
+                        navController.navigate(Screen.GuestPass.route)
+                    },
                     onNavigateToNotifications = {
                         navController.navigate(Screen.Notifications.route)
                     },
@@ -141,9 +223,128 @@ fun MainScreen(
                     },
                     onNavigateToEditProfile = {
                         navController.navigate(Screen.EditProfile.route)
+                    },
+                    onNavigateToDocuments = {
+                        navController.navigate(Screen.Documents.route)
+                    },
+                    onNavigateToPurchaseHistory = {
+                        navController.navigate(Screen.PurchaseHistory.route)
+                    },
+                    onNavigateToHelp = {
+                        navController.navigate(Screen.Help.route)
+                    },
+                    onNavigateToAbout = {
+                        navController.navigate(Screen.About.route)
                     }
                 )
             }
         }
+    }
+    
+    if (showQrSheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showQrSheet = false },
+            sheetState = sheetState
+        ) {
+            QrQuickAccessContent(
+                viewModel = qrViewModel,
+                onClose = { showQrSheet = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun QrQuickAccessContent(
+    viewModel: QrCodeViewModel,
+    onClose: () -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState)
+            .padding(24.dp)
+            .padding(WindowInsets.navigationBars.asPaddingValues())
+            .padding(bottom = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Вход в зал",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = uiState.userName,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        when {
+            uiState.qrCodeData != null -> {
+                val qrBitmap = remember(uiState.qrCodeData) {
+                    generateQrBitmap(uiState.qrCodeData!!, 300)
+                }
+                qrBitmap?.let {
+                    Card(
+                        modifier = Modifier.size(240.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = "QR код",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+            }
+            uiState.isLoading -> CircularProgressIndicator()
+            else -> Text(
+                text = "Войдите в аккаунт",
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Поднесите к сканеру",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(
+            onClick = onClose,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Text("Закрыть")
+        }
+    }
+}
+
+private fun generateQrBitmap(content: String, size: Int): Bitmap? {
+    return try {
+        val writer = QRCodeWriter()
+        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
+            }
+        }
+        bitmap
+    } catch (e: Exception) {
+        null
     }
 }

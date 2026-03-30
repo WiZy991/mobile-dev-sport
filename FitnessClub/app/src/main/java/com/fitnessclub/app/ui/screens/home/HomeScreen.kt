@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.ui.components.OccupancyCard
+import com.fitnessclub.app.ui.components.SecondaryButton
 import com.fitnessclub.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,7 +32,12 @@ fun HomeScreen(
     onNavigateToShop: () -> Unit,
     onNavigateToTrainers: () -> Unit,
     onNavigateToClubInfo: () -> Unit,
+    onNavigateToLockers: () -> Unit = {},
     onNavigateToNotifications: () -> Unit,
+    onNavigateToQrCode: () -> Unit = {},
+    onNavigateToTrainingDetails: (String) -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToReferral: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -45,7 +52,7 @@ fun HomeScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { /* Menu */ }) {
+                    IconButton(onClick = onNavigateToProfile) {
                         Icon(Icons.Default.Person, contentDescription = "Профиль")
                     }
                 },
@@ -75,10 +82,10 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 16.dp)
+            contentPadding = PaddingValues(bottom = 88.dp)
         ) {
             // Promo banner
-            item {
+            item(key = "promo") {
                 PromoBanner(
                     title = uiState.promoTitle,
                     subtitle = uiState.promoSubtitle,
@@ -86,36 +93,52 @@ fun HomeScreen(
                 )
             }
             
+            // Occupancy widget
+            item(key = "occupancy") {
+                OccupancyCard(
+                    current = uiState.occupancyCurrent,
+                    max = uiState.occupancyMax,
+                    percentage = uiState.occupancyPercentage,
+                    status = uiState.occupancyStatus,
+                    onRefresh = { viewModel.loadOccupancy() }
+                )
+            }
+            
             // Quick menu
-            item {
+            item(key = "quickmenu") {
                 QuickMenuSection(
+                    onQrCode = onNavigateToQrCode,
                     onPersonalTraining = onNavigateToPersonalTraining,
                     onSchedule = onNavigateToSchedule,
                     onShop = onNavigateToShop,
                     onClubInfo = onNavigateToClubInfo,
+                    onLockers = onNavigateToLockers,
                     onTrainers = onNavigateToTrainers
                 )
             }
             
             // Upcoming trainings
             if (uiState.upcomingTrainings.isNotEmpty()) {
-                item {
+                item(key = "upcoming_title") {
                     SectionTitle("Ближайшие тренировки")
                 }
-                item {
+                item(key = "upcoming") {
                     UpcomingTrainingsSection(
                         trainings = uiState.upcomingTrainings,
-                        onClick = { }
+                        onClick = onNavigateToTrainingDetails
                     )
                 }
             }
             
             // Special offers
-            item {
+            item(key = "offers_title") {
                 SectionTitle("Специальные предложения")
             }
-            item {
-                SpecialOffersSection(onClick = onNavigateToShop)
+            item(key = "offers") {
+                SpecialOffersSection(
+                    onShopClick = onNavigateToShop,
+                    onReferralClick = onNavigateToReferral
+                )
             }
         }
     }
@@ -132,18 +155,19 @@ private fun PromoBanner(
             .fillMaxWidth()
             .padding(16.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(160.dp)
+                .height(180.dp)
                 .background(
                     brush = Brush.horizontalGradient(
                         colors = listOf(Primary, AccentBlue)
                     )
                 )
-                .padding(20.dp)
+                .padding(24.dp)
         ) {
             Column(
                 modifier = Modifier.align(Alignment.CenterStart)
@@ -158,17 +182,24 @@ private fun PromoBanner(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = onClick,
+                    modifier = Modifier.height(48.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 2.dp
+                    ),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.onPrimary,
                         contentColor = Primary
                     )
                 ) {
-                    Text("Подробнее")
+                    Text("Подробнее", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
@@ -177,19 +208,29 @@ private fun PromoBanner(
 
 @Composable
 private fun QuickMenuSection(
+    onQrCode: () -> Unit,
     onPersonalTraining: () -> Unit,
     onSchedule: () -> Unit,
     onShop: () -> Unit,
     onClubInfo: () -> Unit,
+    onLockers: () -> Unit,
     onTrainers: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
+            QuickMenuItem(
+                icon = Icons.Default.QrCode2,
+                title = "Вход в зал",
+                subtitle = "Показать QR-код для прохода",
+                onClick = onQrCode
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             QuickMenuItem(
                 icon = Icons.Default.Person,
                 title = "Записаться на персональную тренировку",
@@ -216,6 +257,13 @@ private fun QuickMenuSection(
                 title = "Мы на карте",
                 subtitle = "Покажем кратчайший путь",
                 onClick = onClubInfo
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            QuickMenuItem(
+                icon = Icons.Default.LockOpen,
+                title = "Шкафчики",
+                subtitle = "Бронирование и QR-код для открытия",
+                onClick = onLockers
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             QuickMenuItem(
@@ -256,16 +304,22 @@ private fun QuickMenuItem(
             )
         }
         Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.fillMaxWidth()
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
             )
         }
         Icon(
@@ -312,7 +366,8 @@ private fun UpcomingTrainingCard(
         modifier = Modifier
             .width(200.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -352,7 +407,10 @@ private fun UpcomingTrainingCard(
 }
 
 @Composable
-private fun SpecialOffersSection(onClick: () -> Unit) {
+private fun SpecialOffersSection(
+    onShopClick: () -> Unit,
+    onReferralClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .horizontalScroll(rememberScrollState())
@@ -363,19 +421,19 @@ private fun SpecialOffersSection(onClick: () -> Unit) {
             title = "Пробная тренировка",
             description = "Бесплатно для новых клиентов",
             buttonText = "Получить",
-            onClick = onClick
+            onClick = onShopClick
         )
         OfferCard(
             title = "Приведи друга",
             description = "500 бонусов за каждого друга",
             buttonText = "Узнать больше",
-            onClick = onClick
+            onClick = onReferralClick
         )
         OfferCard(
             title = "-20% на годовой",
             description = "При покупке до конца месяца",
             buttonText = "Купить",
-            onClick = onClick
+            onClick = onShopClick
         )
     }
 }
@@ -389,9 +447,10 @@ private fun OfferCard(
 ) {
     Card(
         modifier = Modifier.width(180.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = AccentOrange.copy(alpha = 0.1f)
+            containerColor = AccentOrange.copy(alpha = 0.08f)
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -407,7 +466,7 @@ private fun OfferCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(
+            SecondaryButton(
                 onClick = onClick,
                 modifier = Modifier.fillMaxWidth()
             ) {

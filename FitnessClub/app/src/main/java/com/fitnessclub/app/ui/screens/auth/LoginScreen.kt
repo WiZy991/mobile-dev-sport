@@ -28,6 +28,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.fitnessclub.app.ui.components.PrimaryButton
+import androidx.compose.ui.platform.LocalUriHandler
+import com.fitnessclub.app.data.config.AppConfig
+import com.fitnessclub.app.ui.theme.AppShapes
 import com.fitnessclub.app.ui.theme.Primary
 import com.fitnessclub.app.ui.theme.PrimaryVariant
 
@@ -39,6 +43,7 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
+    val uriHandler = LocalUriHandler.current
     var passwordVisible by remember { mutableStateOf(false) }
     
     LaunchedEffect(Unit) {
@@ -106,7 +111,7 @@ fun LoginScreen(
             // Login form card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(28.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -122,6 +127,7 @@ fun LoginScreen(
                         value = uiState.email,
                         onValueChange = viewModel::onEmailChange,
                         label = { Text("Email") },
+                        shape = AppShapes.medium,
                         leadingIcon = {
                             Icon(Icons.Default.Email, contentDescription = null)
                         },
@@ -145,6 +151,7 @@ fun LoginScreen(
                         value = uiState.password,
                         onValueChange = viewModel::onPasswordChange,
                         label = { Text("Пароль") },
+                        shape = AppShapes.medium,
                         leadingIcon = {
                             Icon(Icons.Default.Lock, contentDescription = null)
                         },
@@ -184,7 +191,7 @@ fun LoginScreen(
                     
                     // Forgot password
                     TextButton(
-                        onClick = { /* TODO: Forgot password */ },
+                        onClick = { uriHandler.openUri(AppConfig.FORGOT_PASSWORD_URL) },
                         modifier = Modifier.align(Alignment.End)
                     ) {
                         Text("Забыли пароль?")
@@ -193,13 +200,12 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     
                     // Login button
-                    Button(
-                        onClick = viewModel::login,
+                    PrimaryButton(
+                        onClick = { viewModel.login() },
                         enabled = !uiState.isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp)
+                            .height(56.dp)
                     ) {
                         if (uiState.isLoading) {
                             CircularProgressIndicator(

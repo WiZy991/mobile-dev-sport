@@ -12,6 +12,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -21,7 +23,8 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
     
-    private const val BASE_URL = "http://127.0.0.1:8000/api/v1/"
+    // 10.0.2.2 = localhost на эмуляторе; для реального устройства укажите IP вашего ПК (например 192.168.1.x)
+    private const val BASE_URL = "http://10.0.2.2:8000/api/v1/"
     
     @Provides
     @Singleton
@@ -49,10 +52,14 @@ object AppModule {
                 val originalRequest = chain.request()
                 val requestBuilder = originalRequest.newBuilder()
                 
-                // Add auth token if available
-                kotlinx.coroutines.runBlocking {
+                runBlocking {
+                    // Add auth token if available
                     tokenManager.getAccessToken()?.let { token ->
                         requestBuilder.addHeader("Authorization", "Bearer $token")
+                    }
+                    // Add X-User-Id for API to identify current user (after login/register)
+                    tokenManager.getUser().first()?.id?.let { userId ->
+                        requestBuilder.addHeader("X-User-Id", userId)
                     }
                 }
                 

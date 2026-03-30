@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
@@ -25,15 +27,34 @@ class Lead
     #[ORM\Column(type: 'string', length: 50)]
     private string $status = 'new'; // new, trial_scheduled, trial_visited, converted, inactive
 
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?User $convertedUser = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $comment = null;
+
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    private ?string $source = null; // site, instagram, referral, call, other
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
+    /** @var Collection<int, LeadNote> */
+    #[ORM\OneToMany(targetEntity: LeadNote::class, mappedBy: 'lead', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'DESC'])]
+    private Collection $notes;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        $this->notes = new ArrayCollection();
+    }
+
+    /** @return Collection<int, LeadNote> */
+    public function getNotes(): Collection
+    {
+        return $this->notes;
     }
 
     public function getId(): ?int
@@ -74,6 +95,17 @@ class Lead
         return $this;
     }
 
+    public function getConvertedUser(): ?User
+    {
+        return $this->convertedUser;
+    }
+
+    public function setConvertedUser(?User $user): self
+    {
+        $this->convertedUser = $user;
+        return $this;
+    }
+
     public function getStatus(): string
     {
         return $this->status;
@@ -95,6 +127,9 @@ class Lead
         $this->comment = $comment;
         return $this;
     }
+
+    public function getSource(): ?string { return $this->source; }
+    public function setSource(?string $source): self { $this->source = $source; return $this; }
 
     public function getCreatedAt(): \DateTimeImmutable
     {

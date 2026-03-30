@@ -12,6 +12,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
+    surfaceVariant = Gray100,
+    outlineVariant = Gray300,
     primary = Primary,
     onPrimary = OnPrimary,
     primaryContainer = PrimaryVariant,
@@ -64,6 +66,7 @@ fun FitnessClubTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = AppShapes,
         content = content
     )
 }

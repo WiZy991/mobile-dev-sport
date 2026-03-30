@@ -1,0 +1,71 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Касса{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Касса</h1>
+        <form method="get" class="d-flex align-items-center gap-2">
+            <input type="date" name="date" class="form-control form-control-sm" value="{{ cashDate }}" style="width: auto;">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Показать</button>
+        </form>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Выручка за {{ cashDate|date('d.m.Y') }}</div>
+                <div class="h3 text-success mb-0">{{ revenueToday|number_format(0, '', ' ') }} ₽</div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">По способам оплаты</div>
+                {% for row in paymentBreakdown|default([]) %}
+                    <div class="d-flex justify-content-between small">
+                        <span>{{ row.paymentMethod == 'cash' ? 'Наличные' : (row.paymentMethod == 'card' ? 'Карта' : 'Бонусы') }}</span>
+                        <span>{{ row.totalSum|number_format(0, '', ' ') }} ₽</span>
+                    </div>
+                {% else %}
+                    <div class="text-secondary small">—</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Продажи за {{ cashDate|date('d.m.Y') }}</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Клиент</th>
+                    <th>Товар</th>
+                    <th>Кол-во</th>
+                    <th>Сумма</th>
+                    <th>Оплата</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for sale in salesToday %}
+                    <tr>
+                        <td>{{ sale.createdAt|date('H:i') }}</td>
+                        <td>{{ sale.user ? sale.user.name : sale.clientName }}</td>
+                        <td>{{ sale.productName }}</td>
+                        <td>{{ sale.quantity }}</td>
+                        <td>{{ sale.total|number_format(0, '', ' ') }} ₽</td>
+                        <td>{{ sale.paymentMethod }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary">
+                            Продаж за выбранную дату пока нет.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

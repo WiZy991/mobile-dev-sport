@@ -3,6 +3,14 @@
 {% block body %}
 <div class="content-header">
   <h1 class="h4 mb-0">Расписание</h1>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="btn btn-sm {{ (scheduleDate|default('')) == ("now"|date("Y-m-d")) ? 'btn-primary' : 'btn-outline-secondary' }}">Сегодня</a>
+    <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "tomorrow"|date("Y-m-d") }}" class="btn btn-sm {{ (scheduleDate|default('')) == ("tomorrow"|date("Y-m-d")) ? 'btn-primary' : 'btn-outline-secondary' }}">Завтра</a>
+    <form method="get" action="{{ path('admin_section', {section: 'schedule'}) }}" class="d-flex align-items-center gap-2">
+      <input type="date" name="date" class="form-control form-control-sm" value="{{ scheduleDate|default('now'|date('Y-m-d')) }}" style="width: auto;">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Показать</button>
+    </form>
+  </div>
 </div>
 
 <div class="content-card mb-3">
@@ -37,6 +45,10 @@
       <input type="number" name="max_participants" class="form-control form-control-sm" value="10" min="0">
     </div>
     <div class="col-md-1">
+      <label class="form-label small text-secondary">Повторять (нед.)</label>
+      <input type="number" name="repeat_weeks" class="form-control form-control-sm" value="1" min="1" max="12" title="Создать эту тренировку на N недель вперёд">
+    </div>
+    <div class="col-md-1">
       <button type="submit" class="btn btn-sm btn-primary w-100">
         Добавить
       </button>
@@ -46,31 +58,59 @@
 
 <div class="content-card">
   <table class="table table-sm table-dark align-middle mb-0">
-    <thead>
-    <tr>
-      <th>ID</th>
-      <th>Название</th>
-      <th>Тренер</th>
-      <th>Начало</th>
-      <th>Конец</th>
-      <th>Мест</th>
-      <th>Записано</th>
-    </tr>
-    </thead>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Тренер</th>
+                    <th>Начало</th>
+                    <th>Конец</th>
+                    <th>Мест</th>
+                    <th>Записано</th>
+                    <th></th>
+                </tr>
+                </thead>
     <tbody>
     {% for t in trainings %}
-      <tr>
+      <tr data-bs-toggle="collapse" data-bs-target="#bookings-{{ t.id }}" style="cursor: pointer">
         <td>{{ t.id }}</td>
-        <td>{{ t.name }}</td>
+        <td>
+          {{ t.name }}
+          {% if (bookingsByTraining[t.id]|default([]))|length > 0 %}
+            <span class="badge bg-info ms-1">{{ (bookingsByTraining[t.id])|length }}</span>
+          {% endif %}
+        </td>
         <td>{{ t.trainerName ?? '—' }}</td>
         <td>{{ t.startAt|date('d.m.Y H:i') }}</td>
         <td>{{ t.endAt|date('d.m.Y H:i') }}</td>
         <td>{{ t.maxParticipants }}</td>
         <td>{{ t.currentParticipants }}</td>
+        <td>
+          {% if t.currentParticipants == 0 %}
+            <form method="post" action="{{ path('admin_training_delete', {id: t.id}) }}" class="d-inline" onclick="event.stopPropagation()">
+              <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить тренировку?')">Удалить</button>
+            </form>
+          {% endif %}
+        </td>
       </tr>
+      {% set trainingBookings = bookingsByTraining[t.id]|default([]) %}
+      {% if trainingBookings|length > 0 %}
+      <tr class="collapse" id="bookings-{{ t.id }}">
+        <td colspan="8" class="bg-dark bg-opacity-50 pt-0 pb-2">
+          <div class="small text-secondary mb-1">Записаны:</div>
+          {% for b in trainingBookings %}
+            {% if b.user %}
+              <a href="{{ path('admin_client_show', {id: b.user.id}) }}" class="badge bg-secondary text-decoration-none me-1">{{ b.clientName }}</a>
+            {% else %}
+              <span class="badge bg-secondary me-1">{{ b.clientName }}</span>
+            {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endif %}
     {% else %}
       <tr>
-        <td colspan="7" class="text-center text-secondary">
+        <td colspan="8" class="text-center text-secondary">
           Пока нет тренировок.
         </td>
       </tr>

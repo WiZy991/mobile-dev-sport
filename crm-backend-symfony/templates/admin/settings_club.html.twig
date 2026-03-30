@@ -1,0 +1,57 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Настройки клуба{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Настройки клуба</h1>
+        <a href="{{ path('admin_section', {section: 'settings'}) }}" class="btn btn-sm btn-outline-secondary">← Настройки</a>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Данные для мобильного приложения и API</div>
+        <form method="post" action="{{ path('admin_settings_club') }}">
+            <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                    <label class="form-label small">Название клуба</label>
+                    <input type="text" name="name" class="form-control form-control-sm" value="{{ club.name }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Телефон</label>
+                    <input type="text" name="phone" class="form-control form-control-sm" value="{{ club.phone }}" placeholder="+7 (495) 123-45-67">
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Адрес</label>
+                    <input type="text" name="address" class="form-control form-control-sm" value="{{ club.address }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Email</label>
+                    <input type="email" name="email" class="form-control form-control-sm" value="{{ club.email }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Режим работы</label>
+                    <input type="text" name="working_hours" class="form-control form-control-sm" value="{{ club.working_hours }}" placeholder="Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00">
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Удобства (через запятую)</label>
+                    <input type="text" name="amenities" class="form-control form-control-sm" value="{{ club.amenities }}" placeholder="Тренажёрный зал, Бассейн, Йога">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Широта</label>
+                    <input type="text" name="latitude" class="form-control form-control-sm" value="{{ club.latitude }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Долгота</label>
+                    <input type="text" name="longitude" class="form-control form-control-sm" value="{{ club.longitude }}">
+                </div>
+                <div class="col-12 mt-2">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="alert alert-info small">
+        Эти данные отображаются в мобильном приложении (раздел «О клубе») и возвращаются API <code>GET /api/v1/club/info</code>.
+    </div>
+{% endblock %}

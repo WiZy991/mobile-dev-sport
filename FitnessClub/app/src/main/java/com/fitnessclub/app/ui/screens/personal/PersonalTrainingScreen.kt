@@ -145,7 +145,23 @@ fun PersonalTrainingScreen(
             Spacer(modifier = Modifier.height(8.dp))
             
             // Time slots
-            if (uiState.isLoading) {
+            if (uiState.error != null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            uiState.error!!,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { viewModel.retryLoad() }) {
+                            Text("Повторить")
+                        }
+                    }
+                }
+            } else if (uiState.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center

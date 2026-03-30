@@ -5,7 +5,137 @@
 {% block body %}
     <div class="content-header">
         <h1 class="h4 mb-0">Клиент: {{ client.name }}</h1>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            {% for tag in client.tags %}
+                <span class="badge" style="background-color: {{ tag.color ?? '#6c757d' }}">{{ tag.name }}</span>
+            {% endfor %}
+            {% if client.isBlocked %}
+                <span class="badge bg-danger">Доступ в приложение заблокирован</span>
+            {% endif %}
+            <form method="post" action="{{ path('admin_client_block', {id: client.id}) }}" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-{{ client.isBlocked ? 'success' : 'warning' }}">
+                    {{ client.isBlocked ? 'Разблокировать приложение' : 'Заблокировать приложение' }}
+                </button>
+            </form>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editClientForm">
+                Редактировать
+            </button>
+        </div>
     </div>
+
+    <div class="collapse mb-3" id="editClientForm">
+        <div class="content-card">
+            <form method="post" action="{{ path('admin_client_update', {id: client.id}) }}">
+                <div class="row g-2 mb-2">
+                    <div class="col-md-3">
+                        <label class="form-label small">ФИО *</label>
+                        <input type="text" name="name" class="form-control form-control-sm" value="{{ client.name }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Телефон *</label>
+                        <input type="text" name="phone" class="form-control form-control-sm" value="{{ client.phone }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Email *</label>
+                        <input type="email" name="email" class="form-control form-control-sm" value="{{ client.email }}" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Дата рождения</label>
+                        <input type="date" name="date_of_birth" class="form-control form-control-sm" value="{{ client.dateOfBirth ? client.dateOfBirth|date('Y-m-d') : '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Место рождения</label>
+                        <input type="text" name="place_of_birth" class="form-control form-control-sm" value="{{ client.placeOfBirth }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Пол</label>
+                        <select name="gender" class="form-select form-select-sm">
+                            <option value="">—</option>
+                            <option value="M" {{ client.gender == 'M' ? 'selected' : '' }}>М</option>
+                            <option value="F" {{ client.gender == 'F' ? 'selected' : '' }}>Ж</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Бонусы</label>
+                        <input type="number" name="bonus_points" class="form-control form-control-sm" value="{{ client.bonusPoints }}" min="0">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Теги</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for tag in allTags|default([]) %}
+                                <label class="mb-0 small"><input type="checkbox" name="tag_ids[]" value="{{ tag.id }}" {{ tag in client.tags ? 'checked' : '' }}> <span class="badge" style="background-color: {{ tag.color ?? '#6c757d' }}">{{ tag.name }}</span></label>
+                            {% else %}
+                                <span class="text-secondary small">Нет тегов. <a href="{{ path('admin_section', {section: 'tags'}) }}">Создать</a></span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-md-2">
+                        <label class="form-label small">Серия паспорта</label>
+                        <input type="text" name="passport_series" class="form-control form-control-sm" value="{{ client.passportSeries }}" maxlength="4">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Номер паспорта</label>
+                        <input type="text" name="passport_number" class="form-control form-control-sm" value="{{ client.passportNumber }}" maxlength="6">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Кем выдан</label>
+                        <input type="text" name="passport_issued_by" class="form-control form-control-sm" value="{{ client.passportIssuedBy }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Дата выдачи</label>
+                        <input type="date" name="passport_issue_date" class="form-control form-control-sm" value="{{ client.passportIssueDate ? client.passportIssueDate|date('Y-m-d') : '' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Код подразделения</label>
+                        <input type="text" name="passport_department_code" class="form-control form-control-sm" value="{{ client.passportDepartmentCode }}" maxlength="7">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Адрес регистрации</label>
+                        <input type="text" name="registration_address" class="form-control form-control-sm" value="{{ client.registrationAddress }}">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Контакт для экстренной связи</label>
+                        <input type="text" name="emergency_contact" class="form-control form-control-sm" value="{{ client.emergencyContact }}" placeholder="+7 999 123-45-67, ФИО">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary">Сохранить</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Лента активности</div>
+        <div class="small">
+            {% for a in activities|default([]) %}
+                <div class="d-flex align-items-start mb-2 pb-2 border-bottom border-secondary">
+                    <span class="text-muted me-2" style="min-width: 65px;">{{ a.date|date('d.m H:i') }}</span>
+                    {% if a.type == 'sale' %}
+                        <span class="badge bg-success me-2">Продажа</span> {{ a.entity.productName }} — {{ a.entity.total|number_format(0, '', ' ') }} ₽
+                    {% elseif a.type == 'subscription' %}
+                        <span class="badge bg-primary me-2">Абонемент</span> {{ a.entity.plan.name }}, статус: {{ a.entity.status }}
+                    {% elseif a.type == 'booking' %}
+                        <span class="badge bg-info me-2">Бронь</span> {{ a.entity.training.name }} ({{ a.entity.training.startAt|date('d.m H:i') }})
+                    {% elseif a.type == 'task' %}
+                        <span class="badge bg-warning text-dark me-2">Задача</span> {{ a.entity.title }} — {{ a.entity.status }}
+                    {% elseif a.type == 'note' %}
+                        <span class="badge bg-secondary me-2">Заметка</span> {{ a.entity.text|slice(0, 80) }}{% if a.entity.text|length > 80 %}...{% endif %}
+                    {% elseif a.type == 'visit' %}
+                        <span class="badge bg-success me-2">Вход QR</span> вход в зал
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="text-secondary">Пока нет активности</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if not client.hasRequiredDataForSubscription and subscriptions|length == 0 %}
+    <div class="alert alert-warning mb-3">
+        <strong>Данные для абонемента не заполнены.</strong> Укажите серию и номер паспорта, дату рождения — требуется для оформления абонемента.
+    </div>
+    {% endif %}
 
     <div class="row g-3">
         <div class="col-md-4">
@@ -14,8 +144,41 @@
                 <div class="mb-1"><strong>ID:</strong> {{ client.id }}</div>
                 <div class="mb-1"><strong>Email:</strong> {{ client.email }}</div>
                 <div class="mb-1"><strong>Телефон:</strong> {{ client.phone }}</div>
+                <div class="mb-1"><strong>Дата рождения:</strong> {{ client.dateOfBirth ? client.dateOfBirth|date('d.m.Y') : '—' }}</div>
+                <div class="mb-1"><strong>Место рождения:</strong> {{ client.placeOfBirth ?? '—' }}</div>
+                <div class="mb-1"><strong>Пол:</strong> {{ client.gender == 'M' ? 'М' : (client.gender == 'F' ? 'Ж' : '—') }}</div>
                 <div class="mb-1"><strong>Бонусы:</strong> {{ client.bonusPoints }}</div>
                 <div class="mb-1"><strong>Создан:</strong> {{ client.createdAt|date('d.m.Y H:i') }}</div>
+            </div>
+            <div class="content-card mb-3">
+                <div class="text-primary small fw-semibold mb-2 text-uppercase">В приложении</div>
+                <div class="mb-1"><strong>Активных абонементов:</strong> {{ activeSubsCount|default(0) }}</div>
+                <div class="mb-1"><strong>Броней:</strong> {{ bookings|length }}</div>
+                <div class="mb-1"><strong>Последний вход (QR):</strong> {{ lastAccess ? lastAccess.createdAt|date('d.m.Y H:i') : '—' }}</div>
+                <div class="mb-1"><strong>Push-уведомления:</strong> {{ pushTokenCount > 0 ? 'подписка есть' : 'нет' }}</div>
+                <p class="text-secondary small mb-0 mt-1">Что видит клиент в мобильном приложении</p>
+            </div>
+            <div class="content-card mb-3">
+                <div class="text-secondary small mb-2">Заметки</div>
+                <form method="post" action="{{ path('admin_note_new', {id: client.id}) }}">
+                    <textarea name="text" class="form-control form-control-sm mb-2" rows="2" placeholder="Добавить заметку..."></textarea>
+                    <button type="submit" class="btn btn-sm btn-primary">Добавить</button>
+                </form>
+                {% for note in clientNotes|default([]) %}
+                    <div class="border-top border-secondary pt-2 mt-2 small">
+                        {{ note.text|nl2br }}
+                        <div class="text-secondary mt-1">{{ note.createdAt|date('d.m.Y H:i') }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="content-card mb-3">
+                <div class="text-secondary small mb-2">Паспорт</div>
+                <div class="mb-1"><strong>Серия/номер:</strong> {{ client.passportSeries and client.passportNumber ? client.passportSeries ~ ' ' ~ client.passportNumber : '—' }}</div>
+                <div class="mb-1"><strong>Кем выдан:</strong> {{ client.passportIssuedBy ?? '—' }}</div>
+                <div class="mb-1"><strong>Дата выдачи:</strong> {{ client.passportIssueDate ? client.passportIssueDate|date('d.m.Y') : '—' }}</div>
+                <div class="mb-1"><strong>Код подразделения:</strong> {{ client.passportDepartmentCode ?? '—' }}</div>
+                <div class="mb-1"><strong>Адрес регистрации:</strong> {{ client.registrationAddress ?? '—' }}</div>
+                <div class="mb-1"><strong>Экстренная связь:</strong> {{ client.emergencyContact ?? '—' }}</div>
             </div>
         </div>
 
@@ -32,6 +195,7 @@
                             <th>Период</th>
                             <th>Посещений</th>
                             <th>Заморозка</th>
+                            <th></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -39,7 +203,15 @@
                             <tr>
                                 <td>{{ sub.id }}</td>
                                 <td>{{ sub.plan.name }}</td>
-                                <td>{{ sub.status }}</td>
+                                <td>
+                                    {% if sub.status == 'active' %}
+                                        <span class="badge bg-success">Активен</span>
+                                    {% elseif sub.status == 'frozen' %}
+                                        <span class="badge bg-warning text-dark">Заморожен</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Истёк</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {{ sub.startDate|date('d.m.Y') }}
                                     {% if sub.endDate %}
@@ -60,10 +232,21 @@
                                         —
                                     {% endif %}
                                 </td>
+                                <td>
+                                    {% if sub.status == 'active' %}
+                                        <form method="post" action="{{ path('admin_subscription_freeze', {id: sub.id}) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning">Заморозить</button>
+                                        </form>
+                                    {% elseif sub.status == 'frozen' %}
+                                        <form method="post" action="{{ path('admin_subscription_unfreeze', {id: sub.id}) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-success">Разморозить</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="6" class="text-center text-secondary">
+                                <td colspan="7" class="text-center text-secondary">
                                     У клиента пока нет абонементов.
                                 </td>
                             </tr>
@@ -72,6 +255,112 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="content-card mt-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Продажи</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Товар / услуга</th>
+                    <th>Кол-во</th>
+                    <th>Цена</th>
+                    <th>Сумма</th>
+                    <th>Оплата</th>
+                    <th>Связь</th>
+                    <th>Дата</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for sale in sales %}
+                    <tr>
+                        <td>{{ sale.id }}</td>
+                        <td>{{ sale.productName }}</td>
+                        <td>{{ sale.quantity }}</td>
+                        <td>{{ sale.price|number_format(0, '', ' ') }} ₽</td>
+                        <td>{{ sale.total|number_format(0, '', ' ') }} ₽</td>
+                        <td>{{ sale.paymentMethod }}</td>
+                        <td>{% if sale.subscription %}<a href="{{ path('admin_section', {section: 'subscriptions'}) }}" class="link-light">Абонемент #{{ sale.subscription.id }}</a>{% else %}—{% endif %}</td>
+                        <td>{{ sale.createdAt|date('d.m.Y H:i') }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-secondary">
+                            У клиента пока нет продаж.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="content-card mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-primary small fw-semibold text-uppercase">Задачи</span>
+            <a href="{{ path('admin_section', {section: 'tasks'}) }}?client_id={{ client.id }}" class="btn btn-sm btn-outline-primary">Все задачи</a>
+        </div>
+        <form method="post" action="{{ path('admin_task_new') }}" class="row g-2 mb-3">
+            <input type="hidden" name="client_id" value="{{ client.id }}">
+            <input type="hidden" name="return_to_client" value="{{ client.id }}">
+            <div class="col-auto flex-grow-1">
+                <input type="text" name="title" class="form-control form-control-sm" placeholder="Быстрая задача (тема)" required>
+            </div>
+            <div class="col-auto">
+                <input type="date" name="due_date" class="form-control form-control-sm">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">+ Задача</button>
+            </div>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Тема</th>
+                    <th>Тип</th>
+                    <th>Статус</th>
+                    <th>Срок</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for task in clientTasks %}
+                    <tr>
+                        <td>
+                            {{ task.title }}{% if task.isOverdue %} <span class="badge bg-danger">Просрочено</span>{% endif %}
+                        </td>
+                        <td>{{ task.type }}</td>
+                        <td>
+                            {% if task.status == 'open' %}
+                                <span class="badge bg-warning text-dark">Открыта</span>
+                            {% elseif task.status == 'in_progress' %}
+                                <span class="badge bg-info">В работе</span>
+                            {% else %}
+                                <span class="badge bg-success">Закрыта</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ task.dueAt ? task.dueAt|date('d.m.Y H:i') : '—' }}</td>
+                        <td>
+                            {% if task.status != 'done' %}
+                                <form method="post" action="{{ path('admin_task_complete', {id: task.id}) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Закрыть</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary">
+                            У клиента пока нет задач.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 

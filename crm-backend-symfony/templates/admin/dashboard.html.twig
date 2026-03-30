@@ -14,10 +14,9 @@
         </div>
         <div class="row g-2">
             <div class="col-6 col-md-3 col-lg-2">
-                <button type="button"
-                        class="d-block w-100 text-center p-3 rounded-3 text-decoration-none btn btn-link border-0"
-                        style="background: #212633; border: 1px solid #2f3645;"
-                        data-bs-toggle="modal" data-bs-target="#modalNewClient">
+                <a href="{{ path('admin_client_new') }}"
+                   class="d-block w-100 text-center p-3 rounded-3 text-decoration-none"
+                   style="background: #212633; border: 1px solid #2f3645;">
                     <div class="mb-2">
                         <span class="badge bg-primary-subtle text-primary border border-primary"
                               style="border-radius: 999px; font-size: 11px;">
@@ -27,7 +26,7 @@
                     <div class="small text-light">
                         Новый клиент
                     </div>
-                </button>
+                </a>
             </div>
 
             {% set quickActions = [
@@ -36,6 +35,7 @@
                 {'label': 'Массовое обслуживание', 'route': 'admin_section', 'params': {'section': 'visits'}} ,
                 {'label': 'Новая задача', 'type': 'modal', 'target': '#modalNewTask'},
                 {'label': 'Аналитика', 'route': 'admin_section', 'params': {'section': 'analytics'}},
+                {'label': 'Финансы', 'route': 'admin_section', 'params': {'section': 'finance'}},
                 {'label': 'Справка', 'route': 'admin_section', 'params': {'section': 'settings'}},
                 {'label': 'Чат поддержки', 'route': 'admin_section', 'params': {'section': 'messengers'}}
             ] %}
@@ -72,37 +72,105 @@
     </div>
 
     <div class="row g-3">
-        <div class="col-md-3">
-            <div class="content-card">
-                <div class="text-secondary small mb-1">Активные клиенты</div>
-                <div class="h4 mb-0">{{ stats.clients }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="content-card">
-                <div class="text-secondary small mb-1">Открытые лиды</div>
-                <div class="h4 mb-0">{{ stats.leads }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="content-card">
-                <div class="text-secondary small mb-1">Тренировки сегодня</div>
-                <div class="h4 mb-0">{{ stats.trainingsToday }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="content-card">
-                <div class="text-secondary small mb-1">Выручка за день</div>
-                <div class="h4 mb-0">
-                    {% if stats.revenueToday %}
-                        {{ stats.revenueToday|number_format(0, '', ' ') }} ₽
-                    {% else %}
-                        0 ₽
-                    {% endif %}
+        <div class="col-6 col-md-2">
+            <a href="{{ path('admin_section', {section: 'clients'}) }}" class="text-decoration-none text-reset">
+                <div class="content-card h-100" style="cursor: pointer;">
+                    <div class="text-secondary small mb-1">Активные клиенты</div>
+                    <div class="h4 mb-0">{{ stats.clients }}</div>
                 </div>
-            </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ path('admin_section', {section: 'leads'}) }}" class="text-decoration-none text-reset">
+                <div class="content-card h-100" style="cursor: pointer;">
+                    <div class="text-secondary small mb-1">Открытые лиды</div>
+                    <div class="h4 mb-0">{{ stats.leads }}</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="text-decoration-none text-reset">
+                <div class="content-card h-100" style="cursor: pointer;">
+                    <div class="text-secondary small mb-1">Тренировки сегодня</div>
+                    <div class="h4 mb-0">{{ stats.trainingsToday }}</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ path('admin_section', {section: 'visits'}) }}" class="text-decoration-none text-reset">
+                <div class="content-card h-100" style="cursor: pointer;">
+                    <div class="text-secondary small mb-1">Посещений сегодня</div>
+                    <div class="h4 mb-0">{{ stats.visitsToday|default(0) }}</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ path('admin_section', {section: 'cashdesk'}) }}?date={{ "now"|date("Y-m-d") }}" class="text-decoration-none text-reset">
+                <div class="content-card h-100" style="cursor: pointer;">
+                    <div class="text-secondary small mb-1">Выручка за день</div>
+                    <div class="h4 mb-0">
+                        {% if stats.revenueToday %}
+                            {{ stats.revenueToday|number_format(0, '', ' ') }} ₽
+                        {% else %}
+                            0 ₽
+                        {% endif %}
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ path('admin_section', {section: 'finance'}) }}" class="text-decoration-none text-reset">
+                <div class="content-card h-100" style="cursor: pointer;">
+                    <div class="text-secondary small mb-1">Выручка за месяц</div>
+                    <div class="h4 mb-0">
+                        {% if stats.revenueMonth is defined and stats.revenueMonth %}
+                            {{ stats.revenueMonth|number_format(0, '', ' ') }} ₽
+                        {% else %}
+                            0 ₽
+                        {% endif %}
+                    </div>
+                </div>
+            </a>
         </div>
     </div>
+
+    {% if funnelLeads is defined and (funnelLeads.new > 0 or funnelLeads.converted > 0) %}
+    <div class="content-card mt-3 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-primary small fw-semibold text-uppercase">Лиды</span>
+            <a href="{{ path('admin_section', {section: 'leads'}) }}" class="btn btn-sm btn-outline-primary">Воронка →</a>
+        </div>
+        <div class="d-flex gap-3">
+            <div><span class="text-secondary small">Новых:</span> <strong>{{ funnelLeads.new }}</strong></div>
+            <div><span class="text-secondary small">Конвертировано:</span> <strong class="text-success">{{ funnelLeads.converted }}</strong></div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if upcomingTrainings|default([])|length > 0 %}
+    <div class="content-card mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Ближайшие тренировки</h2>
+            <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="btn btn-sm btn-outline-primary">Расписание</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead><tr><th>Название</th><th>Тренер</th><th>Время</th><th>Мест</th><th>Записано</th></tr></thead>
+                <tbody>
+                {% for t in upcomingTrainings %}
+                    <tr>
+                        <td>{{ t.name }}</td>
+                        <td>{{ t.trainerName ?? '—' }}</td>
+                        <td>{{ t.startAt|date('d.m H:i') }}</td>
+                        <td>{{ t.maxParticipants }}</td>
+                        <td>{{ t.currentParticipants }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="mt-4 content-card">
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -127,9 +195,15 @@
                 {% if tasks is defined and tasks|length > 0 %}
                     {% for task in tasks %}
                         <tr>
-                            <td>{{ task.title }}</td>
-                            <td>{{ task.clientName }}</td>
-                            <td>{{ task.dueAt|date('d.m.Y H:i') }}</td>
+                            <td>{{ task.title }}{% if task.isOverdue %} <span class="badge bg-danger">Просрочено</span>{% endif %}</td>
+                            <td>
+                                {% if task.client %}
+                                    <a href="{{ path('admin_client_show', {id: task.client.id}) }}" class="link-light text-decoration-none">{{ task.client.name }}</a>
+                                {% else %}
+                                    {{ task.clientName ?? '—' }}
+                                {% endif %}
+                            </td>
+                            <td>{{ task.dueAt ? task.dueAt|date('d.m.Y H:i') : '—' }}</td>
                             <td>
                                 <span class="badge-status bg-warning text-dark">
                                     {{ task.status }}
@@ -149,49 +223,6 @@
         </div>
     </div>
     
-    {# Модальное окно "Новый клиент" #}
-    <div class="modal fade" id="modalNewClient" tabindex="-1" aria-labelledby="modalNewClientLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content bg-dark border-secondary">
-                <div class="modal-header">
-                    <h5 class="modal-title small text-primary fw-semibold" id="modalNewClientLabel">Новый клиент</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                            aria-label="Close"></button>
-                </div>
-                <form method="post" action="/admin/clients/new">
-                    <div class="modal-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label small text-secondary">Имя</label>
-                                <input type="text" name="name" class="form-control form-control-sm" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-secondary">Телефон</label>
-                                <input type="text" name="phone" class="form-control form-control-sm" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-secondary">E-mail</label>
-                                <input type="email" name="email" class="form-control form-control-sm" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-secondary">Бонусы (начальный баланс)</label>
-                                <input type="number" name="bonus_points" class="form-control form-control-sm" value="0">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label small text-secondary">Заметка</label>
-                                <textarea name="note" class="form-control form-control-sm" rows="2"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-sm btn-primary">Создать клиента</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     {# Модальное окно "Новый лид" #}
     <div class="modal fade" id="modalNewLead" tabindex="-1" aria-labelledby="modalNewLeadLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -249,7 +280,13 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small text-secondary">Клиент</label>
-                                <input type="text" name="client_name" class="form-control form-control-sm">
+                                <select name="client_id" class="form-select form-select-sm">
+                                    <option value="">— Выберите —</option>
+                                    {% for u in users|default([]) %}
+                                        <option value="{{ u.id }}">{{ u.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" name="client_name" class="form-control form-control-sm mt-1" placeholder="Или введите вручную">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-secondary">Дата окончания</label>
@@ -292,11 +329,23 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label small text-secondary">Клиент</label>
-                                <input type="text" name="client_name" class="form-control form-control-sm" required>
+                                <select name="user_id" class="form-select form-select-sm" id="saleUserSelect">
+                                    <option value="">— Выберите клиента —</option>
+                                    {% for u in users|default([]) %}
+                                        <option value="{{ u.id }}">{{ u.name }}{% if u.email %} ({{ u.email }}){% endif %}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" name="client_name" class="form-control form-control-sm mt-1" id="saleClientName" placeholder="Или введите имя вручную (если клиента нет в списке)">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small text-secondary">Услуга / товар</label>
-                                <input type="text" name="product_name" class="form-control form-control-sm" required>
+                                <select name="product_id" class="form-select form-select-sm" id="dashboardProductSelect">
+                                    <option value="">— Выберите из каталога —</option>
+                                    {% for p in products|default([]) %}
+                                        <option value="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.price }}">{{ p.name }} — {{ p.price|number_format(0, '', ' ') }} ₽</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" name="product_name" class="form-control form-control-sm mt-1" id="dashboardProductName" placeholder="Или введите вручную" required>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-secondary">Кол-во</label>
@@ -304,7 +353,7 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-secondary">Цена, ₽</label>
-                                <input type="number" step="0.01" name="price" class="form-control form-control-sm" required>
+                                <input type="number" step="0.01" name="price" class="form-control form-control-sm" id="dashboardPrice" required>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-secondary">Оплата</label>
@@ -313,6 +362,10 @@
                                     <option value="card">Карта</option>
                                     <option value="bonus">Бонусы</option>
                                 </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-secondary">Промокод</label>
+                                <input type="text" name="promo_code" class="form-control form-control-sm" placeholder="SUMMER20">
                             </div>
                         </div>
                     </div>
@@ -324,5 +377,21 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.getElementById('dashboardProductSelect')?.addEventListener('change', function() {
+            const opt = this.options[this.selectedIndex];
+            const nameInput = document.getElementById('dashboardProductName');
+            const priceInput = document.getElementById('dashboardPrice');
+            if (opt.value && opt.dataset.name) {
+                nameInput.value = opt.dataset.name;
+                priceInput.value = opt.dataset.price;
+                nameInput.removeAttribute('required');
+            } else {
+                nameInput.value = '';
+                nameInput.setAttribute('required', 'required');
+            }
+        });
+    </script>
 {% endblock %}
 

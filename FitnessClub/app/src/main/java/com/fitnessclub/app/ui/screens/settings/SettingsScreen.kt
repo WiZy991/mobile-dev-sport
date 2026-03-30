@@ -13,6 +13,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.config.AppConfig
+import com.fitnessclub.app.ui.components.GeneralFeedbackDialog
 import com.fitnessclub.app.ui.theme.Primary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -22,9 +26,12 @@ fun SettingsScreen(
     onNavigateToNotificationSettings: () -> Unit = {},
     onNavigateToSecuritySettings: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
-    onNavigateToAbout: () -> Unit = {}
+    onNavigateToAbout: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val uriHandler = LocalUriHandler.current
     var pushEnabled by remember { mutableStateOf(true) }
+    var showFeedbackDialog by remember { mutableStateOf(false) }
     var emailEnabled by remember { mutableStateOf(true) }
     var trainingReminders by remember { mutableStateOf(true) }
     var promoNotifications by remember { mutableStateOf(false) }
@@ -103,20 +110,20 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Lock,
                     title = "Изменить пароль",
-                    onClick = { /* TODO */ }
+                    onClick = { /* Требует API восстановления пароля в CRM */ }
                 )
                 
                 ClickableSettingItem(
                     icon = Icons.Default.Fingerprint,
                     title = "Биометрия",
                     subtitle = "Вход по отпечатку пальца",
-                    onClick = { /* TODO */ }
+                    onClick = { /* В разработке */ }
                 )
                 
                 ClickableSettingItem(
                     icon = Icons.Default.Security,
                     title = "Двухфакторная аутентификация",
-                    onClick = { /* TODO */ }
+                    onClick = { /* В разработке */ }
                 )
             }
             
@@ -126,20 +133,20 @@ fun SettingsScreen(
                     icon = Icons.Default.Language,
                     title = "Язык",
                     subtitle = "Русский",
-                    onClick = { /* TODO */ }
+                    onClick = { /* В разработке */ }
                 )
                 
                 ClickableSettingItem(
                     icon = Icons.Default.Palette,
                     title = "Тема",
                     subtitle = "Системная",
-                    onClick = { /* TODO */ }
+                    onClick = { /* В разработке */ }
                 )
                 
                 ClickableSettingItem(
                     icon = Icons.Default.DeleteSweep,
                     title = "Очистить кэш",
-                    onClick = { /* TODO */ }
+                    onClick = { viewModel.clearCache() }
                 )
             }
             
@@ -154,13 +161,14 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Feedback,
                     title = "Обратная связь",
-                    onClick = { /* TODO */ }
+                    subtitle = "Оцените работу клуба без контакта",
+                    onClick = { showFeedbackDialog = true }
                 )
                 
                 ClickableSettingItem(
                     icon = Icons.Default.Star,
                     title = "Оценить приложение",
-                    onClick = { /* TODO */ }
+                    onClick = { uriHandler.openUri(AppConfig.PLAY_STORE_URL) }
                 )
                 
                 ClickableSettingItem(
@@ -176,18 +184,32 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Description,
                     title = "Пользовательское соглашение",
-                    onClick = { /* TODO */ }
+                    onClick = { uriHandler.openUri(AppConfig.TERMS_URL) }
                 )
                 
                 ClickableSettingItem(
                     icon = Icons.Default.PrivacyTip,
                     title = "Политика конфиденциальности",
-                    onClick = { /* TODO */ }
+                    onClick = { uriHandler.openUri(AppConfig.PRIVACY_URL) }
                 )
             }
             
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+    
+    if (showFeedbackDialog) {
+        GeneralFeedbackDialog(
+            onDismiss = { showFeedbackDialog = false },
+            onSubmit = { rating, comment ->
+                viewModel.submitFeedback(
+                    rating = rating,
+                    comment = comment,
+                    onSuccess = { showFeedbackDialog = false },
+                    onError = { /* Остаёмся в диалоге для повторной попытки */ }
+                )
+            }
+        )
     }
 }
 

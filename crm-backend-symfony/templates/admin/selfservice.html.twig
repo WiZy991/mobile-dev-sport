@@ -5,6 +5,31 @@
 {% block body %}
     <div class="content-header">
         <h1 class="h4 mb-0">Самообслуживание — вход по QR</h1>
+        <a href="{{ path('admin_selfservice_export') }}?date_from={{ dateFrom }}&date_to={{ dateTo }}{% if resultFilter %}&result={{ resultFilter }}{% endif %}" class="btn btn-sm btn-outline-primary">Экспорт CSV</a>
+    </div>
+
+    <div class="content-card mb-3">
+        <form method="get" action="{{ path('admin_section', {section: 'selfservice'}) }}" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">С</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ dateFrom }}">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">По</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ dateTo }}">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Результат</label>
+                <select name="result" class="form-select form-select-sm">
+                    <option value="">Все</option>
+                    <option value="granted" {{ resultFilter == 'granted' ? 'selected' : '' }}>Разрешён</option>
+                    <option value="denied" {{ resultFilter == 'denied' ? 'selected' : '' }}>Отклонён</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+            </div>
+        </form>
     </div>
 
     <div class="content-card">

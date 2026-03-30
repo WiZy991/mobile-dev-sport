@@ -67,6 +67,9 @@
 <body>
 <div class="layout">
     <aside class="sidebar">
+        <form method="get" action="{{ path('admin_search') }}" class="p-2">
+            <input type="text" name="q" class="form-control form-control-sm" placeholder="Поиск..." value="{{ app.request.query.get('q', '') }}">
+        </form>
         <div class="menu-section-title">Навигация</div>
         {% for key, label in menu %}
             <a href="{{ key == 'dashboard' ? path('admin_dashboard') : path('admin_section', {section: key}) }}"
@@ -76,6 +79,14 @@
         {% endfor %}
     </aside>
     <main class="content">
+        {% for type, messages in app.flashes %}
+            {% for message in messages %}
+                <div class="alert alert-{{ type == 'error' ? 'danger' : type }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endfor %}
         {% block body %}{% endblock %}
     </main>
 </div>

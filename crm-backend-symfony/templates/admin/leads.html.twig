@@ -7,6 +7,67 @@
         <h1 class="h4 mb-0">Лиды</h1>
     </div>
 
+    {% if funnel is defined %}
+    <div class="content-card mb-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Воронка лидов</div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a href="{{ path('admin_section', {section: 'leads', status: 'new'}) }}" class=" rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'new' ? 'bg-secondary' : '' }}" style="background: #262b34; min-width: 100px; text-align: center;">
+                <div class="small text-secondary">Новый</div>
+                <div class="h5 mb-0">{{ funnel.new|default(0) }}</div>
+            </a>
+            <span class="text-secondary">→</span>
+            <a href="{{ path('admin_section', {section: 'leads', status: 'trial_scheduled'}) }}" class="rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'trial_scheduled' ? 'bg-info' : '' }}" style="background: #262b34; min-width: 100px; text-align: center;">
+                <div class="small text-secondary">Пробное</div>
+                <div class="h5 mb-0">{{ funnel.trial_scheduled|default(0) }}</div>
+            </a>
+            <span class="text-secondary">→</span>
+            <a href="{{ path('admin_section', {section: 'leads', status: 'trial_visited'}) }}" class="rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'trial_visited' ? 'bg-primary' : '' }}" style="background: #262b34; min-width: 100px; text-align: center;">
+                <div class="small text-secondary">Пришёл</div>
+                <div class="h5 mb-0">{{ funnel.trial_visited|default(0) }}</div>
+            </a>
+            <span class="text-secondary">→</span>
+            <a href="{{ path('admin_section', {section: 'leads', status: 'converted'}) }}" class="rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'converted' ? 'bg-success' : '' }}" style="background: #262b34; min-width: 100px; text-align: center;">
+                <div class="small text-secondary">Клиент</div>
+                <div class="h5 mb-0 text-success">{{ funnel.converted|default(0) }}</div>
+            </a>
+            <a href="{{ path('admin_section', {section: 'leads', status: 'inactive'}) }}" class="rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'inactive' ? 'bg-dark' : '' }}" style="background: #262b34; min-width: 80px; text-align: center;">
+                <div class="small text-secondary">Неактивен</div>
+                <div class="h5 mb-0">{{ funnel.inactive|default(0) }}</div>
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="content-card mb-3">
+        <form method="get" action="{{ path('admin_section', {section: 'leads'}) }}" class="row g-2 align-items-end mb-0">
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Статус</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">Все</option>
+                    <option value="new" {{ statusFilter == 'new' ? 'selected' : '' }}>Новый</option>
+                    <option value="trial_scheduled" {{ statusFilter == 'trial_scheduled' ? 'selected' : '' }}>Пробное назначено</option>
+                    <option value="trial_visited" {{ statusFilter == 'trial_visited' ? 'selected' : '' }}>Пробное прошло</option>
+                    <option value="converted" {{ statusFilter == 'converted' ? 'selected' : '' }}>Клиент</option>
+                    <option value="inactive" {{ statusFilter == 'inactive' ? 'selected' : '' }}>Неактивен</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Источник</label>
+                <select name="source" class="form-select form-select-sm">
+                    <option value="">Все</option>
+                    <option value="site" {{ sourceFilter == 'site' ? 'selected' : '' }}>Сайт</option>
+                    <option value="instagram" {{ sourceFilter == 'instagram' ? 'selected' : '' }}>Instagram</option>
+                    <option value="referral" {{ sourceFilter == 'referral' ? 'selected' : '' }}>Рекомендация</option>
+                    <option value="call" {{ sourceFilter == 'call' ? 'selected' : '' }}>Звонок</option>
+                    <option value="other" {{ sourceFilter == 'other' ? 'selected' : '' }}>Другое</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+            </div>
+        </form>
+    </div>
+
     <div class="content-card mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="text-primary small fw-semibold text-uppercase">Новый лид</span>
@@ -16,17 +77,28 @@
         </div>
         <form method="post" action="{{ path('admin_lead_new') }}">
             <div class="row g-2 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small text-secondary">Имя</label>
                     <input type="text" name="name" class="form-control form-control-sm" required>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small text-secondary">Телефон</label>
                     <input type="text" name="phone" class="form-control form-control-sm" required>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small text-secondary">Email</label>
                     <input type="email" name="email" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-secondary">Источник</label>
+                    <select name="source" class="form-select form-select-sm">
+                        <option value="">—</option>
+                        <option value="site">Сайт</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="referral">Рекомендация</option>
+                        <option value="call">Звонок</option>
+                        <option value="other">Другое</option>
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small text-secondary">Комментарий</label>
@@ -48,6 +120,9 @@
                     <th>Имя</th>
                     <th>Телефон</th>
                     <th>Email</th>
+                    <th>Источник</th>
+                    <th>Комментарий</th>
+                    <th>Заметки</th>
                     <th>Статус</th>
                     <th>Создан</th>
                     <th></th>
@@ -57,9 +132,36 @@
                 {% for lead in leads %}
                     <tr>
                         <td>{{ lead.id }}</td>
-                        <td>{{ lead.name }}</td>
-                        <td>{{ lead.phone }}</td>
+                        <td>
+                            {% if lead.convertedUser %}
+                                <a href="{{ path('admin_client_show', {id: lead.convertedUser.id}) }}" class="link-light text-decoration-none">{{ lead.name }}</a>
+                                <span class="badge bg-success ms-1">→ клиент</span>
+                            {% else %}
+                                {{ lead.name }}
+                            {% endif %}
+                        </td>
+                        <td><a href="tel:{{ (lead.phone ?? '')|replace({' ': '', '-': '', '(': '', ')': ''}) }}" class="link-light text-decoration-none">{{ lead.phone }}</a></td>
                         <td>{{ lead.email ?? '—' }}</td>
+                        <td>{{ {'site':'Сайт','instagram':'Instagram','referral':'Рекомендация','call':'Звонок','other':'Другое'}[lead.source] ?? (lead.source ?: '—') }}</td>
+                        <td>
+                            <form method="post" action="{{ path('admin_lead_comment', {id: lead.id}) }}" class="d-inline-flex align-items-center gap-1">
+                                <input type="text" name="comment" class="form-control form-control-sm" style="width: 100px" value="{{ lead.comment ?? '' }}" placeholder="—">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary py-0">✓</button>
+                            </form>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-1">
+                                {% if lead.notes|length > 0 %}
+                                    <span class="badge bg-secondary" title="{{ lead.notes|length }} заметок">{{ lead.notes|length }}</span>
+                                {% endif %}
+                                <form method="post" action="{{ path('admin_lead_note_new', {id: lead.id}) }}" class="d-inline-flex">
+                                    <input type="hidden" name="status_filter" value="{{ statusFilter }}">
+                                    <input type="hidden" name="source_filter" value="{{ sourceFilter }}">
+                                    <input type="text" name="text" class="form-control form-control-sm" style="width: 80px" placeholder="+ заметка">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary py-0 ms-1">+</button>
+                                </form>
+                            </div>
+                        </td>
                         <td>
                             {# Нормализуем старые статусы (in_progress / won / lost) в новую воронку #}
                             {% set normalized = {
@@ -117,7 +219,11 @@
                                         <button type="submit" class="btn btn-outline-secondary btn-sm">Не купил</button>
                                     </form>
                                 {% elseif normalized == 'converted' %}
-                                    <span class="badge bg-success">Клиент</span>
+                                    {% if lead.convertedUser %}
+                                        <a href="{{ path('admin_client_show', {id: lead.convertedUser.id}) }}" class="btn btn-outline-success btn-sm">→ Клиент #{{ lead.convertedUser.id }}</a>
+                                    {% else %}
+                                        <span class="badge bg-success">Клиент</span>
+                                    {% endif %}
                                 {% else %}
                                     <span class="text-secondary small">Нет активных действий</span>
                                 {% endif %}
@@ -126,7 +232,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="7" class="text-center text-secondary">
+                        <td colspan="10" class="text-center text-secondary">
                             Пока нет ни одного лида.
                         </td>
                     </tr>

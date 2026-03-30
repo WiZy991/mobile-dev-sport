@@ -1,0 +1,74 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Записи на тренировки{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Записи на тренировки</h1>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="{{ path('admin_section', {section: 'bookings'}) }}?date={{ "now"|date("Y-m-d") }}" class="btn btn-sm {{ (bookDate|default('')) == ("now"|date("Y-m-d")) ? 'btn-primary' : 'btn-outline-secondary' }}">Сегодня</a>
+            <a href="{{ path('admin_section', {section: 'bookings'}) }}?date={{ "tomorrow"|date("Y-m-d") }}" class="btn btn-sm {{ (bookDate|default('')) == ("tomorrow"|date("Y-m-d")) ? 'btn-primary' : 'btn-outline-secondary' }}">Завтра</a>
+            <form method="get" action="{{ path('admin_section', {section: 'bookings'}) }}" class="d-flex align-items-center gap-2">
+                <input type="date" name="date" class="form-control form-control-sm" value="{{ bookDate|default('') }}" style="width: auto;" placeholder="Все даты">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Фильтр</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Клиент</th>
+                    <th>Тренировка</th>
+                    <th>Статус</th>
+                    <th>Дата записи</th>
+                    <th>Начало тренировки</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for b in bookings %}
+                    <tr>
+                        <td>{{ b.id }}</td>
+                        <td>
+                            {% if b.user %}
+                                <a href="{{ path('admin_client_show', {id: b.user.id}) }}" class="link-light text-decoration-none">{{ b.clientName }}</a>
+                            {% else %}
+                                {{ b.clientName }}
+                            {% endif %}
+                        </td>
+                        <td>{{ b.training.name }}</td>
+                        <td>
+                            {% if b.status == 'confirmed' %}
+                                <span class="badge bg-success">Подтверждено</span>
+                            {% elseif b.status == 'waiting' %}
+                                <span class="badge bg-warning text-dark">Лист ожидания</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Отменено</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ b.bookedAt|date('d.m.Y H:i') }}</td>
+                        <td>{{ b.training.startAt|date('d.m.Y H:i') }}</td>
+                        <td>
+                            {% if b.status in ['confirmed', 'waiting'] %}
+                                <form method="post" action="{{ path('admin_booking_cancel', {id: b.id}) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Отменить запись?')">Отменить</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary">
+                            Пока нет записей на тренировки.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

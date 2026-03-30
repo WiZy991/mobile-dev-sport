@@ -3,7 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\PushToken;
-use App\Entity\User;
+use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -15,6 +15,7 @@ class PushTokenController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly CurrentUserResolver $userResolver,
     ) {}
 
     #[Route('/push-token', name: 'api_user_push_token', methods: ['POST'])]
@@ -39,14 +40,17 @@ class PushTokenController extends AbstractController
                 ->setToken($tokenValue)
                 ->setPlatform($platform);
 
-            // Временно считаем "текущим" первого пользователя в БД
-            $user = $this->em->getRepository(User::class)->findOneBy([]);
+            $user = $this->userResolver->resolve($request);
             if ($user) {
                 $pushToken->setUser($user);
             }
 
             $this->em->persist($pushToken);
         } else {
+            $user = $this->userResolver->resolve($request);
+            if ($user) {
+                $pushToken->setUser($user);
+            }
             $pushToken
                 ->setPlatform($platform)
                 ->touch();

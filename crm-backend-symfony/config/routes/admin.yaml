@@ -2,19 +2,44 @@ admin_dashboard:
   path: /admin
   controller: App\Controller\Admin\AdminController::dashboard
 
+admin_search:
+  path: /admin/search
+  controller: App\Controller\Admin\AdminController::search
+  methods: [GET]
+
 admin_section:
   path: /admin/{section}
   controller: App\Controller\Admin\AdminController::section
 
 admin_client_new:
   path: /admin/clients/new
-  controller: App\Controller\Admin\AdminController::createClient
-  methods: [POST]
+  controller: App\Controller\Admin\AdminController::clientNew
+  methods: [GET, POST]
 
 admin_client_show:
   path: /admin/clients/{id}
   controller: App\Controller\Admin\AdminController::showClient
   methods: [GET]
+
+admin_client_update:
+  path: /admin/clients/{id}/update
+  controller: App\Controller\Admin\AdminController::updateClient
+  methods: [POST]
+
+admin_client_block:
+  path: /admin/clients/{id}/block
+  controller: App\Controller\Admin\AdminController::blockClient
+  methods: [POST]
+
+admin_subscription_freeze:
+  path: /admin/subscriptions/{id}/freeze
+  controller: App\Controller\Admin\AdminController::freezeSubscription
+  methods: [POST]
+
+admin_subscription_unfreeze:
+  path: /admin/subscriptions/{id}/unfreeze
+  controller: App\Controller\Admin\AdminController::unfreezeSubscription
+  methods: [POST]
 
 admin_lead_new:
   path: /admin/leads/new
@@ -31,9 +56,39 @@ admin_lead_convert:
   controller: App\Controller\Admin\AdminController::convertLeadToClient
   methods: [POST]
 
+admin_lead_comment:
+  path: /admin/leads/{id}/comment
+  controller: App\Controller\Admin\AdminController::updateLeadComment
+  methods: [POST]
+
+admin_booking_cancel:
+  path: /admin/bookings/{id}/cancel
+  controller: App\Controller\Admin\AdminController::cancelBooking
+  methods: [POST]
+
 admin_task_new:
   path: /admin/tasks/new
   controller: App\Controller\Admin\AdminController::createTask
+  methods: [POST]
+
+admin_task_complete:
+  path: /admin/tasks/{id}/complete
+  controller: App\Controller\Admin\AdminController::completeTask
+  methods: [POST]
+
+admin_task_start:
+  path: /admin/tasks/{id}/start
+  controller: App\Controller\Admin\AdminController::startTask
+  methods: [POST]
+
+admin_task_update:
+  path: /admin/tasks/{id}/update
+  controller: App\Controller\Admin\AdminController::updateTask
+  methods: [POST]
+
+admin_task_delete:
+  path: /admin/tasks/{id}/delete
+  controller: App\Controller\Admin\AdminController::deleteTask
   methods: [POST]
 
 admin_sale_new:
@@ -51,8 +106,133 @@ admin_staff_new:
   controller: App\Controller\Admin\AdminController::createStaff
   methods: [POST]
 
+admin_product_toggle:
+  path: /admin/products/{id}/toggle
+  controller: App\Controller\Admin\AdminController::toggleProduct
+  methods: [POST]
+
+admin_product_stock:
+  path: /admin/products/{id}/stock
+  controller: App\Controller\Admin\AdminController::updateProductStock
+  methods: [POST]
+
+admin_training_delete:
+  path: /admin/trainings/{id}/delete
+  controller: App\Controller\Admin\AdminController::deleteTraining
+  methods: [POST]
+
+admin_trainer_delete:
+  path: /admin/trainers/{id}/delete
+  controller: App\Controller\Admin\AdminController::deleteTrainer
+  methods: [POST]
+
+admin_trainer_update:
+  path: /admin/trainers/{id}/update
+  controller: App\Controller\Admin\AdminController::updateTrainer
+  methods: [POST]
+
 admin_subscription_issue:
   path: /admin/subscriptions/issue
   controller: App\Controller\Admin\AdminController::issueSubscription
+  methods: [POST]
+
+admin_plan_update:
+  path: /admin/plans/{id}/update
+  controller: App\Controller\Admin\AdminController::updatePlan
+  methods: [POST]
+
+admin_plan_delete:
+  path: /admin/plans/{id}/delete
+  controller: App\Controller\Admin\AdminController::deletePlan
+  methods: [POST]
+
+admin_product_update:
+  path: /admin/products/{id}/update
+  controller: App\Controller\Admin\AdminController::updateProduct
+  methods: [POST]
+
+admin_settings_club:
+  path: /admin/settings/club
+  controller: App\Controller\Admin\AdminController::settingsClub
+  methods: [GET, POST]
+
+admin_visits_export:
+  path: /admin/visits/export
+  controller: App\Controller\Admin\AdminController::exportVisits
+  methods: [GET]
+
+admin_clients_export:
+  path: /admin/clients/export
+  controller: App\Controller\Admin\AdminController::exportClients
+  methods: [GET]
+
+admin_sales_export:
+  path: /admin/sales/export
+  controller: App\Controller\Admin\AdminController::exportSales
+  methods: [GET]
+
+admin_note_new:
+  path: /admin/clients/{id}/notes
+  controller: App\Controller\Admin\AdminController::addClientNote
+  methods: [POST]
+
+admin_document_upload:
+  path: /admin/documents/upload
+  controller: App\Controller\Admin\AdminController::uploadDocument
+  methods: [POST]
+
+admin_document_delete:
+  path: /admin/documents/{id}/delete
+  controller: App\Controller\Admin\AdminController::deleteDocument
+  methods: [POST]
+
+admin_document_download:
+  path: /admin/documents/{id}/download
+  controller: App\Controller\Admin\AdminController::downloadDocument
+  methods: [GET]
+
+admin_promo_delete:
+  path: /admin/promocodes/{id}/delete
+  controller: App\Controller\Admin\AdminController::deletePromoCode
+  methods: [POST]
+
+admin_promo_toggle:
+  path: /admin/promocodes/{id}/toggle
+  controller: App\Controller\Admin\AdminController::togglePromoCode
+  methods: [POST]
+
+admin_promo_update:
+  path: /admin/promocodes/{id}/update
+  controller: App\Controller\Admin\AdminController::updatePromoCode
+  methods: [POST]
+
+admin_selfservice_export:
+  path: /admin/selfservice/export
+  controller: App\Controller\Admin\AdminController::exportSelfservice
+  methods: [GET]
+
+admin_tag_new:
+  path: /admin/tags/new
+  controller: App\Controller\Admin\AdminController::createTag
+  methods: [POST]
+
+admin_tag_delete:
+  path: /admin/tags/{id}/delete
+  controller: App\Controller\Admin\AdminController::deleteTag
+  methods: [POST]
+
+admin_lead_note_new:
+  path: /admin/leads/{id}/notes
+  controller: App\Controller\Admin\AdminController::addLeadNote
+  methods: [POST]
+
+admin_expense_new:
+  path: /admin/expenses/new
+  controller: App\Controller\Admin\AdminController::createExpense
+  methods: [POST]
+
+admin_expense_delete:
+  path: /admin/expenses/{id}/delete
+  controller: App\Controller\Admin\AdminController::deleteExpense
   methods: [POST]
 

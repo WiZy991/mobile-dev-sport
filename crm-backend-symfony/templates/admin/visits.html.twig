@@ -4,7 +4,24 @@
 
 {% block body %}
     <div class="content-header">
-        <h1 class="h4 mb-0">Посещения</h1>
+        <h1 class="h4 mb-0">Посещения — входы по QR</h1>
+        <a href="{{ path('admin_visits_export') }}?date_from={{ dateFrom }}&date_to={{ dateTo }}" class="btn btn-sm btn-outline-success">Скачать CSV</a>
+    </div>
+
+    <div class="content-card mb-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">С</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ dateFrom }}">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">По</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ dateTo }}">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+            </div>
+        </form>
     </div>
 
     <div class="content-card">
@@ -14,10 +31,9 @@
                 <tr>
                     <th>ID</th>
                     <th>Клиент</th>
-                    <th>Тренировка</th>
-                    <th>Статус</th>
-                    <th>Дата записи</th>
-                    <th>Начало</th>
+                    <th>Телефон</th>
+                    <th>Устройство</th>
+                    <th>Дата и время</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -26,20 +42,19 @@
                         <td>{{ visit.id }}</td>
                         <td>
                             {% if visit.user %}
-                                {{ visit.user.name }} ({{ visit.user.phone }})
+                                <a href="{{ path('admin_client_show', {id: visit.user.id}) }}" class="link-light text-decoration-none">{{ visit.user.name }}</a>
                             {% else %}
-                                {{ visit.clientName }}
+                                —
                             {% endif %}
                         </td>
-                        <td>{{ visit.training.name }}</td>
-                        <td>{{ visit.status }}</td>
-                        <td>{{ visit.bookedAt|date('d.m.Y H:i') }}</td>
-                        <td>{{ visit.training.startAt|date('d.m.Y H:i') }}</td>
+                        <td>{{ visit.user ? visit.user.phone : '—' }}</td>
+                        <td>{{ visit.deviceId ?? '—' }}</td>
+                        <td>{{ visit.createdAt|date('d.m.Y H:i:s') }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="6" class="text-center text-secondary">
-                            Пока нет ни одного посещения.
+                        <td colspan="5" class="text-center text-secondary">
+                            Пока нет ни одного посещения (входов по QR).
                         </td>
                     </tr>
                 {% endfor %}

@@ -79,29 +79,35 @@ enum class SubscriptionStatus {
 
 data class SubscriptionPlan(
     @SerializedName("id")
-    val id: String,
+    val id: String? = null,
     
     @SerializedName("name")
-    val name: String,
+    val name: String? = null,
     
     @SerializedName("description")
-    val description: String,
+    val description: String? = null,
     
     @SerializedName("price")
     val price: Double,
     
     @SerializedName("duration_days")
-    val durationDays: Int,
+    val durationDays: Int? = null,
     
     @SerializedName("visits_count")
     val visitsCount: Int? = null,
     
     @SerializedName("type")
-    val type: SubscriptionType,
+    val type: SubscriptionType? = null,
     
     @SerializedName("features")
-    val features: List<String> = emptyList(),
+    val features: List<String>? = null,
     
     @SerializedName("is_popular")
     val isPopular: Boolean = false
-)
+) {
+    val safeId: String get() = id ?: "plan-0"
+    val safeName: String get() = name ?: ""
+    val safeDescription: String get() = description ?: ""
+    val safeDurationDays: Int get() = durationDays ?: 0
+    val safeFeatures: List<String> get() = features ?: emptyList()
+}

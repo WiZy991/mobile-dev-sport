@@ -1,0 +1,71 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Документы{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Документы и шаблоны</h1>
+        <form method="get" action="{{ path('admin_section', {section: 'documents'}) }}" class="d-flex align-items-center gap-2 flex-wrap">
+            <input type="text" name="q" class="form-control form-control-sm" value="{{ searchQ|default('') }}" placeholder="Поиск по названию" style="width: 140px;">
+            <input type="text" name="category" class="form-control form-control-sm" value="{{ categoryFilter|default('') }}" placeholder="Категория" style="width: 120px;">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Найти</button>
+        </form>
+    </div>
+
+    <div class="content-card mb-3">
+        <form method="post" action="{{ path('admin_document_upload') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Название</label>
+                <input type="text" name="name" class="form-control form-control-sm" placeholder="Договор оферты" required>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Категория</label>
+                <input type="text" name="category" class="form-control form-control-sm" placeholder="договоры">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">PDF файл</label>
+                <input type="file" name="file" class="form-control form-control-sm" accept=".pdf" required>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Загрузить</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Загруженные документы</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Категория</th>
+                    <th>Загружен</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for doc in documents|default([]) %}
+                    <tr>
+                        <td>{{ doc.id }}</td>
+                        <td>{{ doc.name }}</td>
+                        <td>{{ doc.category ?? '—' }}</td>
+                        <td>{{ doc.createdAt|date('d.m.Y H:i') }}</td>
+                        <td>
+                            <a href="{{ path('admin_document_download', {id: doc.id}) }}" class="btn btn-sm btn-outline-primary">Скачать</a>
+                            <form method="post" action="{{ path('admin_document_delete', {id: doc.id}) }}" class="d-inline" onsubmit="return confirm('Удалить документ?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary">Пока нет загруженных документов.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

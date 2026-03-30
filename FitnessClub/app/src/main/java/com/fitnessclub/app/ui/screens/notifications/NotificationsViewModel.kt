@@ -1,5 +1,7 @@
 package com.fitnessclub.app.ui.screens.notifications
 
+import com.fitnessclub.app.data.api.ApiNotification
+import com.fitnessclub.app.data.api.FitnessApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -8,6 +10,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 data class NotificationsUiState(
@@ -16,7 +22,9 @@ data class NotificationsUiState(
 )
 
 @HiltViewModel
-class NotificationsViewModel @Inject constructor() : ViewModel() {
+class NotificationsViewModel @Inject constructor(
+    private val api: FitnessApi
+) : ViewModel() {
     
     private val _uiState = MutableStateFlow(NotificationsUiState())
     val uiState: StateFlow<NotificationsUiState> = _uiState.asStateFlow()
@@ -25,12 +33,71 @@ class NotificationsViewModel @Inject constructor() : ViewModel() {
         loadNotifications()
     }
     
-    private fun loadNotifications() {
+    fun loadNotifications() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            
-            // Mock notifications
-            val notifications = listOf(
+            try {
+                val res = api.getNotifications()
+                if (res.isSuccessful) {
+                    val list = res.body() ?: emptyList()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            notifications = list.map { mapToNotificationItem(it) }
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(isLoading = false, notifications = mockFallback()) }
+                }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isLoading = false, notifications = mockFallback()) }
+            }
+        }
+    }
+    
+    private fun mapToNotificationItem(n: ApiNotification): NotificationItem {
+        val type = when (n.type) {
+            "training_reminder" -> NotificationType.TRAINING_REMINDER
+            "booking_confirmed" -> NotificationType.BOOKING_CONFIRMED
+            "booking_cancelled" -> NotificationType.BOOKING_CANCELLED
+            "spot_freed" -> NotificationType.SPOT_FREED
+            "schedule_change" -> NotificationType.SCHEDULE_CHANGE
+            "promo" -> NotificationType.PROMO
+            "subscription" -> NotificationType.SUBSCRIPTION
+            "bonus" -> NotificationType.BONUS
+            else -> NotificationType.SYSTEM
+        }
+        return NotificationItem(
+            id = n.id,
+            type = type,
+            title = n.title,
+            message = n.message,
+            time = formatTimeAgo(n.createdAt),
+            isRead = n.isRead
+        )
+    }
+    
+    private fun formatTimeAgo(iso: String): String {
+        return try {
+            val instant = Instant.parse(iso.replace(" ", "T"))
+            val created = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+            val now = LocalDateTime.now()
+            val mins = ChronoUnit.MINUTES.between(created, now)
+            val hours = ChronoUnit.HOURS.between(created, now)
+            val days = ChronoUnit.DAYS.between(created, now)
+            when {
+                mins < 60 -> "${mins} мин"
+                hours < 24 -> "$hours ч"
+                days == 1L -> "Вчера"
+                days < 7 -> "$days дней"
+                else -> "Неделю"
+            }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+    
+    private fun mockFallback(): List<NotificationItem> = listOf(
                 NotificationItem(
                     id = "1",
                     type = NotificationType.TRAINING_REMINDER,
@@ -96,35 +163,30 @@ class NotificationsViewModel @Inject constructor() : ViewModel() {
                     isRead = true
                 )
             )
-            
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    notifications = notifications
-                )
-            }
-        }
-    }
     
     fun markAsRead(notificationId: String) {
+        viewModelScope.launch {
+            try {
+                api.markNotificationRead(notificationId)
+            } catch (_: Exception) { }
+        }
         _uiState.update { state ->
             state.copy(
-                notifications = state.notifications.map { notification ->
-                    if (notification.id == notificationId) {
-                        notification.copy(isRead = true)
-                    } else {
-                        notification
-                    }
+                notifications = state.notifications.map { n ->
+                    if (n.id == notificationId) n.copy(isRead = true) else n
                 }
             )
         }
     }
     
     fun markAllAsRead() {
+        viewModelScope.launch {
+            try {
+                api.markAllNotificationsRead()
+            } catch (_: Exception) { }
+        }
         _uiState.update { state ->
-            state.copy(
-                notifications = state.notifications.map { it.copy(isRead = true) }
-            )
+            state.copy(notifications = state.notifications.map { it.copy(isRead = true) })
         }
     }
 }

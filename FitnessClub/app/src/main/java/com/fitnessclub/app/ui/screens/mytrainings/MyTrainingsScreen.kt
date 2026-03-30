@@ -266,6 +266,7 @@ private fun StatusChip(status: BookingStatus) {
     }
     
     Surface(
+        modifier = Modifier.widthIn(min = 72.dp),
         color = backgroundColor,
         shape = RoundedCornerShape(8.dp)
     ) {
@@ -273,6 +274,7 @@ private fun StatusChip(status: BookingStatus) {
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = textColor,
+            maxLines = 1,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
         )
     }

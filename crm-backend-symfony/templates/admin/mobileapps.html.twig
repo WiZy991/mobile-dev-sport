@@ -1,0 +1,92 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Мобильное приложение{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Мобильное приложение</h1>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Готовность к работе приложения</div>
+        <div class="row g-2 small">
+            <div class="col-md-6">
+                <span class="{{ clubConfigured ? 'text-success' : 'text-warning' }}">{{ clubConfigured ? '✓' : '○' }}</span>
+                Клуб настроен (название, адрес)
+                {% if not clubConfigured %}<a href="{{ path('admin_settings_club') }}" class="ms-1">Настроить</a>{% endif %}
+            </div>
+            <div class="col-md-6">
+                <span class="{{ plansCount > 0 ? 'text-success' : 'text-warning' }}">{{ plansCount > 0 ? '✓' : '○' }}</span>
+                Тарифных планов: {{ plansCount }}
+                {% if plansCount == 0 %}<a href="{{ path('admin_section', {section: 'subscriptions'}) }}" class="ms-1">Добавить</a>{% endif %}
+            </div>
+            <div class="col-md-6">
+                <span class="{{ trainersCount > 0 ? 'text-success' : 'text-warning' }}">{{ trainersCount > 0 ? '✓' : '○' }}</span>
+                Тренеров: {{ trainersCount }}
+                {% if trainersCount == 0 %}<a href="{{ path('admin_section', {section: 'staff'}) }}" class="ms-1">Добавить</a>{% endif %}
+            </div>
+            <div class="col-md-6">
+                <span class="text-secondary">○</span> Активных товаров/услуг в магазине: {{ productsActiveCount }}
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Push-уведомления</div>
+        <p class="text-secondary small mb-0">Клиентов с подпиской на уведомления: <strong>{{ pushTokensCount }}</strong></p>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Последние входы по QR</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead><tr><th>Дата</th><th>Клиент</th><th>Результат</th></tr></thead>
+                <tbody>
+                {% for log in recentAccessLogs|default([]) %}
+                    <tr>
+                        <td>{{ log.createdAt|date('d.m.Y H:i:s') }}</td>
+                        <td>{% if log.user %}<a href="{{ path('admin_client_show', {id: log.user.id}) }}" class="link-light">{{ log.user.name }}</a>{% else %}—{% endif %}</td>
+                        <td><span class="badge bg-{{ log.result == 'granted' ? 'success' : 'danger' }}">{{ log.result == 'granted' ? 'Вход' : 'Отклонён' }}</span></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="3" class="text-center text-secondary">Нет записей</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <a href="{{ path('admin_section', {section: 'selfservice'}) }}" class="btn btn-sm btn-outline-secondary mt-2">Все логи самообслуживания</a>
+    </div>
+
+    <div class="content-card">
+        <div class="mb-3 text-primary small fw-semibold text-uppercase">FitnessClub</div>
+        <p class="text-secondary small mb-2">
+            Клиентское Android-приложение для бесконтактного доступа в зал.
+        </p>
+        <ul class="small text-secondary mb-0">
+            <li>Расписание тренировок с фильтром по дате</li>
+            <li>Запись и отмена бронирований</li>
+            <li>Мои абонементы (заморозка/разморозка)</li>
+            <li>QR-код для входа в зал</li>
+            <li>Профиль и редактирование данных</li>
+            <li>Список тренеров</li>
+        </ul>
+    </div>
+
+    <div class="content-card mt-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Вход по QR</div>
+        <p class="text-secondary small mb-2">
+            Клиент открывает QR в приложении, турникет сканирует код и отправляет POST на <code>/api/v1/access/entry</code>.
+            Формат: <code>FITNESSCLUB:ENTRY:user-{id}:{timestamp}</code>. Код действителен 5 минут.
+        </p>
+    </div>
+
+    <div class="content-card mt-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">API и ссылки</div>
+        <div class="small">
+            <a href="{{ path('admin_section', {section: 'schedule'}) }}" class="btn btn-sm btn-outline-primary me-2">Расписание в CRM</a>
+            <a href="{{ path('admin_section', {section: 'subscriptions'}) }}" class="btn btn-sm btn-outline-primary me-2">Абонементы</a>
+            <a href="{{ path('admin_section', {section: 'staff'}) }}" class="btn btn-sm btn-outline-primary me-2">Персонал</a>
+            <a href="{{ path('admin_settings_club') }}" class="btn btn-sm btn-outline-primary me-2">Настройки клуба</a>
+        </div>
+    </div>
+{% endblock %}

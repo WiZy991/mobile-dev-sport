@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import com.fitnessclub.app.data.api.FitnessApi
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -15,11 +16,17 @@ data class HomeUiState(
     val promoTitle: String = "СКИДКА 20%!",
     val promoSubtitle: String = "на все карты 12 и 6 месяцев",
     val unreadNotifications: Int = 3,
-    val upcomingTrainings: List<UpcomingTraining> = emptyList()
+    val upcomingTrainings: List<UpcomingTraining> = emptyList(),
+    val occupancyCurrent: Int? = null,
+    val occupancyMax: Int? = null,
+    val occupancyPercentage: Int? = null,
+    val occupancyStatus: String? = null
 )
 
 @HiltViewModel
-class HomeViewModel @Inject constructor() : ViewModel() {
+class HomeViewModel @Inject constructor(
+    private val api: FitnessApi
+) : ViewModel() {
     
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -28,8 +35,42 @@ class HomeViewModel @Inject constructor() : ViewModel() {
         loadData()
     }
     
+    fun loadUnreadCount() {
+        viewModelScope.launch {
+            try {
+                val res = api.getNotifications()
+                if (res.isSuccessful) {
+                    val count = (res.body() ?: emptyList()).count { !it.isRead }
+                    _uiState.update { it.copy(unreadNotifications = count) }
+                }
+            } catch (_: Exception) { }
+        }
+    }
+    
+    fun loadOccupancy() {
+        viewModelScope.launch {
+            try {
+                val res = api.getClubOccupancy()
+                if (res.isSuccessful) {
+                    res.body()?.let { occ ->
+                        _uiState.update {
+                            it.copy(
+                                occupancyCurrent = occ.current,
+                                occupancyMax = occ.maxCapacity,
+                                occupancyPercentage = occ.percentage,
+                                occupancyStatus = occ.status
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+    }
+    
     private fun loadData() {
         viewModelScope.launch {
+            loadOccupancy()
+            loadUnreadCount()
             _uiState.update { 
                 it.copy(
                     upcomingTrainings = listOf(

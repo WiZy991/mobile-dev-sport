@@ -1,5 +1,7 @@
 package com.fitnessclub.app.ui.screens.personal
 
+import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.model.TrainingType
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -9,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.*
 import javax.inject.Inject
@@ -27,11 +30,14 @@ data class PersonalTrainingUiState(
     val weekDays: List<DayInfo> = emptyList(),
     val timeSlots: List<TimeSlot> = emptyList(),
     val selectedTrainingType: String? = null,
-    val selectedTrainer: String? = null
+    val selectedTrainer: String? = null,
+    val error: String? = null
 )
 
 @HiltViewModel
-class PersonalTrainingViewModel @Inject constructor() : ViewModel() {
+class PersonalTrainingViewModel @Inject constructor(
+    private val fitnessApi: FitnessApi
+) : ViewModel() {
     
     private val _uiState = MutableStateFlow(PersonalTrainingUiState())
     val uiState: StateFlow<PersonalTrainingUiState> = _uiState.asStateFlow()
@@ -87,79 +93,47 @@ class PersonalTrainingViewModel @Inject constructor() : ViewModel() {
     
     private fun loadTimeSlots() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
             
-            // Mock data
-            val slots = listOf(
-                TimeSlot(
-                    id = "1",
-                    time = "9:00-10:00",
-                    trainerName = "Петров Алексей",
-                    trainingType = "Йога тренировка",
-                    room = "Зал йоги"
-                ),
-                TimeSlot(
-                    id = "2",
-                    time = "9:00-10:00",
-                    trainerName = "Сотников Иван Иванович",
-                    trainingType = "Йога тренировка",
-                    room = "Зал йоги"
-                ),
-                TimeSlot(
-                    id = "3",
-                    time = "10:00-11:00",
-                    trainerName = "Сотников Иван Иванович",
-                    trainingType = "Йога тренировка",
-                    room = "Зал йоги",
-                    isAvailable = false
-                ),
-                TimeSlot(
-                    id = "4",
-                    time = "11:00-12:00",
-                    trainerName = "Петров Алексей",
-                    trainingType = "Йога тренировка",
-                    room = "Зал йоги"
-                ),
-                TimeSlot(
-                    id = "5",
-                    time = "11:00-12:00",
-                    trainerName = "Сотников Иван Иванович",
-                    trainingType = "Йога тренировка",
-                    room = "Зал йоги"
-                ),
-                TimeSlot(
-                    id = "6",
-                    time = "12:00-13:00",
-                    trainerName = "Петров Алексей",
-                    trainingType = "Силовая тренировка",
-                    room = "Тренажёрный зал"
-                ),
-                TimeSlot(
-                    id = "7",
-                    time = "14:00-15:00",
-                    trainerName = "Волков Дмитрий",
-                    trainingType = "Бокс",
-                    room = "Зал единоборств"
-                ),
-                TimeSlot(
-                    id = "8",
-                    time = "15:00-16:00",
-                    trainerName = "Козлова Ольга",
-                    trainingType = "Пилатес",
-                    room = "Зал пилатеса"
-                )
-            )
+            val dateStr = selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
+            val result = fitnessApi.getTrainings(date = dateStr, type = "personal")
             
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    timeSlots = slots
-                )
+            if (result.isSuccessful) {
+                val allTrainings = result.body() ?: emptyList()
+                val trainings = allTrainings.filter { it.type == TrainingType.PERSONAL }
+                val slots = trainings.map { t ->
+                    val start = t.startTime.take(16).replace("T", " ").substring(11, 16)
+                    val end = t.endTime.take(16).replace("T", " ").substring(11, 16)
+                    val trainerName = t.trainer.name
+                    TimeSlot(
+                        id = t.id,
+                        time = "$start-$end",
+                        trainerName = trainerName,
+                        trainingType = t.name,
+                        room = t.room,
+                        isAvailable = !t.isBooked && t.spotsLeft > 0
+                    )
+                }
+                _uiState.update {
+                    it.copy(isLoading = false, timeSlots = slots)
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        timeSlots = emptyList(),
+                        error = result.message() ?: "Ошибка загрузки"
+                    )
+                }
             }
         }
     }
     
     fun bookSlot(slot: TimeSlot) {
-        // TODO: Implement booking
+        // TODO: Implement booking via fitnessApi.bookTraining(slot.id)
+    }
+
+    fun retryLoad() {
+        loadTimeSlots()
     }
 }

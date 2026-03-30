@@ -1,0 +1,97 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Аналитика{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Аналитика</h1>
+        <div class="btn-group btn-group-sm">
+            <a href="{{ path('admin_section', {section: 'analytics', period: 'today'}) }}" class="btn {{ (periodFilter|default('today')) == 'today' ? 'btn-primary' : 'btn-outline-secondary' }}">Сегодня</a>
+            <a href="{{ path('admin_section', {section: 'analytics', period: 'week'}) }}" class="btn {{ periodFilter == 'week' ? 'btn-primary' : 'btn-outline-secondary' }}">Неделя</a>
+            <a href="{{ path('admin_section', {section: 'analytics', period: 'month'}) }}" class="btn {{ periodFilter == 'month' ? 'btn-primary' : 'btn-outline-secondary' }}">Месяц</a>
+        </div>
+        <span class="text-secondary small ms-2">На {{ "now"|date("d.m.Y") }}</span>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Выручка за {{ periodFilter == 'month' ? 'месяц' : (periodFilter == 'week' ? 'неделю' : 'сегодня') }}</div>
+                <div class="h4 text-success mb-0">{{ revenuePeriod|number_format(0, '', ' ') }} ₽</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Посещений (QR) за {{ periodFilter == 'month' ? 'месяц' : (periodFilter == 'week' ? 'неделю' : 'сегодня') }}</div>
+                <div class="h4 mb-0">{{ visitsPeriod }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Сравнение: сегодня / нед / мес</div>
+                <div class="small mb-0">{{ revenueToday|number_format(0, '', ' ') }} / {{ revenueWeek|number_format(0, '', ' ') }} / {{ revenueMonth|number_format(0, '', ' ') }} ₽</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Активных абонементов</div>
+                <div class="h4 mb-0 text-primary">{{ activeSubsCount|default(0) }}</div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Новых абонементов сегодня</div>
+                <div class="h4 mb-0">{{ newSubsToday|default(0) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card mb-4">
+        <div class="mb-3 text-primary small fw-semibold text-uppercase">Лиды</div>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="text-secondary small">Всего лидов</div>
+                <div class="h5 mb-0">{{ leadsTotal }}</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-secondary small">Конверсия в клиентов</div>
+                <div class="h5 mb-0">{{ leadsConverted }}</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-secondary small">Процент конверсии</div>
+                <div class="h5 mb-0 text-primary">{{ conversionRate }}%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="mb-3 text-primary small fw-semibold text-uppercase">Топ продаж по товарам/услугам</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Товар / услуга</th>
+                    <th>Кол-во продаж</th>
+                    <th>Сумма выручки</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in topProducts|default([]) %}
+                    <tr>
+                        <td>{{ row.productName }}</td>
+                        <td>{{ row.qty }}</td>
+                        <td>{{ row.total|number_format(0, '', ' ') }} ₽</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-secondary">Пока нет данных о продажах</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

@@ -43,6 +43,17 @@ fun ShopScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedCategory by remember { mutableStateOf(ShopCategory.SERVICES) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    
+    LaunchedEffect(uiState.purchaseMessage, uiState.error) {
+        uiState.purchaseMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearPurchaseMessage()
+        }
+        uiState.error?.let { err ->
+            snackbarHostState.showSnackbar(err, withDismissAction = true)
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -67,10 +78,13 @@ fun ShopScreen(
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+        ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
             // Category tabs
             ScrollableTabRow(
@@ -125,6 +139,11 @@ fun ShopScreen(
                     }
                 }
             }
+        }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }

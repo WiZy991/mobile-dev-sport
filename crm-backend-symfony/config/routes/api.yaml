@@ -1,3 +1,13 @@
+api_root:
+  path: /api/v1
+  controller: App\Controller\Api\ApiController::index
+  methods: [GET]
+
+api_root_slash:
+  path: /api/v1/
+  controller: App\Controller\Api\ApiController::index
+  methods: [GET]
+
 api_auth_login:
   path: /api/v1/auth/login
   controller: App\Controller\Api\AuthController::login
@@ -17,6 +27,16 @@ api_auth_logout:
   path: /api/v1/auth/logout
   controller: App\Controller\Api\AuthController::logout
   methods: [POST]
+
+api_user_purchases:
+  path: /api/v1/user/purchases
+  controller: App\Controller\Api\UserController::purchases
+  methods: [GET]
+
+api_user_stats:
+  path: /api/v1/user/stats
+  controller: App\Controller\Api\UserController::stats
+  methods: [GET]
 
 api_user_profile_get:
   path: /api/v1/user/profile
@@ -63,6 +83,11 @@ api_subscriptions_list:
   controller: App\Controller\Api\SubscriptionController::list
   methods: [GET]
 
+api_subscriptions_purchase:
+  path: /api/v1/subscriptions/purchase
+  controller: App\Controller\Api\SubscriptionController::purchase
+  methods: [POST]
+
 api_subscriptions_plans:
   path: /api/v1/subscriptions/plans
   controller: App\Controller\Api\SubscriptionController::plans
@@ -92,4 +117,104 @@ api_user_push_token:
   path: /api/v1/user/push-token
   controller: App\Controller\Api\PushTokenController::register
   methods: [POST]
+
+api_products_list:
+  path: /api/v1/products
+  controller: App\Controller\Api\ProductController::list
+  methods: [GET]
+
+api_products_purchase:
+  path: /api/v1/products/{id}/purchase
+  controller: App\Controller\Api\ProductController::purchase
+  methods: [POST]
+
+api_clubs_list:
+  path: /api/v1/clubs
+  controller: App\Controller\Api\ClubController::list
+  methods: [GET]
+
+api_club_show:
+  path: /api/v1/clubs/{id}
+  controller: App\Controller\Api\ClubController::show
+  methods: [GET]
+
+api_club_occupancy:
+  path: /api/v1/club/occupancy
+  controller: App\Controller\Api\ClubController::occupancy
+  methods: [GET]
+
+api_club_info:
+  path: /api/v1/club/info
+  controller: App\Controller\Api\ClubController::info
+  methods: [GET]
+
+api_access_exit:
+  path: /api/v1/access/exit
+  controller: App\Controller\Api\AccessController::exit
+  methods: [POST]
+
+api_lockers_list:
+  path: /api/v1/lockers
+  controller: App\Controller\Api\LockerController::list
+  methods: [GET]
+
+api_lockers_my_booking:
+  path: /api/v1/lockers/my-booking
+  controller: App\Controller\Api\LockerController::myBooking
+  methods: [GET]
+
+api_lockers_book:
+  path: /api/v1/lockers/{id}/book
+  controller: App\Controller\Api\LockerController::book
+  methods: [POST]
+
+api_lockers_release:
+  path: /api/v1/lockers/release
+  controller: App\Controller\Api\LockerController::release
+  methods: [POST]
+
+api_notifications_list:
+  path: /api/v1/notifications
+  controller: App\Controller\Api\NotificationController::list
+  methods: [GET]
+
+api_notifications_mark_all_read:
+  path: /api/v1/notifications/read-all
+  controller: App\Controller\Api\NotificationController::markAllRead
+  methods: [POST]
+
+api_notifications_mark_read:
+  path: /api/v1/notifications/{id}/read
+  controller: App\Controller\Api\NotificationController::markRead
+  methods: [POST]
+
+api_feedback_submit:
+  path: /api/v1/feedback
+  controller: App\Controller\Api\FeedbackController::submit
+  methods: [POST]
+
+api_guest_passes_list:
+  path: /api/v1/guest-passes
+  controller: App\Controller\Api\GuestPassController::list
+  methods: [GET]
+
+api_guest_passes_create:
+  path: /api/v1/guest-passes
+  controller: App\Controller\Api\GuestPassController::create
+  methods: [POST]
+
+api_documents_list:
+  path: /api/v1/documents
+  controller: App\Controller\Api\DocumentController::list
+  methods: [GET]
+
+api_documents_upload:
+  path: /api/v1/documents
+  controller: App\Controller\Api\DocumentController::upload
+  methods: [POST]
+
+api_documents_download:
+  path: /api/v1/documents/{id}/download
+  controller: App\Controller\Api\DocumentController::download
+  methods: [GET]
 

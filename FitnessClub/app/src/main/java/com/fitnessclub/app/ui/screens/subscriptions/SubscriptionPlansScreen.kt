@@ -19,13 +19,18 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.data.model.SubscriptionPlan
-import com.fitnessclub.app.ui.theme.*
+import com.fitnessclub.app.ui.theme.AccentOrange
+import com.fitnessclub.app.ui.theme.AppShapes
+import com.fitnessclub.app.ui.theme.Error
+import com.fitnessclub.app.ui.theme.Primary
+import com.fitnessclub.app.ui.theme.Success
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscriptionPlansScreen(
     onNavigateBack: () -> Unit,
     onPromoCode: () -> Unit,
+    onPurchaseSuccess: () -> Unit = {},
     viewModel: SubscriptionPlansViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -101,7 +106,10 @@ fun SubscriptionPlansScreen(
                     }
                     
                     // Plans
-                    items(uiState.plans) { plan ->
+                    items(
+                        items = uiState.plans,
+                        key = { it.safeId }
+                    ) { plan ->
                         SubscriptionPlanCard(
                             plan = plan,
                             discount = if (uiState.appliedPromoCode != null) uiState.promoDiscount else 0,
@@ -159,14 +167,26 @@ fun SubscriptionPlansScreen(
     }
     
     // Purchase dialog
+    var purchaseError by remember { mutableStateOf<String?>(null) }
     showPurchaseDialog?.let { plan ->
         PurchaseConfirmDialog(
             plan = plan,
             discount = if (uiState.appliedPromoCode != null) uiState.promoDiscount else 0,
-            onDismiss = { showPurchaseDialog = null },
+            isLoading = uiState.isLoading,
+            error = purchaseError,
+            onDismiss = { showPurchaseDialog = null; purchaseError = null },
             onConfirm = {
-                viewModel.purchasePlan(plan)
-                showPurchaseDialog = null
+                purchaseError = null
+                viewModel.purchasePlan(
+                    plan = plan,
+                    onSuccess = {
+                        showPurchaseDialog = null
+                        onPurchaseSuccess()
+                    },
+                    onError = { msg ->
+                        purchaseError = msg
+                    }
+                )
             }
         )
     }
@@ -261,7 +281,7 @@ private fun SubscriptionPlanCard(
             
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = plan.name,
+                    text = plan.safeName,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -269,7 +289,7 @@ private fun SubscriptionPlanCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 
                 Text(
-                    text = plan.description,
+                    text = plan.safeDescription,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -277,7 +297,7 @@ private fun SubscriptionPlanCard(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Features
-                plan.features.forEach { feature ->
+                plan.safeFeatures.forEach { feature ->
                     Row(
                         modifier = Modifier.padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -297,10 +317,10 @@ private fun SubscriptionPlanCard(
                 
                 // Duration and visits
                 Row {
-                    if (plan.durationDays > 0) {
+                    if (plan.safeDurationDays > 0) {
                         AssistChip(
                             onClick = {},
-                            label = { Text("${plan.durationDays} дней") },
+                            label = { Text("${plan.safeDurationDays} дней") },
                             leadingIcon = {
                                 Icon(
                                     Icons.Default.CalendarMonth,
@@ -387,6 +407,7 @@ private fun PromoCodeDialog(
                 value = code,
                 onValueChange = { code = it.uppercase() },
                 label = { Text("Промокод") },
+                shape = AppShapes.medium,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -418,6 +439,8 @@ private fun PromoCodeDialog(
 private fun PurchaseConfirmDialog(
     plan: SubscriptionPlan,
     discount: Int,
+    isLoading: Boolean = false,
+    error: String? = null,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -433,19 +456,29 @@ private fun PurchaseConfirmDialog(
         text = {
             Column {
                 Text(
-                    text = plan.name,
+                    text = plan.safeName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Срок: ${plan.durationDays} дней",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                if (plan.safeDurationDays > 0) {
+                    Text(
+                        text = "Срок: ${plan.safeDurationDays} дней",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
                 plan.visitsCount?.let {
                     Text(
                         text = "Посещений: $it",
                         style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        color = Error,
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -457,8 +490,12 @@ private fun PurchaseConfirmDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm) {
-                Text("Оплатить")
+            Button(onClick = onConfirm, enabled = !isLoading) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Оплатить")
+                }
             }
         },
         dismissButton = {

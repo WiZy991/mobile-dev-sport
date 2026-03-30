@@ -1,0 +1,104 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Финансы{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Финансовый отчёт</h1>
+        <form method="get" action="{{ path('admin_section', {section: 'finance'}) }}" class="d-flex align-items-center gap-2">
+            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ dateFrom }}" style="width: auto;">
+            <span class="text-secondary">—</span>
+            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ dateTo }}" style="width: auto;">
+            <button type="submit" class="btn btn-sm btn-primary">Показать</button>
+        </form>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Доход (продажи)</div>
+                <div class="h4 text-success mb-0">{{ income|number_format(0, '', ' ') }} ₽</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Расходы</div>
+                <div class="h4 text-danger mb-0">{{ expenseTotal|number_format(0, '', ' ') }} ₽</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="content-card">
+                <div class="text-secondary small mb-1">Прибыль</div>
+                <div class="h4 mb-0 {{ profit >= 0 ? 'text-success' : 'text-danger' }}">{{ profit|number_format(0, '', ' ') }} ₽</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card mb-4">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Добавить расход</div>
+        <form method="post" action="{{ path('admin_expense_new') }}" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small mb-0">Описание</label>
+                <input type="text" name="description" class="form-control form-control-sm" placeholder="Аренда, зарплата..." required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0">Сумма, ₽</label>
+                <input type="number" name="amount" class="form-control form-control-sm" step="0.01" min="0.01" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0">Дата</label>
+                <input type="date" name="date" class="form-control form-control-sm" value="{{ "now"|date("Y-m-d") }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0">Категория</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">—</option>
+                    <option value="rent">Аренда</option>
+                    <option value="utilities">Коммунальные</option>
+                    <option value="salary">Зарплата</option>
+                    <option value="inventory">Товары</option>
+                    <option value="other">Прочее</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Добавить</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <div class="mb-3 text-primary small fw-semibold text-uppercase">Расходы за период {{ dateFrom }} — {{ dateTo }}</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Описание</th>
+                    <th>Категория</th>
+                    <th>Сумма</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for e in expenses %}
+                    <tr>
+                        <td>{{ e.date|date('d.m.Y') }}</td>
+                        <td>{{ e.description }}</td>
+                        <td>{{ {'rent':'Аренда','utilities':'Коммунальные','salary':'Зарплата','inventory':'Товары','other':'Прочее'}[e.category] ?? e.category ?? '—' }}</td>
+                        <td class="text-danger">{{ e.amount|number_format(0, '', ' ') }} ₽</td>
+                        <td>
+                            <form method="post" action="{{ path('admin_expense_delete', {id: e.id}) }}" class="d-inline" onsubmit="return confirm('Удалить расход?');">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary py-0">×</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary">Нет расходов за выбранный период</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

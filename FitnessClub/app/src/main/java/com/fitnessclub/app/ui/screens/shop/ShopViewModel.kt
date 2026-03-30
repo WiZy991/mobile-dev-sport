@@ -2,6 +2,8 @@ package com.fitnessclub.app.ui.screens.shop
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.repository.ProductRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,11 +14,15 @@ import javax.inject.Inject
 
 data class ShopUiState(
     val isLoading: Boolean = true,
-    val items: List<ShopItem> = emptyList()
+    val items: List<ShopItem> = emptyList(),
+    val error: String? = null,
+    val purchaseMessage: String? = null
 )
 
 @HiltViewModel
-class ShopViewModel @Inject constructor() : ViewModel() {
+class ShopViewModel @Inject constructor(
+    private val productRepository: ProductRepository
+) : ViewModel() {
     
     private val _uiState = MutableStateFlow(ShopUiState())
     val uiState: StateFlow<ShopUiState> = _uiState.asStateFlow()
@@ -25,141 +31,94 @@ class ShopViewModel @Inject constructor() : ViewModel() {
         loadItems()
     }
     
-    private fun loadItems() {
+    fun loadItems() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
             
-            val items = listOf(
-                // Services
-                ShopItem(
-                    id = "srv-1",
-                    name = "Пробная тренировка",
-                    description = "Пробная тренировка — это отличная возможность познакомиться с клубом, получить консультацию тренера и пройти исследование состава тела.",
-                    price = 0.0,
-                    category = ShopCategory.SERVICES
-                ),
-                ShopItem(
-                    id = "srv-2",
-                    name = "Йога",
-                    description = "Йога – это отличный способ отвлечься от проблем и избавиться от ненужных мыслей.",
-                    price = 350.0,
-                    oldPrice = 500.0,
-                    category = ShopCategory.SERVICES,
-                    isPromo = true,
-                    promoText = "действует персональное предложение"
-                ),
-                ShopItem(
-                    id = "srv-3",
-                    name = "Пилатес",
-                    description = "Укрепление мышц кора, улучшение осанки и гибкости.",
-                    price = 500.0,
-                    category = ShopCategory.SERVICES
-                ),
-                ShopItem(
-                    id = "srv-4",
-                    name = "Персональная тренировка",
-                    description = "Индивидуальное занятие с персональным тренером.",
-                    price = 2000.0,
-                    category = ShopCategory.SERVICES
-                ),
-                
-                // Subscriptions
-                ShopItem(
-                    id = "sub-1",
-                    name = "Безлимит на месяц",
-                    description = "Неограниченное посещение всех групповых занятий в течение месяца.",
-                    price = 4500.0,
-                    oldPrice = 5000.0,
-                    category = ShopCategory.SUBSCRIPTIONS,
-                    isPromo = true,
-                    promoText = "скидка 10% при онлайн оплате"
-                ),
-                ShopItem(
-                    id = "sub-2",
-                    name = "Безлимит на 3 месяца",
-                    description = "Неограниченное посещение на 3 месяца + заморозка 14 дней.",
-                    price = 12000.0,
-                    category = ShopCategory.SUBSCRIPTIONS
-                ),
-                ShopItem(
-                    id = "sub-3",
-                    name = "Безлимит на год",
-                    description = "Максимальная выгода! Безлимит на год + заморозка 30 дней.",
-                    price = 36000.0,
-                    oldPrice = 48000.0,
-                    category = ShopCategory.SUBSCRIPTIONS,
-                    isPromo = true,
-                    promoText = "скидка 25%!"
-                ),
-                ShopItem(
-                    id = "sub-4",
-                    name = "8 занятий",
-                    description = "8 групповых занятий на выбор в течение месяца.",
-                    price = 3500.0,
-                    category = ShopCategory.SUBSCRIPTIONS
-                ),
-                
-                // Deposits
-                ShopItem(
-                    id = "dep-1",
-                    name = "Пополнение 1000 руб.",
-                    description = "Пополните депозит и оплачивайте услуги со скидкой 5%.",
-                    price = 1000.0,
-                    category = ShopCategory.DEPOSITS
-                ),
-                ShopItem(
-                    id = "dep-2",
-                    name = "Пополнение 5000 руб.",
-                    description = "Пополните депозит и получите бонус 500 руб.",
-                    price = 5000.0,
-                    category = ShopCategory.DEPOSITS,
-                    isPromo = true,
-                    promoText = "+500 руб. бонусом"
-                ),
-                ShopItem(
-                    id = "dep-3",
-                    name = "Пополнение 10000 руб.",
-                    description = "Пополните депозит и получите бонус 1500 руб.",
-                    price = 10000.0,
-                    category = ShopCategory.DEPOSITS,
-                    isPromo = true,
-                    promoText = "+1500 руб. бонусом"
-                ),
-                
-                // Goods
-                ShopItem(
-                    id = "good-1",
-                    name = "Полотенце с логотипом",
-                    description = "Мягкое хлопковое полотенце с логотипом клуба.",
-                    price = 800.0,
-                    category = ShopCategory.GOODS
-                ),
-                ShopItem(
-                    id = "good-2",
-                    name = "Бутылка для воды",
-                    description = "Спортивная бутылка 750 мл.",
-                    price = 600.0,
-                    category = ShopCategory.GOODS
-                ),
-                ShopItem(
-                    id = "good-3",
-                    name = "Перчатки для фитнеса",
-                    description = "Профессиональные перчатки для тренировок.",
-                    price = 1200.0,
-                    category = ShopCategory.GOODS
-                )
-            )
-            
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    items = items
-                )
+            runCatching {
+                when (val result = productRepository.getProducts()) {
+                    is ApiResult.Success -> {
+                        val apiItems = result.data
+                        val subDepItems = getMockSubscriptionAndDepositItems()
+                        val allItems = if (apiItems.isNotEmpty()) apiItems + subDepItems else getMockItems()
+                        _uiState.update {
+                            it.copy(isLoading = false, items = allItems)
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                items = getMockItems(),
+                                error = result.message
+                            )
+                        }
+                    }
+                    is ApiResult.Loading -> { /* no-op */ }
+                }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        items = getMockItems(),
+                        error = e.message ?: "Ошибка загрузки"
+                    )
+                }
             }
         }
     }
     
+    private fun getMockSubscriptionAndDepositItems(): List<ShopItem> = listOf(
+        ShopItem(id = "sub-1", name = "Безлимит на месяц", description = "Неограниченное посещение всех занятий. Купите в разделе Абонементы.", price = 4500.0, category = ShopCategory.SUBSCRIPTIONS),
+        ShopItem(id = "sub-2", name = "Безлимит на 3 месяца", description = "Неограниченное посещение на 3 месяца + заморозка.", price = 12000.0, category = ShopCategory.SUBSCRIPTIONS),
+        ShopItem(id = "dep-1", name = "Пополнение депозита", description = "Пополните депозит в клубе.", price = 1000.0, category = ShopCategory.DEPOSITS)
+    )
+
+    private fun getMockItems(): List<ShopItem> = listOf(
+        ShopItem(id = "srv-1", name = "Пробная тренировка", description = "Пробная тренировка — отличная возможность познакомиться с клубом.", price = 0.0, category = ShopCategory.SERVICES),
+        ShopItem(id = "srv-2", name = "Йога", description = "Йога – отличный способ отвлечься от проблем.", price = 350.0, category = ShopCategory.SERVICES),
+        ShopItem(id = "sub-1", name = "Безлимит на месяц", description = "Неограниченное посещение всех занятий.", price = 4500.0, category = ShopCategory.SUBSCRIPTIONS),
+        ShopItem(id = "good-1", name = "Полотенце с логотипом", description = "Мягкое хлопковое полотенце.", price = 800.0, category = ShopCategory.GOODS)
+    ) + getMockSubscriptionAndDepositItems()
+    
     fun buyItem(item: ShopItem) {
-        // TODO: Implement purchase flow
+        viewModelScope.launch {
+            when {
+                item.id.startsWith("product-") -> {
+                    when (val result = productRepository.purchaseProduct(item.id)) {
+                        is ApiResult.Success -> {
+                            _uiState.update {
+                                it.copy(purchaseMessage = "Покупка оформлена: ${item.name}")
+                            }
+                        }
+                        is ApiResult.Error -> {
+                            _uiState.update {
+                                it.copy(error = result.message ?: "Ошибка покупки")
+                            }
+                        }
+                        is ApiResult.Loading -> { /* no-op */ }
+                    }
+                }
+                item.id.startsWith("sub-") -> {
+                    _uiState.update {
+                        it.copy(purchaseMessage = "Абонементы — в разделе «Абонементы»")
+                    }
+                }
+                item.price == 0.0 -> {
+                    _uiState.update {
+                        it.copy(purchaseMessage = "Оформите услугу в клубе")
+                    }
+                }
+                else -> {
+                    _uiState.update {
+                        it.copy(purchaseMessage = "Оформите покупку в клубе")
+                    }
+                }
+            }
+        }
+    }
+    
+    fun clearPurchaseMessage() {
+        _uiState.update { it.copy(purchaseMessage = null, error = null) }
     }
 }

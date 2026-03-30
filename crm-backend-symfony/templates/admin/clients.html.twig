@@ -5,6 +5,31 @@
 {% block body %}
     <div class="content-header">
         <h1 class="h4 mb-0">Клиенты</h1>
+        <div>
+            <a href="{{ path('admin_clients_export') }}?q={{ search|default('')|url_encode }}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
+            <a href="{{ path('admin_client_new') }}" class="btn btn-sm btn-primary">+ Новый клиент</a>
+        </div>
+    </div>
+
+    <div class="content-card mb-3">
+        <form method="get" action="{{ path('admin_section', {section: 'clients'}) }}" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small mb-0">Поиск</label>
+                <input type="text" name="q" class="form-control form-control-sm" placeholder="Имя, email, телефон..." value="{{ search|default('') }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-0">Тег</label>
+                <select name="tag_id" class="form-select form-select-sm">
+                    <option value="">— Все —</option>
+                    {% for tag in allTags|default([]) %}
+                        <option value="{{ tag.id }}" {{ (filterTagId|default(null)) == tag.id ? 'selected' : '' }}>{{ tag.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-primary">Найти</button>
+            </div>
+        </form>
     </div>
 
     <div class="content-card">
@@ -14,8 +39,10 @@
                 <tr>
                     <th>ID</th>
                     <th>Имя</th>
+                    <th>Теги</th>
                     <th>Email</th>
                     <th>Телефон</th>
+                    <th>Паспорт</th>
                     <th>Бонусы</th>
                     <th>Создан</th>
                 </tr>
@@ -29,14 +56,22 @@
                             </a>
                         </td>
                         <td>{{ client.name }}</td>
+                        <td>{% for tag in client.tags %}<span class="badge me-1" style="background-color: {{ tag.color ?? '#6c757d' }}">{{ tag.name }}</span>{% else %}—{% endfor %}</td>
                         <td>{{ client.email }}</td>
-                        <td>{{ client.phone }}</td>
+                        <td><a href="tel:{{ (client.phone ?? '')|replace({' ': '', '-': '', '(': '', ')': ''}) }}" class="link-light text-decoration-none">{{ client.phone }}</a></td>
+                        <td>
+                            {% if client.passportSeries and client.passportNumber %}
+                                <span class="badge bg-success" title="Данные для абонемента заполнены">✓</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark" title="Заполните паспорт для выдачи абонемента">—</span>
+                            {% endif %}
+                        </td>
                         <td>{{ client.bonusPoints }}</td>
                         <td>{{ client.createdAt|date('d.m.Y H:i') }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="6" class="text-center text-secondary">
+                        <td colspan="8" class="text-center text-secondary">
                             Пока нет ни одного клиента.
                         </td>
                     </tr>

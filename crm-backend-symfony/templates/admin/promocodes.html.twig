@@ -1,0 +1,195 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Промокоды{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Промокоды</h1>
+        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNewPromo">+ Новый промокод</button>
+    </div>
+
+    <div class="content-card mb-3">
+        <form method="post" action="{{ path('admin_section', {section: 'promocodes'}) }}" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Код *</label>
+                <input type="text" name="code" class="form-control form-control-sm" placeholder="SUMMER20" required>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Скидка %</label>
+                <input type="number" name="discount_percent" class="form-control form-control-sm" placeholder="20" step="0.01" min="0" max="100">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Скидка ₽</label>
+                <input type="number" name="discount_amount" class="form-control form-control-sm" placeholder="500" step="0.01" min="0">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Действует с</label>
+                <input type="date" name="valid_from" class="form-control form-control-sm">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">До</label>
+                <input type="date" name="valid_to" class="form-control form-control-sm">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Лимит использований</label>
+                <input type="number" name="usage_limit" class="form-control form-control-sm" placeholder="∞" min="1">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Создать</button>
+            </div>
+        </form>
+        <div class="small text-secondary mt-1">Укажите либо скидку в %, либо фиксированную сумму. Код сохраняется в верхнем регистре.</div>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Код</th>
+                    <th>Скидка</th>
+                    <th>Период</th>
+                    <th>Использований</th>
+                    <th>Статус</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for promo in promoCodes %}
+                    <tr>
+                        <td>{{ promo.id }}</td>
+                        <td><code>{{ promo.code }}</code></td>
+                        <td>
+                            {% if promo.discountPercent %}
+                                {{ promo.discountPercent|number_format(0, '', '') }}%
+                            {% elseif promo.discountAmount %}
+                                {{ promo.discountAmount|number_format(0, '', ' ') }} ₽
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ promo.validFrom ? promo.validFrom|date('d.m.Y') : '—' }}
+                            —
+                            {{ promo.validTo ? promo.validTo|date('d.m.Y') : '—' }}
+                        </td>
+                        <td>{{ promo.usedCount }}{% if promo.usageLimit %} / {{ promo.usageLimit }}{% endif %}</td>
+                        <td>
+                            <span class="badge {{ promo.isValid ? 'bg-success' : 'bg-secondary' }}">
+                                {{ promo.isActive ? 'Активен' : 'Отключён' }}{% if not promo.isValid and promo.isActive %} (истёк){% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEditPromo{{ promo.id }}">Редактировать</button>
+                            <form method="post" action="{{ path('admin_promo_toggle', {id: promo.id}) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-{{ promo.isActive ? 'warning' : 'success' }}">
+                                    {{ promo.isActive ? 'Выкл' : 'Вкл' }}
+                                </button>
+                            </form>
+                            <form method="post" action="{{ path('admin_promo_delete', {id: promo.id}) }}" class="d-inline" onsubmit="return confirm('Удалить промокод?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary">Пока нет промокодов.</td>
+                    </tr>
+                {% endfor %}
+                {% for promo in promoCodes %}
+                    <div class="modal fade" id="modalEditPromo{{ promo.id }}" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content bg-dark border-secondary">
+                                <div class="modal-header">
+                                    <h5 class="modal-title small text-primary fw-semibold">Редактировать {{ promo.code }}</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="post" action="{{ path('admin_promo_update', {id: promo.id}) }}">
+                                    <div class="modal-body">
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <label class="form-label small">Код *</label>
+                                                <input type="text" name="code" class="form-control form-control-sm" value="{{ promo.code }}" required>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small">Скидка %</label>
+                                                <input type="number" name="discount_percent" class="form-control form-control-sm" step="0.01" min="0" value="{{ promo.discountPercent ?? '' }}">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small">Скидка ₽</label>
+                                                <input type="number" name="discount_amount" class="form-control form-control-sm" step="0.01" min="0" value="{{ promo.discountAmount ?? '' }}">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small">Лимит использований</label>
+                                                <input type="number" name="usage_limit" class="form-control form-control-sm" min="1" value="{{ promo.usageLimit ?? '' }}">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small">Действует с</label>
+                                                <input type="date" name="valid_from" class="form-control form-control-sm" value="{{ promo.validFrom ? promo.validFrom|date('Y-m-d') : '' }}">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small">До</label>
+                                                <input type="date" name="valid_to" class="form-control form-control-sm" value="{{ promo.validTo ? promo.validTo|date('Y-m-d') : '' }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">Сохранить</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalNewPromo" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary">
+                <div class="modal-header">
+                    <h5 class="modal-title small text-primary fw-semibold">Новый промокод</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{{ path('admin_section', {section: 'promocodes'}) }}">
+                    <div class="modal-body">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Код *</label>
+                                <input type="text" name="code" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Скидка %</label>
+                                <input type="number" name="discount_percent" class="form-control form-control-sm" step="0.01" min="0">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Скидка ₽</label>
+                                <input type="number" name="discount_amount" class="form-control form-control-sm" step="0.01" min="0">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Лимит использований</label>
+                                <input type="number" name="usage_limit" class="form-control form-control-sm" min="1">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Действует с</label>
+                                <input type="date" name="valid_from" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">До</label>
+                                <input type="date" name="valid_to" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-sm btn-primary">Создать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

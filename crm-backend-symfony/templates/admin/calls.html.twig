@@ -1,0 +1,28 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Звонки{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Звонки</h1>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="text-primary small fw-semibold text-uppercase mb-2">Связь с клиентами</div>
+        <p class="text-secondary small mb-3">Быстрый доступ к контактам для звонков. Используйте ссылки ниже для звонка из браузера на мобильном.</p>
+        <div class="row g-2">
+            <div class="col-12">
+                <a href="{{ path('admin_section', {section: 'clients'}) }}" class="btn btn-sm btn-outline-primary">Перейти к клиентам</a>
+                <a href="{{ path('admin_section', {section: 'leads'}) }}" class="btn btn-sm btn-outline-primary">Перейти к лидам</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="text-primary small fw-semibold text-uppercase mb-2">Рекомендации</div>
+        <ul class="small text-secondary mb-0">
+            <li>В карточке клиента и лида отображается телефон — на мобильном устройстве можно нажать для звонка</li>
+            <li>Для интеграции с колл-центром или CRM-звонками потребуется отдельная настройка (API телефонии)</li>
+        </ul>
+    </div>
+{% endblock %}

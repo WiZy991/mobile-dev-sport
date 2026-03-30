@@ -54,6 +54,25 @@ class SubscriptionRepository @Inject constructor(
             ApiResult.Error(e.message ?: "Неизвестная ошибка")
         }
     }
+
+    suspend fun purchaseSubscription(planId: String, promoCode: String? = null): ApiResult<Subscription> {
+        return try {
+            val response = api.purchaseSubscription(
+                com.fitnessclub.app.data.api.PurchaseSubscriptionRequest(
+                    planId = planId,
+                    promoCode = promoCode
+                )
+            )
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                val msg = response.message() ?: response.errorBody()?.string() ?: "Ошибка покупки абонемента"
+                ApiResult.Error(msg, response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+        }
+    }
     
     fun freezeSubscription(subscriptionId: String, days: Int): Flow<ApiResult<Subscription>> = flow {
         emit(ApiResult.Loading)

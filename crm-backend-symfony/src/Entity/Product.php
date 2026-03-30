@@ -28,6 +28,9 @@ class Product
     #[ORM\Column(type: 'boolean')]
     private bool $isActive = true;
 
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $quantity = null; // остаток на складе (для товаров)
+
     public function getId(): ?int
     {
         return $this->id;
@@ -85,6 +88,17 @@ class Product
     public function setIsActive(bool $isActive): self
     {
         $this->isActive = $isActive;
+        return $this;
+    }
+
+    public function getQuantity(): ?int
+    {
+        return $this->quantity;
+    }
+
+    public function setQuantity(?int $quantity): self
+    {
+        $this->quantity = $quantity;
         return $this;
     }
 }

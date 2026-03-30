@@ -20,19 +20,23 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClubInfoScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    viewModel: ClubInfoViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    
+    val uiState by viewModel.uiState.collectAsState()
+    val club = uiState.club
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("FitnessClub") },
+                title = { Text(club?.name ?: "FitnessClub") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
@@ -40,7 +44,8 @@ fun ClubInfoScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+74991234567"))
+                        val phone = club?.phone?.replace(Regex("[^+0-9]"), "") ?: "74991234567"
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
                         context.startActivity(intent)
                     }) {
                         Icon(Icons.Default.Call, contentDescription = "Позвонить")
@@ -55,11 +60,20 @@ fun ClubInfoScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            if (uiState.isLoading && uiState.club == null) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (uiState.error != null && uiState.club == null) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(uiState.error!!)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { viewModel.loadClubInfo() }) { Text("Повторить") }
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
             // Club image placeholder
             item {
                 Box(
@@ -111,7 +125,8 @@ fun ClubInfoScreen(
                     color = AccentBlue.copy(alpha = 0.1f)
                 ) {
                     Text(
-                        text = "Добро пожаловать! Работаем ежедневно с 7:00 до 23:00",
+                        text = club?.workingHours?.let { "Добро пожаловать! $it" }
+                            ?: "Добро пожаловать! Работаем ежедневно с 7:00 до 23:00",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(16.dp)
                     )
@@ -129,10 +144,11 @@ fun ClubInfoScreen(
                     Column {
                         ContactItem(
                             icon = Icons.Default.LocationOn,
-                            text = "г. Москва, ул. Примерная, д. 123",
+                            text = club?.address ?: "г. Москва, ул. Примерная, д. 123",
                             iconColor = Primary,
                             onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=Москва,+ул.+Примерная,+123"))
+                                val addr = club?.address ?: "Москва ул Примерная 123"
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(addr)}"))
                                 context.startActivity(intent)
                             }
                         )
@@ -140,10 +156,11 @@ fun ClubInfoScreen(
                         
                         ContactItem(
                             icon = Icons.Default.Phone,
-                            text = "+7 (499) 123-45-67",
+                            text = club?.phone ?: "+7 (499) 123-45-67",
                             iconColor = Primary,
                             onClick = {
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+74991234567"))
+                                val phone = club?.phone?.replace(Regex("[^+0-9]"), "") ?: "74991234567"
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
                                 context.startActivity(intent)
                             }
                         )
@@ -151,10 +168,11 @@ fun ClubInfoScreen(
                         
                         ContactItem(
                             icon = Icons.Default.Email,
-                            text = "info@fitnessclub.ru",
+                            text = club?.email ?: "info@fitnessclub.ru",
                             iconColor = Primary,
                             onClick = {
-                                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:info@fitnessclub.ru"))
+                                val email = club?.email ?: "info@fitnessclub.ru"
+                                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email"))
                                 context.startActivity(intent)
                             }
                         )
@@ -230,15 +248,21 @@ fun ClubInfoScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        WorkingHoursRow("Пн-Пт", "7:00 - 23:00")
-                        WorkingHoursRow("Сб", "8:00 - 22:00")
-                        WorkingHoursRow("Вс", "9:00 - 21:00")
+                        club?.workingHours?.let { hours ->
+                            Text(hours, style = MaterialTheme.typography.bodyMedium)
+                        } ?: run {
+                            WorkingHoursRow("Пн-Пт", "7:00 - 23:00")
+                            WorkingHoursRow("Сб", "8:00 - 22:00")
+                            WorkingHoursRow("Вс", "9:00 - 21:00")
+                        }
                     }
                 }
             }
             
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
             }
         }
     }

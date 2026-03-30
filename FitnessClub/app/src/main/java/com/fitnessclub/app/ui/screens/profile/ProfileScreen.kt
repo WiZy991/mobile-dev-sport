@@ -16,8 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.fitnessclub.app.data.api.Achievement
 import com.fitnessclub.app.data.model.Subscription
 import com.fitnessclub.app.data.model.SubscriptionStatus
+import com.fitnessclub.app.ui.components.PrimaryButton
+import com.fitnessclub.app.ui.components.SecondaryButton
 import com.fitnessclub.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,9 +32,14 @@ fun ProfileScreen(
     onNavigateToQrCode: () -> Unit = {},
     onNavigateToSubscriptionPlans: () -> Unit = {},
     onNavigateToReferral: () -> Unit = {},
+    onNavigateToGuestPass: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToEditProfile: () -> Unit = {}
+    onNavigateToEditProfile: () -> Unit = {},
+    onNavigateToDocuments: () -> Unit = {},
+    onNavigateToPurchaseHistory: () -> Unit = {},
+    onNavigateToHelp: () -> Unit = {},
+    onNavigateToAbout: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -91,6 +99,17 @@ fun ProfileScreen(
                     )
                 }
                 
+                // Gamification (streak & achievements)
+                if (uiState.stats != null) {
+                    item {
+                        GamificationCard(
+                            totalVisits = uiState.stats!!.totalVisits,
+                            streakDays = uiState.stats!!.streakDays,
+                            achievements = uiState.stats!!.achievements
+                        )
+                    }
+                }
+                
                 // Quick actions
                 item {
                     QuickActionsRow(
@@ -137,8 +156,13 @@ fun ProfileScreen(
                 
                 item {
                     MenuCard(
+                        onGuestPassClick = onNavigateToGuestPass,
                         onNotificationsClick = onNavigateToNotifications,
-                        onSettingsClick = onNavigateToSettings
+                        onSettingsClick = onNavigateToSettings,
+                        onDocumentsClick = onNavigateToDocuments,
+                        onPurchaseHistoryClick = onNavigateToPurchaseHistory,
+                        onHelpClick = onNavigateToHelp,
+                        onAboutClick = onNavigateToAbout
                     )
                 }
             }
@@ -178,6 +202,63 @@ fun ProfileScreen(
                 showFreezeDialog = null
             }
         )
+    }
+}
+
+@Composable
+private fun GamificationCard(
+    totalVisits: Int,
+    streakDays: Int,
+    achievements: List<Achievement>
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = AccentOrange.copy(alpha = 0.12f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$totalVisits", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text("посещений", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$streakDays", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = AccentOrange)
+                    Text("дней подряд", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (achievements.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Достижения", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+                achievements.take(4).forEach { ach ->
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = null,
+                            tint = AccentOrange,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(ach.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(ach.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -378,7 +459,7 @@ private fun SubscriptionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -468,7 +549,7 @@ private fun SubscriptionCard(
             if (subscription.status == SubscriptionStatus.ACTIVE && subscription.freezeDaysLeft > 0) {
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                OutlinedButton(
+                SecondaryButton(
                     onClick = onFreezeClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -485,7 +566,7 @@ private fun SubscriptionCard(
             if (subscription.status == SubscriptionStatus.FROZEN) {
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                Button(
+                PrimaryButton(
                     onClick = onUnfreezeClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -528,6 +609,7 @@ private fun SubscriptionStatusChip(status: SubscriptionStatus) {
     }
     
     Surface(
+        modifier = Modifier.widthIn(min = 72.dp),
         color = backgroundColor,
         shape = RoundedCornerShape(8.dp)
     ) {
@@ -535,6 +617,7 @@ private fun SubscriptionStatusChip(status: SubscriptionStatus) {
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = textColor,
+            maxLines = 1,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
         )
     }
@@ -568,7 +651,7 @@ private fun EmptySubscriptionsCard(onBuyClick: () -> Unit = {}) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Button(onClick = onBuyClick) {
+            PrimaryButton(onClick = onBuyClick) {
                 Text("Купить абонемент")
             }
         }
@@ -577,8 +660,13 @@ private fun EmptySubscriptionsCard(onBuyClick: () -> Unit = {}) {
 
 @Composable
 private fun MenuCard(
+    onGuestPassClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onDocumentsClick: () -> Unit = {},
+    onPurchaseHistoryClick: () -> Unit = {},
+    onHelpClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -586,9 +674,27 @@ private fun MenuCard(
     ) {
         Column {
             MenuItem(
+                icon = Icons.Default.PersonAdd,
+                title = "Гостевой пропуск",
+                onClick = onGuestPassClick
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            MenuItem(
                 icon = Icons.Default.Notifications,
                 title = "Уведомления",
                 onClick = onNotificationsClick
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            MenuItem(
+                icon = Icons.Default.Description,
+                title = "Документы",
+                onClick = onDocumentsClick
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            MenuItem(
+                icon = Icons.Default.ReceiptLong,
+                title = "История покупок",
+                onClick = onPurchaseHistoryClick
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             MenuItem(
@@ -600,13 +706,13 @@ private fun MenuCard(
             MenuItem(
                 icon = Icons.Default.Help,
                 title = "Помощь",
-                onClick = { }
+                onClick = onHelpClick
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             MenuItem(
                 icon = Icons.Default.Info,
                 title = "О приложении",
-                onClick = { }
+                onClick = onAboutClick
             )
         }
     }

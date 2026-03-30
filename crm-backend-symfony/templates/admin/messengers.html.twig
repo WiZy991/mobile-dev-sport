@@ -1,0 +1,40 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Мессенджеры{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Мессенджеры</h1>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="text-primary small fw-semibold text-uppercase mb-2">Интеграции</div>
+        <p class="text-secondary small mb-3">Подключите мессенджеры для общения с клиентами. В будущем здесь будут интеграции с Telegram, WhatsApp, VK и др.</p>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="p-3 rounded bg-dark bg-opacity-50 border border-secondary">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-info me-2">Скоро</span>
+                        <strong>Telegram Bot</strong>
+                    </div>
+                    <div class="small text-secondary">Уведомления о записях, напоминания о тренировках</div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-3 rounded bg-dark bg-opacity-50 border border-secondary">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-info me-2">Скоро</span>
+                        <strong>WhatsApp</strong>
+                    </div>
+                    <div class="small text-secondary">Подтверждение записи, рассылки по клиентам</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="text-primary small fw-semibold text-uppercase mb-2">Чат поддержки</div>
+        <p class="text-secondary small">Ссылка на чат поддержки отображается в мобильном приложении. Настройте в разделе «Настройки клуба» поле контактов.</p>
+        <a href="{{ path('admin_settings_club') }}" class="btn btn-sm btn-outline-primary">Настройки клуба</a>
+    </div>
+{% endblock %}

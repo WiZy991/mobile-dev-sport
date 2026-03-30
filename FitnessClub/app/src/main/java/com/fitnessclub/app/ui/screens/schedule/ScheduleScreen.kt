@@ -199,7 +199,14 @@ private fun FilterChips(
         FilterChip(
             selected = selectedFilter == TrainingType.PERSONAL,
             onClick = { onFilterSelected(TrainingType.PERSONAL) },
-            label = { Text("Персональные") }
+            modifier = Modifier.widthIn(min = 110.dp),
+            label = {
+                Text(
+                    "Персональные",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         )
     }
 }

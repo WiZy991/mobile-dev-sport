@@ -39,24 +39,35 @@ class SubscriptionPlansViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             
-            when (val result = subscriptionRepository.getSubscriptionPlansSuspend()) {
-                is ApiResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            plans = result.data
-                        )
+            runCatching {
+                when (val result = subscriptionRepository.getSubscriptionPlansSuspend()) {
+                    is ApiResult.Success -> {
+                        val validPlans = result.data.filter { it.safeId.isNotBlank() && it.safeName.isNotBlank() }
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                plans = validPlans
+                            )
+                        }
                     }
-                }
-                is ApiResult.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = result.message
-                        )
+                    is ApiResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                error = result.message
+                            )
+                        }
                     }
+                    is ApiResult.Loading -> { /* handled by initial update */ }
                 }
-                is ApiResult.Loading -> { /* handled by initial update */ }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Ошибка загрузки",
+                        plans = emptyList()
+                    )
+                }
             }
         }
     }
@@ -105,18 +116,27 @@ class SubscriptionPlansViewModel @Inject constructor(
         }
     }
     
-    fun purchasePlan(plan: SubscriptionPlan) {
+    fun purchasePlan(plan: SubscriptionPlan, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            
-            // Mock purchase - in real app would redirect to payment
-            kotlinx.coroutines.delay(1000)
-            
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    purchaseSuccess = true
-                )
+            _uiState.update { it.copy(isLoading = true, error = null) }
+
+            when (val result = subscriptionRepository.purchaseSubscription(
+                planId = plan.safeId,
+                promoCode = _uiState.value.appliedPromoCode
+            )) {
+                is ApiResult.Success -> {
+                    _uiState.update {
+                        it.copy(isLoading = false, purchaseSuccess = true)
+                    }
+                    onSuccess()
+                }
+                is ApiResult.Error -> {
+                    _uiState.update {
+                        it.copy(isLoading = false)
+                    }
+                    onError(result.message)
+                }
+                is ApiResult.Loading -> { /* no-op */ }
             }
         }
     }
