@@ -7,6 +7,7 @@ use App\Entity\Sale;
 use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
 use App\Entity\User;
+use App\Service\Api\SberMobileAuthService;
 use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +21,8 @@ class SubscriptionController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
+        private readonly SberMobileAuthService $sberMobileAuth,
+        private readonly bool $requireSberVerificationBeforePurchase = false,
     ) {}
 
     #[Route('', name: 'api_subscriptions_list', methods: ['GET'])]
@@ -77,6 +80,31 @@ class SubscriptionController extends AbstractController
         $plan = $this->em->getRepository(SubscriptionPlan::class)->find($planId);
         if (!$plan) {
             return $this->json(['error' => 'Plan not found'], 404);
+        }
+
+        if ($this->requireSberVerificationBeforePurchase) {
+            if (!$this->sberMobileAuth->isReady()) {
+                return $this->json([
+                    'code' => 'sber_not_configured',
+                    'error' => 'Включена обязательная верификация, но Сбер ID для приложения не настроен (SBER_ID_*, SBER_ID_MOBILE_REDIRECT_URI).',
+                ], 503);
+            }
+            if ($user->getPassportVerificationStatus() !== 'verified') {
+                try {
+                    $authorizeUrl = $this->sberMobileAuth->buildAuthorizeUrlForUser($user);
+                } catch (\Throwable $e) {
+                    return $this->json([
+                        'code' => 'sber_url_failed',
+                        'error' => $e->getMessage(),
+                    ], 500);
+                }
+
+                return $this->json([
+                    'code' => 'verification_required',
+                    'message' => 'Требуется верификация через Сбер ID. После успеха вернитесь в приложение и нажмите «Купить» снова.',
+                    'authorize_url' => $authorizeUrl,
+                ], 403);
+            }
         }
 
         $price = $plan->getPrice();
@@ -137,7 +165,7 @@ class SubscriptionController extends AbstractController
             ->setQuantity(1)
             ->setPrice($price)
             ->setTotal($price)
-            ->setPaymentMethod('card') // покупка в приложении
+            ->setPaymentMethod('app_acquiring_stub') // после подключения эквайринга — webhook подтверждения оплаты
             ->setSubscription($sub);
         if ($promo) {
             $sale->setPromoCode($promo);

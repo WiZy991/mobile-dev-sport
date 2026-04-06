@@ -8,6 +8,7 @@
         <span class="text-secondary small">Сегодня {{ "now"|date("d.m.Y") }}</span>
     </div>
 
+    {% if admin_can_mutate() %}
     <div class="content-card mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="text-primary small fw-semibold text-uppercase">Быстрые действия</span>
@@ -70,43 +71,62 @@
             {% endfor %}
         </div>
     </div>
+    {% endif %}
 
     <div class="row g-3">
         <div class="col-6 col-md-2">
+            {% if menu.clients is defined %}
             <a href="{{ path('admin_section', {section: 'clients'}) }}" class="text-decoration-none text-reset">
-                <div class="content-card h-100" style="cursor: pointer;">
+            {% endif %}
+                <div class="content-card h-100" {% if menu.clients is defined %}style="cursor: pointer;"{% endif %}>
                     <div class="text-secondary small mb-1">Активные клиенты</div>
                     <div class="h4 mb-0">{{ stats.clients }}</div>
                 </div>
+            {% if menu.clients is defined %}
             </a>
+            {% endif %}
         </div>
         <div class="col-6 col-md-2">
+            {% if menu.leads is defined %}
             <a href="{{ path('admin_section', {section: 'leads'}) }}" class="text-decoration-none text-reset">
-                <div class="content-card h-100" style="cursor: pointer;">
+            {% endif %}
+                <div class="content-card h-100" {% if menu.leads is defined %}style="cursor: pointer;"{% endif %}>
                     <div class="text-secondary small mb-1">Открытые лиды</div>
                     <div class="h4 mb-0">{{ stats.leads }}</div>
                 </div>
+            {% if menu.leads is defined %}
             </a>
+            {% endif %}
         </div>
         <div class="col-6 col-md-2">
+            {% if menu.schedule is defined %}
             <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="text-decoration-none text-reset">
-                <div class="content-card h-100" style="cursor: pointer;">
+            {% endif %}
+                <div class="content-card h-100" {% if menu.schedule is defined %}style="cursor: pointer;"{% endif %}>
                     <div class="text-secondary small mb-1">Тренировки сегодня</div>
                     <div class="h4 mb-0">{{ stats.trainingsToday }}</div>
                 </div>
+            {% if menu.schedule is defined %}
             </a>
+            {% endif %}
         </div>
         <div class="col-6 col-md-2">
+            {% if menu.visits is defined %}
             <a href="{{ path('admin_section', {section: 'visits'}) }}" class="text-decoration-none text-reset">
-                <div class="content-card h-100" style="cursor: pointer;">
+            {% endif %}
+                <div class="content-card h-100" {% if menu.visits is defined %}style="cursor: pointer;"{% endif %}>
                     <div class="text-secondary small mb-1">Посещений сегодня</div>
                     <div class="h4 mb-0">{{ stats.visitsToday|default(0) }}</div>
                 </div>
+            {% if menu.visits is defined %}
             </a>
+            {% endif %}
         </div>
         <div class="col-6 col-md-2">
+            {% if menu.cashdesk is defined %}
             <a href="{{ path('admin_section', {section: 'cashdesk'}) }}?date={{ "now"|date("Y-m-d") }}" class="text-decoration-none text-reset">
-                <div class="content-card h-100" style="cursor: pointer;">
+            {% endif %}
+                <div class="content-card h-100" {% if menu.cashdesk is defined %}style="cursor: pointer;"{% endif %}>
                     <div class="text-secondary small mb-1">Выручка за день</div>
                     <div class="h4 mb-0">
                         {% if stats.revenueToday %}
@@ -116,11 +136,15 @@
                         {% endif %}
                     </div>
                 </div>
+            {% if menu.cashdesk is defined %}
             </a>
+            {% endif %}
         </div>
         <div class="col-6 col-md-2">
+            {% if menu.finance is defined %}
             <a href="{{ path('admin_section', {section: 'finance'}) }}" class="text-decoration-none text-reset">
-                <div class="content-card h-100" style="cursor: pointer;">
+            {% endif %}
+                <div class="content-card h-100" {% if menu.finance is defined %}style="cursor: pointer;"{% endif %}>
                     <div class="text-secondary small mb-1">Выручка за месяц</div>
                     <div class="h4 mb-0">
                         {% if stats.revenueMonth is defined and stats.revenueMonth %}
@@ -130,11 +154,13 @@
                         {% endif %}
                     </div>
                 </div>
+            {% if menu.finance is defined %}
             </a>
+            {% endif %}
         </div>
     </div>
 
-    {% if funnelLeads is defined and (funnelLeads.new > 0 or funnelLeads.converted > 0) %}
+    {% if menu.leads is defined and funnelLeads is defined and (funnelLeads.new > 0 or funnelLeads.converted > 0) %}
     <div class="content-card mt-3 mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="text-primary small fw-semibold text-uppercase">Лиды</span>
@@ -172,6 +198,7 @@
     </div>
     {% endif %}
 
+    {% if menu.tasks is defined %}
     <div class="mt-4 content-card">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h2 class="h6 mb-0">Задачи</h2>
@@ -222,7 +249,9 @@
             </table>
         </div>
     </div>
+    {% endif %}
     
+    {% if admin_can_mutate() %}
     {# Модальное окно "Новый лид" #}
     <div class="modal fade" id="modalNewLead" tabindex="-1" aria-labelledby="modalNewLeadLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -377,6 +406,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <script>
         document.getElementById('dashboardProductSelect')?.addEventListener('change', function() {

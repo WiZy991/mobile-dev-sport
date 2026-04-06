@@ -44,14 +44,66 @@
                     <label class="form-label small">Долгота</label>
                     <input type="text" name="longitude" class="form-control form-control-sm" value="{{ club.longitude }}">
                 </div>
-                <div class="col-12 mt-2">
-                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                <div class="col-12 mt-3">
+                    <div class="text-primary small fw-semibold text-uppercase mb-2">Баннер на главной экране приложения</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Заголовок акции / новости</label>
+                    <input type="text" name="promo_home_title" class="form-control form-control-sm" value="{{ club.promo_home_title }}" placeholder="СКИДКА 20%!">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Подзаголовок</label>
+                    <input type="text" name="promo_home_subtitle" class="form-control form-control-sm" value="{{ club.promo_home_subtitle }}" placeholder="на все карты 12 и 6 месяцев">
+                </div>
+            </div>
+
+            <hr class="border-secondary my-3">
+
+            <div class="mb-2 text-primary small fw-semibold text-uppercase">СКУД PERCo-Web (модуль интеграции WM04)</div>
+            <p class="small text-secondary mb-2">
+                HTTP/JSON API сервера PERCo-Web в локальной сети клуба. Описание модуля:
+                <a href="https://www.perco.ru/products/perco-wm-04-integratsiya-s-vneshnimi-sistemami.php" target="_blank" rel="noopener">PERCo-WM04</a>.
+                Примеры запросов: <a href="https://github.com/percodev/api_examples" target="_blank" rel="noopener">percodev/api_examples</a>.
+            </p>
+            <input type="hidden" name="perco_enabled" value="0">
+            <div class="row g-2 align-items-end">
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="perco_enabled" value="1" id="perco_enabled" {{ club.perco_enabled == '1' ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="perco_enabled">Включить исходящие запросы к PERCo-Web</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Базовый URL сервера PERCo-Web</label>
+                    <input type="text" name="perco_base_url" class="form-control form-control-sm" value="{{ club.perco_base_url }}" placeholder="https://192.168.0.10:8443">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Логин API</label>
+                    <input type="text" name="perco_login" class="form-control form-control-sm" value="{{ club.perco_login }}" autocomplete="off">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Пароль API</label>
+                    <input type="password" name="perco_password" class="form-control form-control-sm" placeholder="Оставьте пустым, чтобы не менять" autocomplete="new-password">
+                </div>
+                <div class="col-12">
+                    <input type="hidden" name="perco_verify_ssl" value="0">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="perco_verify_ssl" value="1" id="perco_verify_ssl" {{ club.perco_verify_ssl != '0' ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="perco_verify_ssl">Проверять SSL-сертификат (снимите для самоподписанного сертификата на стенде)</label>
+                    </div>
+                </div>
+                <div class="col-12 mt-2 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary">Сохранить всё</button>
+                    {% if admin_can_mutate() %}
+                    <button type="submit" class="btn btn-outline-secondary btn-sm" formaction="{{ path('admin_perco_test') }}" formmethod="post" title="Проверяет сохранённые в БД настройки — сначала нажмите «Сохранить», если меняли URL или пароль">Проверить авторизацию PERCo</button>
+                    {% endif %}
                 </div>
             </div>
         </form>
     </div>
 
     <div class="alert alert-info small">
-        Эти данные отображаются в мобильном приложении (раздел «О клубе») и возвращаются API <code>GET /api/v1/club/info</code>.
+        Данные клуба и баннер главной — в API <code>GET /api/v1/club/info</code> (приложение и «О клубе»).
+        Вход по QR из приложения обрабатывается через <code>POST /api/v1/access/entry</code> (шлюз у турникета передаёт содержимое QR; при необходимости тот же шлюз может дублировать логику на стороне PERCo-Web).
     </div>
 {% endblock %}

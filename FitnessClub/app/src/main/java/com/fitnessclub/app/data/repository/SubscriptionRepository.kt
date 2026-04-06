@@ -4,6 +4,8 @@ import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.model.Subscription
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.google.gson.annotations.SerializedName
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
@@ -11,7 +13,8 @@ import javax.inject.Singleton
 
 @Singleton
 class SubscriptionRepository @Inject constructor(
-    private val api: FitnessApi
+    private val api: FitnessApi,
+    private val gson: Gson,
 ) {
     
     fun getMySubscriptions(): Flow<ApiResult<List<Subscription>>> = flow {
@@ -55,7 +58,7 @@ class SubscriptionRepository @Inject constructor(
         }
     }
 
-    suspend fun purchaseSubscription(planId: String, promoCode: String? = null): ApiResult<Subscription> {
+    suspend fun purchaseSubscription(planId: String, promoCode: String? = null): PurchaseSubscriptionOutcome {
         return try {
             val response = api.purchaseSubscription(
                 com.fitnessclub.app.data.api.PurchaseSubscriptionRequest(
@@ -64,13 +67,35 @@ class SubscriptionRepository @Inject constructor(
                 )
             )
             if (response.isSuccessful && response.body() != null) {
-                ApiResult.Success(response.body()!!)
+                PurchaseSubscriptionOutcome.Success(response.body()!!)
             } else {
-                val msg = response.message() ?: response.errorBody()?.string() ?: "Ошибка покупки абонемента"
-                ApiResult.Error(msg, response.code())
+                val raw = response.errorBody()?.string().orEmpty()
+                val parsed = runCatching {
+                    gson.fromJson(raw, SubscriptionPurchaseErrorBody::class.java)
+                }.getOrNull()
+                when {
+                    response.code() == 403 &&
+                        parsed?.code == "verification_required" &&
+                        !parsed.authorizeUrl.isNullOrBlank() -> {
+                        PurchaseSubscriptionOutcome.VerificationRequired(
+                            authorizeUrl = parsed.authorizeUrl,
+                            message = parsed.message
+                                ?: "Требуется верификация через Сбер ID. После успеха вернитесь и нажмите «Купить» снова.",
+                        )
+                    }
+                    else -> {
+                        val msg = listOfNotNull(
+                            parsed?.message,
+                            parsed?.error,
+                            raw.takeIf { it.isNotBlank() },
+                            response.message(),
+                        ).firstOrNull() ?: "Ошибка покупки абонемента"
+                        PurchaseSubscriptionOutcome.Error(msg, response.code())
+                    }
+                }
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            PurchaseSubscriptionOutcome.Error(e.message ?: "Неизвестная ошибка", null)
         }
     }
     
@@ -102,3 +127,10 @@ class SubscriptionRepository @Inject constructor(
         }
     }
 }
+
+private data class SubscriptionPurchaseErrorBody(
+    @SerializedName("code") val code: String? = null,
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("error") val error: String? = null,
+    @SerializedName("authorize_url") val authorizeUrl: String? = null,
+)

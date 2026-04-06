@@ -38,7 +38,7 @@ class TrainersViewModel @Inject constructor(
                 val apiTrainers = result.body() ?: emptyList()
                 val trainers = apiTrainers.map { t ->
                     TrainerInfo(
-                        id = t.id,
+                        id = t.id.orEmpty(),
                         name = t.name,
                         specialization = t.specialization ?: "",
                         rating = t.rating,

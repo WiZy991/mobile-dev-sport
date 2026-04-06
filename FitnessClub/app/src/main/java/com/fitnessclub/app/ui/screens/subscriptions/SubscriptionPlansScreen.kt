@@ -1,5 +1,10 @@
 package com.fitnessclub.app.ui.screens.subscriptions
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -11,12 +16,14 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.ui.theme.AccentOrange
@@ -36,8 +43,12 @@ fun SubscriptionPlansScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showPromoDialog by remember { mutableStateOf(false) }
     var showPurchaseDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
-    
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Купить абонемент") },
@@ -142,7 +153,8 @@ fun SubscriptionPlansScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     "• Оплата онлайн или в клубе\n" +
-                                    "• Заморозка до 14 дней\n" +
+                                    "• Если клуб включил проверку — подтверждение через Сбер ID перед оплатой\n" +
+                                    "• Заморозка до 14 дней (по правилам тарифа)\n" +
                                     "• Возврат в течение 14 дней",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -183,6 +195,13 @@ fun SubscriptionPlansScreen(
                         showPurchaseDialog = null
                         onPurchaseSuccess()
                     },
+                    onVerificationRequired = { url, message ->
+                        showPurchaseDialog = null
+                        scope.launch {
+                            snackbarHostState.showSnackbar(message)
+                        }
+                        openSberVerification(context, url)
+                    },
                     onError = { msg ->
                         purchaseError = msg
                     }
@@ -190,6 +209,20 @@ fun SubscriptionPlansScreen(
             }
         )
     }
+}
+
+private fun openSberVerification(context: Context, url: String) {
+    val activity = context.findActivity() ?: return
+    CustomTabsIntent.Builder()
+        .setShowTitle(true)
+        .build()
+        .launchUrl(activity, Uri.parse(url))
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable
@@ -319,7 +352,8 @@ private fun SubscriptionPlanCard(
                 Row {
                     if (plan.safeDurationDays > 0) {
                         AssistChip(
-                            onClick = {},
+                            onClick = { },
+                            enabled = false,
                             label = { Text("${plan.safeDurationDays} дней") },
                             leadingIcon = {
                                 Icon(
@@ -333,7 +367,8 @@ private fun SubscriptionPlanCard(
                     }
                     plan.visitsCount?.let { visits ->
                         AssistChip(
-                            onClick = {},
+                            onClick = { },
+                            enabled = false,
                             label = { Text("$visits посещений") },
                             leadingIcon = {
                                 Icon(

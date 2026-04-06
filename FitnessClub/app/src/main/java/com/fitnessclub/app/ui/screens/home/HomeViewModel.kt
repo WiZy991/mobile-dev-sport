@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.model.BookingStatus
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -71,33 +72,45 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             loadOccupancy()
             loadUnreadCount()
-            _uiState.update { 
-                it.copy(
-                    upcomingTrainings = listOf(
-                        UpcomingTraining(
-                            id = "1",
-                            name = "Йога",
-                            time = "09:00",
-                            trainer = "Мария И.",
-                            room = "Зал йоги"
-                        ),
-                        UpcomingTraining(
-                            id = "2",
-                            name = "Силовая",
-                            time = "11:00",
-                            trainer = "Алексей П.",
-                            room = "Тренажёрный зал"
-                        ),
-                        UpcomingTraining(
-                            id = "3",
-                            name = "Кардио",
-                            time = "14:00",
-                            trainer = "Елена С.",
-                            room = "Аэробный зал"
-                        )
-                    )
-                )
-            }
+            try {
+                val clubRes = api.getClubInfo()
+                if (clubRes.isSuccessful) {
+                    clubRes.body()?.let { c ->
+                        _uiState.update { s ->
+                            s.copy(
+                                promoTitle = c.promoTitle?.takeIf { it.isNotBlank() } ?: s.promoTitle,
+                                promoSubtitle = c.promoSubtitle?.takeIf { it.isNotBlank() } ?: s.promoSubtitle
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) { }
+
+            try {
+                val bookRes = api.getMyBookings()
+                if (bookRes.isSuccessful) {
+                    val upcoming = (bookRes.body() ?: emptyList())
+                        .filter { it.status != BookingStatus.CANCELLED }
+                        .sortedBy { it.training.startTime }
+                        .take(8)
+                        .map { b ->
+                            val t = b.training
+                            val time = try {
+                                t.startTime.substring(11, 16)
+                            } catch (_: Exception) {
+                                "—"
+                            }
+                            UpcomingTraining(
+                                id = t.id,
+                                name = t.name,
+                                time = time,
+                                trainer = t.trainer.name,
+                                room = t.room
+                            )
+                        }
+                    _uiState.update { it.copy(upcomingTrainings = upcoming) }
+                }
+            } catch (_: Exception) { }
         }
     }
 }

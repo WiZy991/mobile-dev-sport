@@ -3,6 +3,9 @@
 {% block title %}CRM FitnessClub — Клиент {{ client.name }}{% endblock %}
 
 {% block body %}
+    {% if not admin_can_mutate() %}
+        <div class="alert alert-secondary py-2 small mb-3">Режим просмотра: редактирование, блокировки, заметки, абонементы и верификация недоступны.</div>
+    {% endif %}
     <div class="content-header">
         <h1 class="h4 mb-0">Клиент: {{ client.name }}</h1>
         <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -12,6 +15,7 @@
             {% if client.isBlocked %}
                 <span class="badge bg-danger">Доступ в приложение заблокирован</span>
             {% endif %}
+            {% if admin_can_mutate() %}
             <form method="post" action="{{ path('admin_client_block', {id: client.id}) }}" class="d-inline">
                 <button type="submit" class="btn btn-sm btn-{{ client.isBlocked ? 'success' : 'warning' }}">
                     {{ client.isBlocked ? 'Разблокировать приложение' : 'Заблокировать приложение' }}
@@ -20,9 +24,37 @@
             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editClientForm">
                 Редактировать
             </button>
+            {% endif %}
         </div>
     </div>
 
+    <div class="content-card mb-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+                <div class="small text-secondary">Верификация документа (Сбер ID)</div>
+                <div>
+                    {% set st = client.passportVerificationStatus %}
+                    {% if st == 'verified' %}
+                        <span class="badge bg-success">Подтверждено</span>
+                        {% if client.passportVerifiedAt %}<span class="small text-secondary ms-1">{{ client.passportVerifiedAt|date('d.m.Y H:i') }}</span>{% endif %}
+                        {% if client.passportVerificationSubject %}<span class="small text-secondary ms-1">sub: {{ client.passportVerificationSubject }}</span>{% endif %}
+                    {% elseif st == 'pending' %}
+                        <span class="badge bg-warning text-dark">В процессе</span>
+                    {% elseif st == 'rejected' %}
+                        <span class="badge bg-danger">Отклонено</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Не проводилась</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if admin_can_mutate() %}
+            <a href="{{ path('admin_sber_id_start', {id: client.id}) }}" class="btn btn-sm btn-outline-warning">Подтвердить через Сбер ID</a>
+            {% endif %}
+        </div>
+        <p class="small text-secondary mb-0 mt-2">После настройки SBER_ID_* в окружении сотрудник перенаправляется на Сбер ID; по возврату клиенту проставляется статус верификации и сохраняются утверждения id_token (без юридической силы сопоставления с паспортом — при необходимости добавьте ручную сверку).</p>
+    </div>
+
+    {% if admin_can_mutate() %}
     <div class="collapse mb-3" id="editClientForm">
         <div class="content-card">
             <form method="post" action="{{ path('admin_client_update', {id: client.id}) }}">
@@ -104,6 +136,7 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
     <div class="content-card mb-3">
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Лента активности</div>
@@ -160,10 +193,12 @@
             </div>
             <div class="content-card mb-3">
                 <div class="text-secondary small mb-2">Заметки</div>
+                {% if admin_can_mutate() %}
                 <form method="post" action="{{ path('admin_note_new', {id: client.id}) }}">
                     <textarea name="text" class="form-control form-control-sm mb-2" rows="2" placeholder="Добавить заметку..."></textarea>
                     <button type="submit" class="btn btn-sm btn-primary">Добавить</button>
                 </form>
+                {% endif %}
                 {% for note in clientNotes|default([]) %}
                     <div class="border-top border-secondary pt-2 mt-2 small">
                         {{ note.text|nl2br }}
@@ -233,6 +268,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    {% if admin_can_mutate() %}
                                     {% if sub.status == 'active' %}
                                         <form method="post" action="{{ path('admin_subscription_freeze', {id: sub.id}) }}" class="d-inline">
                                             <button type="submit" class="btn btn-sm btn-outline-warning">Заморозить</button>
@@ -242,6 +278,7 @@
                                             <button type="submit" class="btn btn-sm btn-outline-success">Разморозить</button>
                                         </form>
                                     {% endif %}
+                                    {% else %}—{% endif %}
                                 </td>
                             </tr>
                         {% else %}
@@ -301,8 +338,11 @@
     <div class="content-card mt-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="text-primary small fw-semibold text-uppercase">Задачи</span>
+            {% if menu.tasks is defined %}
             <a href="{{ path('admin_section', {section: 'tasks'}) }}?client_id={{ client.id }}" class="btn btn-sm btn-outline-primary">Все задачи</a>
+            {% endif %}
         </div>
+        {% if admin_can_mutate() %}
         <form method="post" action="{{ path('admin_task_new') }}" class="row g-2 mb-3">
             <input type="hidden" name="client_id" value="{{ client.id }}">
             <input type="hidden" name="return_to_client" value="{{ client.id }}">
@@ -316,6 +356,7 @@
                 <button type="submit" class="btn btn-sm btn-primary">+ Задача</button>
             </div>
         </form>
+        {% endif %}
         <div class="table-responsive">
             <table class="table table-sm table-dark align-middle mb-0">
                 <thead>
@@ -345,7 +386,7 @@
                         </td>
                         <td>{{ task.dueAt ? task.dueAt|date('d.m.Y H:i') : '—' }}</td>
                         <td>
-                            {% if task.status != 'done' %}
+                            {% if admin_can_mutate() and task.status != 'done' %}
                                 <form method="post" action="{{ path('admin_task_complete', {id: task.id}) }}" class="d-inline">
                                     <button type="submit" class="btn btn-sm btn-outline-success">Закрыть</button>
                                 </form>

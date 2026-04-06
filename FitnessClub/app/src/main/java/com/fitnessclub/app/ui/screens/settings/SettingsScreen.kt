@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalUriHandler
@@ -30,6 +31,8 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uriHandler = LocalUriHandler.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var pushEnabled by remember { mutableStateOf(true) }
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var emailEnabled by remember { mutableStateOf(true) }
@@ -38,6 +41,7 @@ fun SettingsScreen(
     var scheduleChanges by remember { mutableStateOf(true) }
     
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Настройки") },
@@ -110,20 +114,35 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Lock,
                     title = "Изменить пароль",
-                    onClick = { /* Требует API восстановления пароля в CRM */ }
+                    onClick = {
+                        runCatching { uriHandler.openUri(AppConfig.FORGOT_PASSWORD_URL) }
+                            .onFailure {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Не удалось открыть страницу восстановления")
+                                }
+                            }
+                    }
                 )
-                
+
                 ClickableSettingItem(
                     icon = Icons.Default.Fingerprint,
                     title = "Биометрия",
                     subtitle = "Вход по отпечатку пальца",
-                    onClick = { /* В разработке */ }
+                    onClick = {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Скоро: вход по биометрии")
+                        }
+                    }
                 )
-                
+
                 ClickableSettingItem(
                     icon = Icons.Default.Security,
                     title = "Двухфакторная аутентификация",
-                    onClick = { /* В разработке */ }
+                    onClick = {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("2FA появится в обновлении приложения")
+                        }
+                    }
                 )
             }
             
@@ -133,14 +152,22 @@ fun SettingsScreen(
                     icon = Icons.Default.Language,
                     title = "Язык",
                     subtitle = "Русский",
-                    onClick = { /* В разработке */ }
+                    onClick = {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Другие языки будут добавлены позже")
+                        }
+                    }
                 )
-                
+
                 ClickableSettingItem(
                     icon = Icons.Default.Palette,
                     title = "Тема",
                     subtitle = "Системная",
-                    onClick = { /* В разработке */ }
+                    onClick = {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Выбор темы — в следующем обновлении")
+                        }
+                    }
                 )
                 
                 ClickableSettingItem(

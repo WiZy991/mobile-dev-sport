@@ -10,7 +10,7 @@ data class Training(
     val name: String,
     
     @SerializedName("description")
-    val description: String,
+    val description: String? = null,
     
     @SerializedName("type")
     val type: TrainingType,
@@ -55,9 +55,13 @@ data class Training(
 enum class TrainingType {
     @SerializedName("group")
     GROUP,
-    
+
     @SerializedName("personal")
-    PERSONAL
+    PERSONAL,
+
+    /** Дополнительные услуги (солярий, массаж и т.п.) — слоты в расписании как у групповых */
+    @SerializedName("extra")
+    EXTRA
 }
 
 enum class Intensity {
@@ -73,7 +77,7 @@ enum class Intensity {
 
 data class Trainer(
     @SerializedName("id")
-    val id: String,
+    val id: String? = null,
     
     @SerializedName("name")
     val name: String,

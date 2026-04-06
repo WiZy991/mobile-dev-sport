@@ -1,0 +1,41 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM — {{ staffUser ? 'Редактирование' : 'Новый' }} пользователь{% endblock %}
+
+{% block body %}
+<div class="content-header">
+    <h1 class="h4 mb-0">{{ staffUser ? 'Редактирование: ' ~ staffUser.email : 'Новый пользователь CRM' }}</h1>
+    <a href="{{ path('admin_crm_staff_index') }}" class="btn btn-sm btn-outline-secondary">Назад</a>
+</div>
+
+<div class="content-card">
+    <form method="post" action="{{ staffUser ? path('admin_crm_staff_edit', {id: staffUser.id}) : path('admin_crm_staff_new') }}" class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label small">Email</label>
+            <input type="email" name="email" class="form-control form-control-sm" required value="{{ staffUser ? staffUser.email : '' }}">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small">Имя</label>
+            <input type="text" name="name" class="form-control form-control-sm" required value="{{ staffUser ? staffUser.name : '' }}">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small">Пароль {{ staffUser ? '(оставьте пустым, чтобы не менять)' : '' }}</label>
+            <input type="password" name="password" class="form-control form-control-sm" {{ staffUser ? '' : 'required' }} autocomplete="new-password">
+        </div>
+        <div class="col-12">
+            <label class="form-label small">Роли</label>
+            <div class="d-flex flex-wrap gap-3">
+                {% for role, label in selectableRoles %}
+                    <label class="small mb-0"><input type="checkbox" name="roles[]" value="{{ role }}" {{ role in checkedRoles ? 'checked' : '' }}> {{ label }}</label>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="col-12">
+            <label class="small mb-0"><input type="checkbox" name="is_active" value="1" {{ (staffUser is null or staffUser.isActive) ? 'checked' : '' }}> Учётная запись активна</label>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-sm btn-success">Сохранить</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -97,9 +97,11 @@ class SeedDataCommand extends Command
             }
         }
 
-        // 3b. Персональные тренировки (для экрана "Индивидуальная тренировка")
+        // 3b. Персональные тренировки (экран «Индивидуальная тренировка» в приложении)
+        // Окно ~90 дней от «сегодня», иначе при листании месяцев слотов не видно (раньше было только 7 дней).
+        $personalHorizonDays = 90;
         $personalNames = ['Йога тренировка', 'Силовая тренировка', 'Пилатес', 'Бокс'];
-        for ($d = 0; $d < 7; $d++) {
+        for ($d = 0; $d < $personalHorizonDays; $d++) {
             $date = $today->modify("+{$d} days");
             for ($i = 0; $i < 2; $i++) {
                 $start = $date->setTime(9 + $i * 2, 0);
@@ -118,6 +120,25 @@ class SeedDataCommand extends Command
                     ->setCurrentParticipants(0);
                 $this->em->persist($t);
             }
+        }
+
+        // 3c. Допуслуги (тип extra — запись как на групповое)
+        $extraNames = ['Солярий 10 мин', 'Массаж классический'];
+        for ($d = 0; $d < 7; $d++) {
+            $date = $today->modify("+{$d} days");
+            $start = $date->setTime(18, 0);
+            $end = $start->modify('+30 minutes');
+            $t = (new Training())
+                ->setName($extraNames[$d % count($extraNames)])
+                ->setDescription('Дополнительная услуга')
+                ->setType('extra')
+                ->setTrainer($trainerEntities[0])
+                ->setStartAt($start)
+                ->setEndAt($end)
+                ->setRoom('Зона сервиса')
+                ->setMaxParticipants(3)
+                ->setCurrentParticipants(0);
+            $this->em->persist($t);
         }
 
         // 4. Тарифные планы
@@ -180,6 +201,8 @@ class SeedDataCommand extends Command
             ['latitude', '55.7558'],
             ['longitude', '37.6173'],
             ['gym_max_capacity', '100'],
+            ['promo_home_title', 'СКИДКА 20%!'],
+            ['promo_home_subtitle', 'на все карты 12 и 6 месяцев'],
         ];
         foreach ($settings as [$key, $value]) {
             $s = (new ClubSetting())

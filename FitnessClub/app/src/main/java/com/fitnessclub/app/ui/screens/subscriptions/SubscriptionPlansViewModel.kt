@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.data.repository.PurchaseSubscriptionOutcome
 import com.fitnessclub.app.data.repository.SubscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -116,27 +117,35 @@ class SubscriptionPlansViewModel @Inject constructor(
         }
     }
     
-    fun purchasePlan(plan: SubscriptionPlan, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun purchasePlan(
+        plan: SubscriptionPlan,
+        onSuccess: () -> Unit,
+        onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
+        onError: (String) -> Unit,
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            when (val result = subscriptionRepository.purchaseSubscription(
-                planId = plan.safeId,
-                promoCode = _uiState.value.appliedPromoCode
-            )) {
-                is ApiResult.Success -> {
+            when (
+                val result = subscriptionRepository.purchaseSubscription(
+                    planId = plan.safeId,
+                    promoCode = _uiState.value.appliedPromoCode,
+                )
+            ) {
+                is PurchaseSubscriptionOutcome.Success -> {
                     _uiState.update {
                         it.copy(isLoading = false, purchaseSuccess = true)
                     }
                     onSuccess()
                 }
-                is ApiResult.Error -> {
-                    _uiState.update {
-                        it.copy(isLoading = false)
-                    }
+                is PurchaseSubscriptionOutcome.VerificationRequired -> {
+                    _uiState.update { it.copy(isLoading = false) }
+                    onVerificationRequired(result.authorizeUrl, result.message)
+                }
+                is PurchaseSubscriptionOutcome.Error -> {
+                    _uiState.update { it.copy(isLoading = false) }
                     onError(result.message)
                 }
-                is ApiResult.Loading -> { /* no-op */ }
             }
         }
     }

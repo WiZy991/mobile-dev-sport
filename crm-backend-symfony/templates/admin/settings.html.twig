@@ -33,6 +33,12 @@
                 <span class="text-secondary small">Скидки и акции</span>
             </div>
         </div>
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Автоматика (сервер)</div>
+        <p class="small text-secondary mb-2">
+            Уведомления в приложении за 5–7 дней до окончания абонемента:
+            <code class="text-light">php bin/console app:notify-subscription-expiring</code>
+            — добавьте в планировщик (cron) раз в сутки.
+        </p>
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Быстрые ссылки</div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ path('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Дашборд</a>

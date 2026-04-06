@@ -44,8 +44,19 @@ fun PersonalTrainingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showBookingDialog by remember { mutableStateOf<TimeSlot?>(null) }
-    
+    var typeMenuExpanded by remember { mutableStateOf(false) }
+    var trainerMenuExpanded by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.bookSuccessMessage) {
+        uiState.bookSuccessMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.consumeBookSuccess()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Индивидуальная тренировка") },
@@ -75,24 +86,31 @@ fun PersonalTrainingScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { viewModel.previousWeek() }) {
-                    Icon(Icons.Default.ChevronLeft, contentDescription = "Предыдущая неделя")
+                IconButton(onClick = { viewModel.previousPeriod() }) {
+                    Icon(Icons.Default.ChevronLeft, contentDescription = "Назад")
                 }
-                
+
                 Text(
                     text = uiState.currentMonth,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                
+
                 FilterChip(
-                    onClick = { },
-                    label = { Text("месяц") },
-                    selected = false
+                    onClick = { viewModel.toggleCalendarMode() },
+                    label = {
+                        Text(
+                            when (uiState.calendarMode) {
+                                CalendarMode.MONTH -> "неделя"
+                                CalendarMode.WEEK -> "месяц"
+                            }
+                        )
+                    },
+                    selected = uiState.calendarMode == CalendarMode.MONTH
                 )
-                
-                IconButton(onClick = { viewModel.nextWeek() }) {
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Следующая неделя")
+
+                IconButton(onClick = { viewModel.nextPeriod() }) {
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Вперёд")
                 }
             }
             
@@ -124,22 +142,68 @@ fun PersonalTrainingScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterChip(
-                    onClick = { },
-                    label = { Text(uiState.selectedTrainingType ?: "Все тренировки") },
-                    selected = uiState.selectedTrainingType != null,
-                    trailingIcon = {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                Box {
+                    FilterChip(
+                        onClick = { typeMenuExpanded = true },
+                        label = { Text(uiState.selectedTrainingType ?: "Все тренировки") },
+                        selected = uiState.selectedTrainingType != null,
+                        trailingIcon = {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = typeMenuExpanded,
+                        onDismissRequest = { typeMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Все тренировки") },
+                            onClick = {
+                                viewModel.setTrainingTypeFilter(null)
+                                typeMenuExpanded = false
+                            }
+                        )
+                        uiState.trainingTypeOptions.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type) },
+                                onClick = {
+                                    viewModel.setTrainingTypeFilter(type)
+                                    typeMenuExpanded = false
+                                }
+                            )
+                        }
                     }
-                )
-                FilterChip(
-                    onClick = { },
-                    label = { Text(uiState.selectedTrainer ?: "Тренер (все)") },
-                    selected = uiState.selectedTrainer != null,
-                    trailingIcon = {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
+                Box {
+                    FilterChip(
+                        onClick = { trainerMenuExpanded = true },
+                        label = { Text(uiState.selectedTrainer ?: "Тренер (все)") },
+                        selected = uiState.selectedTrainer != null,
+                        trailingIcon = {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = trainerMenuExpanded,
+                        onDismissRequest = { trainerMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Все тренеры") },
+                            onClick = {
+                                viewModel.setTrainerFilter(null)
+                                trainerMenuExpanded = false
+                            }
+                        )
+                        uiState.trainerNameOptions.forEach { name ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                onClick = {
+                                    viewModel.setTrainerFilter(name)
+                                    trainerMenuExpanded = false
+                                }
+                            )
+                        }
                     }
-                )
+                }
             }
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -182,8 +246,15 @@ fun PersonalTrainingScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Нет доступных слотов\nна выбранную дату",
+                            text = "Нет доступных слотов на эту дату",
                             style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Выберите другой день или снимите фильтры. Слоты приходят из CRM: на эту дату нет свободных персональных занятий.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )

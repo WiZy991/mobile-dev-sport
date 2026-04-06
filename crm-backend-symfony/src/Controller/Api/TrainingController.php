@@ -102,11 +102,14 @@ class TrainingController extends AbstractController
 
         $trainer = $t->getTrainer();
 
+        $durationMin = (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60);
+
         return [
             'id' => 'training-' . $t->getId(),
             'name' => $t->getName(),
-            'description' => $t->getDescription(),
+            'description' => $t->getDescription() ?? '',
             'type' => $t->getType(),
+            // Приложение (Gson + Kotlin non-null): без null в id/name/rating
             'trainer' => $trainer ? [
                 'id' => 'trainer-' . $trainer->getId(),
                 'name' => $trainer->getName(),
@@ -114,20 +117,20 @@ class TrainingController extends AbstractController
                 'specialization' => $trainer->getSpecialization(),
                 'rating' => $trainer->getRating(),
             ] : [
-                'id' => null,
-                'name' => $t->getTrainerName(),
+                'id' => '',
+                'name' => $t->getTrainerName() ?: 'Без тренера',
                 'photo_url' => null,
                 'specialization' => null,
-                'rating' => null,
+                'rating' => 0.0,
             ],
             'start_time' => $start->format('Y-m-d\TH:i:s'),
             'end_time' => $end->format('Y-m-d\TH:i:s'),
-            'duration_minutes' => ($end->getTimestamp() - $start->getTimestamp()) / 60,
-            'room' => $t->getRoom(),
+            'duration_minutes' => max(0, $durationMin),
+            'room' => $t->getRoom() ?? '',
             'max_participants' => $t->getMaxParticipants(),
             'current_participants' => $t->getCurrentParticipants(),
             'is_booked' => $isBooked,
-            'intensity' => null,
+            'intensity' => 'medium',
             'image_url' => null,
         ];
     }

@@ -592,7 +592,9 @@ class MockInterceptor : Interceptor {
         "working_hours": "Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00",
         "amenities": ["Тренажёрный зал", "Бассейн", "Йога", "Групповые занятия"],
         "latitude": 55.7558,
-        "longitude": 37.6173
+        "longitude": 37.6173,
+        "promo_title": "СКИДКА 20%!",
+        "promo_subtitle": "на все карты 12 и 6 месяцев"
     }
     """.trimIndent()
     

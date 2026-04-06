@@ -97,6 +97,7 @@ class AuthController extends AbstractController
             'phone' => $user->getPhone(),
             'avatar_url' => $user->getAvatarUrl(),
             'bonus_points' => $user->getBonusPoints(),
+            'passport_verification_status' => $user->getPassportVerificationStatus(),
             'created_at' => $user->getCreatedAt()->format('Y-m-d\TH:i:s'),
         ];
     }

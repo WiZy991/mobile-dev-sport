@@ -35,6 +35,7 @@ import com.fitnessclub.app.ui.screens.profile.ProfileViewModel
 import com.fitnessclub.app.ui.screens.qrcode.QrCodeViewModel
 import com.fitnessclub.app.ui.screens.schedule.ScheduleScreen
 import com.fitnessclub.app.ui.screens.schedule.ScheduleViewModel
+import com.fitnessclub.app.ui.components.SecureScreenEffect
 import com.fitnessclub.app.ui.theme.AppShapes
 import com.fitnessclub.app.ui.theme.Primary
 import com.google.zxing.BarcodeFormat
@@ -247,6 +248,7 @@ fun MainScreen(
             onDismissRequest = { showQrSheet = false },
             sheetState = sheetState
         ) {
+            SecureScreenEffect()
             QrQuickAccessContent(
                 viewModel = qrViewModel,
                 onClose = { showQrSheet = false }
@@ -315,7 +317,15 @@ private fun QrQuickAccessContent(
                 color = MaterialTheme.colorScheme.error
             )
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        if (uiState.secondsRemaining > 0 && uiState.qrCodeData != null) {
+            Text(
+                text = "Обновление кода через ${uiState.secondsRemaining} сек",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Поднесите к сканеру",
             style = MaterialTheme.typography.bodySmall,

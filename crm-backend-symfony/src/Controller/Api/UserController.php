@@ -103,16 +103,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request) ?? $this->createDemoUser();
 
-        return $this->json([
-            'id' => 'user-' . $user->getId(),
-            'email' => $user->getEmail(),
-            'name' => $user->getName(),
-            'phone' => $user->getPhone(),
-            'avatar_url' => $user->getAvatarUrl(),
-            'bonus_points' => $user->getBonusPoints(),
-            'date_of_birth' => $user->getDateOfBirth()?->format('Y-m-d'),
-            'created_at' => $user->getCreatedAt()->format('Y-m-d\TH:i:s'),
-        ]);
+        return $this->json($this->serializeUserProfile($user));
     }
 
     #[Route('/profile', name: 'api_user_profile_update', methods: ['PUT'])]
@@ -139,7 +130,13 @@ class UserController extends AbstractController
         $this->em->persist($user);
         $this->em->flush();
 
-        return $this->json([
+        return $this->json($this->serializeUserProfile($user));
+    }
+
+    /** @return array<string, mixed> */
+    private function serializeUserProfile(User $user): array
+    {
+        return [
             'id' => 'user-' . $user->getId(),
             'email' => $user->getEmail(),
             'name' => $user->getName(),
@@ -147,8 +144,9 @@ class UserController extends AbstractController
             'avatar_url' => $user->getAvatarUrl(),
             'bonus_points' => $user->getBonusPoints(),
             'date_of_birth' => $user->getDateOfBirth()?->format('Y-m-d'),
+            'passport_verification_status' => $user->getPassportVerificationStatus(),
             'created_at' => $user->getCreatedAt()->format('Y-m-d\TH:i:s'),
-        ]);
+        ];
     }
 
     private function computeStreak(User $user): int

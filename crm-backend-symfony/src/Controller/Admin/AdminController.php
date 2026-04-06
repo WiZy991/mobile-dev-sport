@@ -20,6 +20,8 @@ use App\Entity\ClubSetting;
 use App\Entity\Tag;
 use App\Entity\LeadNote;
 use App\Entity\Expense;
+use App\Service\Admin\AdminMenuBuilder;
+use App\Service\Integration\PercoWebClient;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,43 +34,42 @@ class AdminController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly AdminMenuBuilder $adminMenuBuilder,
+        private readonly PercoWebClient $percoWebClient,
     ) {}
-    private function getMenu(): array
+
+    private function buildMenu(): array
     {
-        return [
-            'dashboard' => 'Дашборд',
-            'tasks' => 'Задачи',
-            'clients' => 'Клиенты',
-            'schedule' => 'Расписание',
-            'bookings' => 'Записи на тренировки',
-            'subscriptions' => 'Абонементы',
-            'visits' => 'Посещения',
-            'sales' => 'Продажи',
-            'services' => 'Услуги',
-            'leads' => 'Лиды',
-            'deals' => 'Сделки',
-            'comments' => 'Комментарии',
-            'messengers' => 'Мессенджеры',
-            'calls' => 'Звонки',
-            'selfservice' => 'Самообслуживание',
-            'cashdesk' => 'Касса',
-            'warehouse' => 'Склад',
-            'analytics' => 'Аналитика',
-            'finance' => 'Финансы',
-            'mobileapps' => 'Мобильные приложения',
-            'staff' => 'Персонал',
-            'documents' => 'Документы',
-            'promocodes' => 'Промокоды',
-            'tags' => 'Теги',
-            'settings' => 'Настройки',
-        ];
+        return $this->adminMenuBuilder->buildFor($this->getUser());
+    }
+
+    private function redirectToSchedulePreservingDate(Request $request): Response
+    {
+        $url = $this->generateUrl('admin_section', ['section' => 'schedule']);
+        $d = $request->request->get('redirect_date');
+        if ($d !== null && $d !== '') {
+            $url .= '?date=' . rawurlencode((string) $d);
+        }
+
+        return $this->redirect($url);
+    }
+
+    private function redirectToBookingsPreservingDate(Request $request): Response
+    {
+        $url = $this->generateUrl('admin_section', ['section' => 'bookings']);
+        $d = $request->request->get('redirect_date');
+        if ($d !== null && $d !== '') {
+            $url .= '?date=' . rawurlencode((string) $d);
+        }
+
+        return $this->redirect($url);
     }
 
     #[Route('/search', name: 'admin_search', methods: ['GET'])]
     public function search(Request $request): Response
     {
         $q = trim((string) $request->query->get('q', ''));
-        $menu = $this->getMenu();
+        $menu = $this->buildMenu();
         $results = ['clients' => [], 'leads' => [], 'tasks' => []];
 
         if (mb_strlen($q) >= 2) {
@@ -198,7 +199,7 @@ class AdminController extends AbstractController
         $products = $this->em->getRepository(Product::class)->findBy(['isActive' => true], ['name' => 'ASC']);
 
         return $this->render('admin/dashboard.html.twig', [
-            'menu' => $this->getMenu(),
+            'menu' => $this->buildMenu(),
             'current' => 'dashboard',
             'stats' => [
                 'clients' => $clientsCount,
@@ -219,7 +220,7 @@ class AdminController extends AbstractController
     #[Route('/clients/new', name: 'admin_client_new', methods: ['GET', 'POST'])]
     public function clientNew(Request $request): Response
     {
-        $menu = $this->getMenu();
+        $menu = $this->buildMenu();
 
         if ($request->isMethod('POST')) {
             $email = trim((string) $request->request->get('email', ''));
@@ -295,7 +296,7 @@ class AdminController extends AbstractController
     #[Route('/clients/{id}', name: 'admin_client_show', methods: ['GET'])]
     public function showClient(int $id): Response
     {
-        $menu = $this->getMenu();
+        $menu = $this->buildMenu();
 
         $client = $this->em->getRepository(User::class)->find($id);
         if (!$client) {
@@ -623,7 +624,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/bookings/{id}/cancel', name: 'admin_booking_cancel', methods: ['POST'])]
-    public function cancelBooking(int $id): Response
+    public function cancelBooking(int $id, Request $request): Response
     {
         $booking = $this->em->getRepository(Booking::class)->find($id);
         if ($booking && in_array($booking->getStatus(), ['confirmed', 'waiting'], true)) {
@@ -636,7 +637,7 @@ class AdminController extends AbstractController
             $this->em->flush();
         }
 
-        return $this->redirectToRoute('admin_section', ['section' => 'bookings']);
+        return $this->redirectToBookingsPreservingDate($request);
     }
 
     #[Route('/tasks/new', name: 'admin_task_new', methods: ['POST'])]
@@ -834,10 +835,18 @@ class AdminController extends AbstractController
         $endAt = $endAtRaw ? new \DateTimeImmutable($endAtRaw) : null;
 
         if (!$startAt || !$endAt) {
-            return $this->redirectToRoute('admin_section', ['section' => 'schedule']);
+            return $this->redirectToSchedulePreservingDate($request);
         }
 
         $repeatWeeks = min(12, max(1, (int) $request->request->get('repeat_weeks', 1)));
+        $trainingType = (string) $request->request->get('training_type', 'group');
+        if (!in_array($trainingType, ['group', 'personal', 'extra'], true)) {
+            $trainingType = 'group';
+        }
+        if ($trainingType === 'personal') {
+            $maxParticipants = 1;
+        }
+
         $trainer = null;
         if ($trainerId) {
             $trainer = $this->em->getRepository(Trainer::class)->find((int) $trainerId);
@@ -849,6 +858,12 @@ class AdminController extends AbstractController
 
             $training = (new Training())
                 ->setName($name)
+                ->setDescription(match ($trainingType) {
+                    'personal' => 'Персональное занятие',
+                    'extra' => 'Дополнительная услуга',
+                    default => 'Групповое занятие',
+                })
+                ->setType($trainingType)
                 ->setRoom($room)
                 ->setStartAt($weekStart)
                 ->setEndAt($weekEnd)
@@ -864,10 +879,80 @@ class AdminController extends AbstractController
         $this->em->flush();
         $this->addFlash('success', $repeatWeeks > 1 ? "Добавлено $repeatWeeks тренировок." : 'Тренировка добавлена.');
 
-        return $this->redirectToRoute('admin_section', ['section' => 'schedule']);
+        return $this->redirectToSchedulePreservingDate($request);
     }
 
-    #[Route('/staff/new', name: 'admin_staff_new', methods: ['POST'])]
+    #[Route('/trainings/{id}/update', name: 'admin_training_update', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function updateTraining(int $id, Request $request): Response
+    {
+        $training = $this->em->getRepository(Training::class)->find($id);
+        if (!$training) {
+            throw $this->createNotFoundException();
+        }
+
+        $name = trim((string) $request->request->get('name'));
+        $trainerId = $request->request->get('trainer_id');
+        $room = $request->request->get('room') ?: null;
+        $maxParticipants = (int) $request->request->get('max_participants', $training->getMaxParticipants());
+
+        $trainingType = (string) $request->request->get('training_type', $training->getType());
+        if (!in_array($trainingType, ['group', 'personal', 'extra'], true)) {
+            $trainingType = $training->getType();
+        }
+        if ($trainingType === 'personal') {
+            $maxParticipants = 1;
+        }
+
+        $startAtRaw = $request->request->get('start_at');
+        $endAtRaw = $request->request->get('end_at');
+        $startAt = $startAtRaw ? new \DateTimeImmutable((string) $startAtRaw) : $training->getStartAt();
+        $endAt = $endAtRaw ? new \DateTimeImmutable((string) $endAtRaw) : $training->getEndAt();
+
+        if ($endAt <= $startAt) {
+            $this->addFlash('warning', 'Время окончания должно быть позже начала.');
+
+            return $this->redirectToSchedulePreservingDate($request);
+        }
+
+        if ($name !== '') {
+            $training->setName($name);
+        }
+        $prevType = $training->getType();
+        $training->setType($trainingType);
+        if ($prevType !== $trainingType) {
+            $training->setDescription(match ($trainingType) {
+                'personal' => 'Персональное занятие',
+                'extra' => 'Дополнительная услуга',
+                default => 'Групповое занятие',
+            });
+        }
+        $training->setRoom($room);
+        $maxParticipants = max(0, $maxParticipants);
+        if ($maxParticipants < $training->getCurrentParticipants()) {
+            $this->addFlash('warning', 'Лимит мест меньше числа записанных. Увеличьте лимит или отмените записи.');
+
+            return $this->redirectToSchedulePreservingDate($request);
+        }
+        $training->setMaxParticipants($maxParticipants);
+        $training->setStartAt($startAt)->setEndAt($endAt);
+
+        $trainer = null;
+        if ($trainerId !== null && $trainerId !== '') {
+            $trainer = $this->em->getRepository(Trainer::class)->find((int) $trainerId);
+        }
+        if ($trainer) {
+            $training->setTrainer($trainer)->setTrainerName($trainer->getName());
+        } else {
+            $training->setTrainer(null)->setTrainerName(null);
+        }
+
+        $this->em->flush();
+        $this->addFlash('success', 'Тренировка обновлена (перенесена).');
+
+        return $this->redirectToSchedulePreservingDate($request);
+    }
+
+    #[Route('/trainers/new', name: 'admin_trainer_new', methods: ['POST'])]
     public function createStaff(Request $request): Response
     {
         $name = (string) $request->request->get('name');
@@ -885,7 +970,7 @@ class AdminController extends AbstractController
         $this->em->persist($trainer);
         $this->em->flush();
 
-        return $this->redirectToRoute('admin_section', ['section' => 'staff']);
+        return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
     }
 
     #[Route('/products/{id}/toggle', name: 'admin_product_toggle', methods: ['POST'])]
@@ -925,7 +1010,7 @@ class AdminController extends AbstractController
             }
         }
 
-        return $this->redirectToRoute('admin_section', ['section' => 'staff']);
+        return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
     }
 
     #[Route('/trainers/{id}/update', name: 'admin_trainer_update', methods: ['POST'])]
@@ -943,11 +1028,11 @@ class AdminController extends AbstractController
         $this->em->flush();
         $this->addFlash('success', 'Тренер обновлён.');
 
-        return $this->redirectToRoute('admin_section', ['section' => 'staff']);
+        return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
     }
 
     #[Route('/trainings/{id}/delete', name: 'admin_training_delete', methods: ['POST'])]
-    public function deleteTraining(int $id): Response
+    public function deleteTraining(int $id, Request $request): Response
     {
         $training = $this->em->getRepository(Training::class)->find($id);
         if ($training && $training->getCurrentParticipants() === 0) {
@@ -955,7 +1040,7 @@ class AdminController extends AbstractController
             $this->em->flush();
         }
 
-        return $this->redirectToRoute('admin_section', ['section' => 'schedule']);
+        return $this->redirectToSchedulePreservingDate($request);
     }
 
     #[Route('/subscriptions/issue', name: 'admin_subscription_issue', methods: ['POST'])]
@@ -1104,7 +1189,7 @@ class AdminController extends AbstractController
     #[Route('/settings/club', name: 'admin_settings_club', methods: ['GET', 'POST'])]
     public function settingsClub(Request $request): Response
     {
-        $menu = $this->getMenu();
+        $menu = $this->buildMenu();
 
         $getSetting = function (string $key, string $default = ''): string {
             $s = $this->em->getRepository(ClubSetting::class)->find($key);
@@ -1112,7 +1197,7 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
-            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude'];
+            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
                 $setting = $this->em->getRepository(ClubSetting::class)->find($key);
@@ -1123,6 +1208,18 @@ class AdminController extends AbstractController
                 $setting->setSettingValue($value ?: null);
                 $this->em->persist($setting);
             }
+
+            $percoEnabled = $request->request->get('perco_enabled') === '1' ? '1' : '0';
+            $this->persistSetting('perco_enabled', $percoEnabled);
+            $this->persistSetting('perco_base_url', trim((string) $request->request->get('perco_base_url', '')) ?: null);
+            $this->persistSetting('perco_login', trim((string) $request->request->get('perco_login', '')) ?: null);
+            $percoPass = (string) $request->request->get('perco_password', '');
+            if ($percoPass !== '') {
+                $this->persistSetting('perco_password', $percoPass);
+            }
+            $percoVerify = $request->request->get('perco_verify_ssl') === '1' ? '1' : '0';
+            $this->persistSetting('perco_verify_ssl', $percoVerify);
+
             $this->em->flush();
             $this->addFlash('success', 'Настройки клуба сохранены.');
 
@@ -1141,8 +1238,42 @@ class AdminController extends AbstractController
                 'amenities' => $getSetting('amenities', 'Тренажёрный зал, Бассейн, Йога'),
                 'latitude' => $getSetting('latitude', '55.7558'),
                 'longitude' => $getSetting('longitude', '37.6173'),
+                'promo_home_title' => $getSetting('promo_home_title', 'СКИДКА 20%!'),
+                'promo_home_subtitle' => $getSetting('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
+                'perco_enabled' => $getSetting('perco_enabled', '0'),
+                'perco_base_url' => $getSetting('perco_base_url', ''),
+                'perco_login' => $getSetting('perco_login', ''),
+                'perco_verify_ssl' => $getSetting('perco_verify_ssl', '1'),
             ],
         ]);
+    }
+
+    public function testPercoConnection(): Response
+    {
+        if (!$this->percoWebClient->isConfigured()) {
+            $this->addFlash('warning', 'Заполните и сохраните настройки PERCo-Web, включите интеграцию.');
+
+            return $this->redirectToRoute('admin_settings_club');
+        }
+        try {
+            $this->percoWebClient->testAuthentication();
+            $this->addFlash('success', 'PERCo-Web: авторизация успешна (токен получен).');
+        } catch (\Throwable $e) {
+            $this->addFlash('danger', 'PERCo-Web: ошибка — ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('admin_settings_club');
+    }
+
+    private function persistSetting(string $key, ?string $value): void
+    {
+        $setting = $this->em->getRepository(ClubSetting::class)->find($key);
+        if (!$setting) {
+            $setting = new ClubSetting();
+            $setting->setSettingKey($key);
+        }
+        $setting->setSettingValue($value);
+        $this->em->persist($setting);
     }
 
     #[Route('/documents/upload', name: 'admin_document_upload', methods: ['POST'])]
@@ -1433,7 +1564,7 @@ class AdminController extends AbstractController
     #[Route('/{section}', name: 'admin_section', methods: ['GET', 'POST'])]
     public function section(string $section, Request $request): Response
     {
-        $menu = $this->getMenu();
+        $menu = $this->buildMenu();
         if (!isset($menu[$section])) {
             throw $this->createNotFoundException();
         }
@@ -1738,7 +1869,7 @@ class AdminController extends AbstractController
             ]);
         }
 
-        if ($section === 'staff') {
+        if ($section === 'trainers') {
             $trainers = $this->em->getRepository(Trainer::class)->findBy([], ['id' => 'ASC']);
 
             return $this->render('admin/staff.html.twig', [

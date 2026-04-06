@@ -53,8 +53,9 @@
                         <td>{{ b.bookedAt|date('d.m.Y H:i') }}</td>
                         <td>{{ b.training.startAt|date('d.m.Y H:i') }}</td>
                         <td>
-                            {% if b.status in ['confirmed', 'waiting'] %}
+                            {% if admin_can_coach() and b.status in ['confirmed', 'waiting'] %}
                                 <form method="post" action="{{ path('admin_booking_cancel', {id: b.id}) }}" class="d-inline">
+                                    <input type="hidden" name="redirect_date" value="{{ bookDate|default('') }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Отменить запись?')">Отменить</button>
                                 </form>
                             {% endif %}
@@ -62,8 +63,9 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="7" class="text-center text-secondary">
-                            Пока нет записей на тренировки.
+                        <td colspan="7" class="text-center text-secondary py-4">
+                            <p class="mb-2">Пока нет записей на тренировки.</p>
+                            <p class="small mb-0">Записи появляются, когда клиент бронирует слот в приложении или администратор добавляет запись. Сначала создайте слоты в разделе <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="link-light">Расписание</a> (для приложения «Индивидуальная тренировка» — тип <strong>Персональная</strong>).</p>
                         </td>
                     </tr>
                 {% endfor %}

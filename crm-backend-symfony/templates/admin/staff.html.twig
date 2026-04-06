@@ -2,11 +2,12 @@
 
 {% block body %}
 <div class="content-header">
-    <h1 class="h4 mb-0">Персонал</h1>
+    <h1 class="h4 mb-0">Тренеры</h1>
 </div>
 
+{% if admin_can_mutate() %}
 <div class="content-card mb-3">
-    <form method="post" action="{{ path('admin_staff_new') }}" class="row g-2 align-items-end">
+    <form method="post" action="{{ path('admin_trainer_new') }}" class="row g-2 align-items-end">
         <div class="col-md-3">
             <label class="form-label small text-secondary">Имя</label>
             <input type="text" name="name" class="form-control form-control-sm" required>
@@ -28,6 +29,7 @@
         </div>
     </form>
 </div>
+{% endif %}
 
 <div class="content-card">
     <div class="table-responsive">
@@ -52,12 +54,17 @@
                     <td>{{ t.specialization ?? '—' }}</td>
                     <td>{{ t.rating is not null ? t.rating : '—' }}</td>
                     <td>
+                        {% if admin_can_coach() %}
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#edit-trainer-{{ t.id }}">Изменить</button>
+                        {% endif %}
+                        {% if admin_can_mutate() %}
                         <form method="post" action="{{ path('admin_trainer_delete', {id: t.id}) }}" class="d-inline">
                             <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить тренера?')">Удалить</button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
+                {% if admin_can_coach() %}
                 <tr class="collapse" id="edit-trainer-{{ t.id }}">
                         <td colspan="5" class="bg-dark py-2">
                             <form method="post" action="{{ path('admin_trainer_update', {id: t.id}) }}" class="row g-2 align-items-end">
@@ -83,13 +90,14 @@
                             </form>
                         </td>
                 </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center text-secondary">
-                            Персонал пока не добавлен.
-                        </td>
-                    </tr>
-                {% endfor %}
+                {% endif %}
+            {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-secondary">
+                        Персонал пока не добавлен.
+                    </td>
+                </tr>
+            {% endfor %}
             </tbody>
         </table>
     </div>

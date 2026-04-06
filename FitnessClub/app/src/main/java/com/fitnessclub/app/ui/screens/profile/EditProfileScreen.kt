@@ -14,13 +14,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.ui.theme.Primary
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,7 +32,10 @@ fun EditProfileScreen(
     viewModel: EditProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
+    val uriHandler = LocalUriHandler.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
             onNavigateBack()
@@ -37,6 +43,7 @@ fun EditProfileScreen(
     }
     
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -92,7 +99,13 @@ fun EditProfileScreen(
                     .size(120.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer)
-                    .clickable { /* TODO: Change avatar */ },
+                    .clickable {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                "Смена фото в приложении появится позже. Пока обратитесь в клуб или добавьте документ в разделе «Документы»."
+                            )
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (uiState.avatarUrl != null) {
@@ -215,7 +228,14 @@ fun EditProfileScreen(
             
             // Change password button
             OutlinedButton(
-                onClick = { /* TODO: Navigate to change password */ },
+                onClick = {
+                    runCatching { uriHandler.openUri(AppConfig.FORGOT_PASSWORD_URL) }
+                        .onFailure {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Не удалось открыть ссылку восстановления пароля")
+                            }
+                        }
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Lock, contentDescription = null)

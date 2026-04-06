@@ -18,6 +18,7 @@ release/
 
 # Gradle files
 .gradle/
+.gradle-user-home/
 build/
 
 # Local configuration file

@@ -13,11 +13,21 @@
   </div>
 </div>
 
+{% if admin_can_coach() %}
 <div class="content-card mb-3">
   <form method="post" action="{{ path('admin_training_new') }}" class="row g-2 align-items-end">
-    <div class="col-md-3">
+    <input type="hidden" name="redirect_date" value="{{ scheduleDate|default('now'|date('Y-m-d')) }}">
+    <div class="col-md-2">
       <label class="form-label small text-secondary">Название</label>
       <input type="text" name="name" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary">Тип слота</label>
+      <select name="training_type" class="form-select form-select-sm" title="Персональные — экран «Индивидуальная тренировка» в приложении">
+        <option value="group">Групповая</option>
+        <option value="personal">Персональная (приложение)</option>
+        <option value="extra">Доп. услуга</option>
+      </select>
     </div>
     <div class="col-md-2">
       <label class="form-label small text-secondary">Тренер</label>
@@ -42,7 +52,7 @@
     </div>
     <div class="col-md-1">
       <label class="form-label small text-secondary">Мест</label>
-      <input type="number" name="max_participants" class="form-control form-control-sm" value="10" min="0">
+      <input type="number" name="max_participants" class="form-control form-control-sm" value="10" min="0" title="Для персональной будет 1">
     </div>
     <div class="col-md-1">
       <label class="form-label small text-secondary">Повторять (нед.)</label>
@@ -54,7 +64,9 @@
       </button>
     </div>
   </form>
+  <p class="small text-secondary mb-0 mt-2">Персональные слоты попадают в приложение в раздел записи на индивидуальную тренировку (<code>GET /api/v1/trainings?type=personal</code>). Групповые — в общее расписание.</p>
 </div>
+{% endif %}
 
 <div class="content-card">
   <table class="table table-sm table-dark align-middle mb-0">
@@ -62,6 +74,7 @@
                 <tr>
                     <th>ID</th>
                     <th>Название</th>
+                    <th>Тип</th>
                     <th>Тренер</th>
                     <th>Начало</th>
                     <th>Конец</th>
@@ -80,23 +93,83 @@
             <span class="badge bg-info ms-1">{{ (bookingsByTraining[t.id])|length }}</span>
           {% endif %}
         </td>
+        <td>
+          {% set ttype = t.type|default('group') %}
+          {% if ttype == 'personal' %}<span class="badge bg-warning text-dark">персонал</span>
+          {% elseif ttype == 'extra' %}<span class="badge bg-info">доп</span>
+          {% else %}<span class="badge bg-secondary">группа</span>{% endif %}
+        </td>
         <td>{{ t.trainerName ?? '—' }}</td>
         <td>{{ t.startAt|date('d.m.Y H:i') }}</td>
         <td>{{ t.endAt|date('d.m.Y H:i') }}</td>
         <td>{{ t.maxParticipants }}</td>
         <td>{{ t.currentParticipants }}</td>
-        <td>
-          {% if t.currentParticipants == 0 %}
-            <form method="post" action="{{ path('admin_training_delete', {id: t.id}) }}" class="d-inline" onclick="event.stopPropagation()">
+        <td onclick="event.stopPropagation()">
+          {% if admin_can_coach() %}
+            <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="collapse" data-bs-target="#edit-training-{{ t.id }}">Перенести / править</button>
+          {% endif %}
+          {% if admin_can_coach() and t.currentParticipants == 0 %}
+            <form method="post" action="{{ path('admin_training_delete', {id: t.id}) }}" class="d-inline">
+              <input type="hidden" name="redirect_date" value="{{ scheduleDate|default('now'|date('Y-m-d')) }}">
               <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить тренировку?')">Удалить</button>
             </form>
           {% endif %}
         </td>
       </tr>
+      {% if admin_can_coach() %}
+      <tr class="collapse" id="edit-training-{{ t.id }}">
+        <td colspan="9" class="bg-dark bg-opacity-50 py-2 border-secondary border-top">
+          <div class="small text-secondary mb-2">Изменить слот (перенос времени, зал, тренер, вместимость)</div>
+          <form method="post" action="{{ path('admin_training_update', {id: t.id}) }}" class="row g-2 align-items-end">
+            <input type="hidden" name="redirect_date" value="{{ scheduleDate|default('now'|date('Y-m-d')) }}">
+            <div class="col-md-2">
+              <label class="form-label small mb-0 text-secondary">Название</label>
+              <input type="text" name="name" class="form-control form-control-sm" value="{{ t.name }}" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small mb-0 text-secondary">Тип</label>
+              <select name="training_type" class="form-select form-select-sm">
+                <option value="group" {{ t.type|default('group') == 'group' ? 'selected' : '' }}>Групповая</option>
+                <option value="personal" {{ t.type|default('group') == 'personal' ? 'selected' : '' }}>Персональная</option>
+                <option value="extra" {{ t.type|default('group') == 'extra' ? 'selected' : '' }}>Доп. услуга</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small mb-0 text-secondary">Тренер</label>
+              <select name="trainer_id" class="form-select form-select-sm">
+                <option value="" {{ t.trainer is null ? 'selected' : '' }}>Без тренера</option>
+                {% for tr in trainers %}
+                  <option value="{{ tr.id }}" {{ t.trainer and t.trainer.id == tr.id ? 'selected' : '' }}>{{ tr.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small mb-0 text-secondary">Начало</label>
+              <input type="datetime-local" name="start_at" class="form-control form-control-sm" value="{{ t.startAt|date('Y-m-d\\TH:i') }}" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small mb-0 text-secondary">Конец</label>
+              <input type="datetime-local" name="end_at" class="form-control form-control-sm" value="{{ t.endAt|date('Y-m-d\\TH:i') }}" required>
+            </div>
+            <div class="col-md-1">
+              <label class="form-label small mb-0 text-secondary">Зал</label>
+              <input type="text" name="room" class="form-control form-control-sm" value="{{ t.room ?? '' }}">
+            </div>
+            <div class="col-md-1">
+              <label class="form-label small mb-0 text-secondary">Мест</label>
+              <input type="number" name="max_participants" class="form-control form-control-sm" value="{{ t.maxParticipants }}" min="0">
+            </div>
+            <div class="col-md-2">
+              <button type="submit" class="btn btn-sm btn-success">Сохранить</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      {% endif %}
       {% set trainingBookings = bookingsByTraining[t.id]|default([]) %}
       {% if trainingBookings|length > 0 %}
       <tr class="collapse" id="bookings-{{ t.id }}">
-        <td colspan="8" class="bg-dark bg-opacity-50 pt-0 pb-2">
+        <td colspan="9" class="bg-dark bg-opacity-50 pt-0 pb-2">
           <div class="small text-secondary mb-1">Записаны:</div>
           {% for b in trainingBookings %}
             {% if b.user %}
@@ -110,7 +183,7 @@
       {% endif %}
     {% else %}
       <tr>
-        <td colspan="8" class="text-center text-secondary">
+        <td colspan="9" class="text-center text-secondary">
           Пока нет тренировок.
         </td>
       </tr>
@@ -119,4 +192,3 @@
   </table>
 </div>
 {% endblock %}
-

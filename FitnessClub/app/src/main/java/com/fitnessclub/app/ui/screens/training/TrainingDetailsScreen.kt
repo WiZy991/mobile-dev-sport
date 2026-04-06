@@ -173,7 +173,7 @@ private fun TrainingDetailsContent(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = training.description,
+                    text = training.description.orEmpty(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

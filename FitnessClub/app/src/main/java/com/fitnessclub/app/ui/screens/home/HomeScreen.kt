@@ -375,7 +375,7 @@ private fun UpcomingTrainingCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 AssistChip(
-                    onClick = {},
+                    onClick = onClick,
                     label = { Text(training.time) },
                     leadingIcon = {
                         Icon(

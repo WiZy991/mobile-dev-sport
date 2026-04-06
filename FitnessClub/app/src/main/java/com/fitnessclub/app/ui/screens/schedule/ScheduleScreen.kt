@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -180,9 +181,11 @@ private fun FilterChips(
     selectedFilter: TrainingType?,
     onFilterSelected: (TrainingType?) -> Unit
 ) {
+    val chipScroll = rememberScrollState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .horizontalScroll(chipScroll)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -207,6 +210,11 @@ private fun FilterChips(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        )
+        FilterChip(
+            selected = selectedFilter == TrainingType.EXTRA,
+            onClick = { onFilterSelected(TrainingType.EXTRA) },
+            label = { Text("Допуслуги") }
         )
     }
 }
@@ -264,6 +272,16 @@ fun TrainingCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
+                val typeLabel = when (training.type) {
+                    TrainingType.EXTRA -> "Допуслуга"
+                    TrainingType.GROUP -> "Групповая"
+                    TrainingType.PERSONAL -> "Персональная"
+                }
+                Text(
+                    text = typeLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 Text(
                     text = training.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -317,7 +335,7 @@ fun TrainingCard(
             ) {
                 if (training.isBooked) {
                     AssistChip(
-                        onClick = {},
+                        onClick = onClick,
                         label = { Text("Записан") },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = Success.copy(alpha = 0.1f),
@@ -326,7 +344,7 @@ fun TrainingCard(
                     )
                 } else if (training.isFull) {
                     AssistChip(
-                        onClick = {},
+                        onClick = onClick,
                         label = { Text("Мест нет") },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = Error.copy(alpha = 0.1f),

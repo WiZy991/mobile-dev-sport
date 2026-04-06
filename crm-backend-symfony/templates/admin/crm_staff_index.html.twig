@@ -1,0 +1,41 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM — Персонал CRM{% endblock %}
+
+{% block body %}
+<div class="content-header">
+    <h1 class="h4 mb-0">Учётные записи CRM</h1>
+    <a href="{{ path('admin_crm_staff_new') }}" class="btn btn-sm btn-primary">Новый пользователь</a>
+</div>
+
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="table table-sm table-dark align-middle mb-0">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Имя</th>
+                <th>Роли</th>
+                <th>Активен</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for u in staffUsers %}
+                <tr>
+                    <td>{{ u.id }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>{{ u.name }}</td>
+                    <td><small class="text-secondary">{{ u.roles|join(', ') }}</small></td>
+                    <td>{{ u.isActive ? 'да' : 'нет' }}</td>
+                    <td><a href="{{ path('admin_crm_staff_edit', {id: u.id}) }}" class="btn btn-sm btn-outline-secondary">Изменить</a></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6" class="text-center text-secondary">Пока нет записей. Создайте первого пользователя командой <code>php bin/console app:create-staff-user</code> или кнопкой выше.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

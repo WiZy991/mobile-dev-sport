@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.ui.components.SecureScreenEffect
 import com.fitnessclub.app.ui.theme.Primary
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
@@ -31,7 +32,8 @@ fun QrCodeScreen(
     viewModel: QrCodeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
+    SecureScreenEffect()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -165,7 +167,11 @@ fun QrCodeScreen(
             
             // Valid until
             Text(
-                text = "QR-код действителен до ${uiState.validUntil}",
+                text = if (uiState.secondsRemaining > 0) {
+                    "Код обновится через ${uiState.secondsRemaining} сек (действует 15 сек)"
+                } else {
+                    "Обновление…"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

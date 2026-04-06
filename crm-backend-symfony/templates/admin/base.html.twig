@@ -70,9 +70,15 @@
         <form method="get" action="{{ path('admin_search') }}" class="p-2">
             <input type="text" name="q" class="form-control form-control-sm" placeholder="Поиск..." value="{{ app.request.query.get('q', '') }}">
         </form>
+        {% if app.user %}
+            <div class="px-3 py-2 small text-secondary border-bottom border-secondary border-opacity-25">
+                {{ app.user.userIdentifier }}
+                <a href="{{ path('admin_logout') }}" class="d-block mt-1 text-warning text-decoration-none">Выйти</a>
+            </div>
+        {% endif %}
         <div class="menu-section-title">Навигация</div>
         {% for key, label in menu %}
-            <a href="{{ key == 'dashboard' ? path('admin_dashboard') : path('admin_section', {section: key}) }}"
+            <a href="{% if key == 'dashboard' %}{{ path('admin_dashboard') }}{% elseif key == 'crm_staff' %}{{ path('admin_crm_staff_index') }}{% else %}{{ path('admin_section', {section: key}) }}{% endif %}"
                class="menu-item {{ current == key ? 'active' : '' }}">
                 {{ label }}
             </a>

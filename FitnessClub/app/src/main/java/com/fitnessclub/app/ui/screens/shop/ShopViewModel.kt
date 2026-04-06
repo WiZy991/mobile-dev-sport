@@ -69,9 +69,21 @@ class ShopViewModel @Inject constructor(
     }
     
     private fun getMockSubscriptionAndDepositItems(): List<ShopItem> = listOf(
-        ShopItem(id = "sub-1", name = "Безлимит на месяц", description = "Неограниченное посещение всех занятий. Купите в разделе Абонементы.", price = 4500.0, category = ShopCategory.SUBSCRIPTIONS),
-        ShopItem(id = "sub-2", name = "Безлимит на 3 месяца", description = "Неограниченное посещение на 3 месяца + заморозка.", price = 12000.0, category = ShopCategory.SUBSCRIPTIONS),
-        ShopItem(id = "dep-1", name = "Пополнение депозита", description = "Пополните депозит в клубе.", price = 1000.0, category = ShopCategory.DEPOSITS)
+        ShopItem(
+            id = "sub-1",
+            name = "Безлимит на месяц",
+            description = "Неограниченное посещение всех занятий. Нажмите «Купить», чтобы выбрать тариф и оформить абонемент.",
+            price = 4500.0,
+            category = ShopCategory.SUBSCRIPTIONS
+        ),
+        ShopItem(
+            id = "sub-2",
+            name = "Безлимит на 3 месяца",
+            description = "Неограниченное посещение на 3 месяца + заморозка. Оформление — на следующем экране с тарифами клуба.",
+            price = 12000.0,
+            category = ShopCategory.SUBSCRIPTIONS
+        ),
+        ShopItem(id = "dep-1", name = "Пополнение депозита", description = "Пополните депозит на ресепшене клуба.", price = 1000.0, category = ShopCategory.DEPOSITS)
     )
 
     private fun getMockItems(): List<ShopItem> = listOf(
@@ -99,19 +111,55 @@ class ShopViewModel @Inject constructor(
                         is ApiResult.Loading -> { /* no-op */ }
                     }
                 }
-                item.id.startsWith("sub-") -> {
+                item.category == ShopCategory.DEPOSITS || item.id.startsWith("dep-") -> {
                     _uiState.update {
-                        it.copy(purchaseMessage = "Абонементы — в разделе «Абонементы»")
+                        it.copy(purchaseMessage = "Депозит пополняется на ресепшене клуба или через администратора.")
                     }
                 }
                 item.price == 0.0 -> {
                     _uiState.update {
-                        it.copy(purchaseMessage = "Оформите услугу в клубе")
+                        it.copy(purchaseMessage = "Бесплатная услуга: запись в разделе «Расписание» или у администратора.")
+                    }
+                }
+                item.category == ShopCategory.SERVICES -> {
+                    when (val result = productRepository.purchaseProduct(item.id)) {
+                        is ApiResult.Success -> {
+                            _uiState.update { it.copy(purchaseMessage = "Услуга оформлена: ${item.name}") }
+                        }
+                        is ApiResult.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    purchaseMessage = "Услуга из каталога клуба оформляется после появления её в приложении. Запишитесь через «Расписание»."
+                                )
+                            }
+                        }
+                        is ApiResult.Loading -> {}
+                    }
+                }
+                item.category == ShopCategory.GOODS -> {
+                    when (val result = productRepository.purchaseProduct(item.id)) {
+                        is ApiResult.Success -> {
+                            _uiState.update { it.copy(purchaseMessage = "Заказ оформлен: ${item.name}") }
+                        }
+                        is ApiResult.Error -> {
+                            _uiState.update {
+                                it.copy(purchaseMessage = "Товар получите в клубе — позиция пока не в онлайн-каталоге.")
+                            }
+                        }
+                        is ApiResult.Loading -> {}
                     }
                 }
                 else -> {
-                    _uiState.update {
-                        it.copy(purchaseMessage = "Оформите покупку в клубе")
+                    when (val result = productRepository.purchaseProduct(item.id)) {
+                        is ApiResult.Success -> {
+                            _uiState.update { it.copy(purchaseMessage = "Оформлено: ${item.name}") }
+                        }
+                        is ApiResult.Error -> {
+                            _uiState.update {
+                                it.copy(purchaseMessage = "Обратитесь в клуб для оформления этой позиции.")
+                            }
+                        }
+                        is ApiResult.Loading -> {}
                     }
                 }
             }

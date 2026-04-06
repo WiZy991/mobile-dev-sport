@@ -29,6 +29,7 @@ import com.fitnessclub.app.ui.screens.help.HelpScreen
 import com.fitnessclub.app.ui.screens.about.AboutScreen
 import com.fitnessclub.app.ui.screens.shop.ShopScreen
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPlansScreen
+import com.fitnessclub.app.ui.screens.trainers.TrainerDetailsScreen
 import com.fitnessclub.app.ui.screens.trainers.TrainersScreen
 import com.fitnessclub.app.ui.screens.training.TrainingDetailsScreen
 import com.fitnessclub.app.ui.screens.training.TrainingDetailsViewModel
@@ -177,7 +178,9 @@ fun NavGraph(
         // Shop
         composable(Screen.Shop.route) {
             ShopScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onOpenPurchaseHistory = { navController.navigate(Screen.PurchaseHistory.route) },
+                onNavigateToSubscriptionPlans = { navController.navigate(Screen.SubscriptionPlans.route) }
             )
         }
         
@@ -210,10 +213,24 @@ fun NavGraph(
         composable(Screen.Trainers.route) {
             TrainersScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onTrainerClick = { /* Navigate to trainer details */ }
+                onTrainerClick = { trainerId ->
+                    navController.navigate(Screen.TrainerDetails.createRoute(trainerId))
+                }
             )
         }
-        
+
+        composable(
+            route = Screen.TrainerDetails.route,
+            arguments = listOf(navArgument(NavArgs.TRAINER_ID) { type = NavType.StringType })
+        ) {
+            TrainerDetailsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onBookPersonalTraining = {
+                    navController.navigate(Screen.PersonalTraining.route)
+                }
+            )
+        }
+
         // Personal Training
         composable(Screen.PersonalTraining.route) {
             PersonalTrainingScreen(

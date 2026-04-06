@@ -23,7 +23,7 @@
             <div class="col-md-6">
                 <span class="{{ trainersCount > 0 ? 'text-success' : 'text-warning' }}">{{ trainersCount > 0 ? '✓' : '○' }}</span>
                 Тренеров: {{ trainersCount }}
-                {% if trainersCount == 0 %}<a href="{{ path('admin_section', {section: 'staff'}) }}" class="ms-1">Добавить</a>{% endif %}
+                {% if trainersCount == 0 %}<a href="{{ path('admin_section', {section: 'trainers'}) }}" class="ms-1">Добавить</a>{% endif %}
             </div>
             <div class="col-md-6">
                 <span class="text-secondary">○</span> Активных товаров/услуг в магазине: {{ productsActiveCount }}
@@ -85,7 +85,7 @@
         <div class="small">
             <a href="{{ path('admin_section', {section: 'schedule'}) }}" class="btn btn-sm btn-outline-primary me-2">Расписание в CRM</a>
             <a href="{{ path('admin_section', {section: 'subscriptions'}) }}" class="btn btn-sm btn-outline-primary me-2">Абонементы</a>
-            <a href="{{ path('admin_section', {section: 'staff'}) }}" class="btn btn-sm btn-outline-primary me-2">Персонал</a>
+            <a href="{{ path('admin_section', {section: 'trainers'}) }}" class="btn btn-sm btn-outline-primary me-2">Тренеры</a>
             <a href="{{ path('admin_settings_club') }}" class="btn btn-sm btn-outline-primary me-2">Настройки клуба</a>
         </div>
     </div>

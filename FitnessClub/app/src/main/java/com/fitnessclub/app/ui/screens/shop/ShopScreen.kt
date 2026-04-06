@@ -39,6 +39,8 @@ data class ShopItem(
 @Composable
 fun ShopScreen(
     onNavigateBack: () -> Unit,
+    onOpenPurchaseHistory: () -> Unit = {},
+    onNavigateToSubscriptionPlans: () -> Unit = {},
     viewModel: ShopViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -65,8 +67,8 @@ fun ShopScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Cart */ }) {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = "Корзина")
+                    IconButton(onClick = onOpenPurchaseHistory) {
+                        Icon(Icons.Default.ReceiptLong, contentDescription = "Мои покупки")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -134,7 +136,15 @@ fun ShopScreen(
                     items(filteredItems) { item ->
                         ShopItemCard(
                             item = item,
-                            onBuy = { viewModel.buyItem(item) }
+                            onBuy = {
+                                if (item.category == ShopCategory.SUBSCRIPTIONS ||
+                                    item.id.startsWith("sub-")
+                                ) {
+                                    onNavigateToSubscriptionPlans()
+                                } else {
+                                    viewModel.buyItem(item)
+                                }
+                            }
                         )
                     }
                 }

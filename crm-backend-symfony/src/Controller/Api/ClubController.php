@@ -126,6 +126,8 @@ class ClubController extends AbstractController
             'amenities' => $amenities,
             'latitude' => (float) $get('latitude', '55.7558'),
             'longitude' => (float) $get('longitude', '37.6173'),
+            'promo_title' => $get('promo_home_title', 'СКИДКА 20%!'),
+            'promo_subtitle' => $get('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
         ]);
     }
 }

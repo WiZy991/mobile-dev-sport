@@ -362,6 +362,10 @@ data class ClubItem(
 data class ClubInfo(
     @com.google.gson.annotations.SerializedName("id")
     val id: String? = null,
+    @com.google.gson.annotations.SerializedName("promo_title")
+    val promoTitle: String? = null,
+    @com.google.gson.annotations.SerializedName("promo_subtitle")
+    val promoSubtitle: String? = null,
     @com.google.gson.annotations.SerializedName("name")
     val name: String,
     @com.google.gson.annotations.SerializedName("address")

@@ -21,7 +21,7 @@ class Training
     private ?string $description = null;
 
     #[ORM\Column(type: 'string', length: 50)]
-    private string $type = 'group'; // group, personal
+    private string $type = 'group'; // group, personal, extra (допуслуги / запись на услугу)
 
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $trainerName = null;

@@ -63,6 +63,22 @@ class User
     #[ORM\Column(type: 'boolean')]
     private bool $isBlocked = false;
 
+    /** none | pending | verified | rejected — соответствие паспорта (Сбер ID / др.) */
+    #[ORM\Column(type: 'string', length: 20)]
+    private string $passportVerificationStatus = 'none';
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $passportVerifiedAt = null;
+
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    private ?string $passportVerificationProvider = null;
+
+    #[ORM\Column(type: 'string', length: 128, nullable: true)]
+    private ?string $passportVerificationSubject = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $passportVerificationAuditJson = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -287,6 +303,61 @@ class User
     public function setIsBlocked(bool $isBlocked): self
     {
         $this->isBlocked = $isBlocked;
+        return $this;
+    }
+
+    public function getPassportVerificationStatus(): string
+    {
+        return $this->passportVerificationStatus;
+    }
+
+    public function setPassportVerificationStatus(string $passportVerificationStatus): self
+    {
+        $this->passportVerificationStatus = $passportVerificationStatus;
+        return $this;
+    }
+
+    public function getPassportVerifiedAt(): ?\DateTimeImmutable
+    {
+        return $this->passportVerifiedAt;
+    }
+
+    public function setPassportVerifiedAt(?\DateTimeImmutable $passportVerifiedAt): self
+    {
+        $this->passportVerifiedAt = $passportVerifiedAt;
+        return $this;
+    }
+
+    public function getPassportVerificationProvider(): ?string
+    {
+        return $this->passportVerificationProvider;
+    }
+
+    public function setPassportVerificationProvider(?string $passportVerificationProvider): self
+    {
+        $this->passportVerificationProvider = $passportVerificationProvider;
+        return $this;
+    }
+
+    public function getPassportVerificationSubject(): ?string
+    {
+        return $this->passportVerificationSubject;
+    }
+
+    public function setPassportVerificationSubject(?string $passportVerificationSubject): self
+    {
+        $this->passportVerificationSubject = $passportVerificationSubject;
+        return $this;
+    }
+
+    public function getPassportVerificationAuditJson(): ?string
+    {
+        return $this->passportVerificationAuditJson;
+    }
+
+    public function setPassportVerificationAuditJson(?string $passportVerificationAuditJson): self
+    {
+        $this->passportVerificationAuditJson = $passportVerificationAuditJson;
         return $this;
     }
 

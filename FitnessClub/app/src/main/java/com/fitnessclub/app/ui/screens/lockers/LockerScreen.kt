@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.ui.components.SecureScreenEffect
 import com.fitnessclub.app.data.api.Locker
 import com.fitnessclub.app.data.api.LockerBooking
 import com.fitnessclub.app.ui.theme.Primary
@@ -197,6 +198,7 @@ private fun MyBookingCard(
                     generateQrBitmap(booking.qrCodeData, 256)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    SecureScreenEffect()
                     qrBitmap?.let {
                         Card(
                             modifier = Modifier

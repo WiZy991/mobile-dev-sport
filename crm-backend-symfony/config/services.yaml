@@ -7,6 +7,8 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # Пустой redirect по умолчанию, если переменная не задана (см. env var processors).
+    sber_id_mobile_redirect_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -18,6 +20,29 @@ services:
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+
+    App\Service\Admin\SberIdOAuthService:
+        arguments:
+            $clientId: '%env(SBER_ID_CLIENT_ID)%'
+            $clientSecret: '%env(SBER_ID_CLIENT_SECRET)%'
+            $authorizeUrl: '%env(SBER_ID_AUTHORIZE_URL)%'
+            $tokenUrl: '%env(SBER_ID_TOKEN_URL)%'
+
+    App\Controller\Admin\AdminSberIdController:
+        bind:
+            $sberRedirectUri: '%env(SBER_ID_REDIRECT_URI)%'
+
+    App\Service\Api\SberMobileOAuthStateService:
+        arguments:
+            $secret: '%kernel.secret%'
+
+    App\Service\Api\SberMobileAuthService:
+        arguments:
+            $mobileRedirectUri: '%env(default:sber_id_mobile_redirect_default:SBER_ID_MOBILE_REDIRECT_URI)%'
+
+    App\Controller\Api\SubscriptionController:
+        bind:
+            $requireSberVerificationBeforePurchase: '%env(bool:SUBSCRIPTION_REQUIRE_SBER)%'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

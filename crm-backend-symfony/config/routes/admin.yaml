@@ -1,3 +1,18 @@
+admin_login:
+  path: /admin/login
+  controller: App\Controller\Admin\AdminSecurityController::login
+  methods: [GET]
+
+admin_login_check:
+  path: /admin/login_check
+  controller: App\Controller\Admin\AdminSecurityController::loginCheck
+  methods: [POST]
+
+admin_logout:
+  path: /admin/logout
+  controller: App\Controller\Admin\AdminSecurityController::logout
+  methods: [GET]
+
 admin_dashboard:
   path: /admin
   controller: App\Controller\Admin\AdminController::dashboard
@@ -101,8 +116,8 @@ admin_training_new:
   controller: App\Controller\Admin\AdminController::createTraining
   methods: [POST]
 
-admin_staff_new:
-  path: /admin/staff/new
+admin_trainer_new:
+  path: /admin/trainers/new
   controller: App\Controller\Admin\AdminController::createStaff
   methods: [POST]
 
@@ -114,6 +129,11 @@ admin_product_toggle:
 admin_product_stock:
   path: /admin/products/{id}/stock
   controller: App\Controller\Admin\AdminController::updateProductStock
+  methods: [POST]
+
+admin_training_update:
+  path: /admin/trainings/{id}/update
+  controller: App\Controller\Admin\AdminController::updateTraining
   methods: [POST]
 
 admin_training_delete:
@@ -155,6 +175,11 @@ admin_settings_club:
   path: /admin/settings/club
   controller: App\Controller\Admin\AdminController::settingsClub
   methods: [GET, POST]
+
+admin_perco_test:
+  path: /admin/settings/perco-test
+  controller: App\Controller\Admin\AdminController::testPercoConnection
+  methods: [POST]
 
 admin_visits_export:
   path: /admin/visits/export

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.ui.components.SecureScreenEffect
 import com.fitnessclub.app.data.api.GuestPass
 import com.fitnessclub.app.ui.theme.Primary
 import com.google.zxing.BarcodeFormat
@@ -242,6 +243,7 @@ private fun GuestPassQrDialog(
         title = { Text("Гостевой пропуск") },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                SecureScreenEffect()
                 Text(pass.guestName ?: "Гость", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(16.dp))
                 qrBitmap?.let {
