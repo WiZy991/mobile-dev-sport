@@ -1,0 +1,150 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Акции{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Акции для главного экрана приложения</h1>
+    </div>
+
+    <div class="content-card mb-3">
+        <form method="post" action="{{ path('admin_section', {section: 'promotions'}) }}" class="row g-2">
+            <div class="col-md-4">
+                <label class="form-label small">Заголовок *</label>
+                <input type="text" name="title" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Подзаголовок</label>
+                <input type="text" name="subtitle" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Кнопка</label>
+                <input type="text" name="button_text" class="form-control form-control-sm" value="Подробнее">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Порядок</label>
+                <input type="number" name="sort_order" class="form-control form-control-sm" value="100">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label small">Действие</label>
+                <select name="action_type" class="form-select form-select-sm">
+                    <option value="shop">Открыть «Приобрести»</option>
+                    <option value="subscriptions">Открыть тарифы абонементов</option>
+                    <option value="none">Без действия</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Доп. значение действия (опц.)</label>
+                <input type="text" name="action_value" class="form-control form-control-sm" placeholder="пока не используется">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Цвет слева</label>
+                <input type="color" name="bg_from" class="form-control form-control-sm form-control-color" value="#F97316">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Цвет справа</label>
+                <input type="color" name="bg_to" class="form-control form-control-sm form-control-color" value="#3B82F6">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="is_active_new" name="is_active" value="1" checked>
+                    <label class="form-check-label small" for="is_active_new">Активна</label>
+                </div>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-sm btn-primary">Добавить акцию</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Превью</th>
+                    <th>Действие</th>
+                    <th>Порядок</th>
+                    <th>Статус</th>
+                    <th>Управление</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for p in promotions %}
+                    <tr>
+                        <td>{{ p.id }}</td>
+                        <td style="min-width: 340px;">
+                            <div class="p-2 rounded" style="background: linear-gradient(90deg, {{ p.bgFrom }}, {{ p.bgTo }});">
+                                <div class="fw-bold">{{ p.title }}</div>
+                                <div class="small text-light">{{ p.subtitle ?: '—' }}</div>
+                                <span class="badge bg-light text-dark mt-1">{{ p.buttonText }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <code>{{ p.actionType }}</code>
+                            {% if p.actionValue %}<div class="small text-secondary">{{ p.actionValue }}</div>{% endif %}
+                        </td>
+                        <td>{{ p.sortOrder }}</td>
+                        <td>
+                            {% if p.isActive %}
+                                <span class="badge bg-success">Активна</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Выключена</span>
+                            {% endif %}
+                        </td>
+                        <td style="min-width: 420px;">
+                            <form method="post" action="{{ path('admin_promotion_update', {id: p.id}) }}" class="row g-1">
+                                <div class="col-5">
+                                    <input type="text" name="title" class="form-control form-control-sm" value="{{ p.title }}" required>
+                                </div>
+                                <div class="col-3">
+                                    <input type="number" name="sort_order" class="form-control form-control-sm" value="{{ p.sortOrder }}">
+                                </div>
+                                <div class="col-4">
+                                    <select name="action_type" class="form-select form-select-sm">
+                                        <option value="shop" {{ p.actionType == 'shop' ? 'selected' : '' }}>shop</option>
+                                        <option value="subscriptions" {{ p.actionType == 'subscriptions' ? 'selected' : '' }}>subscriptions</option>
+                                        <option value="none" {{ p.actionType == 'none' ? 'selected' : '' }}>none</option>
+                                    </select>
+                                </div>
+                                <div class="col-8">
+                                    <input type="text" name="subtitle" class="form-control form-control-sm" value="{{ p.subtitle }}">
+                                </div>
+                                <div class="col-4">
+                                    <input type="text" name="button_text" class="form-control form-control-sm" value="{{ p.buttonText }}">
+                                </div>
+                                <div class="col-4">
+                                    <input type="color" name="bg_from" class="form-control form-control-sm form-control-color" value="{{ p.bgFrom }}">
+                                </div>
+                                <div class="col-4">
+                                    <input type="color" name="bg_to" class="form-control form-control-sm form-control-color" value="{{ p.bgTo }}">
+                                </div>
+                                <div class="col-4 d-flex align-items-center">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_active" value="1" {{ p.isActive ? 'checked' : '' }}>
+                                        <label class="form-check-label small">Активна</label>
+                                    </div>
+                                </div>
+                                <div class="col-12 d-flex gap-1">
+                                    <button class="btn btn-sm btn-outline-primary" type="submit">Сохранить</button>
+                            </form>
+                                    <form method="post" action="{{ path('admin_promotion_toggle', {id: p.id}) }}">
+                                        <button class="btn btn-sm btn-outline-warning" type="submit">{{ p.isActive ? 'Выключить' : 'Включить' }}</button>
+                                    </form>
+                                    <form method="post" action="{{ path('admin_promotion_delete', {id: p.id}) }}" onsubmit="return confirm('Удалить акцию?')">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Удалить</button>
+                                    </form>
+                                </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="text-center text-secondary">Акций пока нет.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+

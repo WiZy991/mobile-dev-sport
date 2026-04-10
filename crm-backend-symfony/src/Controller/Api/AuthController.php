@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\User;
+use App\Service\MobileClientPayloadApplier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -14,6 +15,7 @@ class AuthController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly MobileClientPayloadApplier $mobileClientPayloadApplier,
     ) {}
 
     #[Route('/login', name: 'api_auth_login', methods: ['POST'])]
@@ -78,6 +80,8 @@ class AuthController extends AbstractController
             ->setBonusPoints(0)
             ->setIsBlocked(false);
 
+        $this->mobileClientPayloadApplier->applyRegistrationPayload($user, $data);
+
         $this->em->persist($user);
         $this->em->flush();
 
@@ -98,6 +102,7 @@ class AuthController extends AbstractController
             'avatar_url' => $user->getAvatarUrl(),
             'bonus_points' => $user->getBonusPoints(),
             'passport_verification_status' => $user->getPassportVerificationStatus(),
+            'date_of_birth' => $user->getDateOfBirth()?->format('Y-m-d'),
             'created_at' => $user->getCreatedAt()->format('Y-m-d\TH:i:s'),
         ];
     }

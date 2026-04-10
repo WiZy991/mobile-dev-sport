@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\ClubSetting;
+use App\Entity\Promotion;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -129,5 +130,28 @@ class ClubController extends AbstractController
             'promo_title' => $get('promo_home_title', 'СКИДКА 20%!'),
             'promo_subtitle' => $get('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
         ]);
+    }
+
+    #[Route('/promotions', name: 'api_club_promotions', methods: ['GET'])]
+    public function promotions(): JsonResponse
+    {
+        $items = $this->em->getRepository(Promotion::class)->findBy(
+            ['isActive' => true],
+            ['sortOrder' => 'ASC', 'id' => 'DESC']
+        );
+
+        $data = array_map(static fn (Promotion $p) => [
+            'id' => (string) $p->getId(),
+            'title' => $p->getTitle(),
+            'subtitle' => $p->getSubtitle(),
+            'button_text' => $p->getButtonText(),
+            'action_type' => $p->getActionType(),
+            'action_value' => $p->getActionValue(),
+            'bg_from' => $p->getBgFrom(),
+            'bg_to' => $p->getBgTo(),
+            'sort_order' => $p->getSortOrder(),
+        ], $items);
+
+        return $this->json($data);
     }
 }

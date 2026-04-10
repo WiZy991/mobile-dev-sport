@@ -1,0 +1,50 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Импорт клиентов{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Импорт (клиенты, абонементы, записи)</h1>
+        <a href="{{ path('admin_section', {section: 'clients'}) }}" class="btn btn-sm btn-outline-secondary">← К списку</a>
+    </div>
+
+    <div class="content-card mb-3">
+        <p class="text-secondary small mb-2">
+            Форматы: <strong>.csv</strong> (разделитель <code>;</code> или <code>,</code>, UTF-8, BOM допустим) и <strong>.xlsx</strong> / <strong>.xls</strong>.
+        </p>
+        <p class="text-secondary small mb-2">
+            <strong>Excel — несколько листов:</strong> переименуйте листы так, чтобы в названии были слова
+            <em>Клиенты</em> / <em>client</em>, <em>Абонементы</em> / <em>subscription</em>, <em>Записи</em> / <em>booking</em> — тогда тип строк определяется автоматически.
+            В одном листе можно смешивать типы, если есть колонка <strong>тип</strong> / <strong>record_type</strong>:
+            <code>client</code> / <code>клиент</code>, <code>subscription</code> / <code>абонемент</code>, <code>booking</code> / <code>запись</code>.
+        </p>
+        <p class="text-secondary small mb-2">
+            <strong>Клиенты</strong> — те же колонки, что в «Скачать CSV» (Имя, Email, Телефон, паспорт, бонусы…).<br>
+            <strong>Абонементы</strong> — клиент (ID клиента / Email клиента / Телефон клиента), тариф (ID тарифа или Название тарифа как в CRM), даты начала/окончания, статус, посещения, заморозка.<br>
+            <strong>Записи</strong> — клиент, <strong>ID тренировки</strong> или пара <strong>Дата и время тренировки</strong> (±90 сек) + при необходимости <strong>Название тренировки</strong>, статус записи, дата записи.
+        </p>
+        <p class="text-secondary small mb-0">
+            Порядок обработки: сначала все строки клиентов, затем абонементы, затем записи (чтобы клиенты уже были в базе).
+            Тренировки и тарифы должны <strong>уже существовать</strong> в CRM — импорт не создаёт занятия в расписании, только привязку клиента к существующей тренировке.
+        </p>
+    </div>
+
+    <div class="content-card">
+        <form method="post" action="{{ path('admin_clients_import') }}" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label class="form-label">Файл</label>
+                <input type="file" name="import_file" class="form-control form-control-sm" accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" required>
+            </div>
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" name="update_existing" value="1" id="update_existing" checked>
+                <label class="form-check-label" for="update_existing">
+                    Обновлять существующие записи (клиенты по ID/email/телефону; абонементы по ID или паре клиент+тариф+дата начала; записи — одна активная запись клиента на тренировку)
+                </label>
+            </div>
+            <p class="small text-secondary mb-3">
+                Без галочки дубликаты пропускаются.
+            </p>
+            <button type="submit" class="btn btn-primary">Загрузить и импортировать</button>
+        </form>
+    </div>
+{% endblock %}

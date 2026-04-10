@@ -83,8 +83,8 @@
                         <label class="form-label small">Пол</label>
                         <select name="gender" class="form-select form-select-sm">
                             <option value="">—</option>
-                            <option value="M" {{ client.gender == 'M' ? 'selected' : '' }}>М</option>
-                            <option value="F" {{ client.gender == 'F' ? 'selected' : '' }}>Ж</option>
+                            <option value="M" {{ client.gender in ['M', 'm', 'male', 'Male'] ? 'selected' : '' }}>М</option>
+                            <option value="F" {{ client.gender in ['F', 'f', 'female', 'Female'] ? 'selected' : '' }}>Ж</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -179,7 +179,7 @@
                 <div class="mb-1"><strong>Телефон:</strong> {{ client.phone }}</div>
                 <div class="mb-1"><strong>Дата рождения:</strong> {{ client.dateOfBirth ? client.dateOfBirth|date('d.m.Y') : '—' }}</div>
                 <div class="mb-1"><strong>Место рождения:</strong> {{ client.placeOfBirth ?? '—' }}</div>
-                <div class="mb-1"><strong>Пол:</strong> {{ client.gender == 'M' ? 'М' : (client.gender == 'F' ? 'Ж' : '—') }}</div>
+                <div class="mb-1"><strong>Пол:</strong> {% set gl = client.gender ? client.gender|lower : '' %}{{ gl in ['m', 'male'] ? 'М' : (gl in ['f', 'female'] ? 'Ж' : (client.gender ?: '—')) }}</div>
                 <div class="mb-1"><strong>Бонусы:</strong> {{ client.bonusPoints }}</div>
                 <div class="mb-1"><strong>Создан:</strong> {{ client.createdAt|date('d.m.Y H:i') }}</div>
             </div>

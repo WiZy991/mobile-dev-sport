@@ -148,6 +148,11 @@ api_club_info:
   controller: App\Controller\Api\ClubController::info
   methods: [GET]
 
+api_club_promotions:
+  path: /api/v1/club/promotions
+  controller: App\Controller\Api\ClubController::promotions
+  methods: [GET]
+
 api_access_exit:
   path: /api/v1/access/exit
   controller: App\Controller\Api\AccessController::exit
