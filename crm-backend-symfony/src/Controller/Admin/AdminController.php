@@ -1473,6 +1473,11 @@ class AdminController extends AbstractController
             ->setSortOrder((int) $request->request->get('sort_order', 100))
             ->setIsActive($request->request->get('is_active') === '1');
 
+        $file = $request->files->get('image_file');
+        if ($file instanceof UploadedFile && $file->isValid()) {
+            $promotion->setImagePath($this->storePromotionImage($file));
+        }
+
         $this->em->flush();
         $this->addFlash('success', 'Акция обновлена.');
 
@@ -2351,6 +2356,11 @@ class AdminController extends AbstractController
                         ->setBgTo($this->normalizeHexColor((string) $request->request->get('bg_to', '#3B82F6')))
                         ->setSortOrder((int) $request->request->get('sort_order', 100))
                         ->setIsActive($request->request->get('is_active') === '1');
+
+                    $file = $request->files->get('image_file');
+                    if ($file instanceof UploadedFile && $file->isValid()) {
+                        $promotion->setImagePath($this->storePromotionImage($file));
+                    }
                     $this->em->persist($promotion);
                     $this->em->flush();
                     $this->addFlash('success', 'Акция создана.');
@@ -2438,6 +2448,25 @@ class AdminController extends AbstractController
             return '#F97316';
         }
         return $c;
+    }
+
+    private function storePromotionImage(UploadedFile $file): string
+    {
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        $ext = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension() ?: '');
+        if (!in_array($ext, $allowed, true)) {
+            throw new \RuntimeException('Формат изображения: jpg, png, webp.');
+        }
+
+        $uploadsDir = $this->getParameter('kernel.project_dir') . '/public/uploads/promotions';
+        if (!is_dir($uploadsDir) && !mkdir($uploadsDir, 0775, true) && !is_dir($uploadsDir)) {
+            throw new \RuntimeException('Не удалось создать директорию для изображений.');
+        }
+
+        $filename = 'promo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $file->move($uploadsDir, $filename);
+
+        return '/uploads/promotions/' . $filename;
     }
 }
 

@@ -144,6 +144,7 @@ class ClubController extends AbstractController
             'id' => (string) $p->getId(),
             'title' => $p->getTitle(),
             'subtitle' => $p->getSubtitle(),
+            'image_url' => $p->getImagePath(),
             'button_text' => $p->getButtonText(),
             'action_type' => $p->getActionType(),
             'action_value' => $p->getActionValue(),

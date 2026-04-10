@@ -29,6 +29,9 @@ class Promotion
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $actionValue = null;
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $imagePath = null;
+
     #[ORM\Column(type: 'string', length: 9)]
     private string $bgFrom = '#F97316';
 
@@ -64,6 +67,9 @@ class Promotion
 
     public function getActionValue(): ?string { return $this->actionValue; }
     public function setActionValue(?string $actionValue): self { $this->actionValue = $actionValue; return $this; }
+
+    public function getImagePath(): ?string { return $this->imagePath; }
+    public function setImagePath(?string $imagePath): self { $this->imagePath = $imagePath; return $this; }
 
     public function getBgFrom(): string { return $this->bgFrom; }
     public function setBgFrom(string $bgFrom): self { $this->bgFrom = $bgFrom; return $this; }
