@@ -32,6 +32,7 @@ final class AdminMenuBuilder
         'analytics' => 'Аналитика',
         'finance' => 'Финансы',
         'mobileapps' => 'Мобильные приложения',
+        'app_support' => 'Обращения из приложения',
         'trainers' => 'Тренеры',
         'crm_staff' => 'Персонал CRM',
         'documents' => 'Документы',
@@ -51,13 +52,13 @@ final class AdminMenuBuilder
         /** Операционный блок: лиды, записи, документы, тренеры зала и т.д. */
         'ROLE_MANAGER' => [
             'dashboard', 'tasks', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits',
-            'leads', 'deals', 'comments', 'services', 'mobileapps', 'documents', 'tags', 'settings', 'selfservice', 'promotions',
+            'leads', 'deals', 'comments', 'services', 'mobileapps', 'app_support', 'documents', 'tags', 'settings', 'selfservice', 'promotions',
             'trainers', 'analytics',
         ],
         /** Касса, склад, отчёты по деньгам */
         'ROLE_FINANCE' => [
             'dashboard', 'sales', 'cashdesk', 'warehouse', 'finance', 'analytics',
-            'subscriptions', 'clients', 'promocodes', 'promotions', 'visits', 'services',
+            'subscriptions', 'clients', 'promocodes', 'promotions', 'visits', 'services', 'app_support',
         ],
         /** Тренер зала: расписание (создание/перенос/удаление), записи, абонементы, клиенты, своя карточка в «Тренеры». */
         'ROLE_TRAINER' => [
@@ -65,7 +66,7 @@ final class AdminMenuBuilder
         ],
         /** Широкий просмотр без изменений (POST блокируется подписчиком). */
         'ROLE_VIEWER' => [
-            'dashboard', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits', 'analytics',
+            'dashboard', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits', 'analytics', 'app_support',
         ],
     ];
 

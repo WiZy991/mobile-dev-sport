@@ -198,6 +198,11 @@ api_feedback_submit:
   controller: App\Controller\Api\FeedbackController::submit
   methods: [POST]
 
+api_support_ticket_create:
+  path: /api/v1/support/tickets
+  controller: App\Controller\Api\SupportTicketController::create
+  methods: [POST]
+
 api_guest_passes_list:
   path: /api/v1/guest-passes
   controller: App\Controller\Api\GuestPassController::list

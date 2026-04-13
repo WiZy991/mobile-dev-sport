@@ -21,6 +21,8 @@ use App\Entity\Tag;
 use App\Entity\LeadNote;
 use App\Entity\Expense;
 use App\Entity\Promotion;
+use App\Entity\StaffUser;
+use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
 use App\Service\Integration\PercoWebClient;
@@ -2227,6 +2229,41 @@ class AdminController extends AbstractController
                 'productsActiveCount' => $productsActiveCount,
                 'pushTokensCount' => $pushTokensCount,
                 'recentAccessLogs' => $recentAccessLogs,
+            ]);
+        }
+
+        if ($section === 'app_support') {
+            $staff = $this->getUser();
+            $canMutate = $staff instanceof StaffUser && $this->adminMenuBuilder->canMutateAdmin($staff);
+
+            if ($request->isMethod('POST') && $canMutate) {
+                $ticketId = (int) $request->request->get('ticket_id');
+                $status = (string) $request->request->get('status');
+                if ($ticketId > 0 && in_array($status, SupportTicket::allowedStatuses(), true)) {
+                    $ticket = $this->em->find(SupportTicket::class, $ticketId);
+                    if ($ticket instanceof SupportTicket) {
+                        $ticket->setStatus($status);
+                        $this->em->flush();
+                        $this->addFlash('success', 'Статус обновлён.');
+                    }
+                }
+
+                return $this->redirectToRoute('admin_section', ['section' => 'app_support']);
+            }
+
+            $tickets = $this->em->createQueryBuilder()
+                ->select('t')
+                ->from(SupportTicket::class, 't')
+                ->orderBy('t.createdAt', 'DESC')
+                ->setMaxResults(200)
+                ->getQuery()
+                ->getResult();
+
+            return $this->render('admin/app_support.html.twig', [
+                'menu' => $menu,
+                'current' => $section,
+                'tickets' => $tickets,
+                'canMutate' => $canMutate,
             ]);
         }
 

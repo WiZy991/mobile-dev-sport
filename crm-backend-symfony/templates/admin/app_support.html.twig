@@ -1,0 +1,82 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Обращения из приложения{% endblock %}
+
+{% set category_labels = {
+    'question': 'Вопрос',
+    'complaint': 'Жалоба',
+    'suggestion': 'Предложение',
+    'technical': 'Техническая проблема',
+    'billing': 'Оплата / абонемент',
+    'other': 'Другое'
+} %}
+{% set status_labels = {
+    'new': 'Новое',
+    'in_progress': 'В работе',
+    'done': 'Закрыто'
+} %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Обращения из приложения</h1>
+    </div>
+
+    <p class="text-secondary small mb-3">Сообщения из раздела «Помощь» в мобильном приложении. Ответ клиенту — по телефону или e-mail из карточки клиента.</p>
+
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Клиент</th>
+                    <th>Тема</th>
+                    <th>Категория</th>
+                    <th>Текст</th>
+                    <th>Статус</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for t in tickets %}
+                    <tr>
+                        <td class="text-nowrap">{{ t.createdAt|date('d.m.Y H:i') }}</td>
+                        <td>
+                            {% if t.user %}
+                                <a href="{{ path('admin_client_show', {id: t.user.id}) }}" class="link-light text-decoration-none">{{ t.user.name }}</a>
+                                <div class="small text-secondary">{{ t.user.email }}</div>
+                            {% else %}
+                                <span class="text-secondary">—</span>
+                                {% if t.contactEmail %}
+                                    <div class="small">{{ t.contactEmail }}</div>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td>{{ t.subject }}</td>
+                        <td>{{ category_labels[t.category]|default(t.category) }}</td>
+                        <td class="small" style="max-width: 280px;">{{ t.message|nl2br }}</td>
+                        <td>
+                            {% if canMutate %}
+                                <form method="post" action="{{ path('admin_section', {section: 'app_support'}) }}" class="d-flex flex-column gap-1">
+                                    <input type="hidden" name="ticket_id" value="{{ t.id }}">
+                                    <select name="status" class="form-select form-select-sm bg-dark text-light border-secondary" style="min-width: 130px;">
+                                        {% for st in ['new', 'in_progress', 'done'] %}
+                                            <option value="{{ st }}" {{ t.status == st ? 'selected' : '' }}>{{ status_labels[st] }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary py-0">Сохранить</button>
+                                </form>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ status_labels[t.status]|default(t.status) }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary">Пока нет обращений из приложения.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
