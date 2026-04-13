@@ -24,6 +24,10 @@
             <label class="form-label small text-secondary">Фото (URL)</label>
             <input type="url" name="photo_url" class="form-control form-control-sm">
         </div>
+        <div class="col-12">
+            <label class="form-label small text-secondary">О себе (для приложения)</label>
+            <textarea name="description" class="form-control form-control-sm" rows="3" placeholder="Кратко о опыте, подходе к тренировкам — текст увидят клиенты в карточке тренера."></textarea>
+        </div>
         <div class="col-12 col-md-2 mt-2 mt-md-0">
             <button type="submit" class="btn btn-sm btn-primary w-100">Добавить тренера</button>
         </div>
@@ -83,6 +87,10 @@
                                 <div class="col-md-3">
                                     <label class="form-label small mb-0">Фото (URL)</label>
                                     <input type="url" name="photo_url" class="form-control form-control-sm" value="{{ t.photoUrl ?? '' }}">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-0">О себе (для приложения)</label>
+                                    <textarea name="description" class="form-control form-control-sm" rows="3" placeholder="Текст для клиентов в приложении">{{ t.description ?? '' }}</textarea>
                                 </div>
                                 <div class="col-md-2">
                                     <button type="submit" class="btn btn-sm btn-success">Сохранить</button>

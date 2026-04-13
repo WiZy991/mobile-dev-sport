@@ -43,6 +43,7 @@ $c = [regex]::Replace($c, '(\[PHP\]\r?\n)', "`$1extension_dir = `"$extAbs`"`r`n"
 
 $replacements = @{
     ';extension=curl'       = 'extension=php_curl.dll'
+    ';extension=gd'        = 'extension=php_gd.dll'
     ';extension=fileinfo'   = 'extension=php_fileinfo.dll'
     ';extension=intl'       = 'extension=php_intl.dll'
     ';extension=mbstring'   = 'extension=php_mbstring.dll'
@@ -66,6 +67,7 @@ $bare = [ordered]@{
     '(?m)^\s*extension\s*=\s*mbstring\s*$'  = 'extension=php_mbstring.dll'
     '(?m)^\s*extension\s*=\s*openssl\s*$'  = 'extension=php_openssl.dll'
     '(?m)^\s*extension\s*=\s*zip\s*$'       = 'extension=php_zip.dll'
+    '(?m)^\s*extension\s*=\s*gd\s*$'        = 'extension=php_gd.dll'
 }
 foreach ($kv in $bare.GetEnumerator()) {
     $c = [regex]::Replace($c, $kv.Key, $kv.Value)

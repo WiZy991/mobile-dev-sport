@@ -73,7 +73,7 @@
                         <td style="min-width: 340px;">
                             <div class="p-2 rounded" style="background: linear-gradient(90deg, {{ p.bgFrom }}, {{ p.bgTo }});">
                                 {% if p.imagePath %}
-                                    <div class="mb-1"><img src="{{ p.imagePath }}" alt="promo image" style="max-height:70px; max-width:100%; object-fit:cover; border-radius:8px;"></div>
+                                    <div class="mb-1"><img src="{{ app.request.schemeAndHttpHost ~ p.imagePath }}" alt="promo image" style="max-height:70px; max-width:100%; object-fit:cover; border-radius:8px;"></div>
                                 {% endif %}
                                 <div class="fw-bold">{{ p.title }}</div>
                                 <div class="small text-light">{{ p.subtitle ?: '—' }}</div>
@@ -125,19 +125,21 @@
                                 <div class="col-12">
                                     <input type="file" name="image_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.webp,image/*">
                                     {% if p.imagePath %}
-                                        <div class="small text-secondary mt-1">Текущее: <a href="{{ p.imagePath }}" target="_blank">{{ p.imagePath }}</a></div>
+                                        <div class="small text-secondary mt-1">Текущее: <a href="{{ app.request.schemeAndHttpHost ~ p.imagePath }}" target="_blank">{{ p.imagePath }}</a></div>
                                     {% endif %}
                                 </div>
-                                <div class="col-12 d-flex gap-1">
+                                <div class="col-12">
                                     <button class="btn btn-sm btn-outline-primary" type="submit">Сохранить</button>
-                            </form>
-                                    <form method="post" action="{{ path('admin_promotion_toggle', {id: p.id}) }}">
-                                        <button class="btn btn-sm btn-outline-warning" type="submit">{{ p.isActive ? 'Выключить' : 'Включить' }}</button>
-                                    </form>
-                                    <form method="post" action="{{ path('admin_promotion_delete', {id: p.id}) }}" onsubmit="return confirm('Удалить акцию?')">
-                                        <button class="btn btn-sm btn-outline-danger" type="submit">Удалить</button>
-                                    </form>
                                 </div>
+                            </form>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                <form method="post" action="{{ path('admin_promotion_toggle', {id: p.id}) }}" class="d-inline">
+                                    <button class="btn btn-sm btn-outline-warning" type="submit">{{ p.isActive ? 'Выключить' : 'Включить' }}</button>
+                                </form>
+                                <form method="post" action="{{ path('admin_promotion_delete', {id: p.id}) }}" class="d-inline" onsubmit="return confirm('Удалить акцию?')">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Удалить</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 {% else %}

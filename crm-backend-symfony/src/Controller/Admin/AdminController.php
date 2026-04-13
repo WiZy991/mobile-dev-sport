@@ -1028,11 +1028,16 @@ class AdminController extends AbstractController
         $ratingRaw = $request->request->get('rating');
         $rating = $ratingRaw !== null && $ratingRaw !== '' ? (float) $ratingRaw : null;
 
+        $description = $request->request->get('description');
+        $description = is_string($description) ? trim($description) : '';
+        $description = $description !== '' ? $description : null;
+
         $trainer = (new Trainer())
             ->setName($name)
             ->setSpecialization($specialization)
             ->setPhotoUrl($photoUrl)
-            ->setRating($rating);
+            ->setRating($rating)
+            ->setDescription($description);
 
         $this->em->persist($trainer);
         $this->em->flush();
@@ -1087,9 +1092,14 @@ class AdminController extends AbstractController
         if (!$trainer) {
             throw $this->createNotFoundException();
         }
+        $description = $request->request->get('description');
+        $description = is_string($description) ? trim($description) : '';
+        $description = $description !== '' ? $description : null;
+
         $trainer->setName((string) $request->request->get('name'))
             ->setSpecialization($request->request->get('specialization') ?: null)
-            ->setPhotoUrl($request->request->get('photo_url') ?: null);
+            ->setPhotoUrl($request->request->get('photo_url') ?: null)
+            ->setDescription($description);
         $ratingRaw = $request->request->get('rating');
         $trainer->setRating($ratingRaw !== '' && $ratingRaw !== null ? (float) $ratingRaw : null);
         $this->em->flush();
@@ -1473,10 +1483,7 @@ class AdminController extends AbstractController
             ->setSortOrder((int) $request->request->get('sort_order', 100))
             ->setIsActive($request->request->get('is_active') === '1');
 
-        $file = $request->files->get('image_file');
-        if ($file instanceof UploadedFile && $file->isValid()) {
-            $promotion->setImagePath($this->storePromotionImage($file));
-        }
+        $this->applyPromotionImageUpload($request, $promotion);
 
         $this->em->flush();
         $this->addFlash('success', 'Акция обновлена.');
@@ -2357,10 +2364,7 @@ class AdminController extends AbstractController
                         ->setSortOrder((int) $request->request->get('sort_order', 100))
                         ->setIsActive($request->request->get('is_active') === '1');
 
-                    $file = $request->files->get('image_file');
-                    if ($file instanceof UploadedFile && $file->isValid()) {
-                        $promotion->setImagePath($this->storePromotionImage($file));
-                    }
+                    $this->applyPromotionImageUpload($request, $promotion);
                     $this->em->persist($promotion);
                     $this->em->flush();
                     $this->addFlash('success', 'Акция создана.');
@@ -2450,12 +2454,43 @@ class AdminController extends AbstractController
         return $c;
     }
 
+    private function applyPromotionImageUpload(Request $request, Promotion $promotion): void
+    {
+        $file = $request->files->get('image_file');
+        if (!$file instanceof UploadedFile) {
+            return;
+        }
+        if (!$file->isValid()) {
+            if ($file->getError() !== \UPLOAD_ERR_NO_FILE) {
+                $this->addFlash('warning', 'Изображение не принято: ' . $file->getErrorMessage());
+            }
+
+            return;
+        }
+        try {
+            $promotion->setImagePath($this->storePromotionImage($file));
+        } catch (\Throwable $e) {
+            $this->addFlash('warning', $e->getMessage());
+        }
+    }
+
     private function storePromotionImage(UploadedFile $file): string
     {
         $allowed = ['jpg', 'jpeg', 'png', 'webp'];
-        $ext = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension() ?: '');
+        // Имя файла — без symfony/mime; guessExtension() без пакета symfony/mime даёт предупреждение/сбой.
+        $ext = strtolower(pathinfo($file->getClientOriginalName(), \PATHINFO_EXTENSION));
         if (!in_array($ext, $allowed, true)) {
-            throw new \RuntimeException('Формат изображения: jpg, png, webp.');
+            try {
+                $g = strtolower((string) ($file->guessExtension() ?: ''));
+                if (in_array($g, $allowed, true)) {
+                    $ext = $g;
+                }
+            } catch (\Throwable) {
+                // нет MimeTypes — остаёмся по имени файла
+            }
+        }
+        if (!in_array($ext, $allowed, true)) {
+            throw new \RuntimeException('Формат изображения: jpg, png, webp (расширение файла: ' . ($ext !== '' ? $ext : 'не определено') . ').');
         }
 
         $uploadsDir = $this->getParameter('kernel.project_dir') . '/public/uploads/promotions';

@@ -9,6 +9,7 @@ use App\Entity\Promotion;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route('/api/v1/club')]
@@ -133,18 +134,18 @@ class ClubController extends AbstractController
     }
 
     #[Route('/promotions', name: 'api_club_promotions', methods: ['GET'])]
-    public function promotions(): JsonResponse
+    public function promotions(Request $request): JsonResponse
     {
         $items = $this->em->getRepository(Promotion::class)->findBy(
             ['isActive' => true],
             ['sortOrder' => 'ASC', 'id' => 'DESC']
         );
 
-        $data = array_map(static fn (Promotion $p) => [
+        $data = array_map(fn (Promotion $p) => [
             'id' => (string) $p->getId(),
             'title' => $p->getTitle(),
             'subtitle' => $p->getSubtitle(),
-            'image_url' => $p->getImagePath(),
+            'image_url' => self::absolutePublicUrl($request, $p->getImagePath()),
             'button_text' => $p->getButtonText(),
             'action_type' => $p->getActionType(),
             'action_value' => $p->getActionValue(),
@@ -154,5 +155,20 @@ class ClubController extends AbstractController
         ], $items);
 
         return $this->json($data);
+    }
+
+    /** Полный URL к файлу в public/ (Coil и браузеры не подставляют хост к пути «/uploads/...»). */
+    private static function absolutePublicUrl(Request $request, ?string $path): ?string
+    {
+        if ($path === null || trim($path) === '') {
+            return null;
+        }
+        $path = trim($path);
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+        $base = $request->getSchemeAndHttpHost();
+
+        return str_starts_with($path, '/') ? $base . $path : $base . '/' . $path;
     }
 }

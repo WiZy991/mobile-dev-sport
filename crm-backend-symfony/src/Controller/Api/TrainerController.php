@@ -27,6 +27,7 @@ class TrainerController extends AbstractController
                 'photo_url' => $t->getPhotoUrl(),
                 'specialization' => $t->getSpecialization(),
                 'rating' => $t->getRating(),
+                'description' => $t->getDescription(),
             ];
         }, $trainers);
 
@@ -51,6 +52,7 @@ class TrainerController extends AbstractController
             'photo_url' => $trainer->getPhotoUrl(),
             'specialization' => $trainer->getSpecialization(),
             'rating' => $trainer->getRating(),
+            'description' => $trainer->getDescription(),
         ]);
     }
 }

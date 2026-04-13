@@ -52,14 +52,15 @@ class SeedDataCommand extends Command
 
         // 2. Тренеры (один тренер — как в типичной CRM; все слоты привязаны к нему)
         $trainers = [
-            ['Тренер клуба', 'Персональные и групповые тренировки', 5.0],
+            ['Тренер клуба', 'Персональные и групповые тренировки', 5.0, 'Опытный тренер клуба. Помогу сформировать программу и достичь ваших целей безопасно и комфортно.'],
         ];
         $trainerEntities = [];
-        foreach ($trainers as [$name, $spec, $rating]) {
+        foreach ($trainers as [$name, $spec, $rating, $bio]) {
             $t = (new Trainer())
                 ->setName($name)
                 ->setSpecialization($spec)
-                ->setRating($rating);
+                ->setRating($rating)
+                ->setDescription($bio);
             $this->em->persist($t);
             $trainerEntities[] = $t;
         }
