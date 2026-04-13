@@ -102,7 +102,10 @@ class UserController extends AbstractController
     #[Route('/profile', name: 'api_user_profile_get', methods: ['GET'])]
     public function profile(Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve($request) ?? $this->createDemoUser();
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
 
         return $this->json($this->serializeUserProfile($user));
     }
@@ -112,7 +115,10 @@ class UserController extends AbstractController
     {
         $data = json_decode($request->getContent(), true) ?? [];
 
-        $user = $this->userResolver->resolve($request) ?? $this->createDemoUser();
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
 
         if (isset($data['email'])) {
             $user->setEmail($data['email']);
@@ -193,20 +199,6 @@ class UserController extends AbstractController
             $expected = (new \DateTimeImmutable($d . ' -1 day'))->format('Y-m-d');
         }
         return $streak;
-    }
-
-    private function createDemoUser(): User
-    {
-        $user = (new User())
-            ->setEmail('user@example.com')
-            ->setName('Антон')
-            ->setPhone('+7 922 222-22-22')
-            ->setBonusPoints(150);
-
-        $this->em->persist($user);
-        $this->em->flush();
-
-        return $user;
     }
 }
 

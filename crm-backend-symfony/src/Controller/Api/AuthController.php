@@ -49,11 +49,7 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Access denied', 'code' => 'user_blocked'], 403);
         }
 
-        return $this->json([
-            'token' => bin2hex(random_bytes(16)),
-            'refresh_token' => bin2hex(random_bytes(16)),
-            'user' => $this->serializeUser($user),
-        ]);
+        return $this->json($this->issueTokenPayload($user, false));
     }
 
     #[Route('/register', name: 'api_auth_register', methods: ['POST'])]
@@ -65,12 +61,15 @@ class AuthController extends AbstractController
         $phone = trim((string) ($data['phone'] ?? '+7 900 000-00-00'));
 
         if ($email === '') {
-            return $this->json(['error' => 'Email is required'], 400);
+            return $this->json(['error' => 'Укажите email'], 400);
         }
 
         $existing = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
         if ($existing !== null) {
-            return $this->json(['error' => 'User with this email already exists'], 409);
+            return $this->json([
+                'error' => 'Пользователь с таким email уже зарегистрирован',
+                'code' => 'email_already_exists',
+            ], 409);
         }
 
         $user = (new User())
@@ -85,11 +84,7 @@ class AuthController extends AbstractController
         $this->em->persist($user);
         $this->em->flush();
 
-        return $this->json([
-            'token' => bin2hex(random_bytes(16)),
-            'refresh_token' => bin2hex(random_bytes(16)),
-            'user' => $this->serializeUser($user),
-        ]);
+        return $this->json($this->issueTokenPayload($user, true));
     }
 
     private function serializeUser(User $user): array
@@ -110,27 +105,58 @@ class AuthController extends AbstractController
     #[Route('/refresh', name: 'api_auth_refresh', methods: ['POST'])]
     public function refresh(Request $request): JsonResponse
     {
-        // TODO: проверить refresh_token и выдать новый access_token
-        return $this->json([
-            'token' => bin2hex(random_bytes(16)),
-            'refresh_token' => bin2hex(random_bytes(16)),
-            'user' => [
-                'id' => 'user-123',
-                'email' => 'user@example.com',
-                'name' => 'Антон',
-                'phone' => '+7 922 222-22-22',
-                'avatar_url' => null,
-                'bonus_points' => 150,
-                'created_at' => '2025-06-01T10:00:00',
-            ],
-        ]);
+        $refresh = $this->extractBearerToken($request);
+        if ($refresh === null || $refresh === '') {
+            return $this->json(['error' => 'Требуется refresh-токен', 'code' => 'missing_refresh'], 401);
+        }
+
+        $user = $this->em->getRepository(User::class)->findOneBy(['apiRefreshToken' => $refresh]);
+        if ($user === null || $user->isBlocked()) {
+            return $this->json(['error' => 'Недействительный refresh-токен', 'code' => 'invalid_refresh'], 401);
+        }
+
+        return $this->json($this->issueTokenPayload($user, false));
     }
 
     #[Route('/logout', name: 'api_auth_logout', methods: ['POST'])]
     public function logout(): JsonResponse
     {
-        // TODO: инвалидировать токен / refresh_token
+        // Refresh-токен в БД не сбрасываем: клиент после «Выйти» может снова войти по отпечатку
+        // (в SecureStore лежит тот же refresh). Полная смена сессии — через смену пароля/отключение биометрии в приложении.
         return $this->json(['success' => true]);
+    }
+
+    /**
+     * @return array{token: string, refresh_token: string, user: array<string, mixed>}
+     *
+     * При входе по паролю и при /auth/refresh refresh-токен в БД не меняем — в приложении в SecureStore
+     * остаётся тот же refresh, что был зашифрован при включении биометрии. Иначе после «Выйти» → вход по паролю
+     * отпечаток отправлял бы старый токен и получал 401.
+     */
+    private function issueTokenPayload(User $user, bool $rotateRefresh): array
+    {
+        $accessToken = bin2hex(random_bytes(16));
+        if ($rotateRefresh || $user->getApiRefreshToken() === null || $user->getApiRefreshToken() === '') {
+            $user->setApiRefreshToken(bin2hex(random_bytes(16)));
+        }
+        $this->em->flush();
+        $refreshToken = (string) $user->getApiRefreshToken();
+
+        return [
+            'token' => $accessToken,
+            'refresh_token' => $refreshToken,
+            'user' => $this->serializeUser($user),
+        ];
+    }
+
+    private function extractBearerToken(Request $request): ?string
+    {
+        $auth = $request->headers->get('Authorization', '');
+        if (preg_match('/Bearer\s+(\S+)/i', $auth, $m)) {
+            return trim($m[1], " \t\"'");
+        }
+
+        return null;
     }
 }
 

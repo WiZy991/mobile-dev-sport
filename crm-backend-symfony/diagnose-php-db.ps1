@@ -11,9 +11,12 @@ $extLong = Join-Path (Split-Path $CrmPhpExe -Parent) 'ext'
 Write-Host '--- ext folder (long path) ---'
 Write-Host $extLong
 if (Test-Path -LiteralPath $extLong) {
-    $dll = Join-Path $extLong 'php_pdo_sqlite.dll'
-    Write-Host "php_pdo_sqlite.dll exists: $(Test-Path -LiteralPath $dll)"
-    Get-ChildItem -LiteralPath $extLong -Filter '*sqlite*' | ForEach-Object { Write-Host "  $($_.Name)" }
+    $dllSqlite = Join-Path $extLong 'php_pdo_sqlite.dll'
+    $dllMysql = Join-Path $extLong 'php_pdo_mysql.dll'
+    Write-Host "php_pdo_sqlite.dll exists: $(Test-Path -LiteralPath $dllSqlite)"
+    Write-Host "php_pdo_mysql.dll exists:  $(Test-Path -LiteralPath $dllMysql)"
+    Get-ChildItem -LiteralPath $extLong -Filter '*sqlite*' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+    Get-ChildItem -LiteralPath $extLong -Filter '*mysql*' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
 } else {
     Write-Host 'EXT FOLDER MISSING — reinstall PHP or use full zip from windows.php.net'
 }
@@ -23,13 +26,10 @@ if ($CrmPhpIni -and (Test-Path -LiteralPath $CrmPhpIni)) {
     Select-String -LiteralPath $CrmPhpIni -Pattern 'extension_dir' | ForEach-Object { $_.Line }
 }
 
-$dExt = @()
-if ($CrmPhpExtDir) { $dExt = @('-d', "extension_dir=$CrmPhpExtDir") }
-
 $printPdo = Join-Path $PSScriptRoot 'bin\print-pdo-drivers.php'
 if ($CrmPhpExe -and $CrmPhpIni -and (Test-Path -LiteralPath $CrmPhpIni)) {
     Write-Host '--- php -m (pdo*) ---'
-    & $CrmPhpExe -c $CrmPhpIni @dExt -m 2>&1 | Select-String -Pattern 'pdo|sqlite'
+    & $CrmPhpExe -c $CrmPhpIni -m 2>&1 | Select-String -Pattern 'pdo|sqlite|mysql'
     Write-Host '--- PDO::getAvailableDrivers() ---'
-    & $CrmPhpExe -c $CrmPhpIni @dExt $printPdo
+    & $CrmPhpExe -c $CrmPhpIni $printPdo
 }

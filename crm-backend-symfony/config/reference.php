@@ -1325,14 +1325,10 @@ final class App
      */
     public static function config(array $config): array
     {
-<<<<<<< HEAD
-        return AppReference::config($config);
-=======
         /** @var ConfigType $config */
         $config = AppReference::config($config);
 
         return $config;
->>>>>>> 3cd5da9808eff9cd06781f749dc7a9766b62a180
     }
 }
 

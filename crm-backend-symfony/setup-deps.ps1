@@ -29,11 +29,9 @@ if (-not (Test-Path -LiteralPath $phar) -or ((Get-Item $phar).Length -lt 2MB)) {
 }
 
 Write-Host 'Running composer install...'
-$dExt = @()
-if ($CrmPhpExtDir) { $dExt = @('-d', "extension_dir=$CrmPhpExtDir") }
 if ($CrmPhpIni) {
-    & $CrmPhpExe -c $CrmPhpIni @dExt composer.phar install --no-interaction
+    & $CrmPhpExe -c $CrmPhpIni composer.phar install --no-interaction
 } else {
-    & $CrmPhpExe @dExt composer.phar install --no-interaction
+    & $CrmPhpExe composer.phar install --no-interaction
 }
 Write-Host 'Done. Start server: .\dev-server.ps1'

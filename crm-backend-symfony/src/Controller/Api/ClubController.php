@@ -72,7 +72,9 @@ class ClubController extends AbstractController
     {
         $clubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
         if (empty($clubs)) {
-            return $this->json([]);
+            // Пустая таблица clubs (частый случай после миграций без сида): отдаём один «виртуальный»
+            // клуб из настроек CRM — тот же источник, что и GET /club/info.
+            return $this->json([$this->defaultClubListItemFromSettings()]);
         }
         $list = array_map(fn (Club $c) => [
             'id' => (string) $c->getId(),
@@ -87,6 +89,43 @@ class ClubController extends AbstractController
             'max_capacity' => $c->getMaxCapacity(),
         ], $clubs);
         return $this->json($list);
+    }
+
+    /**
+     * Один клуб для списка регистрации, если в БД ещё нет строк в `clubs`.
+     * id = "default" — не PK в таблице; регистрация в API пока не привязывает пользователя к клубу.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultClubListItemFromSettings(): array
+    {
+        $get = function (string $key, string $default): string {
+            $s = $this->em->getRepository(ClubSetting::class)->find($key);
+
+            return $s?->getSettingValue() ?? $default;
+        };
+
+        $amenitiesStr = $get('amenities', 'Тренажёрный зал, Бассейн, Йога, Групповые занятия');
+        $amenities = array_values(array_map('trim', array_filter(explode(',', $amenitiesStr))));
+
+        $maxCapacity = null;
+        $capSetting = $this->em->getRepository(ClubSetting::class)->find('gym_max_capacity');
+        if ($capSetting && $capSetting->getSettingValue() !== null && $capSetting->getSettingValue() !== '') {
+            $maxCapacity = max(10, (int) $capSetting->getSettingValue());
+        }
+
+        return [
+            'id' => 'default',
+            'name' => $get('name', 'FitnessClub'),
+            'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
+            'phone' => $get('phone', '+7 (495) 123-45-67'),
+            'email' => $get('email', 'info@fitnessclub.ru'),
+            'working_hours' => $get('working_hours', 'Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00'),
+            'latitude' => (float) $get('latitude', '55.7558'),
+            'longitude' => (float) $get('longitude', '37.6173'),
+            'amenities' => $amenities,
+            'max_capacity' => $maxCapacity,
+        ];
     }
 
     public function show(int $id): JsonResponse

@@ -1,6 +1,7 @@
 # One-time: copy php.ini-development to php.ini and enable extensions (Composer + Symfony).
-# extension_dir = full path with forward slashes (NOT 8.3 with ~ — PHP breaks on ~ on Windows).
-# extension=php_*.dll — explicit names for Windows.
+# extension_dir = "ext" (относительно каталога php.exe). Абсолютный путь с кириллицей в имени
+# пользователя часто ломается при записи в php.ini / при -d в PowerShell → DLL не грузятся.
+# extension=php_*.dll — явные имена для Windows.
 # Run after: winget install PHP.PHP.8.5
 
 $ErrorActionPreference = 'Stop'
@@ -27,19 +28,23 @@ if (-not (Test-Path -LiteralPath $extPathLong)) {
     exit 1
 }
 
-$pdoDll = Join-Path $extPathLong 'php_pdo_sqlite.dll'
-if (-not (Test-Path -LiteralPath $pdoDll)) {
+$pdoSqliteDll = Join-Path $extPathLong 'php_pdo_sqlite.dll'
+$pdoMysqlDll = Join-Path $extPathLong 'php_pdo_mysql.dll'
+if (-not (Test-Path -LiteralPath $pdoSqliteDll)) {
     Write-Error "Missing php_pdo_sqlite.dll. WinGet PHP may be incomplete. Download Thread Safe x64 ZIP from https://windows.php.net/download/ and extract into:`n$phpRoot"
     exit 1
 }
+if (-not (Test-Path -LiteralPath $pdoMysqlDll)) {
+    Write-Error "Missing php_pdo_mysql.dll (needed for MySQL / DATABASE_URL). WinGet PHP may be incomplete. Download Thread Safe x64 ZIP from https://windows.php.net/download/ and extract into:`n$phpRoot"
+    exit 1
+}
 
-$extAbs = $extPathLong.Replace('\', '/')
-Write-Host "extension_dir: $extAbs"
+Write-Host 'extension_dir: ext (relative to php.exe folder)'
 
 $c = Get-Content -LiteralPath $ini -Raw -Encoding UTF8
 
 $c = [regex]::Replace($c, '(?m)^\s*;?\s*extension_dir\s*=.*\r?\n?', '')
-$c = [regex]::Replace($c, '(\[PHP\]\r?\n)', "`$1extension_dir = `"$extAbs`"`r`n", 1)
+$c = [regex]::Replace($c, '(\[PHP\]\r?\n)', "`$1extension_dir = `"ext`"`r`n", 1)
 
 $replacements = @{
     ';extension=curl'       = 'extension=php_curl.dll'
@@ -49,6 +54,7 @@ $replacements = @{
     ';extension=mbstring'   = 'extension=php_mbstring.dll'
     ';extension=openssl'    = 'extension=php_openssl.dll'
     ';extension=pdo_sqlite' = 'extension=php_pdo_sqlite.dll'
+    ';extension=pdo_mysql'  = 'extension=php_pdo_mysql.dll'
     ';extension=sqlite3'    = 'extension=php_sqlite3.dll'
     ';extension=zip'        = 'extension=php_zip.dll'
 }
@@ -57,6 +63,7 @@ foreach ($kv in $replacements.GetEnumerator()) {
 }
 
 $c = $c.Replace('extension=pdo_sqlite', 'extension=php_pdo_sqlite.dll')
+$c = $c.Replace('extension=pdo_mysql', 'extension=php_pdo_mysql.dll')
 $c = $c.Replace('extension=sqlite3', 'extension=php_sqlite3.dll')
 
 # Fix leftover bare names (from older php.ini) — PHP looks for wrong files
@@ -68,6 +75,7 @@ $bare = [ordered]@{
     '(?m)^\s*extension\s*=\s*openssl\s*$'  = 'extension=php_openssl.dll'
     '(?m)^\s*extension\s*=\s*zip\s*$'       = 'extension=php_zip.dll'
     '(?m)^\s*extension\s*=\s*gd\s*$'        = 'extension=php_gd.dll'
+    '(?m)^\s*extension\s*=\s*pdo_mysql\s*$' = 'extension=php_pdo_mysql.dll'
 }
 foreach ($kv in $bare.GetEnumerator()) {
     $c = [regex]::Replace($c, $kv.Key, $kv.Value)

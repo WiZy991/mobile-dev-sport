@@ -19,7 +19,7 @@ if (-not $CrmPhpExe -or -not (Test-Path -LiteralPath $CrmPhpExe)) {
     exit 1
 }
 
-Write-Host '>>> configure-php-win.ps1 (extensions + absolute extension_dir)'
+Write-Host '>>> configure-php-win.ps1 (extensions; extension_dir = ext)'
 & (Join-Path $PSScriptRoot 'configure-php-win.ps1')
 . (Join-Path $PSScriptRoot '_prepend-winget-php.ps1')
 
@@ -48,7 +48,6 @@ if (-not $?) { exit 1 }
 $console = Join-Path $PSScriptRoot 'bin\console'
 $iniOpt = @()
 if ($CrmPhpIni) { $iniOpt += '-c', $CrmPhpIni }
-if ($CrmPhpExtDir) { $iniOpt += '-d', "extension_dir=$CrmPhpExtDir" }
 
 Write-Host '>>> SQLite database (schema from entities; migrations marked applied)'
 & $CrmPhpExe @iniOpt $console doctrine:schema:drop --full-database --force --no-interaction

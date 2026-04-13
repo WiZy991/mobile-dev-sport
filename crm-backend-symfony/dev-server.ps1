@@ -10,6 +10,26 @@ param(
 
 . (Join-Path $PSScriptRoot '_prepend-winget-php.ps1')
 
+function Get-CrmDatabaseUrlFromEnvFiles {
+    param([string]$Root)
+    $url = ''
+    foreach ($name in @('.env', '.env.local')) {
+        $path = Join-Path $Root $name
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+        foreach ($line in Get-Content -LiteralPath $path) {
+            if ($line -match '^\s*#' ) { continue }
+            if ($line -match '^\s*DATABASE_URL\s*=\s*(.+)$') {
+                $v = $Matches[1].Trim()
+                if (($v.StartsWith('"') -and $v.EndsWith('"')) -or ($v.StartsWith("'") -and $v.EndsWith("'"))) {
+                    $v = $v.Substring(1, $v.Length - 2)
+                }
+                $url = $v
+            }
+        }
+    }
+    return $url
+}
+
 function Get-DevPortListenerPids {
     param([int]$Port)
     try {
@@ -86,27 +106,44 @@ if (-not $CrmPhpIni) {
     exit 1
 }
 
-# Full path only — paths with "~" (8.3) break PHP: it truncates at ~.
-$dExt = @()
-if ($CrmPhpExtDir) {
-    $dExt = @('-d', "extension_dir=$CrmPhpExtDir")
-    Write-Host "EXT:  $CrmPhpExtDir"
-}
+# Не передаём -d extension_dir=... с абсолютным путём: кириллица в профиле ломает загрузку DLL.
+# В php.ini после configure-php-win.ps1 должно быть extension_dir = "ext".
 
 # -c forces this ini for built-in server (avoids "could not find driver" when ini is skipped).
-$mods = & $CrmPhpExe -c $CrmPhpIni @dExt -m 2>&1 | Out-String
-if ($mods -notmatch '(?m)^pdo_sqlite\s*$') {
-    Write-Host "pdo_sqlite missing. Run: .\configure-php-win.ps1"
-    Write-Host "Using: $CrmPhpExe"
-    exit 1
+$mods = & $CrmPhpExe -c $CrmPhpIni -m 2>&1 | Out-String
+$dbUrl = Get-CrmDatabaseUrlFromEnvFiles -Root $PSScriptRoot
+$useMysql = $dbUrl -match '(?i)mysql:'
+$useSqlite = $dbUrl -match '(?i)sqlite:'
+if ([string]::IsNullOrWhiteSpace($dbUrl)) {
+    $useMysql = $true
 }
-
-$pdoCheck = Join-Path $PSScriptRoot 'bin\pdo-sqlite-check.php'
-$pdoOut = & $CrmPhpExe -c $CrmPhpIni @dExt $pdoCheck 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host $pdoOut
-    Write-Host "PDO SQLite self-test failed. Run: .\configure-php-win.ps1"
-    exit 1
+if ($useMysql) {
+    if ($mods -notmatch '(?m)^pdo_mysql\s*$') {
+        Write-Host "pdo_mysql missing (DATABASE_URL uses MySQL). Run: .\configure-php-win.ps1"
+        Write-Host "Using: $CrmPhpExe"
+        exit 1
+    }
+    $pdoMysqlCheck = Join-Path $PSScriptRoot 'bin\pdo-mysql-check.php'
+    $pdoMysqlOut = & $CrmPhpExe -c $CrmPhpIni $pdoMysqlCheck 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host $pdoMysqlOut
+        Write-Host "PDO MySQL self-test failed. Run: .\configure-php-win.ps1"
+        exit 1
+    }
+}
+if ($useSqlite) {
+    if ($mods -notmatch '(?m)^pdo_sqlite\s*$') {
+        Write-Host "pdo_sqlite missing (DATABASE_URL uses SQLite). Run: .\configure-php-win.ps1"
+        Write-Host "Using: $CrmPhpExe"
+        exit 1
+    }
+    $pdoSqliteCheck = Join-Path $PSScriptRoot 'bin\pdo-sqlite-check.php'
+    $pdoSqliteOut = & $CrmPhpExe -c $CrmPhpIni $pdoSqliteCheck 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host $pdoSqliteOut
+        Write-Host "PDO SQLite self-test failed. Run: .\configure-php-win.ps1"
+        exit 1
+    }
 }
 
 Set-Location $PSScriptRoot
@@ -159,4 +196,4 @@ Write-Host "PORT: $DevPort"
 Write-Host "Admin:     http://127.0.0.1:$DevPort/admin"
 Write-Host "PDO check: http://127.0.0.1:$DevPort/check-pdo.php"
 # 0.0.0.0 so IPv4 localhost and LAN work.
-& $CrmPhpExe -c $CrmPhpIni @dExt -S "0.0.0.0:$DevPort" -t public
+& $CrmPhpExe -c $CrmPhpIni -S "0.0.0.0:$DevPort" -t public

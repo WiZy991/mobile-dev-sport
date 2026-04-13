@@ -31,8 +31,6 @@ class CurrentUserResolver
             }
         }
 
-        // Fallback: первый пользователь в БД (для обратной совместимости и тестов)
-        $user = $this->em->getRepository(User::class)->findOneBy([], ['id' => 'ASC']);
-        return $user !== null && !$user->isBlocked() ? $user : null;
+        return null;
     }
 }

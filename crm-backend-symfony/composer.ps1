@@ -41,12 +41,9 @@ if (-not (Test-Path -LiteralPath $phar) -or ((Get-Item $phar).Length -lt 2MB)) {
     exit 1
 }
 
-$dExt = @()
-if ($CrmPhpExtDir) { $dExt = @('-d', "extension_dir=$CrmPhpExtDir") }
-
 if ($CrmPhpIni) {
-    & $CrmPhpExe -c $CrmPhpIni @dExt $phar @ComposerArgs
+    & $CrmPhpExe -c $CrmPhpIni $phar @ComposerArgs
 } else {
-    & $CrmPhpExe @dExt $phar @ComposerArgs
+    & $CrmPhpExe $phar @ComposerArgs
 }
 exit $LASTEXITCODE

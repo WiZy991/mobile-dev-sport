@@ -63,6 +63,10 @@ class User
     #[ORM\Column(type: 'boolean')]
     private bool $isBlocked = false;
 
+    /** Одноразовый refresh для мобильного клиента (Bearer в POST /auth/refresh). */
+    #[ORM\Column(name: 'api_refresh_token', type: 'string', length: 64, nullable: true)]
+    private ?string $apiRefreshToken = null;
+
     /** none | pending | verified | rejected — соответствие паспорта (Сбер ID / др.) */
     #[ORM\Column(type: 'string', length: 20)]
     private string $passportVerificationStatus = 'none';
@@ -303,6 +307,18 @@ class User
     public function setIsBlocked(bool $isBlocked): self
     {
         $this->isBlocked = $isBlocked;
+        return $this;
+    }
+
+    public function getApiRefreshToken(): ?string
+    {
+        return $this->apiRefreshToken;
+    }
+
+    public function setApiRefreshToken(?string $apiRefreshToken): self
+    {
+        $this->apiRefreshToken = $apiRefreshToken;
+
         return $this;
     }
 
