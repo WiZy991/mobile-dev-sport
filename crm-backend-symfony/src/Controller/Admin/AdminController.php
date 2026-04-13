@@ -20,12 +20,15 @@ use App\Entity\ClubSetting;
 use App\Entity\Tag;
 use App\Entity\LeadNote;
 use App\Entity\Expense;
+use App\Entity\Promotion;
 use App\Service\Admin\AdminMenuBuilder;
+use App\Service\Admin\ClientImportService;
 use App\Service\Integration\PercoWebClient;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
@@ -36,6 +39,7 @@ class AdminController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly AdminMenuBuilder $adminMenuBuilder,
         private readonly PercoWebClient $percoWebClient,
+        private readonly ClientImportService $clientImportService,
     ) {}
 
     private function buildMenu(): array
@@ -251,6 +255,69 @@ class AdminController extends AbstractController
             'menu' => $menu,
             'current' => 'clients',
             'allTags' => $allTags,
+        ]);
+    }
+
+    #[Route('/clients/import', name: 'admin_clients_import', priority: 10, methods: ['GET', 'POST'])]
+    public function clientsImport(Request $request): Response
+    {
+        $menu = $this->buildMenu();
+
+        if ($request->isMethod('POST')) {
+            $file = $request->files->get('import_file');
+            if (!$file instanceof UploadedFile || !$file->isValid()) {
+                $this->addFlash('danger', 'Выберите файл .csv, .xlsx или .xls.');
+
+                return $this->render('admin/client_import.html.twig', [
+                    'menu' => $menu,
+                    'current' => 'clients',
+                ]);
+            }
+
+            $updateExisting = $request->request->getBoolean('update_existing');
+
+            try {
+                $result = $this->clientImportService->import($file, $updateExisting);
+            } catch (\InvalidArgumentException $e) {
+                $this->addFlash('danger', $e->getMessage());
+
+                return $this->render('admin/client_import.html.twig', [
+                    'menu' => $menu,
+                    'current' => 'clients',
+                ]);
+            } catch (\Throwable $e) {
+                $this->addFlash('danger', 'Ошибка чтения файла: ' . $e->getMessage());
+
+                return $this->render('admin/client_import.html.twig', [
+                    'menu' => $menu,
+                    'current' => 'clients',
+                ]);
+            }
+
+            $msg = sprintf(
+                'Импорт: клиенты — создано %d, обновлено %d; абонементы — создано %d, обновлено %d; записи на тренировки — создано %d, обновлено %d; пропусков строк: %d.',
+                $result->clientsCreated,
+                $result->clientsUpdated,
+                $result->subscriptionsCreated,
+                $result->subscriptionsUpdated,
+                $result->bookingsCreated,
+                $result->bookingsUpdated,
+                $result->skipped
+            );
+            $this->addFlash('success', $msg);
+            foreach (array_slice($result->errors, 0, 25) as $err) {
+                $this->addFlash('warning', $err);
+            }
+            if (count($result->errors) > 25) {
+                $this->addFlash('warning', '… и ещё ' . (count($result->errors) - 25) . ' сообщений.');
+            }
+
+            return $this->redirectToRoute('admin_section', ['section' => 'clients']);
+        }
+
+        return $this->render('admin/client_import.html.twig', [
+            'menu' => $menu,
+            'current' => 'clients',
         ]);
     }
 
@@ -961,11 +1028,16 @@ class AdminController extends AbstractController
         $ratingRaw = $request->request->get('rating');
         $rating = $ratingRaw !== null && $ratingRaw !== '' ? (float) $ratingRaw : null;
 
+        $description = $request->request->get('description');
+        $description = is_string($description) ? trim($description) : '';
+        $description = $description !== '' ? $description : null;
+
         $trainer = (new Trainer())
             ->setName($name)
             ->setSpecialization($specialization)
             ->setPhotoUrl($photoUrl)
-            ->setRating($rating);
+            ->setRating($rating)
+            ->setDescription($description);
 
         $this->em->persist($trainer);
         $this->em->flush();
@@ -1020,9 +1092,14 @@ class AdminController extends AbstractController
         if (!$trainer) {
             throw $this->createNotFoundException();
         }
+        $description = $request->request->get('description');
+        $description = is_string($description) ? trim($description) : '';
+        $description = $description !== '' ? $description : null;
+
         $trainer->setName((string) $request->request->get('name'))
             ->setSpecialization($request->request->get('specialization') ?: null)
-            ->setPhotoUrl($request->request->get('photo_url') ?: null);
+            ->setPhotoUrl($request->request->get('photo_url') ?: null)
+            ->setDescription($description);
         $ratingRaw = $request->request->get('rating');
         $trainer->setRating($ratingRaw !== '' && $ratingRaw !== null ? (float) $ratingRaw : null);
         $this->em->flush();
@@ -1385,6 +1462,58 @@ class AdminController extends AbstractController
             $this->addFlash('success', 'Промокод обновлён.');
         }
         return $this->redirectToRoute('admin_section', ['section' => 'promocodes']);
+    }
+
+    #[Route('/promotions/{id}/update', name: 'admin_promotion_update', methods: ['POST'])]
+    public function updatePromotion(int $id, Request $request): Response
+    {
+        $promotion = $this->em->getRepository(Promotion::class)->find($id);
+        if (!$promotion) {
+            throw $this->createNotFoundException();
+        }
+
+        $promotion
+            ->setTitle(trim((string) $request->request->get('title', $promotion->getTitle())))
+            ->setSubtitle(($request->request->get('subtitle') !== null && trim((string) $request->request->get('subtitle')) !== '') ? trim((string) $request->request->get('subtitle')) : null)
+            ->setButtonText(trim((string) $request->request->get('button_text', 'Подробнее')) ?: 'Подробнее')
+            ->setActionType((string) $request->request->get('action_type', 'shop'))
+            ->setActionValue(($request->request->get('action_value') !== null && trim((string) $request->request->get('action_value')) !== '') ? trim((string) $request->request->get('action_value')) : null)
+            ->setBgFrom($this->normalizeHexColor((string) $request->request->get('bg_from', $promotion->getBgFrom())))
+            ->setBgTo($this->normalizeHexColor((string) $request->request->get('bg_to', $promotion->getBgTo())))
+            ->setSortOrder((int) $request->request->get('sort_order', 100))
+            ->setIsActive($request->request->get('is_active') === '1');
+
+        $this->applyPromotionImageUpload($request, $promotion);
+
+        $this->em->flush();
+        $this->addFlash('success', 'Акция обновлена.');
+
+        return $this->redirectToRoute('admin_section', ['section' => 'promotions']);
+    }
+
+    #[Route('/promotions/{id}/toggle', name: 'admin_promotion_toggle', methods: ['POST'])]
+    public function togglePromotion(int $id): Response
+    {
+        $promotion = $this->em->getRepository(Promotion::class)->find($id);
+        if ($promotion) {
+            $promotion->setIsActive(!$promotion->isActive());
+            $this->em->flush();
+        }
+
+        return $this->redirectToRoute('admin_section', ['section' => 'promotions']);
+    }
+
+    #[Route('/promotions/{id}/delete', name: 'admin_promotion_delete', methods: ['POST'])]
+    public function deletePromotion(int $id): Response
+    {
+        $promotion = $this->em->getRepository(Promotion::class)->find($id);
+        if ($promotion) {
+            $this->em->remove($promotion);
+            $this->em->flush();
+            $this->addFlash('success', 'Акция удалена.');
+        }
+
+        return $this->redirectToRoute('admin_section', ['section' => 'promotions']);
     }
 
     #[Route('/clients/export', name: 'admin_clients_export', methods: ['GET'])]
@@ -2220,6 +2349,41 @@ class AdminController extends AbstractController
             ]);
         }
 
+        if ($section === 'promotions') {
+            if ($request->isMethod('POST')) {
+                $title = trim((string) $request->request->get('title', ''));
+                if ($title !== '') {
+                    $promotion = (new Promotion())
+                        ->setTitle($title)
+                        ->setSubtitle(($request->request->get('subtitle') !== null && trim((string) $request->request->get('subtitle')) !== '') ? trim((string) $request->request->get('subtitle')) : null)
+                        ->setButtonText(trim((string) $request->request->get('button_text', 'Подробнее')) ?: 'Подробнее')
+                        ->setActionType((string) $request->request->get('action_type', 'shop'))
+                        ->setActionValue(($request->request->get('action_value') !== null && trim((string) $request->request->get('action_value')) !== '') ? trim((string) $request->request->get('action_value')) : null)
+                        ->setBgFrom($this->normalizeHexColor((string) $request->request->get('bg_from', '#F97316')))
+                        ->setBgTo($this->normalizeHexColor((string) $request->request->get('bg_to', '#3B82F6')))
+                        ->setSortOrder((int) $request->request->get('sort_order', 100))
+                        ->setIsActive($request->request->get('is_active') === '1');
+
+                    $this->applyPromotionImageUpload($request, $promotion);
+                    $this->em->persist($promotion);
+                    $this->em->flush();
+                    $this->addFlash('success', 'Акция создана.');
+                } else {
+                    $this->addFlash('warning', 'Укажите заголовок акции.');
+                }
+
+                return $this->redirectToRoute('admin_section', ['section' => 'promotions']);
+            }
+
+            $promotions = $this->em->getRepository(Promotion::class)->findBy([], ['sortOrder' => 'ASC', 'id' => 'DESC']);
+
+            return $this->render('admin/promotions.html.twig', [
+                'menu' => $menu,
+                'current' => $section,
+                'promotions' => $promotions,
+            ]);
+        }
+
         if ($section === 'tags') {
             $tags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
             return $this->render('admin/tags.html.twig', [
@@ -2276,6 +2440,68 @@ class AdminController extends AbstractController
             'current' => $section,
             'title' => $menu[$section],
         ]);
+    }
+
+    private function normalizeHexColor(string $value): string
+    {
+        $c = strtoupper(trim($value));
+        if (!str_starts_with($c, '#')) {
+            $c = '#' . $c;
+        }
+        if (!preg_match('/^#[0-9A-F]{6}$/', $c)) {
+            return '#F97316';
+        }
+        return $c;
+    }
+
+    private function applyPromotionImageUpload(Request $request, Promotion $promotion): void
+    {
+        $file = $request->files->get('image_file');
+        if (!$file instanceof UploadedFile) {
+            return;
+        }
+        if (!$file->isValid()) {
+            if ($file->getError() !== \UPLOAD_ERR_NO_FILE) {
+                $this->addFlash('warning', 'Изображение не принято: ' . $file->getErrorMessage());
+            }
+
+            return;
+        }
+        try {
+            $promotion->setImagePath($this->storePromotionImage($file));
+        } catch (\Throwable $e) {
+            $this->addFlash('warning', $e->getMessage());
+        }
+    }
+
+    private function storePromotionImage(UploadedFile $file): string
+    {
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        // Имя файла — без symfony/mime; guessExtension() без пакета symfony/mime даёт предупреждение/сбой.
+        $ext = strtolower(pathinfo($file->getClientOriginalName(), \PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowed, true)) {
+            try {
+                $g = strtolower((string) ($file->guessExtension() ?: ''));
+                if (in_array($g, $allowed, true)) {
+                    $ext = $g;
+                }
+            } catch (\Throwable) {
+                // нет MimeTypes — остаёмся по имени файла
+            }
+        }
+        if (!in_array($ext, $allowed, true)) {
+            throw new \RuntimeException('Формат изображения: jpg, png, webp (расширение файла: ' . ($ext !== '' ? $ext : 'не определено') . ').');
+        }
+
+        $uploadsDir = $this->getParameter('kernel.project_dir') . '/public/uploads/promotions';
+        if (!is_dir($uploadsDir) && !mkdir($uploadsDir, 0775, true) && !is_dir($uploadsDir)) {
+            throw new \RuntimeException('Не удалось создать директорию для изображений.');
+        }
+
+        $filename = 'promo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $file->move($uploadsDir, $filename);
+
+        return '/uploads/promotions/' . $filename;
     }
 }
 

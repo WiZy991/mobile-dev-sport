@@ -50,18 +50,17 @@ class SeedDataCommand extends Command
             ->setBonusPoints(100);
         $this->em->persist($user);
 
-        // 2. Тренеры
+        // 2. Тренеры (один тренер — как в типичной CRM; все слоты привязаны к нему)
         $trainers = [
-            ['Анна Иванова', 'Фитнес, йога', 4.9],
-            ['Михаил Петров', 'Силовые тренировки', 4.8],
-            ['Елена Сидорова', 'Пилатес, стретчинг', 4.7],
+            ['Тренер клуба', 'Персональные и групповые тренировки', 5.0, 'Опытный тренер клуба. Помогу сформировать программу и достичь ваших целей безопасно и комфортно.'],
         ];
         $trainerEntities = [];
-        foreach ($trainers as [$name, $spec, $rating]) {
+        foreach ($trainers as [$name, $spec, $rating, $bio]) {
             $t = (new Trainer())
                 ->setName($name)
                 ->setSpecialization($spec)
-                ->setRating($rating);
+                ->setRating($rating)
+                ->setDescription($bio);
             $this->em->persist($t);
             $trainerEntities[] = $t;
         }
@@ -224,8 +223,8 @@ class SeedDataCommand extends Command
         $io->success('Тестовые данные успешно добавлены!');
         $io->listing([
             '1 пользователь (user@example.com)',
-            count($trainers) . ' тренеров',
-            '63 тренировки на 7 дней',
+            count($trainers) . ' тренер(ов)',
+            'групповые + персональные + extra на горизонте из сида',
             '4 тарифных плана',
             '4 товара/услуги',
             '1 клуб',

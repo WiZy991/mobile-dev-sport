@@ -37,7 +37,11 @@ class TrainingController extends AbstractController
                     [],
                     ['startAt' => 'ASC']
                 );
-                $trainings = array_filter($trainings, fn (Training $t) => $t->getStartAt() >= $start && $t->getStartAt() < $end);
+                // array_filter сохраняет ключи → json_encode даёт JSON-объект, а не массив (ломает Gson в приложении)
+                $trainings = array_values(array_filter(
+                    $trainings,
+                    fn (Training $t) => $t->getStartAt() >= $start && $t->getStartAt() < $end
+                ));
             } catch (\Throwable) {
                 $trainings = $repo->findBy([], ['startAt' => 'ASC']);
             }
@@ -46,7 +50,10 @@ class TrainingController extends AbstractController
         }
 
         if ($typeFilter !== null && $typeFilter !== '') {
-            $trainings = array_filter($trainings, fn (Training $t) => $t->getType() === $typeFilter);
+            $trainings = array_values(array_filter(
+                $trainings,
+                fn (Training $t) => $t->getType() === $typeFilter
+            ));
         }
 
         $user = $this->userResolver->resolve($request);
@@ -116,12 +123,14 @@ class TrainingController extends AbstractController
                 'photo_url' => $trainer->getPhotoUrl(),
                 'specialization' => $trainer->getSpecialization(),
                 'rating' => $trainer->getRating(),
+                'description' => $trainer->getDescription(),
             ] : [
                 'id' => '',
                 'name' => $t->getTrainerName() ?: 'Без тренера',
                 'photo_url' => null,
                 'specialization' => null,
                 'rating' => 0.0,
+                'description' => null,
             ],
             'start_time' => $start->format('Y-m-d\TH:i:s'),
             'end_time' => $end->format('Y-m-d\TH:i:s'),

@@ -6,6 +6,7 @@ use App\Entity\AccessLog;
 use App\Entity\Sale;
 use App\Entity\User;
 use App\Service\CurrentUserResolver;
+use App\Service\MobileClientPayloadApplier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -122,10 +123,8 @@ class UserController extends AbstractController
         if (isset($data['phone'])) {
             $user->setPhone($data['phone']);
         }
-        if (isset($data['date_of_birth'])) {
-            $dob = $data['date_of_birth'];
-            $user->setDateOfBirth($dob ? new \DateTimeImmutable($dob) : null);
-        }
+
+        $this->mobileClientPayloadApplier->applyProfilePatch($user, $data);
 
         $this->em->persist($user);
         $this->em->flush();
@@ -144,6 +143,12 @@ class UserController extends AbstractController
             'avatar_url' => $user->getAvatarUrl(),
             'bonus_points' => $user->getBonusPoints(),
             'date_of_birth' => $user->getDateOfBirth()?->format('Y-m-d'),
+            'gender' => $user->getGender(),
+            'passport_series' => $user->getPassportSeries(),
+            'passport_number' => $user->getPassportNumber(),
+            'passport_issued_by' => $user->getPassportIssuedBy(),
+            'passport_issue_date' => $user->getPassportIssueDate()?->format('Y-m-d'),
+            'registration_address' => $user->getRegistrationAddress(),
             'passport_verification_status' => $user->getPassportVerificationStatus(),
             'created_at' => $user->getCreatedAt()->format('Y-m-d\TH:i:s'),
         ];

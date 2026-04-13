@@ -7,6 +7,7 @@
         <h1 class="h4 mb-0">Клиенты</h1>
         <div>
             <a href="{{ path('admin_clients_export') }}?q={{ search|default('')|url_encode }}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
+            <a href="{{ path('admin_clients_import') }}" class="btn btn-sm btn-outline-primary me-2">Импорт CSV / Excel</a>
             <a href="{{ path('admin_client_new') }}" class="btn btn-sm btn-primary">+ Новый клиент</a>
         </div>
     </div>

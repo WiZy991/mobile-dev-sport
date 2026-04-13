@@ -191,6 +191,11 @@ admin_clients_export:
   controller: App\Controller\Admin\AdminController::exportClients
   methods: [GET]
 
+admin_clients_import:
+  path: /admin/clients/import
+  controller: App\Controller\Admin\AdminController::clientsImport
+  methods: [GET, POST]
+
 admin_sales_export:
   path: /admin/sales/export
   controller: App\Controller\Admin\AdminController::exportSales
@@ -229,6 +234,21 @@ admin_promo_toggle:
 admin_promo_update:
   path: /admin/promocodes/{id}/update
   controller: App\Controller\Admin\AdminController::updatePromoCode
+  methods: [POST]
+
+admin_promotion_update:
+  path: /admin/promotions/{id}/update
+  controller: App\Controller\Admin\AdminController::updatePromotion
+  methods: [POST]
+
+admin_promotion_toggle:
+  path: /admin/promotions/{id}/toggle
+  controller: App\Controller\Admin\AdminController::togglePromotion
+  methods: [POST]
+
+admin_promotion_delete:
+  path: /admin/promotions/{id}/delete
+  controller: App\Controller\Admin\AdminController::deletePromotion
   methods: [POST]
 
 admin_selfservice_export:
