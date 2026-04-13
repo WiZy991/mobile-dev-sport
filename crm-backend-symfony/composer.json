@@ -71,6 +71,16 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
+        ],
+        "db-reset-dev": [
+            "php bin/console doctrine:schema:drop --force --full-database --no-interaction",
+            "php bin/console doctrine:schema:create --no-interaction",
+            "php bin/console doctrine:migrations:sync-metadata-storage --no-interaction",
+            "php bin/console doctrine:migrations:version --add --all --no-interaction"
+        ],
+        "db-mark-migrations-applied": [
+            "php bin/console doctrine:migrations:sync-metadata-storage --no-interaction",
+            "php bin/console doctrine:migrations:version --add --all --no-interaction"
         ]
     },
     "conflict": {
