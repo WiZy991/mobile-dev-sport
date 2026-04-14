@@ -31,6 +31,8 @@ docker compose logs -f app
 
 API будет доступен на `http://<server-ip>:8000/api/v1/`.
 
+Примечание: при старте контейнер `app` автоматически создаёт БД (если её нет) и применяет актуальную схему через Doctrine (`doctrine:schema:update --force`).
+
 ### Как развернуть Symfony‑проект локально без Docker
 
 1. Установите PHP (>= 8.2), Composer и любой веб‑сервер (Symfony CLI или nginx/apache).
