@@ -2,7 +2,36 @@
 
 Этот каталог содержит каркас backend‑части CRM/админки для мобильного приложения **FitnessClub**.
 
-### Как развернуть Symfony‑проект локально
+### Запуск backend + MySQL через Docker
+
+1. Перейдите в каталог backend:
+
+```bash
+cd crm-backend-symfony
+```
+
+2. Убедитесь, что в `.env` указан Docker-хост базы:
+
+```env
+DATABASE_URL="mysql://app:app_password@database:3306/world_fitness?charset=utf8mb4&serverVersion=8.0.32"
+```
+
+3. Поднимите контейнеры:
+
+```bash
+docker compose up -d --build
+```
+
+4. Проверка:
+
+```bash
+docker compose ps
+docker compose logs -f app
+```
+
+API будет доступен на `http://<server-ip>:8000/api/v1/`.
+
+### Как развернуть Symfony‑проект локально без Docker
 
 1. Установите PHP (>= 8.2), Composer и любой веб‑сервер (Symfony CLI или nginx/apache).
 2. Войдите в каталог `crm-backend`:
