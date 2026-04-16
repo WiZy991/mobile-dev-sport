@@ -90,6 +90,11 @@ class User
     #[ORM\JoinTable(name: 'user_tags')]
     private Collection $tags;
 
+    /** Предпочитаемый / основной клуб (фильтр и выгрузка в CRM). */
+    #[ORM\ManyToOne(targetEntity: Club::class)]
+    #[ORM\JoinColumn(name: 'club_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?Club $club = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -119,6 +124,17 @@ class User
     public function clearTags(): self
     {
         $this->tags->clear();
+        return $this;
+    }
+
+    public function getClub(): ?Club
+    {
+        return $this->club;
+    }
+
+    public function setClub(?Club $club): self
+    {
+        $this->club = $club;
         return $this;
     }
 

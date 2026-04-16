@@ -18,6 +18,7 @@ use App\Entity\Booking;
 use App\Entity\AccessLog;
 use App\Entity\ClubSetting;
 use App\Entity\Tag;
+use App\Entity\Club;
 use App\Entity\LeadNote;
 use App\Entity\Expense;
 use App\Entity\Promotion;
@@ -33,6 +34,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Annotation\Route;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 #[Route('/admin')]
 class AdminController extends AbstractController
@@ -235,10 +238,13 @@ class AdminController extends AbstractController
                 $this->addFlash('danger', 'Клиент с таким email уже существует.');
                 $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
 
+                $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+
                 return $this->render('admin/client_new.html.twig', [
                     'menu' => $menu,
                     'current' => 'clients',
                     'allTags' => $allTags,
+                    'allClubs' => $allClubs,
                     'formData' => $request->request->all(),
                 ]);
             }
@@ -253,10 +259,12 @@ class AdminController extends AbstractController
         }
 
         $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
+        $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
         return $this->render('admin/client_new.html.twig', [
             'menu' => $menu,
             'current' => 'clients',
             'allTags' => $allTags,
+            'allClubs' => $allClubs,
         ]);
     }
 
@@ -359,7 +367,56 @@ class AdminController extends AbstractController
             // Таблицы тегов могут отсутствовать — пропускаем
         }
 
+        $clubIdRaw = $request->request->get('club_id');
+        $clubId = ($clubIdRaw !== null && $clubIdRaw !== '') ? (int) $clubIdRaw : 0;
+        if ($clubId > 0) {
+            $club = $this->em->getRepository(Club::class)->find($clubId);
+            $user->setClub($club instanceof Club ? $club : null);
+        } else {
+            $user->setClub(null);
+        }
+
         return $user;
+    }
+
+    /**
+     * @return User[]
+     */
+    private function buildFilteredClientsList(Request $request): array
+    {
+        $search = trim((string) $request->query->get('q', ''));
+        $tagId = $request->query->get('tag_id') ? (int) $request->query->get('tag_id') : null;
+        $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
+
+        if ($tagId) {
+            $tag = $this->em->getRepository(Tag::class)->find($tagId);
+            $clients = $tag ? $tag->getUsers()->toArray() : [];
+        } else {
+            $clients = $this->em->getRepository(User::class)->findBy([], ['name' => 'ASC']);
+        }
+        if ($clubId !== null && $clubId > 0) {
+            $clients = array_values(array_filter($clients, fn (User $u) => $u->getClub()?->getId() === $clubId));
+        }
+        if ($search !== '') {
+            $searchLower = mb_strtolower($search);
+            $clients = array_filter($clients, fn (User $u) =>
+                str_contains(mb_strtolower($u->getName()), $searchLower)
+                || str_contains((string) $u->getEmail(), $search)
+                || str_contains((string) $u->getPhone(), $search)
+            );
+        }
+
+        return array_values($clients);
+    }
+
+    private function clientTagNamesJoined(User $u): string
+    {
+        $names = [];
+        foreach ($u->getTags() as $t) {
+            $names[] = $t->getName();
+        }
+
+        return $names !== [] ? implode(', ', $names) : '—';
     }
 
     #[Route('/clients/{id}', name: 'admin_client_show', methods: ['GET'])]
@@ -448,6 +505,7 @@ class AdminController extends AbstractController
         $activities = array_slice($activities, 0, 30);
 
         $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
+        $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
         return $this->render('admin/client_show.html.twig', [
             'menu' => $menu,
             'current' => 'clients',
@@ -462,6 +520,7 @@ class AdminController extends AbstractController
             'activeSubsCount' => $activeSubsCount,
             'activities' => $activities,
             'allTags' => $allTags,
+            'allClubs' => $allClubs,
         ]);
     }
 
@@ -1519,34 +1578,32 @@ class AdminController extends AbstractController
     }
 
     #[Route('/clients/export', name: 'admin_clients_export', methods: ['GET'])]
-    public function exportClients(Request $request): StreamedResponse
+    public function exportClients(Request $request): Response
     {
-        $search = trim((string) $request->query->get('q', ''));
-        $clients = $this->em->getRepository(User::class)->findBy([], ['name' => 'ASC']);
-        if ($search !== '') {
-            $searchLower = mb_strtolower($search);
-            $clients = array_filter($clients, fn (User $u) =>
-                str_contains(mb_strtolower($u->getName()), $searchLower)
-                || str_contains((string) ($u->getEmail() ?? ''), $search)
-                || str_contains((string) ($u->getPhone() ?? ''), $search)
-            );
+        $clients = $this->buildFilteredClientsList($request);
+        $format = strtolower((string) $request->query->get('format', 'csv'));
+        if ($format === 'xlsx') {
+            return $this->exportClientsAsXlsx($clients, $request);
         }
-        $clients = array_values($clients);
 
         $response = new StreamedResponse(function () use ($clients) {
             $handle = fopen('php://output', 'w');
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($handle, ['ID', 'Имя', 'Email', 'Телефон', 'Дата рождения', 'Паспорт', 'Бонусы', 'Создан'], ';');
+            fputcsv($handle, ['ID', 'Имя', 'Email', 'Телефон', 'Клуб', 'Адрес клуба', 'Дата рождения', 'Паспорт', 'Бонусы', 'Теги', 'Создан'], ';');
             foreach ($clients as $u) {
                 $passport = ($u->getPassportSeries() && $u->getPassportNumber()) ? $u->getPassportSeries() . ' ' . $u->getPassportNumber() : '—';
+                $club = $u->getClub();
                 fputcsv($handle, [
                     $u->getId(),
                     $u->getName(),
                     $u->getEmail() ?? '',
                     $u->getPhone() ?? '',
+                    $club ? $club->getName() : '—',
+                    $club ? $club->getAddress() : '—',
                     $u->getDateOfBirth()?->format('d.m.Y') ?? '—',
                     $passport,
                     $u->getBonusPoints(),
+                    $this->clientTagNamesJoined($u),
                     $u->getCreatedAt()->format('d.m.Y H:i'),
                 ], ';');
             }
@@ -1554,6 +1611,68 @@ class AdminController extends AbstractController
         });
         $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
         $response->headers->set('Content-Disposition', 'attachment; filename="clients_' . date('Y-m-d_H-i') . '.csv"');
+        return $response;
+    }
+
+    private function exportClientsAsXlsx(array $clients, Request $request): StreamedResponse
+    {
+        $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : 0;
+        $suffix = '';
+        if ($clubId > 0) {
+            $c = $this->em->getRepository(Club::class)->find($clubId);
+            if ($c instanceof Club) {
+                $suffix = '_club' . $clubId;
+            }
+        }
+        $filename = 'clients' . $suffix . '_' . date('Y-m-d_H-i') . '.xlsx';
+
+        $response = new StreamedResponse(function () use ($clients) {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Клиенты');
+            $headers = [
+                'ID', 'ФИО', 'Email', 'Телефон', 'Клуб', 'Адрес клуба', 'Дата рождения', 'Место рождения', 'Пол',
+                'Серия паспорта', 'Номер паспорта', 'Кем выдан', 'Дата выдачи', 'Код подразделения',
+                'Адрес регистрации', 'Контакт для экстренной связи', 'Бонусы', 'Теги',
+                'Верификация паспорта', 'Создан',
+            ];
+            $sheet->fromArray($headers, null, 'A1');
+            $row = 2;
+            foreach ($clients as $u) {
+                $club = $u->getClub();
+                $sheet->fromArray([
+                    $u->getId(),
+                    $u->getName(),
+                    $u->getEmail(),
+                    $u->getPhone(),
+                    $club ? $club->getName() : '—',
+                    $club ? $club->getAddress() : '—',
+                    $u->getDateOfBirth()?->format('d.m.Y') ?? '—',
+                    $u->getPlaceOfBirth() ?? '—',
+                    $u->getGender() ?? '—',
+                    $u->getPassportSeries() ?? '—',
+                    $u->getPassportNumber() ?? '—',
+                    $u->getPassportIssuedBy() ?? '—',
+                    $u->getPassportIssueDate()?->format('d.m.Y') ?? '—',
+                    $u->getPassportDepartmentCode() ?? '—',
+                    $u->getRegistrationAddress() ?? '—',
+                    $u->getEmergencyContact() ?? '—',
+                    $u->getBonusPoints(),
+                    $this->clientTagNamesJoined($u),
+                    $u->getPassportVerificationStatus(),
+                    $u->getCreatedAt()->format('d.m.Y H:i'),
+                ], null, 'A' . $row);
+                ++$row;
+            }
+            foreach (range('A', 'T') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        });
+        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+
         return $response;
     }
 
@@ -1704,30 +1823,20 @@ class AdminController extends AbstractController
         if ($section === 'clients') {
             $search = trim((string) $request->query->get('q', ''));
             $tagId = $request->query->get('tag_id') ? (int) $request->query->get('tag_id') : null;
+            $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
             $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
-
-            if ($tagId) {
-                $tag = $this->em->getRepository(Tag::class)->find($tagId);
-                $clients = $tag ? $tag->getUsers()->toArray() : [];
-            } else {
-                $clients = $this->em->getRepository(User::class)->findBy([], ['name' => 'ASC']);
-            }
-            if ($search !== '') {
-                $searchLower = mb_strtolower($search);
-                $clients = array_filter($clients, fn (User $u) =>
-                    str_contains(mb_strtolower($u->getName()), $searchLower)
-                    || str_contains((string) $u->getEmail(), $search)
-                    || str_contains((string) $u->getPhone(), $search)
-                );
-            }
+            $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+            $clients = $this->buildFilteredClientsList($request);
 
             return $this->render('admin/clients.html.twig', [
                 'menu' => $menu,
                 'current' => $section,
-                'clients' => array_values($clients),
+                'clients' => $clients,
                 'search' => $search,
                 'allTags' => $allTags,
+                'allClubs' => $allClubs,
                 'filterTagId' => $tagId,
+                'filterClubId' => $clubId,
             ]);
         }
 

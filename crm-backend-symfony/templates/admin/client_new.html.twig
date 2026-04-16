@@ -44,6 +44,15 @@
                     <label class="form-label small">Бонусы</label>
                     <input type="number" name="bonus_points" class="form-control form-control-sm" value="{{ formData.bonus_points|default(0) }}" min="0">
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Клуб</label>
+                    <select name="club_id" class="form-select form-select-sm">
+                        <option value="">— не указан —</option>
+                        {% for c in allClubs|default([]) %}
+                            <option value="{{ c.id }}" {{ (formData.club_id|default('') == c.id) ? 'selected' : '' }}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 {% if allTags|default([])|length > 0 %}
                 <div class="col-12">
                     <label class="form-label small">Теги</label>

@@ -12,6 +12,9 @@
             {% for tag in client.tags %}
                 <span class="badge" style="background-color: {{ tag.color ?? '#6c757d' }}">{{ tag.name }}</span>
             {% endfor %}
+            {% if client.club %}
+                <span class="badge bg-info text-dark">{{ client.club.name }}</span>
+            {% endif %}
             {% if client.isBlocked %}
                 <span class="badge bg-danger">Доступ в приложение заблокирован</span>
             {% endif %}
@@ -90,6 +93,15 @@
                     <div class="col-md-2">
                         <label class="form-label small">Бонусы</label>
                         <input type="number" name="bonus_points" class="form-control form-control-sm" value="{{ client.bonusPoints }}" min="0">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Клуб</label>
+                        <select name="club_id" class="form-select form-select-sm">
+                            <option value="">— не указан —</option>
+                            {% for c in allClubs|default([]) %}
+                                <option value="{{ c.id }}" {{ client.club and client.club.id == c.id ? 'selected' : '' }}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="col-12">
                         <label class="form-label small">Теги</label>

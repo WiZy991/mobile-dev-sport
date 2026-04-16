@@ -4,13 +4,20 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Club;
 use App\Entity\User;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Поля регистрации/профиля из мобильного приложения → сущность User (клиент в CRM).
  */
 final class MobileClientPayloadApplier
 {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+    ) {
+    }
+
     /** При регистрации из приложения: паспорт, дата рождения, пол. */
     public function applyRegistrationPayload(User $user, array $data): void
     {
@@ -27,6 +34,17 @@ final class MobileClientPayloadApplier
         }
 
         $this->hydratePassportFromRegistration($user, $data);
+
+        $clubRaw = $data['club_id'] ?? null;
+        if ($clubRaw !== null && $clubRaw !== '') {
+            $cid = (int) $clubRaw;
+            if ($cid > 0) {
+                $club = $this->em->getRepository(Club::class)->find($cid);
+                if ($club instanceof Club) {
+                    $user->setClub($club);
+                }
+            }
+        }
     }
 
     /**
