@@ -41,6 +41,20 @@ final class Version20250210000000 extends AbstractMigration
     {
         $conn = $this->connection;
 
+        try {
+            $sm = $conn->createSchemaManager();
+            if (!$sm->tablesExist([$table])) {
+                return false;
+            }
+            foreach ($sm->listTableColumns($table) as $col) {
+                if (strcasecmp($col->getName(), $column) === 0) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+            // fallback для нестандартных схем / прав
+        }
+
         if ($conn->getDatabasePlatform() instanceof SQLitePlatform) {
             $n = (int) $conn->fetchOne(
                 "SELECT COUNT(*) FROM pragma_table_info('{$table}') WHERE name = ?",
