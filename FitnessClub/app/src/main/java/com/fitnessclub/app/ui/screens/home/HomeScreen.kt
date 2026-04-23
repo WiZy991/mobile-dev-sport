@@ -16,13 +16,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.api.ClubPromotion
+import coil.compose.AsyncImage
 import com.fitnessclub.app.ui.components.OccupancyCard
 import com.fitnessclub.app.ui.components.SecondaryButton
 import com.fitnessclub.app.ui.theme.*
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +35,7 @@ fun HomeScreen(
     onNavigateToSchedule: () -> Unit,
     onNavigateToPersonalTraining: () -> Unit,
     onNavigateToShop: () -> Unit,
+    onNavigateToSubscriptionPlans: () -> Unit = onNavigateToShop,
     onNavigateToTrainers: () -> Unit,
     onNavigateToClubInfo: () -> Unit,
     onNavigateToLockers: () -> Unit = {},
@@ -87,9 +93,14 @@ fun HomeScreen(
             // Promo banner
             item(key = "promo") {
                 PromoBanner(
-                    title = uiState.promoTitle,
-                    subtitle = uiState.promoSubtitle,
-                    onClick = onNavigateToShop
+                    promotions = uiState.promotions,
+                    onClick = { promo ->
+                        when (promo.actionType.lowercase()) {
+                            "subscriptions" -> onNavigateToSubscriptionPlans()
+                            "none" -> Unit
+                            else -> onNavigateToShop()
+                        }
+                    }
                 )
             }
             
@@ -146,17 +157,26 @@ fun HomeScreen(
 
 @Composable
 private fun PromoBanner(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
+    promotions: List<ClubPromotion>,
+    onClick: (ClubPromotion) -> Unit
 ) {
+    if (promotions.isEmpty()) return
+    var current by remember(promotions) { mutableStateOf(0) }
+    val currentPromotion = promotions[current.coerceIn(0, promotions.lastIndex)]
+
+    LaunchedEffect(promotions, current) {
+        if (promotions.size <= 1) return@LaunchedEffect
+        delay(4500)
+        current = (current + 1) % promotions.size
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .clickable(onClick = onClick),
+            .clickable { onClick(currentPromotion) },
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(
             modifier = Modifier
@@ -164,30 +184,47 @@ private fun PromoBanner(
                 .height(180.dp)
                 .background(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(Primary, AccentBlue)
+                        colors = listOf(
+                            parsePromoColor(currentPromotion.bgFrom, Primary),
+                            parsePromoColor(currentPromotion.bgTo, AccentBlue)
+                        )
                     )
                 )
-                .padding(24.dp)
         ) {
+            if (!currentPromotion.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = currentPromotion.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.25f))
+                )
+            }
             Column(
-                modifier = Modifier.align(Alignment.CenterStart)
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(24.dp)
             ) {
                 Text(
-                    text = title,
+                    text = currentPromotion.title,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = subtitle,
+                    text = currentPromotion.subtitle.orEmpty(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = onClick,
+                    onClick = { onClick(currentPromotion) },
                     modifier = Modifier.height(48.dp),
                     shape = RoundedCornerShape(16.dp),
                     elevation = ButtonDefaults.buttonElevation(
@@ -199,11 +236,32 @@ private fun PromoBanner(
                         contentColor = Primary
                     )
                 ) {
-                    Text("Подробнее", style = MaterialTheme.typography.labelLarge)
+                    Text(currentPromotion.buttonText.ifBlank { "Подробнее" }, style = MaterialTheme.typography.labelLarge)
+                }
+                if (promotions.size > 1) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        promotions.forEachIndexed { index, _ ->
+                            Box(
+                                modifier = Modifier
+                                    .size(if (index == current) 8.dp else 6.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (index == current) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f)
+                                    )
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+private fun parsePromoColor(hex: String?, fallback: Color): Color {
+    if (hex.isNullOrBlank()) return fallback
+    return runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrElse { fallback }
 }
 
 @Composable
@@ -221,7 +279,7 @@ private fun QuickMenuSection(
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             QuickMenuItem(
@@ -367,7 +425,7 @@ private fun UpcomingTrainingCard(
             .width(200.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -448,7 +506,7 @@ private fun OfferCard(
     Card(
         modifier = Modifier.width(180.dp),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = AccentOrange.copy(alpha = 0.08f)
         )

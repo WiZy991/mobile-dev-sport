@@ -8,13 +8,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.ui.components.GeneralFeedbackDialog
@@ -31,15 +40,22 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val settingsState by viewModel.uiState.collectAsState()
     var pushEnabled by remember { mutableStateOf(true) }
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var emailEnabled by remember { mutableStateOf(true) }
     var trainingReminders by remember { mutableStateOf(true) }
     var promoNotifications by remember { mutableStateOf(false) }
     var scheduleChanges by remember { mutableStateOf(true) }
-    
+
+    DisposableEffect(Unit) {
+        viewModel.refreshBiometricUi()
+        onDispose { }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -124,15 +140,17 @@ fun SettingsScreen(
                     }
                 )
 
-                ClickableSettingItem(
+                SwitchSettingItem(
                     icon = Icons.Default.Fingerprint,
                     title = "Биометрия",
                     subtitle = "Вход по отпечатку пальца",
-                    onClick = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Скоро: вход по биометрии")
+                    checked = settingsState.biometricLoginEnabled,
+                    onCheckedChange = { enabled ->
+                        val act = context as? FragmentActivity
+                        viewModel.onBiometricLoginSwitch(enabled, act) { msg ->
+                            scope.launch { snackbarHostState.showSnackbar(msg) }
                         }
-                    }
+                    },
                 )
 
                 ClickableSettingItem(

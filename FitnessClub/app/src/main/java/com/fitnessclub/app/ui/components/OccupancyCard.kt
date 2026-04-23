@@ -46,7 +46,7 @@ fun OccupancyCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = AppShapes.medium,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = when (status) {
                 "low" -> AccentBlue.copy(alpha = 0.15f)

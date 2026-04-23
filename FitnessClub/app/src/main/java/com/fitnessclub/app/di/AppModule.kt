@@ -24,7 +24,7 @@ import javax.inject.Singleton
 object AppModule {
     
     // 10.0.2.2 = localhost на эмуляторе; для реального устройства укажите IP вашего ПК (например 192.168.1.x)
-    private const val BASE_URL = "http://10.0.2.2:8000/api/v1/"
+    private const val BASE_URL = "http://192.168.0.62:8000/api/v1/"
     
     @Provides
     @Singleton
@@ -53,13 +53,15 @@ object AppModule {
                 val requestBuilder = originalRequest.newBuilder()
                 
                 runBlocking {
-                    // Add auth token if available
-                    tokenManager.getAccessToken()?.let { token ->
-                        requestBuilder.addHeader("Authorization", "Bearer $token")
+                    // Не подменяем Authorization, если Retrofit уже передал (например refresh в POST /auth/refresh).
+                    if (originalRequest.header("Authorization") == null) {
+                        tokenManager.getAccessToken()?.let { token ->
+                            requestBuilder.header("Authorization", "Bearer $token")
+                        }
                     }
                     // Add X-User-Id for API to identify current user (after login/register)
                     tokenManager.getUser().first()?.id?.let { userId ->
-                        requestBuilder.addHeader("X-User-Id", userId)
+                        requestBuilder.header("X-User-Id", userId)
                     }
                 }
                 

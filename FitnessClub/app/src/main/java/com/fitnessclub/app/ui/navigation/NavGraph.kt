@@ -4,13 +4,17 @@ import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navigation
 import com.fitnessclub.app.ui.navigation.NavArgs
 import androidx.navigation.navArgument
 import com.fitnessclub.app.ui.screens.auth.LoginScreen
 import com.fitnessclub.app.ui.screens.auth.LoginViewModel
-import com.fitnessclub.app.ui.screens.auth.RegisterScreen
+import com.fitnessclub.app.ui.screens.auth.RegisterClubPickScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterViewModel
 import com.fitnessclub.app.ui.screens.club.ClubInfoScreen
 import com.fitnessclub.app.ui.screens.clubs.ClubsScreen
@@ -61,19 +65,29 @@ fun NavGraph(
             )
         }
         
-        composable(Screen.Register.route) {
-            val viewModel: RegisterViewModel = hiltViewModel()
-            RegisterScreen(
-                viewModel = viewModel,
-                onNavigateToLogin = {
-                    navController.popBackStack()
-                },
-                onRegisterSuccess = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                    }
+        navigation(
+            route = Screen.Register.route,
+            startDestination = RegisterRoutes.CLUB_PICK
+        ) {
+            composable(RegisterRoutes.CLUB_PICK) {
+                val parentEntry = remember {
+                    navController.getBackStackEntry(Screen.Register.route)
                 }
-            )
+                val viewModel: RegisterViewModel = hiltViewModel(parentEntry)
+                val registerState by viewModel.uiState.collectAsState()
+                RegisterClubPickScreen(
+                    selectedClubId = registerState.selectedClub?.id,
+                    onBack = {
+                        navController.popBackStack(Screen.Login.route, inclusive = false)
+                    },
+                    onPicked = { club ->
+                        viewModel.onClubSelected(club)
+                    },
+                    onRequestSberRegistration = {
+                        // Пока Сбер ID не подключен: оставляем пользователя на этом шаге.
+                    },
+                )
+            }
         }
         
         // Main screens with bottom navigation (tabs: 0=Home, 1=Schedule, 2=MyTrainings, 3=Profile)

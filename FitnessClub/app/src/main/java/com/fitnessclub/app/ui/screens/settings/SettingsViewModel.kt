@@ -1,10 +1,14 @@
 package com.fitnessclub.app.ui.screens.settings
 
 import android.content.Context
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.FeedbackRequest
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.local.BiometricLoginCoordinator
+import com.fitnessclub.app.data.local.BiometricLoginStore
+import com.fitnessclub.app.data.local.TokenManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -14,23 +18,33 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 
 data class SettingsUiState(
     val feedbackSuccess: Boolean = false,
     val feedbackError: String? = null,
-    val cacheCleared: Boolean = false
+    val cacheCleared: Boolean = false,
+    val biometricLoginEnabled: Boolean = false,
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val api: FitnessApi,
+    private val tokenManager: TokenManager,
+    private val biometricLoginStore: BiometricLoginStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    init {
+        refreshBiometricUi()
+    }
+
+    fun refreshBiometricUi() {
+        _uiState.update { it.copy(biometricLoginEnabled = biometricLoginStore.hasStoredCredential()) }
+    }
 
     fun clearCache() {
         viewModelScope.launch {
@@ -57,6 +71,43 @@ class SettingsViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.update { it.copy(feedbackError = e.message) }
                 onError(e.message ?: "Ошибка сети")
+            }
+        }
+    }
+
+    fun onBiometricLoginSwitch(
+        enabled: Boolean,
+        activity: FragmentActivity?,
+        onMessage: (String) -> Unit,
+    ) {
+        if (!enabled) {
+            biometricLoginStore.clear()
+            refreshBiometricUi()
+            return
+        }
+        val act = activity ?: run {
+            onMessage("Не удалось открыть окно биометрии")
+            return
+        }
+        if (!biometricLoginStore.canUseDeviceBiometric()) {
+            onMessage("На устройстве недоступна биометрия")
+            return
+        }
+        viewModelScope.launch {
+            val rt = tokenManager.getRefreshToken()
+            if (rt.isNullOrBlank()) {
+                onMessage("Войдите в аккаунт ещё раз, затем включите отпечаток")
+                return@launch
+            }
+            withContext(Dispatchers.Main) {
+                BiometricLoginCoordinator.startEncryptPrompt(act, biometricLoginStore, rt) { ok, err ->
+                    if (ok) {
+                        refreshBiometricUi()
+                        onMessage("Вход по отпечатку включён")
+                    } else if (!err.isNullOrBlank()) {
+                        onMessage(err)
+                    }
+                }
             }
         }
     }

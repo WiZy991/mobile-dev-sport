@@ -189,36 +189,48 @@ class PersonalTrainingViewModel @Inject constructor(
     private fun loadTimeSlots() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                val dateStr = selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                val result = fitnessApi.getTrainings(date = dateStr, type = "personal")
 
-            val dateStr = selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
-            val result = fitnessApi.getTrainings(date = dateStr, type = "personal")
-
-            if (result.isSuccessful) {
-                val allTrainings = result.body() ?: emptyList()
-                val trainings = allTrainings.filter { it.type == TrainingType.PERSONAL }
-                loadedSlots = trainings.map { t ->
-                    val start = extractTimeHm(t.startTime)
-                    val end = extractTimeHm(t.endTime)
-                    TimeSlot(
-                        id = t.id,
-                        time = "$start-$end",
-                        trainerName = t.trainer.name.ifBlank { "Без тренера" },
-                        trainingType = t.name,
-                        room = t.room,
-                        isAvailable = !t.isBooked && t.spotsLeft > 0
-                    )
+                if (result.isSuccessful) {
+                    val allTrainings = result.body() ?: emptyList()
+                    val trainings = allTrainings.filter { it.type == TrainingType.PERSONAL }
+                    loadedSlots = trainings.map { t ->
+                        val start = extractTimeHm(t.startTime)
+                        val end = extractTimeHm(t.endTime)
+                        TimeSlot(
+                            id = t.id,
+                            time = "$start-$end",
+                            trainerName = t.trainer.name.ifBlank { "Без тренера" },
+                            trainingType = t.name,
+                            room = t.room,
+                            isAvailable = !t.isBooked && t.spotsLeft > 0
+                        )
+                    }
+                    val types = loadedSlots.map { it.trainingType }.distinct().sorted()
+                    val trainers = loadedSlots.map { it.trainerName }.distinct().sorted()
+                    _uiState.update { s ->
+                        s.copy(
+                            isLoading = false,
+                            trainingTypeOptions = types,
+                            trainerNameOptions = trainers,
+                            timeSlots = filterSlots(loadedSlots, s.selectedTrainingType, s.selectedTrainer)
+                        )
+                    }
+                } else {
+                    loadedSlots = emptyList()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            timeSlots = emptyList(),
+                            trainingTypeOptions = emptyList(),
+                            trainerNameOptions = emptyList(),
+                            error = result.message() ?: "Ошибка загрузки"
+                        )
+                    }
                 }
-                val types = loadedSlots.map { it.trainingType }.distinct().sorted()
-                val trainers = loadedSlots.map { it.trainerName }.distinct().sorted()
-                _uiState.update { s ->
-                    s.copy(
-                        isLoading = false,
-                        trainingTypeOptions = types,
-                        trainerNameOptions = trainers,
-                        timeSlots = filterSlots(loadedSlots, s.selectedTrainingType, s.selectedTrainer)
-                    )
-                }
-            } else {
+            } catch (e: Exception) {
                 loadedSlots = emptyList()
                 _uiState.update {
                     it.copy(
@@ -226,7 +238,7 @@ class PersonalTrainingViewModel @Inject constructor(
                         timeSlots = emptyList(),
                         trainingTypeOptions = emptyList(),
                         trainerNameOptions = emptyList(),
-                        error = result.message() ?: "Ошибка загрузки"
+                        error = e.message ?: "Ошибка загрузки"
                     )
                 }
             }

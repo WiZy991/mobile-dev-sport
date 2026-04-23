@@ -89,7 +89,11 @@ data class Trainer(
     val specialization: String? = null,
     
     @SerializedName("rating")
-    val rating: Float = 0f
+    val rating: Float = 0f,
+
+    /** Текст «о себе» из CRM (карточка тренера в приложении). */
+    @SerializedName("description")
+    val description: String? = null,
 )
 
 data class Booking(

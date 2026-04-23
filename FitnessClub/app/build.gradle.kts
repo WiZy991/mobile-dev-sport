@@ -90,6 +90,10 @@ dependencies {
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
+    // Biometric login (отпечаток для расшифровки сохранённого refresh-токена)
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
+
     // Custom Tabs (Сбер ID и будущая оплата в браузере)
     implementation("androidx.browser:browser:1.8.0")
 

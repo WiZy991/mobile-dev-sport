@@ -189,7 +189,7 @@ private fun TrainingDetailsContent(
             DetailRow(
                 icon = Icons.Default.Schedule,
                 title = "Время",
-                value = "${training.startTime.substring(11, 16)} - ${training.endTime.substring(11, 16)}",
+                value = "${formatHm(training.startTime)} - ${formatHm(training.endTime)}",
                 subtitle = "${training.durationMinutes} минут"
             )
             
@@ -197,7 +197,7 @@ private fun TrainingDetailsContent(
             DetailRow(
                 icon = Icons.Default.CalendarToday,
                 title = "Дата",
-                value = training.startTime.substring(0, 10)
+                value = formatIsoDate(training.startTime)
             )
             
             // Room info
@@ -468,4 +468,19 @@ private fun getIntensityColor(intensity: Intensity): Color {
         Intensity.MEDIUM -> Warning
         Intensity.HIGH -> Error
     }
+}
+
+private fun formatHm(value: String): String {
+    if (value.isBlank()) return "--:--"
+    val t = value.indexOf('T')
+    if (t >= 0 && t + 6 <= value.length) return value.substring(t + 1, t + 6)
+    if (value.length >= 5) return value.substring(0, 5)
+    return "--:--"
+}
+
+private fun formatIsoDate(value: String): String {
+    if (value.isBlank()) return "—"
+    val t = value.indexOf('T')
+    if (t > 0) return value.substring(0, t)
+    return if (value.length >= 10) value.substring(0, 10) else value
 }

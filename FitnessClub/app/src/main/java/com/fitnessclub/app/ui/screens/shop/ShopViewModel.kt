@@ -3,7 +3,9 @@ package com.fitnessclub.app.ui.screens.shop
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.data.repository.ProductRepository
+import com.fitnessclub.app.data.repository.SubscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +23,8 @@ data class ShopUiState(
 
 @HiltViewModel
 class ShopViewModel @Inject constructor(
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val subscriptionRepository: SubscriptionRepository
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(ShopUiState())
@@ -39,8 +42,7 @@ class ShopViewModel @Inject constructor(
                 when (val result = productRepository.getProducts()) {
                     is ApiResult.Success -> {
                         val apiItems = result.data
-                        val subDepItems = getMockSubscriptionAndDepositItems()
-                        val allItems = if (apiItems.isNotEmpty()) apiItems + subDepItems else getMockItems()
+                        val allItems = apiItems + getSubscriptionAndDepositItems()
                         _uiState.update {
                             it.copy(isLoading = false, items = allItems)
                         }
@@ -49,7 +51,7 @@ class ShopViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                items = getMockItems(),
+                                items = getFallbackItems(),
                                 error = result.message
                             )
                         }
@@ -60,7 +62,7 @@ class ShopViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        items = getMockItems(),
+                        items = getFallbackItems(),
                         error = e.message ?: "Ошибка загрузки"
                     )
                 }
@@ -68,30 +70,33 @@ class ShopViewModel @Inject constructor(
         }
     }
     
-    private fun getMockSubscriptionAndDepositItems(): List<ShopItem> = listOf(
-        ShopItem(
-            id = "sub-1",
-            name = "Безлимит на месяц",
-            description = "Неограниченное посещение всех занятий. Нажмите «Купить», чтобы выбрать тариф и оформить абонемент.",
-            price = 4500.0,
-            category = ShopCategory.SUBSCRIPTIONS
-        ),
-        ShopItem(
-            id = "sub-2",
-            name = "Безлимит на 3 месяца",
-            description = "Неограниченное посещение на 3 месяца + заморозка. Оформление — на следующем экране с тарифами клуба.",
-            price = 12000.0,
-            category = ShopCategory.SUBSCRIPTIONS
-        ),
-        ShopItem(id = "dep-1", name = "Пополнение депозита", description = "Пополните депозит на ресепшене клуба.", price = 1000.0, category = ShopCategory.DEPOSITS)
-    )
+    private suspend fun getSubscriptionAndDepositItems(): List<ShopItem> {
+        val subscriptionItems = when (val result = subscriptionRepository.getSubscriptionPlansSuspend()) {
+            is ApiResult.Success -> result.data.map { it.toShopSubscriptionItem() }
+            else -> emptyList()
+        }
 
-    private fun getMockItems(): List<ShopItem> = listOf(
+        val depositItems = listOf(
+            ShopItem(
+                id = "dep-1",
+                name = "Пополнение депозита",
+                description = "Пополните депозит на ресепшене клуба.",
+                price = 1000.0,
+                category = ShopCategory.DEPOSITS
+            )
+        )
+
+        return subscriptionItems + depositItems
+    }
+
+    private fun getFallbackItems(): List<ShopItem> = listOf(
         ShopItem(id = "srv-1", name = "Пробная тренировка", description = "Пробная тренировка — отличная возможность познакомиться с клубом.", price = 0.0, category = ShopCategory.SERVICES),
         ShopItem(id = "srv-2", name = "Йога", description = "Йога – отличный способ отвлечься от проблем.", price = 350.0, category = ShopCategory.SERVICES),
-        ShopItem(id = "sub-1", name = "Безлимит на месяц", description = "Неограниченное посещение всех занятий.", price = 4500.0, category = ShopCategory.SUBSCRIPTIONS),
+        ShopItem(id = "sub-1", name = "Абонемент", description = "Тарифы абонементов временно недоступны. Попробуйте позже.", price = 0.0, category = ShopCategory.SUBSCRIPTIONS),
         ShopItem(id = "good-1", name = "Полотенце с логотипом", description = "Мягкое хлопковое полотенце.", price = 800.0, category = ShopCategory.GOODS)
-    ) + getMockSubscriptionAndDepositItems()
+    ) + listOf(
+        ShopItem(id = "dep-1", name = "Пополнение депозита", description = "Пополните депозит на ресепшене клуба.", price = 1000.0, category = ShopCategory.DEPOSITS)
+    )
     
     fun buyItem(item: ShopItem) {
         viewModelScope.launch {
@@ -169,4 +174,28 @@ class ShopViewModel @Inject constructor(
     fun clearPurchaseMessage() {
         _uiState.update { it.copy(purchaseMessage = null, error = null) }
     }
+}
+
+private fun SubscriptionPlan.toShopSubscriptionItem(): ShopItem {
+    val details = buildString {
+        if (safeDescription.isNotBlank()) append(safeDescription)
+        if (safeDurationDays > 0) {
+            if (isNotBlank()) append(" ")
+            append("Срок: $safeDurationDays дней.")
+        }
+        visitsCount?.let {
+            if (isNotBlank()) append(" ")
+            append("Посещений: $it.")
+        }
+    }.ifBlank { "Оформление абонемента на следующем экране." }
+
+    return ShopItem(
+        id = "sub-${safeId}",
+        name = safeName.ifBlank { "Абонемент" },
+        description = details,
+        price = price,
+        category = ShopCategory.SUBSCRIPTIONS,
+        isPromo = isPopular,
+        promoText = if (isPopular) "Популярный выбор" else null
+    )
 }

@@ -100,6 +100,9 @@ interface FitnessApi {
     @GET("club/info")
     suspend fun getClubInfo(): Response<ClubInfo>
 
+    @GET("club/promotions")
+    suspend fun getClubPromotions(): Response<List<ClubPromotion>>
+
     // Clubs (network)
     @GET("clubs")
     suspend fun getClubs(): Response<List<ClubItem>>
@@ -120,6 +123,10 @@ interface FitnessApi {
     // Feedback
     @POST("feedback")
     suspend fun submitFeedback(@Body request: FeedbackRequest): Response<FeedbackResponse>
+
+    /** Обращение в поддержку клуба (попадает в CRM). */
+    @POST("support/tickets")
+    suspend fun createSupportTicket(@Body request: SupportTicketRequest): Response<SupportTicketCreateResponse>
     
     // Guest passes
     @GET("guest-passes")
@@ -295,6 +302,18 @@ data class FeedbackResponse(
     val id: String = ""
 )
 
+data class SupportTicketRequest(
+    val subject: String,
+    val message: String,
+    val category: String,
+    @com.google.gson.annotations.SerializedName("contact_email")
+    val contactEmail: String? = null,
+)
+
+data class SupportTicketCreateResponse(
+    val success: Boolean = true,
+)
+
 data class ApiNotification(
     @com.google.gson.annotations.SerializedName("id")
     val id: String,
@@ -382,4 +401,27 @@ data class ClubInfo(
     val latitude: Double = 0.0,
     @com.google.gson.annotations.SerializedName("longitude")
     val longitude: Double = 0.0
+)
+
+data class ClubPromotion(
+    @com.google.gson.annotations.SerializedName("id")
+    val id: String,
+    @com.google.gson.annotations.SerializedName("title")
+    val title: String,
+    @com.google.gson.annotations.SerializedName("subtitle")
+    val subtitle: String? = null,
+    @com.google.gson.annotations.SerializedName("image_url")
+    val imageUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("button_text")
+    val buttonText: String = "Подробнее",
+    @com.google.gson.annotations.SerializedName("action_type")
+    val actionType: String = "shop",
+    @com.google.gson.annotations.SerializedName("action_value")
+    val actionValue: String? = null,
+    @com.google.gson.annotations.SerializedName("bg_from")
+    val bgFrom: String = "#F97316",
+    @com.google.gson.annotations.SerializedName("bg_to")
+    val bgTo: String = "#3B82F6",
+    @com.google.gson.annotations.SerializedName("sort_order")
+    val sortOrder: Int = 100
 )

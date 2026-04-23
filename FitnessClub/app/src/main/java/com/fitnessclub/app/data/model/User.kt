@@ -54,13 +54,46 @@ data class LoginRequest(
 data class RegisterRequest(
     @SerializedName("email")
     val email: String,
-    
+
     @SerializedName("password")
     val password: String,
-    
+
     @SerializedName("phone")
     val phone: String,
-    
+
     @SerializedName("name")
-    val name: String
+    val name: String,
+
+    @SerializedName("registration_type")
+    val registrationType: String? = null,
+
+    @SerializedName("date_of_birth")
+    val dateOfBirth: String? = null,
+
+    @SerializedName("gender")
+    val gender: String? = null,
+
+    @SerializedName("passport_series")
+    val passportSeries: String? = null,
+
+    @SerializedName("passport_number")
+    val passportNumber: String? = null,
+
+    @SerializedName("passport_issued_by")
+    val passportIssuedBy: String? = null,
+
+    @SerializedName("passport_issue_date")
+    val passportIssueDate: String? = null,
+
+    @SerializedName("registration_address")
+    val registrationAddress: String? = null,
+
+    @SerializedName("promo_code")
+    val promoCode: String? = null,
+
+    @SerializedName("newsletter")
+    val newsletter: Boolean? = null,
+
+    @SerializedName("club_id")
+    val clubId: String? = null
 )

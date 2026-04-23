@@ -33,6 +33,7 @@ class MockInterceptor : Interceptor {
             // Auth endpoints
             path.endsWith("/auth/login") && method == "POST" -> mockLoginResponse()
             path.endsWith("/auth/register") && method == "POST" -> mockRegisterResponse()
+            path.endsWith("/auth/refresh") && method == "POST" -> mockRefreshResponse()
             path.endsWith("/auth/logout") && method == "POST" -> mockLogoutResponse()
             
             // User endpoints
@@ -62,7 +63,9 @@ class MockInterceptor : Interceptor {
             path.endsWith("/products") && method == "GET" -> mockProductsResponse()
             
             // Club info
+            path.endsWith("/clubs") && method == "GET" -> mockClubsListResponse()
             path.endsWith("/club/occupancy") && method == "GET" -> mockOccupancyResponse()
+            path.endsWith("/club/promotions") && method == "GET" -> mockClubPromotionsResponse()
             path.endsWith("/club/info") && method == "GET" -> mockClubInfoResponse()
             
             // Trainers endpoints
@@ -71,6 +74,8 @@ class MockInterceptor : Interceptor {
             
             // Feedback
             path.endsWith("/feedback") && method == "POST" -> """{"success": true, "id": "feedback-1"}"""
+
+            path.endsWith("/support/tickets") && method == "POST" -> """{"success": true, "id": 1}"""
             
             // Guest passes
             path.endsWith("/guest-passes") && method == "POST" -> mockGuestPassCreateResponse()
@@ -99,6 +104,25 @@ class MockInterceptor : Interceptor {
             .build()
     }
     
+    private fun mockRefreshResponse(): String {
+        val token = UUID.randomUUID().toString()
+        return """
+        {
+            "token": "$token",
+            "refresh_token": "${UUID.randomUUID()}",
+            "user": {
+                "id": "user-123",
+                "email": "user@example.com",
+                "name": "Антон",
+                "phone": "+7 922 222-22-22",
+                "avatar_url": null,
+                "bonus_points": 150,
+                "created_at": "2025-06-01T10:00:00"
+            }
+        }
+        """.trimIndent()
+    }
+
     private fun mockLoginResponse(): String {
         val token = UUID.randomUUID().toString()
         return """
@@ -495,50 +519,80 @@ class MockInterceptor : Interceptor {
     }
     """.trimIndent()
     
+    private fun mockClubsListResponse(): String = """
+    [
+        {"id":"1","name":"ТЦ Формат","address":"ул. Центральная, 18, 2 этаж","phone":null,"email":null,"working_hours":null,"latitude":0,"longitude":0,"amenities":[],"max_capacity":null},
+        {"id":"2","name":"ТЦ Новый де Фриз","address":"ул. Купера, 2, 2 этаж","phone":null,"email":null,"working_hours":null,"latitude":0,"longitude":0,"amenities":[],"max_capacity":null},
+        {"id":"3","name":"ул. Купера, 2","address":"Основной зал","phone":null,"email":null,"working_hours":null,"latitude":0,"longitude":0,"amenities":[],"max_capacity":null}
+    ]
+    """.trimIndent()
+
     private fun mockSubscriptionPlansResponse(): String = """
     [
         {
             "id": "plan-1",
-            "name": "Безлимит на месяц",
-            "description": "Неограниченное посещение всех групповых занятий в течение месяца",
-            "price": 5000.0,
-            "duration_days": 30,
+            "name": "На 12 месяцев",
+            "description": "Неограниченное посещение. Заморозка: +30 дней.",
+            "price": 38000.0,
+            "duration_days": 365,
             "visits_count": null,
             "type": "unlimited",
-            "features": ["Все групповые занятия", "Тренажёрный зал", "Сауна"],
+            "features": ["Тренажёрный зал", "Групповые программы", "Заморозка +30 дней"],
             "is_popular": true
         },
         {
             "id": "plan-2",
-            "name": "Безлимит на 3 месяца",
-            "description": "Неограниченное посещение всех групповых занятий в течение 3 месяцев",
-            "price": 12000.0,
-            "duration_days": 90,
+            "name": "На 6 месяцев",
+            "description": "Неограниченное посещение. Заморозка: +20 дней.",
+            "price": 25000.0,
+            "duration_days": 180,
             "visits_count": null,
             "type": "unlimited",
-            "features": ["Все групповые занятия", "Тренажёрный зал", "Сауна", "Бассейн"],
+            "features": ["Тренажёрный зал", "Групповые программы", "Заморозка +20 дней"],
             "is_popular": false
         },
         {
             "id": "plan-3",
-            "name": "8 занятий",
-            "description": "8 групповых занятий на выбор",
-            "price": 3500.0,
-            "duration_days": 30,
-            "visits_count": 8,
-            "type": "limited",
-            "features": ["Групповые занятия на выбор"],
+            "name": "На 4 месяца",
+            "description": "Неограниченное посещение. Заморозка: +15 дней.",
+            "price": 18000.0,
+            "duration_days": 120,
+            "visits_count": null,
+            "type": "unlimited",
+            "features": ["Тренажёрный зал", "Групповые программы", "Заморозка +15 дней"],
             "is_popular": false
         },
         {
             "id": "plan-4",
-            "name": "Персональные тренировки",
-            "description": "10 персональных тренировок с тренером",
-            "price": 15000.0,
+            "name": "На 3 месяца",
+            "description": "Неограниченное посещение. Заморозка: +14 дней.",
+            "price": 16500.0,
             "duration_days": 90,
-            "visits_count": 10,
-            "type": "personal",
-            "features": ["Персональный тренер", "Индивидуальная программа", "Консультация по питанию"],
+            "visits_count": null,
+            "type": "unlimited",
+            "features": ["Тренажёрный зал", "Групповые программы", "Заморозка +14 дней"],
+            "is_popular": false
+        },
+        {
+            "id": "plan-5",
+            "name": "На 1 месяц",
+            "description": "Неограниченное посещение.",
+            "price": 6000.0,
+            "duration_days": 30,
+            "visits_count": null,
+            "type": "unlimited",
+            "features": ["Тренажёрный зал", "Групповые программы"],
+            "is_popular": false
+        },
+        {
+            "id": "plan-6",
+            "name": "Разовое посещение",
+            "description": "Один визит в зал.",
+            "price": 990.0,
+            "duration_days": null,
+            "visits_count": 1,
+            "type": "limited",
+            "features": ["Одно посещение"],
             "is_popular": false
         }
     ]
@@ -597,14 +651,43 @@ class MockInterceptor : Interceptor {
         "promo_subtitle": "на все карты 12 и 6 месяцев"
     }
     """.trimIndent()
+
+    private fun mockClubPromotionsResponse(): String = """
+    [
+      {
+        "id": "promo-1",
+        "title": "СКИДКА 20%!",
+        "subtitle": "на все карты 12 и 6 месяцев",
+        "image_url": null,
+        "button_text": "Подробнее",
+        "action_type": "shop",
+        "action_value": null,
+        "bg_from": "#F97316",
+        "bg_to": "#3B82F6",
+        "sort_order": 10
+      },
+      {
+        "id": "promo-2",
+        "title": "1+1 на персональные",
+        "subtitle": "Оплатите 5 тренировок — получите 5 в подарок",
+        "image_url": null,
+        "button_text": "Купить",
+        "action_type": "subscriptions",
+        "action_value": null,
+        "bg_from": "#EC4899",
+        "bg_to": "#8B5CF6",
+        "sort_order": 20
+      }
+    ]
+    """.trimIndent()
     
     private fun mockTrainersResponse(): String = """
     [
-        {"id": "trainer-1", "name": "Мария Иванова", "photo_url": null, "specialization": "Йога, Растяжка", "rating": 4.8},
-        {"id": "trainer-2", "name": "Алексей Петров", "photo_url": null, "specialization": "Силовой тренинг", "rating": 4.9},
-        {"id": "trainer-3", "name": "Елена Сидорова", "photo_url": null, "specialization": "Кардио, Аэробика", "rating": 4.7},
-        {"id": "trainer-4", "name": "Ольга Козлова", "photo_url": null, "specialization": "Пилатес", "rating": 4.6},
-        {"id": "trainer-5", "name": "Дмитрий Волков", "photo_url": null, "specialization": "Единоборства, CrossFit", "rating": 4.9}
+        {"id": "trainer-1", "name": "Мария Иванова", "photo_url": null, "specialization": "Йога, Растяжка", "rating": 4.8, "description": "Сертифицированный инструктор по хатха-йоге. Помогаю новичкам безопасно войти в практику."},
+        {"id": "trainer-2", "name": "Алексей Петров", "photo_url": null, "specialization": "Силовой тренинг", "rating": 4.9, "description": null},
+        {"id": "trainer-3", "name": "Елена Сидорова", "photo_url": null, "specialization": "Кардио, Аэробика", "rating": 4.7, "description": null},
+        {"id": "trainer-4", "name": "Ольга Козлова", "photo_url": null, "specialization": "Пилатес", "rating": 4.6, "description": null},
+        {"id": "trainer-5", "name": "Дмитрий Волков", "photo_url": null, "specialization": "Единоборства, CrossFit", "rating": 4.9, "description": null}
     ]
     """.trimIndent()
     
@@ -614,7 +697,8 @@ class MockInterceptor : Interceptor {
         "name": "Мария Иванова",
         "photo_url": null,
         "specialization": "Йога, Растяжка",
-        "rating": 4.8
+        "rating": 4.8,
+        "description": "Сертифицированный инструктор по хатха-йоге. Помогаю новичкам безопасно войти в практику."
     }
     """.trimIndent()
     

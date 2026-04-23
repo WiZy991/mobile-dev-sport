@@ -131,6 +131,32 @@ fun TrainerDetailsScreen(
                             )
                         }
                     }
+                    t.description?.takeIf { it.isNotBlank() }?.let { bio ->
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "О тренере",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Primary,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = bio,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth(),

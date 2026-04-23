@@ -44,7 +44,7 @@ class TrainersViewModel @Inject constructor(
                         rating = t.rating,
                         reviewsCount = 0,
                         experience = "",
-                        description = ""
+                        description = t.description.orEmpty(),
                     )
                 }
                 _uiState.update {

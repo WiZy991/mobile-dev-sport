@@ -3,19 +3,26 @@ package com.fitnessclub.app.data.repository
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.local.TokenManager
-import com.fitnessclub.app.data.model.AuthResponse
 import com.fitnessclub.app.data.model.LoginRequest
 import com.fitnessclub.app.data.model.RegisterRequest
 import com.fitnessclub.app.data.model.User
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import retrofit2.Response
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private data class ApiJsonError(
+    val error: String? = null,
+    val message: String? = null,
+)
 
 @Singleton
 class AuthRepository @Inject constructor(
     private val api: FitnessApi,
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val gson: Gson,
 ) {
     
     fun login(email: String, password: String): Flow<ApiResult<User>> = flow {
@@ -28,24 +35,24 @@ class AuthRepository @Inject constructor(
                 tokenManager.saveUser(authResponse.user)
                 emit(ApiResult.Success(authResponse.user))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка входа", response.code()))
+                emit(ApiResult.Error(authErrorMessage(response, "Ошибка входа"), response.code()))
             }
         } catch (e: Exception) {
             emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
         }
     }
     
-    fun register(name: String, email: String, phone: String, password: String): Flow<ApiResult<User>> = flow {
+    fun register(request: RegisterRequest): Flow<ApiResult<User>> = flow {
         emit(ApiResult.Loading)
         try {
-            val response = api.register(RegisterRequest(email, password, phone, name))
+            val response = api.register(request)
             if (response.isSuccessful && response.body() != null) {
                 val authResponse = response.body()!!
                 tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
                 tokenManager.saveUser(authResponse.user)
                 emit(ApiResult.Success(authResponse.user))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка регистрации", response.code()))
+                emit(ApiResult.Error(authErrorMessage(response, "Ошибка регистрации"), response.code()))
             }
         } catch (e: Exception) {
             emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
@@ -58,7 +65,38 @@ class AuthRepository @Inject constructor(
         } catch (_: Exception) {
             // Ignore logout errors
         }
+        // Не трогаем BiometricLoginStore: иначе после «Выйти» пропадает вход по отпечатку,
+        // хотя пользователь явно включил его в настройках. Отключение — только из настроек.
         tokenManager.clearAll()
+    }
+
+    /**
+     * Восстановление сессии по refresh-токену (после успешной биометрии).
+     * Сохраняет новые токены и по возможности подтягивает профиль с сервера.
+     */
+    fun restoreSessionWithRefreshToken(refreshToken: String): Flow<ApiResult<User>> = flow {
+        emit(ApiResult.Loading)
+        try {
+            val response = api.refreshToken("Bearer ${refreshToken.trim()}")
+            if (response.isSuccessful && response.body() != null) {
+                val authResponse = response.body()!!
+                tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
+                // Чтобы getProfile() передал X-User-Id, сначала кладём пользователя из ответа refresh.
+                tokenManager.saveUser(authResponse.user)
+                val profileRes = runCatching { api.getProfile() }.getOrNull()
+                val user = if (profileRes?.isSuccessful == true && profileRes.body() != null) {
+                    profileRes.body()!!
+                } else {
+                    authResponse.user
+                }
+                tokenManager.saveUser(user)
+                emit(ApiResult.Success(user))
+            } else {
+                emit(ApiResult.Error(authErrorMessage(response, "Сессия устарела"), response.code()))
+            }
+        } catch (e: Exception) {
+            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+        }
     }
     
     fun isLoggedIn(): Flow<Boolean> = tokenManager.isLoggedIn()
@@ -66,4 +104,28 @@ class AuthRepository @Inject constructor(
     fun getCurrentUser(): Flow<User?> = tokenManager.getUser()
     
     suspend fun getAccessToken(): String? = tokenManager.getAccessToken()
+
+    private fun authErrorMessage(response: Response<*>, fallback: String): String {
+        val raw = runCatching { response.errorBody()?.string() }.getOrNull().orEmpty()
+        val parsed = runCatching { gson.fromJson(raw, ApiJsonError::class.java) }.getOrNull()
+        val server = parsed?.error?.takeIf { it.isNotBlank() }
+            ?: parsed?.message?.takeIf { it.isNotBlank() }
+        val trimmed = raw.trim()
+        val plain = trimmed.takeIf {
+            it.isNotEmpty() && !it.startsWith("{") && !it.startsWith("[") && !it.startsWith("<")
+        }
+        val base = server ?: plain ?: fallback
+        return humanizeKnownAuthMessages(base)
+    }
+
+    private fun humanizeKnownAuthMessages(text: String): String = when (text.trim()) {
+        "User with this email already exists",
+        "Пользователь с таким email уже существует",
+        "Пользователь с таким email уже зарегистрирован" ->
+            "Этот email уже зарегистрирован. Войдите в аккаунт или укажите другой адрес."
+        "Email is required", "Укажите email" -> "Укажите email"
+        "User not found" -> "Неверный email или пароль"
+        "Access denied" -> "Доступ запрещён"
+        else -> text
+    }
 }

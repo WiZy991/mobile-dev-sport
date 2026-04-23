@@ -2,6 +2,7 @@ package com.fitnessclub.app.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fitnessclub.app.data.api.ClubPromotion
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,8 +15,18 @@ import javax.inject.Inject
 
 data class HomeUiState(
     val isLoading: Boolean = false,
-    val promoTitle: String = "СКИДКА 20%!",
-    val promoSubtitle: String = "на все карты 12 и 6 месяцев",
+    val promotions: List<ClubPromotion> = listOf(
+        ClubPromotion(
+            id = "default",
+            title = "СКИДКА 20%!",
+            subtitle = "на все карты 12 и 6 месяцев",
+            buttonText = "Подробнее",
+            actionType = "shop",
+            bgFrom = "#F97316",
+            bgTo = "#3B82F6",
+            sortOrder = 100
+        )
+    ),
     val unreadNotifications: Int = 3,
     val upcomingTrainings: List<UpcomingTraining> = emptyList(),
     val occupancyCurrent: Int? = null,
@@ -73,18 +84,20 @@ class HomeViewModel @Inject constructor(
             loadOccupancy()
             loadUnreadCount()
             try {
-                val clubRes = api.getClubInfo()
-                if (clubRes.isSuccessful) {
-                    clubRes.body()?.let { c ->
-                        _uiState.update { s ->
-                            s.copy(
-                                promoTitle = c.promoTitle?.takeIf { it.isNotBlank() } ?: s.promoTitle,
-                                promoSubtitle = c.promoSubtitle?.takeIf { it.isNotBlank() } ?: s.promoSubtitle
-                            )
-                        }
+                val promosRes = api.getClubPromotions()
+                if (promosRes.isSuccessful) {
+                    val promos = (promosRes.body() ?: emptyList()).sortedBy { it.sortOrder }
+                    if (promos.isNotEmpty()) {
+                        _uiState.update { it.copy(promotions = promos) }
+                    } else {
+                        loadPromoFallbackFromClubInfo()
                     }
+                } else {
+                    loadPromoFallbackFromClubInfo()
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+                loadPromoFallbackFromClubInfo()
+            }
 
             try {
                 val bookRes = api.getMyBookings()
@@ -111,6 +124,35 @@ class HomeViewModel @Inject constructor(
                     _uiState.update { it.copy(upcomingTrainings = upcoming) }
                 }
             } catch (_: Exception) { }
+        }
+    }
+
+    private suspend fun loadPromoFallbackFromClubInfo() {
+        try {
+            val clubRes = api.getClubInfo()
+            if (clubRes.isSuccessful) {
+                clubRes.body()?.let { c ->
+                    val title = c.promoTitle?.takeIf { it.isNotBlank() } ?: return
+                    val subtitle = c.promoSubtitle?.takeIf { it.isNotBlank() }
+                    _uiState.update {
+                        it.copy(
+                            promotions = listOf(
+                                ClubPromotion(
+                                    id = "club-info",
+                                    title = title,
+                                    subtitle = subtitle,
+                                    buttonText = "Подробнее",
+                                    actionType = "shop",
+                                    bgFrom = "#F97316",
+                                    bgTo = "#3B82F6",
+                                    sortOrder = 100
+                                )
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {
         }
     }
 }

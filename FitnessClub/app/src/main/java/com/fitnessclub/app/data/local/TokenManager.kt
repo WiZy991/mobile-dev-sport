@@ -1,76 +1,74 @@
 package com.fitnessclub.app.data.local
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.fitnessclub.app.data.model.User
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "fitness_prefs")
+/** Старый файл DataStore — один раз очищаем при старте, чтобы не подтягивать прошлую сессию. */
+private val Context.legacyFitnessPrefs by preferencesDataStore(name = "fitness_prefs")
 
+/**
+ * Токены и пользователь только в памяти процесса: после полного закрытия приложения
+ * снова нужен вход (логин/пароль или биометрия, если настроена).
+ */
 @Singleton
 class TokenManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val gson: Gson
+    private val gson: Gson,
 ) {
-    
-    companion object {
-        private val ACCESS_TOKEN_KEY = stringPreferencesKey("access_token")
-        private val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
-        private val USER_KEY = stringPreferencesKey("user")
+
+    private val accessToken = MutableStateFlow<String?>(null)
+    private val refreshToken = MutableStateFlow<String?>(null)
+    private val userJson = MutableStateFlow<String?>(null)
+
+    init {
+        runBlocking {
+            runCatching { context.legacyFitnessPrefs.edit { it.clear() } }
+        }
     }
-    
+
     suspend fun saveTokens(accessToken: String, refreshToken: String) {
-        context.dataStore.edit { preferences ->
-            preferences[ACCESS_TOKEN_KEY] = accessToken
-            preferences[REFRESH_TOKEN_KEY] = refreshToken
-        }
+        this.accessToken.value = accessToken
+        this.refreshToken.value = refreshToken
     }
-    
+
     suspend fun saveUser(user: User) {
-        context.dataStore.edit { preferences ->
-            preferences[USER_KEY] = gson.toJson(user)
-        }
+        userJson.value = gson.toJson(user)
     }
-    
-    suspend fun getAccessToken(): String? {
-        return context.dataStore.data.first()[ACCESS_TOKEN_KEY]
-    }
-    
-    suspend fun getRefreshToken(): String? {
-        return context.dataStore.data.first()[REFRESH_TOKEN_KEY]
-    }
-    
+
+    suspend fun getAccessToken(): String? = accessToken.value
+
+    suspend fun getRefreshToken(): String? = refreshToken.value
+
     fun getUser(): Flow<User?> {
-        return context.dataStore.data.map { preferences ->
-            preferences[USER_KEY]?.let { json ->
+        return userJson.map { json ->
+            json?.let {
                 try {
-                    gson.fromJson(json, User::class.java)
-                } catch (e: Exception) {
+                    gson.fromJson(it, User::class.java)
+                } catch (_: Exception) {
                     null
                 }
             }
         }
     }
-    
+
     fun isLoggedIn(): Flow<Boolean> {
-        return context.dataStore.data.map { preferences ->
-            !preferences[ACCESS_TOKEN_KEY].isNullOrEmpty()
-        }
+        return accessToken.map { !it.isNullOrEmpty() }
     }
-    
+
     suspend fun clearAll() {
-        context.dataStore.edit { preferences ->
-            preferences.clear()
-        }
+        accessToken.value = null
+        refreshToken.value = null
+        userJson.value = null
+        runCatching { context.legacyFitnessPrefs.edit { it.clear() } }
     }
 }

@@ -2,6 +2,7 @@ package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.catalog.LocalSubscriptionCatalog
 import com.fitnessclub.app.data.model.Subscription
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.google.gson.annotations.SerializedName
@@ -35,26 +36,26 @@ class SubscriptionRepository @Inject constructor(
         emit(ApiResult.Loading)
         try {
             val response = api.getSubscriptionPlans()
-            if (response.isSuccessful && response.body() != null) {
+            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка загрузки тарифов", response.code()))
+                emit(ApiResult.Success(LocalSubscriptionCatalog.PLANS))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Success(LocalSubscriptionCatalog.PLANS))
         }
     }
     
     suspend fun getSubscriptionPlansSuspend(): ApiResult<List<SubscriptionPlan>> {
         return try {
             val response = api.getSubscriptionPlans()
-            if (response.isSuccessful && response.body() != null) {
+            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
                 ApiResult.Success(response.body()!!)
             } else {
-                ApiResult.Error(response.message() ?: "Ошибка загрузки тарифов", response.code())
+                ApiResult.Success(LocalSubscriptionCatalog.PLANS)
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Success(LocalSubscriptionCatalog.PLANS)
         }
     }
 

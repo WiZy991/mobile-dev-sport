@@ -162,6 +162,7 @@ fun MainScreen(
                     onNavigateToSchedule = { navController.navigate(Screen.Schedule.route) },
                     onNavigateToPersonalTraining = { navController.navigate(Screen.PersonalTraining.route) },
                     onNavigateToShop = { navController.navigate(Screen.Shop.route) },
+                    onNavigateToSubscriptionPlans = { navController.navigate(Screen.SubscriptionPlans.route) },
                     onNavigateToTrainers = { navController.navigate(Screen.Trainers.route) },
                     onNavigateToClubInfo = { navController.navigate(Screen.Clubs.route) },
                     onNavigateToLockers = { navController.navigate(Screen.Lockers.route) },

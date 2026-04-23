@@ -241,7 +241,7 @@ fun TrainingCard(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = training.startTime.substring(11, 16),
+                    text = formatHm(training.startTime),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -424,4 +424,12 @@ private fun getIntensityColor(intensity: Intensity): Color {
         Intensity.MEDIUM -> Warning
         Intensity.HIGH -> Error
     }
+}
+
+private fun formatHm(value: String): String {
+    if (value.isBlank()) return "--:--"
+    val t = value.indexOf('T')
+    if (t >= 0 && t + 6 <= value.length) return value.substring(t + 1, t + 6)
+    if (value.length >= 5) return value.substring(0, 5)
+    return "--:--"
 }
