@@ -1357,6 +1357,11 @@ class AdminController extends AbstractController
             }
             $percoVerify = $request->request->get('perco_verify_ssl') === '1' ? '1' : '0';
             $this->persistSetting('perco_verify_ssl', $percoVerify);
+            $this->persistSetting('perco_entry_device_id', trim((string) $request->request->get('perco_entry_device_id', '')) ?: null);
+            $this->persistSetting('perco_cmd_number', trim((string) $request->request->get('perco_cmd_number', '')) ?: null);
+            $this->persistSetting('perco_cmd_type', trim((string) $request->request->get('perco_cmd_type', '')) ?: null);
+            $this->persistSetting('perco_cmd_value', trim((string) $request->request->get('perco_cmd_value', '')) ?: null);
+            $this->persistSetting('perco_cmd_param', trim((string) $request->request->get('perco_cmd_param', '')) ?: null);
 
             $this->em->flush();
             $this->addFlash('success', 'Настройки клуба сохранены.');
@@ -1382,6 +1387,11 @@ class AdminController extends AbstractController
                 'perco_base_url' => $getSetting('perco_base_url', ''),
                 'perco_login' => $getSetting('perco_login', ''),
                 'perco_verify_ssl' => $getSetting('perco_verify_ssl', '1'),
+                'perco_entry_device_id' => $getSetting('perco_entry_device_id', ''),
+                'perco_cmd_number' => $getSetting('perco_cmd_number', ''),
+                'perco_cmd_type' => $getSetting('perco_cmd_type', ''),
+                'perco_cmd_value' => $getSetting('perco_cmd_value', ''),
+                'perco_cmd_param' => $getSetting('perco_cmd_param', ''),
             ],
         ]);
     }

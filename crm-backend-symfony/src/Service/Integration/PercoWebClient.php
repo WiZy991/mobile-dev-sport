@@ -2,6 +2,7 @@
 
 namespace App\Service\Integration;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -12,11 +13,54 @@ final class PercoWebClient
     public function __construct(
         private readonly HttpClientInterface $http,
         private readonly PercoClubConfigFactory $configFactory,
+        private readonly LoggerInterface $logger,
     ) {}
 
     public function isConfigured(): bool
     {
         return $this->configFactory->load() instanceof PercoClubConfig;
+    }
+
+    /** Настроено ли устройство для открытия при успешной проверке QR (см. «Настройки клуба»). */
+    public function canOpenEntryFromApi(): bool
+    {
+        $c = $this->configFactory->load();
+
+        return $c instanceof PercoClubConfig && $c->hasEntryDevice();
+    }
+
+    /**
+     * После успешной проверки QR — отправить команду на исполнительное устройство (открытие турникета).
+     * Ошибки логируются; не прерывают бизнес-логику доступа.
+     *
+     * @return bool|null null — интеграция выкл. или device id не задан; true — команда ушла; false — сбой HTTP/PERCo
+     */
+    public function tryOpenEntryAfterGranted(): ?bool
+    {
+        $config = $this->configFactory->load();
+        if (!$config instanceof PercoClubConfig || !$config->hasEntryDevice()) {
+            return null;
+        }
+
+        try {
+            $this->sendDeviceCommand(
+                $config,
+                $config->entryDeviceId,
+                $config->openCmdNumber,
+                $config->openCmdType,
+                $config->openCmdValue,
+                $config->openCmdParam,
+            );
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logger->error('PERCo: не удалось отправить команду открытия', [
+                'device_id' => $config->entryDeviceId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /** Проверка логина к PERCo-Web (POST /api/system/auth). */
@@ -48,6 +92,41 @@ final class PercoWebClient
 
         if ($response->getStatusCode() !== 200) {
             throw new \RuntimeException('PERCo mainCard: HTTP ' . $response->getStatusCode() . ' ' . $response->getContent(false));
+        }
+    }
+
+    /**
+     * Отправка команды на устройство (турникет, замок и т.д.).
+     *
+     * @see https://github.com/percodev/api_examples/blob/main/devices/nodejs/devicesIdCommandPOST.node.ts
+     */
+    public function sendDeviceCommand(
+        PercoClubConfig $config,
+        int $deviceId,
+        int $cmdNumber,
+        int $cmdType,
+        int $cmdValue,
+        int $cmdParam,
+    ): void {
+        $token = $this->authenticate($config);
+        $url = $this->endpoint($config, '/api/devices/' . $deviceId . '/command');
+        $response = $this->http->request('POST', $url, [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+                'Accept' => 'application/json',
+            ],
+            'json' => [
+                'cmdNumber' => $cmdNumber,
+                'cmdType' => $cmdType,
+                'cmdValue' => $cmdValue,
+                'cmdParam' => $cmdParam,
+            ],
+            'verify_peer' => $config->verifyPeer,
+            'timeout' => 20,
+        ]);
+
+        if ($response->getStatusCode() !== 200) {
+            throw new \RuntimeException('PERCo command: HTTP ' . $response->getStatusCode() . ' ' . $response->getContent(false));
         }
     }
 

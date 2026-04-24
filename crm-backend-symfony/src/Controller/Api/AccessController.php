@@ -6,6 +6,7 @@ use App\Entity\AccessLog;
 use App\Entity\GuestPass;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Service\Integration\PercoWebClient;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,6 +18,7 @@ class AccessController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly PercoWebClient $percoWebClient,
     ) {}
 
     #[Route('/entry', name: 'api_access_entry', methods: ['POST'])]
@@ -151,15 +153,20 @@ class AccessController extends AbstractController
         $this->em->persist($log);
         $this->em->flush();
 
-        return $this->json([
-            'access_granted' => true,
-            'reason' => 'ok',
-            'user' => [
-                'id' => 'user-' . $user->getId(),
-                'name' => $user->getName(),
-                'phone' => $user->getPhone(),
+        $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
+
+        return $this->json(array_merge(
+            [
+                'access_granted' => true,
+                'reason' => 'ok',
+                'user' => [
+                    'id' => 'user-' . $user->getId(),
+                    'name' => $user->getName(),
+                    'phone' => $user->getPhone(),
+                ],
             ],
-        ]);
+            $this->percoUnlockPayload($percoUnlock),
+        ));
     }
 
     #[Route('/exit', name: 'api_access_exit', methods: ['POST'])]
@@ -221,15 +228,34 @@ class AccessController extends AbstractController
         $this->em->persist($guestPass);
         $this->em->flush();
 
-        return $this->json([
-            'access_granted' => true,
-            'reason' => 'ok',
-            'user' => [
-                'id' => 'guest-' . $guestPass->getId(),
-                'name' => $guestPass->getGuestName() ?: ('Гость ' . $owner->getName()),
-                'phone' => $owner->getPhone(),
+        $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
+
+        return $this->json(array_merge(
+            [
+                'access_granted' => true,
+                'reason' => 'ok',
+                'user' => [
+                    'id' => 'guest-' . $guestPass->getId(),
+                    'name' => $guestPass->getGuestName() ?: ('Гость ' . $owner->getName()),
+                    'phone' => $owner->getPhone(),
+                ],
             ],
-        ]);
+            $this->percoUnlockPayload($percoUnlock),
+        ));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function percoUnlockPayload(?bool $unlock): array
+    {
+        if ($unlock === null) {
+            return [];
+        }
+
+        return [
+            'perco_unlock' => $unlock,
+        ];
     }
 }
 

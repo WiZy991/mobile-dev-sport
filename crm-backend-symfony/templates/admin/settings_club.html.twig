@@ -92,6 +92,27 @@
                         <label class="form-check-label small" for="perco_verify_ssl">Проверять SSL-сертификат (снимите для самоподписанного сертификата на стенде)</label>
                     </div>
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label small">ID устройства входа (турникет) в PERCo-Web</label>
+                    <input type="text" name="perco_entry_device_id" class="form-control form-control-sm" value="{{ club.perco_entry_device_id }}" inputmode="numeric" placeholder="например 696590" title="Список устройств — в веб-интерфейсе PERCo, иногда через GET /api/devices">
+                </div>
+                <div class="col-12 small text-secondary mb-1">Команда открытия (как в <a href="https://github.com/percodev/api_examples/blob/main/devices/nodejs/devicesIdCommandPOST.node.ts" target="_blank" rel="noopener">примере PERCo</a>); пустые поля — значения по умолчанию 1 / 0 / 3 / 5000</div>
+                <div class="col-md-2">
+                    <label class="form-label small">cmdNumber</label>
+                    <input type="text" name="perco_cmd_number" class="form-control form-control-sm" value="{{ club.perco_cmd_number }}" inputmode="numeric" placeholder="1">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">cmdType</label>
+                    <input type="text" name="perco_cmd_type" class="form-control form-control-sm" value="{{ club.perco_cmd_type }}" inputmode="numeric" placeholder="0">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">cmdValue</label>
+                    <input type="text" name="perco_cmd_value" class="form-control form-control-sm" value="{{ club.perco_cmd_value }}" inputmode="numeric" placeholder="3">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">cmdParam</label>
+                    <input type="text" name="perco_cmd_param" class="form-control form-control-sm" value="{{ club.perco_cmd_param }}" inputmode="numeric" placeholder="5000">
+                </div>
                 <div class="col-12 mt-2 d-flex flex-wrap gap-2">
                     <button type="submit" class="btn btn-primary">Сохранить всё</button>
                     {% if admin_can_mutate() %}
@@ -104,6 +125,6 @@
 
     <div class="alert alert-info small">
         Данные клуба и баннер главной — в API <code>GET /api/v1/club/info</code> (приложение и «О клубе»).
-        Вход по QR из приложения обрабатывается через <code>POST /api/v1/access/entry</code> (шлюз у турникета передаёт содержимое QR; при необходимости тот же шлюз может дублировать логику на стороне PERCo-Web).
+        Вход по QR из приложения: <code>POST /api/v1/access/entry</code> (тело <code>{"qr":"…"}</code>). После успешной проверки бэк при необходимости вызывает PERCo <code>POST /api/devices/{id}/command</code> (открытие — если задан ID устройства и CRM достижим из сети PERCo). Если CRM на внешнем хосте, а PERCo только в LAN клуба, вызов на месте выполняет <strong>шлюз у турникета</strong> (или VPN); иначе команда в логах будет с ошибкой сети.
     </div>
 {% endblock %}

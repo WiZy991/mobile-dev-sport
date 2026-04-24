@@ -35,7 +35,35 @@ final class PercoClubConfigFactory
         $verify = $this->get('perco_verify_ssl');
         $verifyPeer = $verify === '' || $verify === '1';
 
-        return new PercoClubConfig($baseUrl, $login, $password, $verifyPeer);
+        $deviceRaw = trim((string) $this->get('perco_entry_device_id'));
+        $entryDeviceId = $deviceRaw !== '' && ctype_digit($deviceRaw) ? (int) $deviceRaw : null;
+
+        $openCmdNumber = $this->intSetting('perco_cmd_number', 1);
+        $openCmdType = $this->intSetting('perco_cmd_type', 0);
+        $openCmdValue = $this->intSetting('perco_cmd_value', 3);
+        $openCmdParam = $this->intSetting('perco_cmd_param', 5000);
+
+        return new PercoClubConfig(
+            $baseUrl,
+            $login,
+            $password,
+            $verifyPeer,
+            $entryDeviceId,
+            $openCmdNumber,
+            $openCmdType,
+            $openCmdValue,
+            $openCmdParam,
+        );
+    }
+
+    private function intSetting(string $key, int $default): int
+    {
+        $raw = trim((string) ($this->get($key) ?? ''));
+        if ($raw === '' || !is_numeric($raw)) {
+            return $default;
+        }
+
+        return (int) $raw;
     }
 
     private function get(string $key): ?string
