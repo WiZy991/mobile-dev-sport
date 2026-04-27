@@ -19,11 +19,17 @@ class AccessController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PercoWebClient $percoWebClient,
+        private readonly string $accessGateToken = '',
+        private readonly string $percoOpenFromCrm = '1',
     ) {}
 
     #[Route('/entry', name: 'api_access_entry', methods: ['POST'])]
     public function entry(Request $request): JsonResponse
     {
+        if ($g = $this->requireAccessGate($request)) {
+            return $g;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $qr = (string) ($data['qr'] ?? '');
         $deviceId = $data['device_id'] ?? null;
@@ -155,7 +161,7 @@ class AccessController extends AbstractController
 
         $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
 
-        return $this->json(array_merge(
+        return $this->json($this->mergeEntrySuccess(
             [
                 'access_granted' => true,
                 'reason' => 'ok',
@@ -165,13 +171,17 @@ class AccessController extends AbstractController
                     'phone' => $user->getPhone(),
                 ],
             ],
-            $this->percoUnlockPayload($percoUnlock),
+            $percoUnlock,
         ));
     }
 
     #[Route('/exit', name: 'api_access_exit', methods: ['POST'])]
     public function exit(Request $request): JsonResponse
     {
+        if ($g = $this->requireAccessGate($request)) {
+            return $g;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $qr = (string) ($data['qr'] ?? '');
         $deviceId = $data['device_id'] ?? null;
@@ -230,7 +240,7 @@ class AccessController extends AbstractController
 
         $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
 
-        return $this->json(array_merge(
+        return $this->json($this->mergeEntrySuccess(
             [
                 'access_granted' => true,
                 'reason' => 'ok',
@@ -240,22 +250,51 @@ class AccessController extends AbstractController
                     'phone' => $owner->getPhone(),
                 ],
             ],
-            $this->percoUnlockPayload($percoUnlock),
+            $percoUnlock,
         ));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function percoUnlockPayload(?bool $unlock): array
+    private function requireAccessGate(Request $request): ?JsonResponse
     {
-        if ($unlock === null) {
-            return [];
+        $expected = trim($this->accessGateToken);
+        if ($expected === '') {
+            return null;
         }
 
-        return [
-            'perco_unlock' => $unlock,
+        $h = (string) $request->headers->get('X-Access-Gate-Token', '');
+        if ($h !== '' && hash_equals($expected, $h)) {
+            return null;
+        }
+
+        $auth = (string) $request->headers->get('Authorization', '');
+        if (str_starts_with($auth, 'Bearer ') && hash_equals($expected, trim(substr($auth, 7)))) {
+            return null;
+        }
+
+        return $this->json([
+            'access_granted' => false,
+            'reason' => 'unauthorized',
+            'message' => 'Нужен заголовок X-Access-Gate-Token (или Authorization: Bearer) с токеном, заданным в ACCESS_GATE_TOKEN на сервере CRM.',
+        ], 401);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function mergeEntrySuccess(array $data, ?bool $percoUnlock): array
+    {
+        $m = $data;
+        if ($percoUnlock !== null) {
+            $m['perco_unlock'] = $percoUnlock;
+        }
+        $m['integration'] = [
+            'perco_open_from_crm' => $this->percoOpenFromCrm !== '0',
+            /** true = открытие двери с ПК/RPi в клубе (скрипт turnstile_gateway) */
+            'turnstile_open_locally' => $this->percoOpenFromCrm === '0',
         ];
+
+        return $m;
     }
 }
 

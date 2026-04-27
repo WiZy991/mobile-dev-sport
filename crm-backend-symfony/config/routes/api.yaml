@@ -158,6 +158,27 @@ api_access_exit:
   controller: App\Controller\Api\AccessController::exit
   methods: [POST]
 
+# --- Шлюз (ПК в клубе) ---
+api_gateway_access_entry:
+  path: /api/v1/gateway/access/entry
+  controller: App\Controller\Api\GatewayController::entry
+  methods: [POST]
+
+api_gateway_heartbeat:
+  path: /api/v1/gateway/heartbeat
+  controller: App\Controller\Api\GatewayController::heartbeat
+  methods: [POST]
+
+api_gateway_commands_poll:
+  path: /api/v1/gateway/commands
+  controller: App\Controller\Api\GatewayController::poll
+  methods: [GET]
+
+api_gateway_commands_ack:
+  path: /api/v1/gateway/commands/{id}/ack
+  controller: App\Controller\Api\GatewayController::ack
+  methods: [POST]
+
 api_lockers_list:
   path: /api/v1/lockers
   controller: App\Controller\Api\LockerController::list

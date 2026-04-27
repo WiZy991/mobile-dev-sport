@@ -1,0 +1,74 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Франшиза / Шлюзы{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Франшиза: клубы и шлюзы</h1>
+        <a href="{{ path('admin_section', {section: 'settings'}) }}" class="btn btn-sm btn-outline-secondary">← Настройки</a>
+    </div>
+
+    <div class="content-card">
+        <p class="small text-secondary mb-3">
+            Каждый клуб — отдельный экземпляр PERCo в локальной сети. Установлен ПК-шлюз
+            (<code>scripts/turnstile_gateway/gateway.py</code>), он держит long-poll к CRM
+            и сам открывает турникет. Облачной CRM достаточно знать <em>токен шлюза</em>,
+            а локальные IP/логин/пароль PERCo лежат у шлюза в <code>config.ini</code>.
+        </p>
+
+        {% if rows is empty %}
+            <div class="alert alert-warning small mb-0">Клубы не созданы. Добавьте их в БД (миграции/импорт).</div>
+        {% else %}
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Клуб</th>
+                        <th>Адрес</th>
+                        <th>Шлюз</th>
+                        <th>PERCo</th>
+                        <th>Очередь</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rows %}
+                    <tr>
+                        <td><strong>{{ r.club.name }}</strong></td>
+                        <td class="text-secondary small">{{ r.club.address }}</td>
+                        <td>
+                            {% if not r.has_token %}
+                                <span class="badge bg-secondary">токен не задан</span>
+                            {% elseif r.online %}
+                                <span class="badge bg-success">онлайн</span>
+                                <div class="small text-secondary">heartbeat {{ r.last_seen ? r.last_seen|date('H:i:s') : '—' }}</div>
+                            {% else %}
+                                <span class="badge bg-danger">офлайн</span>
+                                <div class="small text-secondary">{{ r.last_seen ? r.last_seen|date('Y-m-d H:i') : 'не подключался' }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.has_perco %}
+                                <span class="badge bg-info">настроен</span>
+                            {% else %}
+                                <span class="badge bg-secondary">не задан</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.pending > 0 %}
+                                <span class="badge bg-warning text-dark">в очереди: {{ r.pending }}</span>
+                            {% else %}
+                                <span class="text-secondary">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ path('admin_franchise_edit', {id: r.club.id}) }}" class="btn btn-sm btn-outline-light">Открыть</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}

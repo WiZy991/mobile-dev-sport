@@ -5,7 +5,10 @@
 {% block body %}
     <div class="content-header">
         <h1 class="h4 mb-0">Настройки клуба</h1>
-        <a href="{{ path('admin_section', {section: 'settings'}) }}" class="btn btn-sm btn-outline-secondary">← Настройки</a>
+        <div class="d-flex gap-2">
+            <a href="{{ path('admin_franchise_list') }}" class="btn btn-sm btn-outline-info">Франшиза / Шлюзы</a>
+            <a href="{{ path('admin_section', {section: 'settings'}) }}" class="btn btn-sm btn-outline-secondary">← Настройки</a>
+        </div>
     </div>
 
     <div class="content-card mb-3">
@@ -125,6 +128,6 @@
 
     <div class="alert alert-info small">
         Данные клуба и баннер главной — в API <code>GET /api/v1/club/info</code> (приложение и «О клубе»).
-        Вход по QR из приложения: <code>POST /api/v1/access/entry</code> (тело <code>{"qr":"…"}</code>). После успешной проверки бэк при необходимости вызывает PERCo <code>POST /api/devices/{id}/command</code> (открытие — если задан ID устройства и CRM достижим из сети PERCo). Если CRM на внешнем хосте, а PERCo только в LAN клуба, вызов на месте выполняет <strong>шлюз у турникета</strong> (или VPN); иначе команда в логах будет с ошибкой сети.
+        Вход по QR: <code>POST /api/v1/access/entry</code>, тело <code>{"qr":"…"}</code>, заголовок <code>X-Access-Gate-Token</code> — если в <code>.env</code> задан <code>ACCESS_GATE_TOKEN</code> (для ПК-шлюза в клубе; обязателен в проде). На облачном CRM задайте <code>PERCO_OPEN_FROM_CRM=0</code> — открытие турникета только скриптом в LAN (см. <code>scripts/turnstile_gateway/README.md</code> в репозитории). Иначе при <code>PERCO_OPEN_FROM_CRM=1</code> и доступности PERCo с сервера CRM — команда <code>POST /api/devices/{id}/command</code> с этого сервера.
     </div>
 {% endblock %}

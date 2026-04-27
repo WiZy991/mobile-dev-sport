@@ -14,6 +14,8 @@ final class PercoWebClient
         private readonly HttpClientInterface $http,
         private readonly PercoClubConfigFactory $configFactory,
         private readonly LoggerInterface $logger,
+        /** 0 = открытие турникета не с CRM, а локальным шлюзом в LAN (см. scripts/turnstile_gateway) */
+        private readonly string $percoOpenFromCrm = '1',
     ) {}
 
     public function isConfigured(): bool
@@ -37,6 +39,10 @@ final class PercoWebClient
      */
     public function tryOpenEntryAfterGranted(): ?bool
     {
+        if ($this->percoOpenFromCrm === '0') {
+            return null;
+        }
+
         $config = $this->configFactory->load();
         if (!$config instanceof PercoClubConfig || !$config->hasEntryDevice()) {
             return null;

@@ -44,5 +44,14 @@ services:
         bind:
             $requireSberVerificationBeforePurchase: '%env(bool:SUBSCRIPTION_REQUIRE_SBER)%'
 
+    App\Controller\Api\AccessController:
+        bind:
+            $accessGateToken: '%env(ACCESS_GATE_TOKEN)%'
+            $percoOpenFromCrm: '%env(PERCO_OPEN_FROM_CRM)%'
+
+    App\Service\Integration\PercoWebClient:
+        bind:
+            $percoOpenFromCrm: '%env(PERCO_OPEN_FROM_CRM)%'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

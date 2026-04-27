@@ -40,6 +40,31 @@ class Club
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $maxCapacity = null;
 
+    /** Уникальный токен ПК-шлюза в клубе для авторизации в /api/v1/gateway/* */
+    #[ORM\Column(type: 'string', length: 64, nullable: true, unique: true)]
+    private ?string $gatewayToken = null;
+
+    /** Время последнего heartbeat от шлюза. */
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $gatewayLastSeenAt = null;
+
+    /** Локальный URL PERCo-Web в LAN клуба (используется только шлюзом). */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $percoBaseUrl = null;
+
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    private ?string $percoLogin = null;
+
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $percoPassword = null;
+
+    /** ID исполнительного устройства (турникета) в PERCo для команды открытия. */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $percoEntryDeviceId = null;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    private bool $percoVerifySsl = true;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -75,4 +100,25 @@ class Club
 
     public function getMaxCapacity(): ?int { return $this->maxCapacity; }
     public function setMaxCapacity(?int $v): self { $this->maxCapacity = $v; return $this; }
+
+    public function getGatewayToken(): ?string { return $this->gatewayToken; }
+    public function setGatewayToken(?string $v): self { $this->gatewayToken = $v; return $this; }
+
+    public function getGatewayLastSeenAt(): ?\DateTimeInterface { return $this->gatewayLastSeenAt; }
+    public function setGatewayLastSeenAt(?\DateTimeInterface $v): self { $this->gatewayLastSeenAt = $v; return $this; }
+
+    public function getPercoBaseUrl(): ?string { return $this->percoBaseUrl; }
+    public function setPercoBaseUrl(?string $v): self { $this->percoBaseUrl = $v; return $this; }
+
+    public function getPercoLogin(): ?string { return $this->percoLogin; }
+    public function setPercoLogin(?string $v): self { $this->percoLogin = $v; return $this; }
+
+    public function getPercoPassword(): ?string { return $this->percoPassword; }
+    public function setPercoPassword(?string $v): self { $this->percoPassword = $v; return $this; }
+
+    public function getPercoEntryDeviceId(): ?int { return $this->percoEntryDeviceId; }
+    public function setPercoEntryDeviceId(?int $v): self { $this->percoEntryDeviceId = $v; return $this; }
+
+    public function isPercoVerifySsl(): bool { return $this->percoVerifySsl; }
+    public function setPercoVerifySsl(bool $v): self { $this->percoVerifySsl = $v; return $this; }
 }

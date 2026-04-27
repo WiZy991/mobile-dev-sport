@@ -181,6 +181,36 @@ admin_perco_test:
   controller: App\Controller\Admin\AdminController::testPercoConnection
   methods: [POST]
 
+# --- Франшиза: клубы и шлюзы ---
+admin_franchise_list:
+  path: /admin/franchise
+  controller: App\Controller\Admin\AdminFranchiseController::list
+  methods: [GET]
+
+admin_franchise_edit:
+  path: /admin/franchise/{id}
+  controller: App\Controller\Admin\AdminFranchiseController::edit
+  methods: [GET]
+  requirements: { id: '\d+' }
+
+admin_franchise_save:
+  path: /admin/franchise/{id}/save
+  controller: App\Controller\Admin\AdminFranchiseController::save
+  methods: [POST]
+  requirements: { id: '\d+' }
+
+admin_franchise_regenerate_token:
+  path: /admin/franchise/{id}/regenerate-token
+  controller: App\Controller\Admin\AdminFranchiseController::regenerateToken
+  methods: [POST]
+  requirements: { id: '\d+' }
+
+admin_franchise_open_door:
+  path: /admin/franchise/{id}/open-door
+  controller: App\Controller\Admin\AdminFranchiseController::openDoor
+  methods: [POST]
+  requirements: { id: '\d+' }
+
 admin_visits_export:
   path: /admin/visits/export
   controller: App\Controller\Admin\AdminController::exportVisits
