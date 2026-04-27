@@ -3,32 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WorldCashFit - CRM для фитнес-клубов и студий</title>
-    <meta name="description" content="WorldCashFit: CRM, мобильные приложения клиента и тренера, онлайн-запись и онлайн-оплата для фитнес-клубов, студий и спортивных школ.">
+    <title>WorldCashFit — CRM и мобильное приложение для фитнес-клубов и студий</title>
+    <meta name="description" content="WorldCashFit: учётная система, CRM, мобильное приложение клиента и тренера, онлайн-запись, онлайн-оплата и аналитика для фитнес-клубов, студий йоги, танцев, единоборств и спорта.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0b1020;
-            --bg-card: #121a30;
-            --text: #eef3ff;
-            --muted: #b9c2df;
+            --bg: #07091a;
+            --bg-soft: #0e1430;
+            --bg-card: #121a3a;
+            --bg-card-2: #18204a;
+            --text: #f1f4ff;
+            --muted: #aab3d8;
             --primary: #5a8cff;
+            --primary-2: #7aa6ff;
             --primary-hover: #3f77ff;
-            --border: #2a355a;
             --accent: #21d4a1;
+            --accent-2: #ffb547;
+            --danger: #ff5d6c;
+            --border: rgba(255, 255, 255, 0.09);
+            --border-strong: rgba(255, 255, 255, 0.18);
+            --shadow: 0 30px 60px -20px rgba(7, 9, 26, 0.7);
         }
 
         * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
 
         body {
             margin: 0;
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             color: var(--text);
-            background: radial-gradient(circle at 20% 0%, #1f2a4d 0%, var(--bg) 40%);
-            line-height: 1.5;
+            background: var(--bg);
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
         }
 
+        a { color: var(--primary-2); text-decoration: none; }
+
+        img { max-width: 100%; display: block; }
+
+        h1, h2, h3, h4 { font-family: inherit; line-height: 1.2; margin: 0 0 0.6em; }
+        h1 { font-size: clamp(2.1rem, 4.4vw, 3.6rem); font-weight: 800; letter-spacing: -0.02em; }
+        h2 { font-size: clamp(1.7rem, 3vw, 2.4rem); font-weight: 800; letter-spacing: -0.01em; }
+        h3 { font-size: 1.2rem; font-weight: 700; }
+        p { margin: 0 0 1em; }
+
         .container {
-            width: min(1120px, calc(100% - 2rem));
+            width: min(1180px, calc(100% - 2rem));
             margin: 0 auto;
         }
 
@@ -36,200 +58,737 @@
             position: sticky;
             top: 0;
             z-index: 50;
-            background: rgba(11, 16, 32, 0.9);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            backdrop-filter: blur(8px);
+            background: rgba(7, 9, 26, 0.85);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
         }
 
         .header-inner {
             display: flex;
             align-items: center;
+            gap: 1.5rem;
             justify-content: space-between;
             padding: 0.9rem 0;
         }
 
         .logo {
-            font-size: 1.15rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
             font-weight: 800;
-            letter-spacing: 0.2px;
+            font-size: 1.15rem;
+            letter-spacing: 0.4px;
         }
 
+        .logo-mark {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #5a8cff, #21d4a1);
+            display: grid;
+            place-items: center;
+            color: #0a0d1f;
+            font-weight: 800;
+        }
+
+        .nav {
+            display: flex;
+            gap: 1.4rem;
+            font-size: 0.95rem;
+        }
+
+        .nav a {
+            color: var(--muted);
+            transition: color 0.15s ease;
+        }
+
+        .nav a:hover { color: var(--text); }
+
+        .header-actions { display: flex; align-items: center; gap: 0.6rem; }
+
         .btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
             border: none;
             border-radius: 12px;
-            padding: 0.72rem 1.1rem;
-            font-weight: 600;
+            padding: 0.78rem 1.2rem;
+            font-weight: 700;
+            font-size: 0.95rem;
             text-decoration: none;
             cursor: pointer;
-            transition: 0.2s ease;
+            transition: 0.18s ease;
+            white-space: nowrap;
+            font-family: inherit;
         }
 
         .btn-primary {
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary), #4d7bf0);
             color: #fff;
+            box-shadow: 0 12px 24px -10px rgba(90, 140, 255, 0.7);
         }
 
-        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 28px -10px rgba(90, 140, 255, 0.85); }
 
-        .btn-outline {
-            color: #fff;
-            border: 1px solid var(--border);
-            background: transparent;
+        .btn-accent {
+            background: linear-gradient(135deg, var(--accent), #1ab98c);
+            color: #04261c;
         }
 
-        .btn-outline:hover { background: rgba(255, 255, 255, 0.05); }
+        .btn-accent:hover { transform: translateY(-1px); }
 
+        .btn-ghost {
+            color: var(--text);
+            border: 1px solid var(--border-strong);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .btn-ghost:hover { background: rgba(255, 255, 255, 0.07); }
+
+        .btn-lg { padding: 1rem 1.5rem; font-size: 1rem; border-radius: 14px; }
+
+        /* HERO */
         .hero {
-            padding: 4.2rem 0 3.5rem;
+            position: relative;
+            padding: 5rem 0 4rem;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: -20% -10% auto -10%;
+            height: 70%;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(90, 140, 255, 0.45), transparent 45%),
+                radial-gradient(circle at 75% 30%, rgba(33, 212, 161, 0.35), transparent 45%);
+            filter: blur(30px);
+            z-index: 0;
         }
 
         .hero-grid {
+            position: relative;
+            z-index: 1;
             display: grid;
-            grid-template-columns: 1.2fr 1fr;
-            gap: 2rem;
+            grid-template-columns: 1.05fr 1fr;
+            gap: 2.5rem;
             align-items: center;
         }
 
-        h1 {
-            margin: 0 0 1rem;
-            font-size: clamp(2rem, 3.8vw, 3.3rem);
-            line-height: 1.15;
+        .badge-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.4rem 0.7rem;
+            background: rgba(33, 212, 161, 0.12);
+            color: #6ce0bd;
+            border: 1px solid rgba(33, 212, 161, 0.3);
+            border-radius: 999px;
+            margin-bottom: 1.1rem;
         }
 
-        .subtitle {
+        .lead {
             color: var(--muted);
-            font-size: 1.05rem;
-            max-width: 50ch;
-            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+            max-width: 56ch;
+            margin-bottom: 1.6rem;
         }
 
         .hero-actions {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.75rem;
-            margin-bottom: 1.3rem;
+            gap: 0.7rem;
+            margin-bottom: 1.8rem;
         }
 
-        .kpi {
+        .hero-stats {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.8rem;
         }
 
-        .kpi-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 0.8rem;
-        }
-
-        .kpi-item strong {
-            display: block;
-            font-size: 1.1rem;
-        }
-
-        .hero-card {
+        .hero-stat {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 1.2rem;
+            border-radius: 14px;
+            padding: 0.9rem 1rem;
         }
 
-        .hero-card h3 { margin-top: 0; }
+        .hero-stat strong { display: block; font-size: 1.45rem; font-weight: 800; }
+        .hero-stat span { color: var(--muted); font-size: 0.85rem; }
 
-        section { padding: 2.2rem 0; }
-
-        .section-title {
-            font-size: 1.55rem;
-            margin: 0 0 1rem;
+        /* Phone mockup (SVG-based illustration) */
+        .hero-visual {
+            position: relative;
+            min-height: 480px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .grid-3 {
+        .phone {
+            position: relative;
+            width: 280px;
+            height: 560px;
+            background: linear-gradient(160deg, #1a2350, #0d1230);
+            border: 6px solid #2a3470;
+            border-radius: 42px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .phone::after {
+            content: "";
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90px;
+            height: 22px;
+            background: #07091a;
+            border-radius: 0 0 14px 14px;
+        }
+
+        .phone-screen {
+            position: absolute;
+            inset: 14px;
+            border-radius: 32px;
+            background: linear-gradient(180deg, #0c1130 0%, #131a3f 100%);
+            padding: 38px 18px 18px;
+            color: #f1f4ff;
+            font-size: 0.78rem;
+        }
+
+        .phone-screen h4 { font-size: 0.9rem; margin-bottom: 0.4rem; }
+        .phone-screen .ph-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.55rem 0.7rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .ph-tag {
+            font-size: 0.65rem;
+            color: #6ce0bd;
+            background: rgba(33, 212, 161, 0.12);
+            padding: 0.15rem 0.4rem;
+            border-radius: 999px;
+        }
+
+        .ph-btn {
+            margin-top: 0.7rem;
+            background: linear-gradient(135deg, var(--primary), #4d7bf0);
+            color: #fff;
+            text-align: center;
+            padding: 0.6rem;
+            border-radius: 10px;
+            font-weight: 700;
+        }
+
+        .floating-card {
+            position: absolute;
+            background: var(--bg-card);
+            border: 1px solid var(--border-strong);
+            border-radius: 16px;
+            padding: 0.85rem 1rem;
+            box-shadow: var(--shadow);
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+        }
+
+        .fc-1 { top: 12%; left: -2%; }
+        .fc-2 { bottom: 10%; right: -4%; }
+
+        .fc-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: grid; place-items: center;
+            flex-shrink: 0;
+        }
+
+        .fc-icon.green { background: rgba(33, 212, 161, 0.18); color: #6ce0bd; }
+        .fc-icon.blue { background: rgba(90, 140, 255, 0.18); color: var(--primary-2); }
+
+        /* Trust strip */
+        .trust {
+            padding: 2rem 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .trust-title {
+            color: var(--muted);
+            text-align: center;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .trust-logos {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.9rem;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 1rem;
+            align-items: center;
         }
 
-        .card {
+        .trust-logo {
+            text-align: center;
+            color: var(--muted);
+            font-weight: 800;
+            opacity: 0.7;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            padding: 0.7rem 0.4rem;
+        }
+
+        /* Sections */
+        section.block {
+            padding: 4.5rem 0;
+        }
+
+        .section-head {
+            text-align: center;
+            max-width: 720px;
+            margin: 0 auto 2.4rem;
+        }
+
+        .section-head p {
+            color: var(--muted);
+            font-size: 1.05rem;
+        }
+
+        /* Industries */
+        .industries {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.85rem;
+        }
+
+        .industry {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 14px;
             padding: 1rem;
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+            transition: 0.2s ease;
         }
 
-        .card h4 {
-            margin: 0 0 0.55rem;
-            font-size: 1rem;
+        .industry:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+
+        .industry-icon {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            display: grid; place-items: center;
+            background: rgba(90, 140, 255, 0.15);
+            color: var(--primary-2);
+            flex-shrink: 0;
         }
 
-        .card p {
-            margin: 0;
-            color: var(--muted);
-            font-size: 0.94rem;
-        }
+        .industry strong { display: block; }
+        .industry span { color: var(--muted); font-size: 0.85rem; }
 
-        .pricing {
+        /* Features */
+        .features {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.9rem;
+            gap: 1rem;
         }
 
-        .price-card {
+        .feature {
             background: var(--bg-card);
             border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 1.4rem;
+            transition: 0.2s ease;
+        }
+
+        .feature:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+
+        .feature-icon {
+            width: 48px; height: 48px;
             border-radius: 14px;
-            padding: 1.1rem;
+            display: grid; place-items: center;
+            margin-bottom: 0.9rem;
+            background: linear-gradient(135deg, rgba(90, 140, 255, 0.2), rgba(33, 212, 161, 0.15));
+            color: var(--primary-2);
         }
 
-        .price {
-            font-size: 1.9rem;
-            font-weight: 800;
-            margin: 0.4rem 0;
+        .feature p { color: var(--muted); margin: 0; font-size: 0.95rem; }
+
+        /* Apps showcase */
+        .apps {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            align-items: center;
         }
 
-        .badge {
-            display: inline-block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #0a1a12;
-            background: var(--accent);
-            border-radius: 999px;
-            padding: 0.25rem 0.55rem;
+        .apps.reverse { direction: rtl; }
+        .apps.reverse > * { direction: ltr; }
+
+        .apps-info ul {
+            list-style: none;
+            padding: 0;
+            margin: 1rem 0 1.4rem;
         }
 
-        .cta {
-            background: linear-gradient(135deg, #1b2951, #132141);
-            border: 1px solid #314574;
-            border-radius: 16px;
-            padding: 1.35rem;
+        .apps-info li {
+            position: relative;
+            padding: 0.45rem 0 0.45rem 1.7rem;
+            color: var(--muted);
+        }
+
+        .apps-info li::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0.85rem;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(33, 212, 161, 0.2);
+            border: 2px solid var(--accent);
+        }
+
+        .apps-mock {
+            background: linear-gradient(160deg, rgba(90, 140, 255, 0.12), rgba(33, 212, 161, 0.06));
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2rem;
+            min-height: 380px;
+            display: grid;
+            place-items: center;
+        }
+
+        /* Numbers */
+        .numbers {
+            background: linear-gradient(135deg, #131b46, #0c1133);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1.2rem;
             text-align: center;
         }
 
-        footer {
-            color: var(--muted);
-            font-size: 0.9rem;
-            padding: 1.5rem 0 2rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            margin-top: 2rem;
+        .num-value {
+            font-size: clamp(1.8rem, 3vw, 2.6rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff, #aab3d8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
         }
 
-        @media (max-width: 900px) {
-            .hero-grid, .grid-3, .pricing, .kpi {
+        .numbers small { display: block; color: var(--muted); margin-top: 0.4rem; }
+
+        /* Testimonials */
+        .reviews {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .review {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 1.4rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .review-text {
+            color: var(--text);
+            font-size: 0.97rem;
+            margin-bottom: 1rem;
+            flex: 1;
+        }
+
+        .review-author {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            border-top: 1px solid var(--border);
+            padding-top: 0.9rem;
+            margin-top: auto;
+        }
+
+        .review-avatar {
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            display: grid; place-items: center;
+            background: linear-gradient(135deg, #5a8cff, #21d4a1);
+            color: #04261c;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        .review-author strong { display: block; }
+        .review-author span { color: var(--muted); font-size: 0.85rem; }
+
+        /* Pricing */
+        .pricing {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .price-card {
+            position: relative;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.6rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .price-card.featured {
+            border-color: var(--primary);
+            background: linear-gradient(160deg, #18225a, #131a3f);
+            box-shadow: 0 30px 60px -25px rgba(90, 140, 255, 0.6);
+        }
+
+        .price-card .badge {
+            position: absolute;
+            top: -12px; right: 16px;
+            background: var(--accent);
+            color: #04261c;
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 0.3rem 0.7rem;
+            border-radius: 999px;
+        }
+
+        .price-name { font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+        .price-value {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin: 0.4rem 0 0.1rem;
+        }
+
+        .price-value small { font-size: 0.95rem; color: var(--muted); font-weight: 500; }
+
+        .price-list {
+            list-style: none;
+            padding: 0;
+            margin: 1rem 0 1.4rem;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .price-list li {
+            padding: 0.4rem 0;
+            border-bottom: 1px dashed var(--border);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .price-list li::before {
+            content: "✓";
+            color: var(--accent);
+            font-weight: 800;
+        }
+
+        /* FAQ */
+        .faq {
+            max-width: 820px;
+            margin: 0 auto;
+        }
+
+        details.q {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1rem 1.2rem;
+            margin-bottom: 0.6rem;
+        }
+
+        details.q[open] { border-color: var(--border-strong); }
+
+        details.q summary {
+            cursor: pointer;
+            font-weight: 700;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        details.q summary::-webkit-details-marker { display: none; }
+        details.q summary::after {
+            content: "+";
+            font-size: 1.4rem;
+            color: var(--muted);
+            transition: 0.2s;
+        }
+
+        details.q[open] summary::after { transform: rotate(45deg); }
+
+        details.q p {
+            margin: 0.7rem 0 0;
+            color: var(--muted);
+        }
+
+        /* CTA */
+        .cta-block {
+            background: linear-gradient(135deg, #1a235a 0%, #102050 60%, #0a1133 100%);
+            border: 1px solid var(--border-strong);
+            border-radius: 24px;
+            padding: 2.6rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-block::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 10% 20%, rgba(90, 140, 255, 0.4), transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(33, 212, 161, 0.3), transparent 40%);
+            z-index: 0;
+        }
+
+        .cta-block > * { position: relative; z-index: 1; }
+
+        .cta-block h2 { margin-bottom: 0.6rem; }
+        .cta-block p { color: var(--muted); margin-bottom: 1.4rem; max-width: 540px; margin-left: auto; margin-right: auto; }
+
+        .cta-actions { display: flex; justify-content: center; gap: 0.7rem; flex-wrap: wrap; }
+
+        /* Form */
+        .form-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.8rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.8rem;
+        }
+
+        .form-grid .full { grid-column: 1 / -1; }
+
+        .field label {
+            display: block;
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .field input, .field textarea, .field select {
+            width: 100%;
+            background: var(--bg-soft);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            padding: 0.7rem 0.9rem;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: 0.15s;
+        }
+
+        .field input:focus, .field textarea:focus, .field select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Footer */
+        footer.foot {
+            padding: 3rem 0 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        .foot-grid {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .foot h5 {
+            color: var(--text);
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            margin: 0 0 0.7rem;
+        }
+
+        .foot a { display: block; color: var(--muted); padding: 0.2rem 0; }
+        .foot a:hover { color: var(--text); }
+
+        .foot-bottom {
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 1000px) {
+            .nav { display: none; }
+            .hero-grid, .apps, .features, .industries, .pricing, .reviews, .numbers, .foot-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .hero-grid { gap: 1.6rem; }
+            .hero-visual { min-height: 420px; }
+        }
+
+        @media (max-width: 700px) {
+            .hero-grid, .apps, .features, .industries, .pricing, .reviews, .form-grid, .foot-grid {
                 grid-template-columns: 1fr;
             }
-
-            .hero {
-                padding-top: 3rem;
-            }
+            .numbers { grid-template-columns: 1fr 1fr; }
+            .trust-logos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .hero { padding: 3rem 0 2rem; }
+            section.block { padding: 3rem 0; }
+            .floating-card { display: none; }
         }
     </style>
 </head>
 <body>
+
 <header class="header">
     <div class="container header-inner">
-        <div class="logo">WorldCashFit</div>
-        <a href="{{ admin_url }}" class="btn btn-primary">Войти в админку</a>
+        <a href="/" class="logo">
+            <span class="logo-mark">W</span>
+            <span>WorldCashFit</span>
+        </a>
+        <nav class="nav">
+            <a href="#features">Возможности</a>
+            <a href="#apps">Приложения</a>
+            <a href="#pricing">Тарифы</a>
+            <a href="#reviews">Отзывы</a>
+            <a href="#faq">FAQ</a>
+        </nav>
+        <div class="header-actions">
+            <a href="#contact" class="btn btn-ghost">Демо бесплатно</a>
+            <a href="{{ admin_url }}" class="btn btn-primary">Войти в админку</a>
+        </div>
     </div>
 </header>
 
@@ -237,103 +796,539 @@
     <section class="hero">
         <div class="container hero-grid">
             <div>
-                <h1>CRM и мобильные приложения для фитнес-клубов</h1>
-                <p class="subtitle">
-                    Запускайте онлайн-запись, автоматизируйте продажи абонементов, контролируйте тренеров и филиалы,
-                    увеличивайте повторные покупки через приложение клиента.
+                <span class="badge-pill">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    14 дней демо. Без карты. Без обязательств
+                </span>
+                <h1>CRM, мобильное приложение и онлайн-запись для фитнес-клубов</h1>
+                <p class="lead">
+                    WorldCashFit — единая платформа: учёт клиентов и абонементов, продажи, оплата онлайн,
+                    приложение клиента и тренера, аналитика по выручке и загрузке. Запускайте за 1 день, экономьте на администраторах,
+                    увеличивайте повторные продажи.
                 </p>
                 <div class="hero-actions">
-                    <a href="{{ admin_url }}" class="btn btn-primary">Демо в админке</a>
-                    <a href="#pricing" class="btn btn-outline">Смотреть тарифы</a>
+                    <a href="#contact" class="btn btn-primary btn-lg">Попробовать 14 дней бесплатно</a>
+                    <a href="{{ admin_url }}" class="btn btn-ghost btn-lg">Войти в CRM</a>
                 </div>
-                <div class="kpi">
-                    <div class="kpi-item"><strong>24/7</strong><span>онлайн-запись и оплаты</span></div>
-                    <div class="kpi-item"><strong>+30%</strong><span>рост повторных продаж</span></div>
-                    <div class="kpi-item"><strong>1 система</strong><span>CRM + приложения + аналитика</span></div>
+                <div class="hero-stats">
+                    <div class="hero-stat"><strong>+30%</strong><span>повторных продаж</span></div>
+                    <div class="hero-stat"><strong>−4 ч</strong><span>работы администратора в день</span></div>
+                    <div class="hero-stat"><strong>24/7</strong><span>запись и онлайн-оплата</span></div>
                 </div>
             </div>
-            <aside class="hero-card">
-                <h3>Что уже входит в решение</h3>
-                <ul>
-                    <li>Учет клиентов, абонементов, посещений и оплат</li>
-                    <li>Приложение клиента: запись, покупка, push-уведомления</li>
-                    <li>Приложение тренера: расписание и список записанных</li>
-                    <li>CRM для администраторов и руководителей</li>
-                    <li>Аналитика по выручке, загрузке и удержанию</li>
-                </ul>
-            </aside>
+
+            <div class="hero-visual">
+                <div class="floating-card fc-1">
+                    <div class="fc-icon green">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+                    </div>
+                    <div>
+                        <strong>Оплата прошла</strong>
+                        <div style="color: var(--muted); font-size: 0.8rem">Абонемент «Фитнес 12 мес»</div>
+                    </div>
+                </div>
+
+                <div class="phone">
+                    <div class="phone-screen">
+                        <h4>Расписание клуба</h4>
+                        <div class="ph-row">
+                            <div>
+                                <div style="font-weight:700">Йога с Анной</div>
+                                <div style="color:var(--muted)">Сегодня, 18:30</div>
+                            </div>
+                            <span class="ph-tag">3 места</span>
+                        </div>
+                        <div class="ph-row">
+                            <div>
+                                <div style="font-weight:700">Силовая</div>
+                                <div style="color:var(--muted)">Сегодня, 20:00</div>
+                            </div>
+                            <span class="ph-tag">5 мест</span>
+                        </div>
+                        <div class="ph-row">
+                            <div>
+                                <div style="font-weight:700">Стретчинг</div>
+                                <div style="color:var(--muted)">Завтра, 09:00</div>
+                            </div>
+                            <span class="ph-tag">2 места</span>
+                        </div>
+                        <div class="ph-btn">Записаться</div>
+                        <div style="margin-top:0.9rem; font-size:0.7rem; color:var(--muted)">Абонемент: осталось 8 занятий</div>
+                    </div>
+                </div>
+
+                <div class="floating-card fc-2">
+                    <div class="fc-icon blue">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>
+                    </div>
+                    <div>
+                        <strong>Загрузка зала</strong>
+                        <div style="color: var(--muted); font-size: 0.8rem">87% — рекорд недели</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
-    <section>
+    <section class="trust">
         <div class="container">
-            <h2 class="section-title">Возможности платформы</h2>
-            <div class="grid-3">
-                <article class="card">
-                    <h4>CRM и автоматизация</h4>
-                    <p>Лиды, сделки, продажи, абонементы, история клиента и контроль персонала в одном интерфейсе.</p>
-                </article>
-                <article class="card">
-                    <h4>Мобильное приложение клиента</h4>
-                    <p>Онлайн-запись, оплаты, перенос тренировок, личный кабинет и уведомления о событиях клуба.</p>
-                </article>
-                <article class="card">
-                    <h4>Приложение тренера</h4>
-                    <p>Список записей, расписание и оперативные уведомления о любых изменениях по занятиям.</p>
-                </article>
-                <article class="card">
-                    <h4>Онлайн-платежи</h4>
-                    <p>Принимайте оплату в 2 клика и сокращайте нагрузку на администраторов и кассу.</p>
-                </article>
-                <article class="card">
-                    <h4>Маркетинг и удержание</h4>
-                    <p>Сегменты клиентов, рассылки, спецпредложения и автоматические напоминания перед тренировками.</p>
-                </article>
-                <article class="card">
-                    <h4>Аналитика руководителя</h4>
-                    <p>Выручка, посещаемость, конверсии и загрузка тренеров с разрезом по филиалам.</p>
-                </article>
+            <div class="trust-title">Нам доверяют фитнес-клубы и студии в 250+ городах</div>
+            <div class="trust-logos">
+                <div class="trust-logo">FITPRO</div>
+                <div class="trust-logo">YOGA365</div>
+                <div class="trust-logo">CROSSGYM</div>
+                <div class="trust-logo">DANCEHALL</div>
+                <div class="trust-logo">POWER ZONE</div>
+                <div class="trust-logo">FLEX&amp;GO</div>
             </div>
         </div>
     </section>
 
-    <section id="pricing">
+    <section class="block" id="industries">
         <div class="container">
-            <h2 class="section-title">Тарифы</h2>
+            <div class="section-head">
+                <h2>Подходит любой спортивной нише</h2>
+                <p>Запускайте автоматизацию в один день: фитнес-клубы, студии йоги, танцев, единоборств, бассейны и детские секции.</p>
+            </div>
+            <div class="industries">
+                <div class="industry">
+                    <div class="industry-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7h12M6 17h12M9 4v16M15 4v16"/></svg></div>
+                    <div><strong>Фитнес-клубы</strong><span>тренажерные залы</span></div>
+                </div>
+                <div class="industry">
+                    <div class="industry-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="6" r="3"/><path d="M12 9v6M9 22l3-7 3 7M6 12l6 3 6-3"/></svg></div>
+                    <div><strong>Йога-студии</strong><span>пилатес, стретчинг</span></div>
+                </div>
+                <div class="industry">
+                    <div class="industry-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12c4-7 14-7 18 0M3 12c4 7 14 7 18 0"/></svg></div>
+                    <div><strong>Танцевальные школы</strong><span>группы и индивидуально</span></div>
+                </div>
+                <div class="industry">
+                    <div class="industry-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg></div>
+                    <div><strong>Единоборства</strong><span>бокс, ММА, дзюдо</span></div>
+                </div>
+                <div class="industry">
+                    <div class="industry-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 18s4-2 10-2 10 2 10 2M2 14s4-2 10-2 10 2 10 2M2 10s4-2 10-2 10 2 10 2"/></svg></div>
+                    <div><strong>Бассейны</strong><span>сауны и SPA</span></div>
+                </div>
+                <div class="industry">
+                    <div class="industry-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></div>
+                    <div><strong>Кроссфит</strong><span>и функциональный тренинг</span></div>
+                </div>
+                <div class="industry">
+                    <div class="industry-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg></div>
+                    <div><strong>Детские секции</strong><span>спортивные школы</span></div>
+                </div>
+                <div class="industry">
+                    <div class="industry-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg></div>
+                    <div><strong>Сети и франшизы</strong><span>несколько филиалов</span></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="block" id="features">
+        <div class="container">
+            <div class="section-head">
+                <h2>Всё для управления клубом в одной системе</h2>
+                <p>Замените 5–7 разрозненных сервисов одной CRM. Настройка под ваш клуб — за 1 день.</p>
+            </div>
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg></div>
+                    <h3>Учётная система и CRM</h3>
+                    <p>Карточки клиентов, абонементы, посещения, продажи, лиды и сделки. История взаимодействий и сегменты.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></div>
+                    <h3>Приложение клиента</h3>
+                    <p>Запись на тренировку, оплата с карты, перенос и отмена записей, push-уведомления и личный кабинет.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V3H8v8M3 13h18v8H3z"/></svg></div>
+                    <h3>Приложение тренера</h3>
+                    <p>Расписание, список записанных, отметки прихода и push при изменениях — тренер сам планирует своё время.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
+                    <h3>Онлайн-оплата</h3>
+                    <p>Эквайринг по картам, рекуррентные платежи и фитнес по подписке. Чек-онлайн и фискализация.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 13l3-3 4 4 5-5"/></svg></div>
+                    <h3>Аналитика и отчёты</h3>
+                    <p>Выручка, конверсии, удержание, загрузка тренеров и залов с разрезом по филиалам и периодам.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+                    <h3>Расписание и онлайн-запись</h3>
+                    <p>Виджет для сайта и соцсетей, лимиты, листы ожидания, автоматические напоминания.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H7l-4 4V5a4 4 0 014-4h10a4 4 0 014 4z"/></svg></div>
+                    <h3>Маркетинг и рассылки</h3>
+                    <p>Push, SMS, email, мессенджеры. Сегменты, акции, промокоды и автоматические триггеры.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+                    <h3>Контроль доступа (СКУД)</h3>
+                    <p>Интеграция с турникетами PERCo и аналогами. Клуб без персонала и автоматический вход по абонементу.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 8L12 17l-6.5 4 2-8L2 9h7z"/></svg></div>
+                    <h3>Программа лояльности</h3>
+                    <p>Бонусы, реферальная программа, гостевые проходы, удержание клиентов и автокоммуникации.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="block" id="apps">
+        <div class="container">
+            <div class="section-head">
+                <h2>Мобильное приложение в ваших цветах</h2>
+                <p>Приложение клиента и тренера. iOS и Android. Брендирование под ваш клуб.</p>
+            </div>
+
+            <div class="apps">
+                <div class="apps-info">
+                    <h3>Для клиентов клуба</h3>
+                    <p style="color: var(--muted)">Главный канал коммуникации с вашими клиентами. Все процессы клуба — в их телефоне.</p>
+                    <ul>
+                        <li>Расписание и онлайн-запись в 2 клика</li>
+                        <li>Покупка и продление абонемента онлайн</li>
+                        <li>Личный кабинет: история, остатки, документы</li>
+                        <li>Push-уведомления о тренировках и акциях</li>
+                        <li>Программа лояльности и реферальная система</li>
+                    </ul>
+                    <a href="#contact" class="btn btn-primary">Запросить приложение клиента</a>
+                </div>
+                <div class="apps-mock">
+                    <div class="phone" style="transform: rotate(-3deg)">
+                        <div class="phone-screen">
+                            <h4>Личный кабинет</h4>
+                            <div class="ph-row" style="background: linear-gradient(135deg, rgba(90,140,255,0.25), rgba(33,212,161,0.18))">
+                                <div>
+                                    <div style="font-weight:700">Абонемент Премиум</div>
+                                    <div style="color:var(--muted)">Действует до 12.10</div>
+                                </div>
+                                <span class="ph-tag" style="background: rgba(255,181,71,0.2); color:#ffd394">Active</span>
+                            </div>
+                            <div class="ph-row">
+                                <div>
+                                    <div style="font-weight:700">Йога 18:30</div>
+                                    <div style="color:var(--muted)">Сегодня</div>
+                                </div>
+                                <span class="ph-tag">записан</span>
+                            </div>
+                            <div class="ph-row">
+                                <div>
+                                    <div style="font-weight:700">Стретчинг</div>
+                                    <div style="color:var(--muted)">Пт, 09:00</div>
+                                </div>
+                                <span class="ph-tag">записан</span>
+                            </div>
+                            <div class="ph-btn">Купить разовое</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="apps reverse" style="margin-top: 3rem">
+                <div class="apps-info">
+                    <h3>Для тренеров и руководителей</h3>
+                    <p style="color: var(--muted)">Тренер видит расписание и записи, руководитель — ключевые метрики клуба в реальном времени.</p>
+                    <ul>
+                        <li>Список записанных и отметка визита</li>
+                        <li>Push-уведомления о переносах и отменах</li>
+                        <li>Отчёты: выручка, посещения, лиды, конверсии</li>
+                        <li>Открытие двери из приложения (с СКУД)</li>
+                        <li>Управление сразу несколькими филиалами</li>
+                    </ul>
+                    <a href="#contact" class="btn btn-accent">Запросить приложение тренера</a>
+                </div>
+                <div class="apps-mock">
+                    <div class="phone" style="transform: rotate(3deg)">
+                        <div class="phone-screen">
+                            <h4>Сегодня в клубе</h4>
+                            <div class="ph-row">
+                                <div>
+                                    <div style="font-weight:700">Выручка</div>
+                                    <div style="color:var(--muted)">за день</div>
+                                </div>
+                                <span class="ph-tag" style="background: rgba(33,212,161,0.18); color:#6ce0bd">+24%</span>
+                            </div>
+                            <div class="ph-row">
+                                <div>
+                                    <div style="font-weight:700">Записей</div>
+                                    <div style="color:var(--muted)">98 / 120</div>
+                                </div>
+                                <span class="ph-tag">82%</span>
+                            </div>
+                            <div class="ph-row">
+                                <div>
+                                    <div style="font-weight:700">Новых лидов</div>
+                                    <div style="color:var(--muted)">сегодня</div>
+                                </div>
+                                <span class="ph-tag">14</span>
+                            </div>
+                            <div class="ph-btn">Открыть отчёт</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="block">
+        <div class="container">
+            <div class="numbers">
+                <div>
+                    <div class="num-value">4 000+</div>
+                    <small>клубов и студий</small>
+                </div>
+                <div>
+                    <div class="num-value">1 000 000+</div>
+                    <small>активных пользователей приложения</small>
+                </div>
+                <div>
+                    <div class="num-value">500 000+</div>
+                    <small>записей в месяц</small>
+                </div>
+                <div>
+                    <div class="num-value">30 000+</div>
+                    <small>онлайн-платежей в месяц</small>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="block" id="reviews">
+        <div class="container">
+            <div class="section-head">
+                <h2>Что говорят владельцы клубов</h2>
+                <p>Реальные истории от клубов, которые перешли с таблиц и админ-чатов на WorldCashFit.</p>
+            </div>
+            <div class="reviews">
+                <div class="review">
+                    <div class="review-text">
+                        «Раньше клиентская база жила в Excel и в голове админа. После запуска WorldCashFit прибыль выросла в 1,5–2 раза:
+                        мы видим источники лидов, понимаем какие услуги продаются, а какие нет.»
+                    </div>
+                    <div class="review-author">
+                        <div class="review-avatar">АО</div>
+                        <div>
+                            <strong>Алёна Ощепкова</strong>
+                            <span>сеть студий пластики</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="review">
+                    <div class="review-text">
+                        «Мы освободили около 4 часов работы администратора в день. Сэкономили целую зарплату на филиал и направили
+                        ресурс на коммуникацию и продажи. Это лучшая инвестиция за весь путь.»
+                    </div>
+                    <div class="review-author">
+                        <div class="review-avatar">ДГ</div>
+                        <div>
+                            <strong>Дмитрий Г.</strong>
+                            <span>сеть студий растяжки, 100+ локаций</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="review">
+                    <div class="review-text">
+                        «80% клиентов теперь записываются через виджет и приложение. Клиенты стали дисциплинированнее,
+                        нагрузка на ресепшн упала, а выручка растёт каждый месяц.»
+                    </div>
+                    <div class="review-author">
+                        <div class="review-avatar">АТ</div>
+                        <div>
+                            <strong>Анастасия Т.</strong>
+                            <span>фитнес-студия TESLA</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="block" id="pricing">
+        <div class="container">
+            <div class="section-head">
+                <h2>Прозрачные тарифы</h2>
+                <p>Платите за результат, а не за модули. Все тарифы — без ограничений на клиентов и записи.</p>
+            </div>
             <div class="pricing">
-                <article class="price-card">
-                    <h4>Старт</h4>
-                    <p class="price">от 2 900 ₽</p>
-                    <p>Для небольшой студии: CRM, онлайн-запись, базовая аналитика.</p>
-                </article>
-                <article class="price-card">
+                <div class="price-card">
+                    <div class="price-name">Старт</div>
+                    <div class="price-value">2 900 ₽<small>/мес</small></div>
+                    <div style="color: var(--muted); font-size: 0.9rem">Для небольшой студии</div>
+                    <ul class="price-list">
+                        <li>CRM и учётная система</li>
+                        <li>Онлайн-запись и виджет</li>
+                        <li>1 филиал, до 3 пользователей</li>
+                        <li>Базовая аналитика</li>
+                        <li>Поддержка в чате</li>
+                    </ul>
+                    <a href="#contact" class="btn btn-ghost">Начать бесплатно</a>
+                </div>
+                <div class="price-card featured">
                     <span class="badge">Популярный</span>
-                    <h4>Бизнес</h4>
-                    <p class="price">от 7 900 ₽</p>
-                    <p>Для растущего клуба: CRM, приложения, онлайн-оплата, автоматизация продаж.</p>
-                </article>
-                <article class="price-card">
-                    <h4>Сеть</h4>
-                    <p class="price">Индивидуально</p>
-                    <p>Для сетей и франшиз: мультифилиальность, роли, расширенные интеграции и SLA.</p>
-                </article>
+                    <div class="price-name">Бизнес</div>
+                    <div class="price-value">7 900 ₽<small>/мес</small></div>
+                    <div style="color: var(--muted); font-size: 0.9rem">Для растущего клуба</div>
+                    <ul class="price-list">
+                        <li>Всё из Старт</li>
+                        <li>Приложение клиента и тренера</li>
+                        <li>Онлайн-оплата и эквайринг</li>
+                        <li>До 2 филиалов, 10 пользователей</li>
+                        <li>Маркетинг и рассылки</li>
+                        <li>Приоритетная поддержка</li>
+                    </ul>
+                    <a href="#contact" class="btn btn-primary">Подключить Бизнес</a>
+                </div>
+                <div class="price-card">
+                    <div class="price-name">Сеть</div>
+                    <div class="price-value">Индивидуально</div>
+                    <div style="color: var(--muted); font-size: 0.9rem">Для сетей и франшиз</div>
+                    <ul class="price-list">
+                        <li>Всё из Бизнес</li>
+                        <li>Неограниченно филиалов</li>
+                        <li>Брендированное приложение</li>
+                        <li>Интеграция СКУД и оборудования</li>
+                        <li>SLA, выделенный менеджер</li>
+                    </ul>
+                    <a href="#contact" class="btn btn-accent">Получить расчёт</a>
+                </div>
             </div>
         </div>
     </section>
 
-    <section>
-        <div class="container cta">
-            <h2>Готовы запустить продажи и запись онлайн?</h2>
-            <p>Откройте CRM и начните настройку клуба прямо сейчас.</p>
-            <a href="{{ admin_url }}" class="btn btn-primary">Перейти в админку</a>
+    <section class="block" id="faq">
+        <div class="container">
+            <div class="section-head">
+                <h2>Часто задаваемые вопросы</h2>
+                <p>Если не нашли ответ — напишите нам, ответим в течение часа.</p>
+            </div>
+            <div class="faq">
+                <details class="q">
+                    <summary>Как быстро мы запустимся?</summary>
+                    <p>Базовая настройка занимает 1 день: импорт клиентов, расписание, тренеры, абонементы. Полное внедрение с приложением и онлайн-оплатой — обычно 3–7 дней.</p>
+                </details>
+                <details class="q">
+                    <summary>Можно перенести данные из текущей системы?</summary>
+                    <p>Да. Поддерживается импорт из Excel/CSV. Также есть готовые сценарии переноса с популярных CRM и из старых SQLite-баз.</p>
+                </details>
+                <details class="q">
+                    <summary>Подойдёт для небольшой студии?</summary>
+                    <p>Да, тариф «Старт» закрывает все базовые задачи студии йоги, танцев или растяжки и стоит как одно занятие в месяц.</p>
+                </details>
+                <details class="q">
+                    <summary>Есть ли мобильное приложение под наш бренд?</summary>
+                    <p>Да. Делаем брендированное приложение клиента в App Store и Google Play с вашим логотипом, цветами и иконкой.</p>
+                </details>
+                <details class="q">
+                    <summary>Принимаете ли онлайн-оплату?</summary>
+                    <p>Да. Поддерживаем эквайринг крупных банков, рекуррентные платежи (фитнес по подписке), фискализацию через онлайн-кассы.</p>
+                </details>
+                <details class="q">
+                    <summary>Что с интеграцией турникетов?</summary>
+                    <p>Поддерживаются турникеты PERCo и аналоги. Можно открывать дверь по приложению клиента или автоматически по активному абонементу.</p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <section class="block" id="contact">
+        <div class="container">
+            <div class="cta-block">
+                <h2>Получите 14 дней WorldCashFit бесплатно</h2>
+                <p>Заполните форму — менеджер свяжется в течение часа, настроит демо и поможет с первыми шагами.</p>
+                <div class="form-card" style="text-align: left; max-width: 720px; margin: 0 auto">
+                    <form action="#" method="post" onsubmit="event.preventDefault(); alert('Спасибо! Мы свяжемся с вами в ближайшее время.');">
+                        <div class="form-grid">
+                            <div class="field">
+                                <label>Имя</label>
+                                <input type="text" name="name" placeholder="Как к вам обращаться" required>
+                            </div>
+                            <div class="field">
+                                <label>Телефон</label>
+                                <input type="tel" name="phone" placeholder="+7 (___) ___-__-__" required>
+                            </div>
+                            <div class="field">
+                                <label>Email</label>
+                                <input type="email" name="email" placeholder="you@club.ru" required>
+                            </div>
+                            <div class="field">
+                                <label>Тип бизнеса</label>
+                                <select name="biz">
+                                    <option>Фитнес-клуб</option>
+                                    <option>Студия йоги / пилатеса</option>
+                                    <option>Танцевальная школа</option>
+                                    <option>Школа единоборств</option>
+                                    <option>Кроссфит</option>
+                                    <option>Бассейн / SPA</option>
+                                    <option>Детская секция</option>
+                                    <option>Другое</option>
+                                </select>
+                            </div>
+                            <div class="field full">
+                                <label>Комментарий</label>
+                                <textarea name="comment" rows="3" placeholder="Расскажите кратко о вашем клубе"></textarea>
+                            </div>
+                            <div class="full" style="display:flex; gap:0.7rem; flex-wrap:wrap; align-items:center; justify-content:space-between">
+                                <small style="color: var(--muted)">Нажимая кнопку, вы соглашаетесь с обработкой персональных данных</small>
+                                <button type="submit" class="btn btn-primary btn-lg">Получить демо-доступ</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="cta-actions" style="margin-top: 1.4rem">
+                    <a href="{{ admin_url }}" class="btn btn-ghost">Уже есть аккаунт — войти в админку</a>
+                </div>
+            </div>
         </div>
     </section>
 </main>
 
-<footer>
+<footer class="foot">
     <div class="container">
-        WorldCashFit, 2026. CRM для фитнес-клубов и спортивных студий.
+        <div class="foot-grid">
+            <div>
+                <div class="logo" style="margin-bottom: 0.8rem">
+                    <span class="logo-mark">W</span>
+                    <span>WorldCashFit</span>
+                </div>
+                <p style="font-size: 0.92rem">CRM, мобильные приложения и онлайн-запись для фитнес-клубов и спортивных студий. Запускайтесь за 1 день и зарабатывайте больше.</p>
+            </div>
+            <div>
+                <h5>Продукт</h5>
+                <a href="#features">Возможности</a>
+                <a href="#apps">Приложение клиента</a>
+                <a href="#apps">Приложение тренера</a>
+                <a href="#pricing">Тарифы</a>
+            </div>
+            <div>
+                <h5>Компания</h5>
+                <a href="#reviews">Отзывы</a>
+                <a href="#faq">FAQ</a>
+                <a href="#contact">Контакты</a>
+                <a href="{{ admin_url }}">Войти в админку</a>
+            </div>
+            <div>
+                <h5>Контакты</h5>
+                <a href="tel:+74959890000">+7 (495) 989-00-00</a>
+                <a href="mailto:hello@worldcashfit.ru">hello@worldcashfit.ru</a>
+                <span style="display:block; padding-top:0.4rem; color:var(--muted); font-size:0.9rem">Поддержка 9:00 – 21:00 МСК</span>
+            </div>
+        </div>
+        <div class="foot-bottom">
+            <span>© 2026 WorldCashFit. Все права защищены.</span>
+            <span>Политика конфиденциальности · Договор-оферта</span>
+        </div>
     </div>
 </footer>
+
 </body>
 </html>
