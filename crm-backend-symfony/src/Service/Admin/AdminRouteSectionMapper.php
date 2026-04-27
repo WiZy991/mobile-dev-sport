@@ -69,6 +69,11 @@ final class AdminRouteSectionMapper
         'admin_crm_staff_index' => 'crm_staff',
         'admin_crm_staff_new' => 'crm_staff',
         'admin_crm_staff_edit' => 'crm_staff',
+        'admin_franchise_list' => 'franchise',
+        'admin_franchise_edit' => 'franchise',
+        'admin_franchise_save' => 'franchise',
+        'admin_franchise_regenerate_token' => 'franchise',
+        'admin_franchise_open_door' => 'franchise',
     ];
 
     public function resolveSection(Request $request): ?string

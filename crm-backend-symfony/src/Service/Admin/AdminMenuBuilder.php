@@ -35,6 +35,7 @@ final class AdminMenuBuilder
         'app_support' => 'Обращения из приложения',
         'trainers' => 'Тренеры',
         'crm_staff' => 'Персонал CRM',
+        'franchise' => 'Франшиза',
         'documents' => 'Документы',
         'promocodes' => 'Промокоды',
         'promotions' => 'Акции',
@@ -137,6 +138,9 @@ final class AdminMenuBuilder
             if ($key === 'crm_staff' && !array_intersect($user->getRoles(), ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
                 continue;
             }
+            if ($key === 'franchise' && !array_intersect($user->getRoles(), ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
+                continue;
+            }
             $menu[$key] = $label;
         }
 
@@ -178,6 +182,9 @@ final class AdminMenuBuilder
         }
         $roles = $user->getRoles();
         if ($section === 'crm_staff' && !array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
+            return false;
+        }
+        if ($section === 'franchise' && !array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
             return false;
         }
         if (array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {

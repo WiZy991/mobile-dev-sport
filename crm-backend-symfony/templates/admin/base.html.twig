@@ -78,7 +78,7 @@
         {% endif %}
         <div class="menu-section-title">Навигация</div>
         {% for key, label in menu %}
-            <a href="{% if key == 'dashboard' %}{{ path('admin_dashboard') }}{% elseif key == 'crm_staff' %}{{ path('admin_crm_staff_index') }}{% else %}{{ path('admin_section', {section: key}) }}{% endif %}"
+            <a href="{% if key == 'dashboard' %}{{ path('admin_dashboard') }}{% elseif key == 'crm_staff' %}{{ path('admin_crm_staff_index') }}{% elseif key == 'franchise' %}{{ path('admin_franchise_list') }}{% else %}{{ path('admin_section', {section: key}) }}{% endif %}"
                class="menu-item {{ current == key ? 'active' : '' }}">
                 {{ label }}
             </a>

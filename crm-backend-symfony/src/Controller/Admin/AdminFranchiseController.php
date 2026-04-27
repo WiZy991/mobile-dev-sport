@@ -9,13 +9,14 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
 
 /**
  * Управление франшизой клубов: per-club настройки PERCo, токен ПК-шлюза,
  * статус «онлайн», постановка команд (например, открыть дверь).
+ *
+ * Маршруты объявлены в config/routes/admin.yaml выше catch-all admin_section,
+ * поэтому атрибутные #[Route] здесь не используются (иначе будет дубликат имени).
  */
-#[Route('/admin/franchise')]
 class AdminFranchiseController extends AbstractController
 {
     /** Считаем шлюз «онлайн», если heartbeat был не позже этого числа секунд назад. */
@@ -27,7 +28,6 @@ class AdminFranchiseController extends AbstractController
     ) {
     }
 
-    #[Route('', name: 'admin_franchise_list', methods: ['GET'])]
     public function list(): Response
     {
         $clubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
@@ -47,12 +47,11 @@ class AdminFranchiseController extends AbstractController
 
         return $this->render('admin/franchise/list.html.twig', [
             'menu' => $this->adminMenuBuilder->buildFor($this->getUser()),
-            'current' => 'settings',
+            'current' => 'franchise',
             'rows' => $rows,
         ]);
     }
 
-    #[Route('/{id}', name: 'admin_franchise_edit', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function edit(int $id): Response
     {
         $club = $this->findClubOrFail($id);
@@ -68,14 +67,13 @@ class AdminFranchiseController extends AbstractController
 
         return $this->render('admin/franchise/edit.html.twig', [
             'menu' => $this->adminMenuBuilder->buildFor($this->getUser()),
-            'current' => 'settings',
+            'current' => 'franchise',
             'club' => $club,
             'online' => $this->isOnline($club, new \DateTimeImmutable()),
             'recent_commands' => $recentCommands,
         ]);
     }
 
-    #[Route('/{id}/save', name: 'admin_franchise_save', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function save(int $id, Request $request): Response
     {
         $club = $this->findClubOrFail($id);
@@ -105,7 +103,6 @@ class AdminFranchiseController extends AbstractController
         return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
     }
 
-    #[Route('/{id}/regenerate-token', name: 'admin_franchise_regenerate_token', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function regenerateToken(int $id): Response
     {
         $club = $this->findClubOrFail($id);
@@ -117,7 +114,6 @@ class AdminFranchiseController extends AbstractController
         return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
     }
 
-    #[Route('/{id}/open-door', name: 'admin_franchise_open_door', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function openDoor(int $id, Request $request): Response
     {
         $club = $this->findClubOrFail($id);
