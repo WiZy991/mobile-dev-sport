@@ -6,6 +6,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'access_logs')]
+#[ORM\Index(name: 'idx_access_logs_created_at', columns: ['created_at'])]
+#[ORM\Index(name: 'idx_access_logs_user_event_created', columns: ['user_id', 'event_type', 'created_at'])]
+#[ORM\Index(name: 'idx_access_logs_club_created', columns: ['club_id', 'created_at'])]
 class AccessLog
 {
     #[ORM\Id]
@@ -16,6 +19,11 @@ class AccessLog
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: true)]
     private ?User $user = null;
+
+    /** Клуб, в котором произошёл проход. Для франшизы — обязателен; для legacy эндпоинта — может быть null. */
+    #[ORM\ManyToOne(targetEntity: Club::class)]
+    #[ORM\JoinColumn(name: 'club_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?Club $club = null;
 
     #[ORM\Column(type: 'string', length: 255)]
     private string $rawData;
@@ -53,6 +61,17 @@ class AccessLog
     public function setUser(?User $user): self
     {
         $this->user = $user;
+        return $this;
+    }
+
+    public function getClub(): ?Club
+    {
+        return $this->club;
+    }
+
+    public function setClub(?Club $club): self
+    {
+        $this->club = $club;
         return $this;
     }
 

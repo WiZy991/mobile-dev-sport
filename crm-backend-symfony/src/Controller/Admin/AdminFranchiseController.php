@@ -5,6 +5,7 @@ namespace App\Controller\Admin;
 use App\Entity\Club;
 use App\Entity\GatewayCommand;
 use App\Service\Admin\AdminMenuBuilder;
+use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,6 +26,7 @@ class AdminFranchiseController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly AdminMenuBuilder $adminMenuBuilder,
+        private readonly OccupancyService $occupancy,
     ) {
     }
 
@@ -42,6 +44,7 @@ class AdminFranchiseController extends AbstractController
                 'has_token' => (bool) $club->getGatewayToken(),
                 'has_perco' => (bool) ($club->getPercoBaseUrl() && $club->getPercoLogin() && $club->getPercoPassword()),
                 'pending' => $this->countPendingCommands($club),
+                'inside' => $this->occupancy->countCurrentlyInside($club),
             ];
         }
 
@@ -71,6 +74,8 @@ class AdminFranchiseController extends AbstractController
             'club' => $club,
             'online' => $this->isOnline($club, new \DateTimeImmutable()),
             'recent_commands' => $recentCommands,
+            'inside' => $this->occupancy->countCurrentlyInside($club),
+            'inside_list' => $this->occupancy->listCurrentlyInside($club, 100),
         ]);
     }
 

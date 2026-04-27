@@ -123,6 +123,24 @@
             {% endif %}
         </div>
         <div class="col-6 col-md-2">
+            {% if menu.visits is defined %}
+            <a href="{{ path('admin_section', {section: 'visits'}) }}" class="text-decoration-none text-reset">
+            {% endif %}
+                <div class="content-card h-100" {% if menu.visits is defined %}style="cursor: pointer;"{% endif %}>
+                    <div class="text-secondary small mb-1">Сейчас в зале</div>
+                    <div class="h4 mb-0">
+                        {% if stats.currentlyInside|default(0) > 0 %}
+                            <span class="text-success">{{ stats.currentlyInside }}</span>
+                        {% else %}
+                            <span class="text-secondary">0</span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% if menu.visits is defined %}
+            </a>
+            {% endif %}
+        </div>
+        <div class="col-6 col-md-2">
             {% if menu.cashdesk is defined %}
             <a href="{{ path('admin_section', {section: 'cashdesk'}) }}?date={{ "now"|date("Y-m-d") }}" class="text-decoration-none text-reset">
             {% endif %}

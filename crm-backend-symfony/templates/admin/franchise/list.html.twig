@@ -27,6 +27,7 @@
                         <th>Адрес</th>
                         <th>Шлюз</th>
                         <th>PERCo</th>
+                        <th>В зале</th>
                         <th>Очередь</th>
                         <th></th>
                     </tr>
@@ -52,6 +53,13 @@
                                 <span class="badge bg-info">настроен</span>
                             {% else %}
                                 <span class="badge bg-secondary">не задан</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.inside > 0 %}
+                                <span class="badge bg-success">{{ r.inside }} чел.</span>
+                            {% else %}
+                                <span class="text-secondary">—</span>
                             {% endif %}
                         </td>
                         <td>

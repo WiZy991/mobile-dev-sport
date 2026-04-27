@@ -58,7 +58,8 @@ class GatewayController extends AbstractController
             ->setRawData($qr)
             ->setDeviceId($deviceId)
             ->setEventType('entry')
-            ->setResult('denied');
+            ->setResult('denied')
+            ->setClub($club);
 
         $parts = explode(':', $qr);
         if (count($parts) < 4 || $parts[0] !== 'FITNESSCLUB') {
@@ -282,7 +283,7 @@ class GatewayController extends AbstractController
         }
 
         $owner = $guestPass->getOwner();
-        $log->setUser($owner)->setResult('granted')->setReason('ok');
+        $log->setUser($owner)->setResult('granted')->setReason('ok')->setClub($club);
 
         $guestPass->setStatus(GuestPass::STATUS_USED)
             ->setUsedAt(new \DateTimeImmutable());

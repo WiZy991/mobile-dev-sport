@@ -27,6 +27,7 @@ use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
 use App\Service\Integration\PercoWebClient;
+use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -45,6 +46,7 @@ class AdminController extends AbstractController
         private readonly AdminMenuBuilder $adminMenuBuilder,
         private readonly PercoWebClient $percoWebClient,
         private readonly ClientImportService $clientImportService,
+        private readonly OccupancyService $occupancy,
     ) {}
 
     private function buildMenu(): array
@@ -215,6 +217,7 @@ class AdminController extends AbstractController
                 'leads' => $leadsCount,
                 'trainingsToday' => $trainingsToday,
                 'visitsToday' => $visitsToday,
+                'currentlyInside' => $this->occupancy->countCurrentlyInside(),
                 'revenueToday' => $revenueToday,
                 'revenueMonth' => $revenueMonth,
             ],
@@ -521,6 +524,7 @@ class AdminController extends AbstractController
             'activities' => $activities,
             'allTags' => $allTags,
             'allClubs' => $allClubs,
+            'isCurrentlyInside' => $this->occupancy->isUserCurrentlyInside($client),
         ]);
     }
 
@@ -2083,6 +2087,8 @@ class AdminController extends AbstractController
                 'visits' => $accessLogs,
                 'dateFrom' => $dateFrom->format('Y-m-d'),
                 'dateTo' => $dateToRaw,
+                'currentlyInside' => $this->occupancy->countCurrentlyInside(),
+                'currentlyInsideList' => $this->occupancy->listCurrentlyInside(null, 100),
             ]);
         }
 

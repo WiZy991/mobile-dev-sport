@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\AccessLog;
+use App\Entity\Club;
 use App\Entity\GuestPass;
 use App\Entity\Subscription;
 use App\Entity\User;
@@ -37,7 +38,8 @@ class AccessController extends AbstractController
         $log = new AccessLog();
         $log->setRawData($qr)
             ->setDeviceId($deviceId)
-            ->setResult('denied');
+            ->setResult('denied')
+            ->setClub($this->resolveDefaultClub());
 
         $response = [
             'access_granted' => false,
@@ -191,7 +193,8 @@ class AccessController extends AbstractController
             ->setDeviceId($deviceId)
             ->setEventType('exit')
             ->setResult('granted')
-            ->setReason('ok');
+            ->setReason('ok')
+            ->setClub($this->resolveDefaultClub());
 
         $parts = explode(':', $qr);
         if (count($parts) >= 3 && $parts[0] === 'FITNESSCLUB' && $parts[1] === 'ENTRY') {
@@ -252,6 +255,23 @@ class AccessController extends AbstractController
             ],
             $percoUnlock,
         ));
+    }
+
+    /**
+     * Для legacy-эндпоинта /api/v1/access/entry клуб не передаётся явно.
+     * Если в системе ровно один клуб — берём его (типичный single-tenant).
+     * В мульти-клубной франшизе клиенты должны идти через /api/v1/gateway/access/entry,
+     * где клуб определяется по Bearer-токену шлюза.
+     */
+    private function resolveDefaultClub(): ?Club
+    {
+        $repo = $this->em->getRepository(Club::class);
+        if ((int) $repo->count([]) !== 1) {
+            return null;
+        }
+        $clubs = $repo->findBy([], null, 1);
+
+        return $clubs[0] ?? null;
     }
 
     private function requireAccessGate(Request $request): ?JsonResponse

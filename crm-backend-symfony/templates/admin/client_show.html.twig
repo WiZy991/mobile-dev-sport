@@ -199,7 +199,13 @@
                 <div class="text-primary small fw-semibold mb-2 text-uppercase">В приложении</div>
                 <div class="mb-1"><strong>Активных абонементов:</strong> {{ activeSubsCount|default(0) }}</div>
                 <div class="mb-1"><strong>Броней:</strong> {{ bookings|length }}</div>
-                <div class="mb-1"><strong>Последний вход (QR):</strong> {{ lastAccess ? lastAccess.createdAt|date('d.m.Y H:i') : '—' }}</div>
+                <div class="mb-1">
+                    <strong>Последний вход (QR):</strong>
+                    {{ lastAccess ? lastAccess.createdAt|date('d.m.Y H:i') : '—' }}
+                    {% if isCurrentlyInside|default(false) %}
+                        <span class="badge bg-success ms-1">сейчас в зале</span>
+                    {% endif %}
+                </div>
                 <div class="mb-1"><strong>Push-уведомления:</strong> {{ pushTokenCount > 0 ? 'подписка есть' : 'нет' }}</div>
                 <p class="text-secondary small mb-0 mt-1">Что видит клиент в мобильном приложении</p>
             </div>
