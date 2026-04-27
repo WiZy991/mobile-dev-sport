@@ -75,7 +75,11 @@ class MockInterceptor : Interceptor {
             // Feedback
             path.endsWith("/feedback") && method == "POST" -> """{"success": true, "id": "feedback-1"}"""
 
+<<<<<<< HEAD
             path.endsWith("/support/tickets") && method == "POST" -> """{"success": true, "id": 1}"""
+=======
+            path.endsWith("/support/tickets") && method == "POST" -> """{"success": true, "id": "42"}"""
+>>>>>>> a188090 (update)
             
             // Guest passes
             path.endsWith("/guest-passes") && method == "POST" -> mockGuestPassCreateResponse()

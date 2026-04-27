@@ -124,9 +124,15 @@ interface FitnessApi {
     @POST("feedback")
     suspend fun submitFeedback(@Body request: FeedbackRequest): Response<FeedbackResponse>
 
+<<<<<<< HEAD
     /** Обращение в поддержку клуба (попадает в CRM). */
     @POST("support/tickets")
     suspend fun createSupportTicket(@Body request: SupportTicketRequest): Response<SupportTicketCreateResponse>
+=======
+    /** Обращение в поддержку (попадает в CRM → «Обращения из приложения»). */
+    @POST("support/tickets")
+    suspend fun createSupportTicket(@Body request: SupportTicketRequest): Response<SupportTicketResponse>
+>>>>>>> a188090 (update)
     
     // Guest passes
     @GET("guest-passes")
@@ -305,6 +311,7 @@ data class FeedbackResponse(
 data class SupportTicketRequest(
     val subject: String,
     val message: String,
+<<<<<<< HEAD
     val category: String,
     @com.google.gson.annotations.SerializedName("contact_email")
     val contactEmail: String? = null,
@@ -312,6 +319,16 @@ data class SupportTicketRequest(
 
 data class SupportTicketCreateResponse(
     val success: Boolean = true,
+=======
+    val category: String = "other",
+    @com.google.gson.annotations.SerializedName("contact_email")
+    val contactEmail: String? = null
+)
+
+data class SupportTicketResponse(
+    val success: Boolean = true,
+    val id: String = ""
+>>>>>>> a188090 (update)
 )
 
 data class ApiNotification(
