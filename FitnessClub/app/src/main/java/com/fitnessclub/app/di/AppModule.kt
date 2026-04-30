@@ -1,5 +1,6 @@
 package com.fitnessclub.app.di
 
+import android.util.Log
 import android.content.Context
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.local.TokenManager
@@ -23,8 +24,9 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
     
-    // 10.0.2.2 = localhost на эмуляторе; для реального устройства укажите IP вашего ПК (например 192.168.1.x)
-    private const val BASE_URL = "http://192.168.0.62:8000/api/v1/"
+    // Прод: порт 80 (на VPS Docker маппит 80->8000 внутри контейнера; снаружи :8000 не слушается).
+    // Локально с compose «ports: 8000:8000» — временно поставьте http://10.0.2.2:8000/api/v1/ (эмулятор).
+    private const val BASE_URL = "http://worldcashfit.ru/api/v1/"
     
     @Provides
     @Singleton
@@ -42,7 +44,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(tokenManager: TokenManager): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
+        // Явный тег FC_HTTP — в Logcat ищите по нему; уровень Verbose, иначе строки OkHttp легко «теряются».
+        val loggingInterceptor = HttpLoggingInterceptor { message -> Log.d("FC_HTTP", message) }.apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
         

@@ -4,25 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.api.SupportTicketRequest
-<<<<<<< HEAD
 import com.fitnessclub.app.data.local.TokenManager
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
-=======
->>>>>>> a188090 (update)
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-<<<<<<< HEAD
 import kotlinx.coroutines.flow.first
-=======
->>>>>>> a188090 (update)
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-<<<<<<< HEAD
 private data class ApiErrorJson(
     @SerializedName("error") val error: String? = null,
 )
@@ -53,29 +46,18 @@ data class HelpUiState(
     val isSubmitting: Boolean = false,
     val successMessage: String? = null,
     val errorMessage: String? = null,
-=======
-data class HelpUiState(
-    val isSending: Boolean = false,
-    val sendError: String? = null,
-    val sendSuccess: Boolean = false
->>>>>>> a188090 (update)
 )
 
 @HiltViewModel
 class HelpViewModel @Inject constructor(
-<<<<<<< HEAD
     private val api: FitnessApi,
     private val tokenManager: TokenManager,
     private val gson: Gson,
-=======
-    private val api: FitnessApi
->>>>>>> a188090 (update)
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HelpUiState())
     val uiState: StateFlow<HelpUiState> = _uiState.asStateFlow()
 
-<<<<<<< HEAD
     init {
         viewModelScope.launch {
             val user = tokenManager.getUser().first()
@@ -174,48 +156,6 @@ class HelpViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(isSubmitting = false, errorMessage = e.message ?: "Ошибка сети")
                 }
-=======
-    fun consumeSuccess() {
-        _uiState.update { it.copy(sendSuccess = false) }
-    }
-
-    fun clearError() {
-        _uiState.update { it.copy(sendError = null) }
-    }
-
-    fun submitSupportTicket(
-        subject: String,
-        message: String,
-        category: String,
-        contactEmail: String?,
-        onDone: () -> Unit,
-        onFail: (String) -> Unit
-    ) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSending = true, sendError = null, sendSuccess = false) }
-            try {
-                val res = api.createSupportTicket(
-                    SupportTicketRequest(
-                        subject = subject.trim(),
-                        message = message.trim(),
-                        category = category,
-                        contactEmail = contactEmail?.trim()?.takeIf { it.isNotEmpty() }
-                    )
-                )
-                if (res.isSuccessful && res.body()?.success == true) {
-                    _uiState.update { it.copy(isSending = false, sendSuccess = true) }
-                    onDone()
-                } else {
-                    val err = res.errorBody()?.string()?.takeIf { it.isNotBlank() }
-                        ?: "Не удалось отправить (${res.code()})"
-                    _uiState.update { it.copy(isSending = false, sendError = err) }
-                    onFail(err)
-                }
-            } catch (e: Exception) {
-                val msg = e.message ?: "Ошибка сети"
-                _uiState.update { it.copy(isSending = false, sendError = msg) }
-                onFail(msg)
->>>>>>> a188090 (update)
             }
         }
     }

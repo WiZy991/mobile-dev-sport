@@ -68,6 +68,10 @@ class GatewayConfig:
     heartbeat_interval: float = 30.0
     poll_timeout_seconds: float = 35.0
     long_poll_backoff_seconds: float = 5.0
+    perco_events_enabled: bool = True
+    perco_events_poll_interval: float = 1.0
+    perco_events_page_size: int = 50
+    perco_only_fitnessclub_qr: bool = True
     cmd_defaults: dict[str, int] = field(default_factory=lambda: {
         "cmd_number": 1, "cmd_type": 1, "cmd_value": 1, "cmd_param": 0,
     })
@@ -122,6 +126,10 @@ class GatewayConfig:
             heartbeat_interval=float(get("crm", "heartbeat_interval") or "30"),
             poll_timeout_seconds=float(get("crm", "poll_timeout_seconds") or "35"),
             long_poll_backoff_seconds=float(get("crm", "long_poll_backoff_seconds") or "5"),
+            perco_events_enabled=_bool(get("perco", "events_enabled"), True),
+            perco_events_poll_interval=float(get("perco", "events_poll_interval") or "1"),
+            perco_events_page_size=max(1, int(get("perco", "events_page_size") or "50")),
+            perco_only_fitnessclub_qr=_bool(get("perco", "only_fitnessclub_qr"), True),
             cmd_defaults={
                 "cmd_number": _int(get("perco", "cmd_number")) or 1,
                 "cmd_type": _int(get("perco", "cmd_type")) or 1,
@@ -245,6 +253,8 @@ class GatewayDaemon:
         self.perco = _build_perco(cfg)
         self._stop = threading.Event()
         self._read_stdin = read_stdin
+        self._perco_seen_uids: set[str] = set()
+        self._perco_last_numeric_id: Optional[int] = None
 
     def stop(self, *_a: Any) -> None:
         if not self._stop.is_set():
@@ -258,6 +268,8 @@ class GatewayDaemon:
             threading.Thread(target=self._loop_heartbeat, name="heartbeat", daemon=True),
             threading.Thread(target=self._loop_commands, name="commands", daemon=True),
         ]
+        if self.perco is not None and self.cfg.perco_events_enabled:
+            threads.append(threading.Thread(target=self._loop_perco_events, name="perco-events", daemon=True))
         if self._read_stdin and sys.stdin and sys.stdin.isatty() is False:
             # Если stdin — пайп (считыватель), запускаем поток чтения строк QR.
             threads.append(threading.Thread(target=self._loop_stdin_qr, name="stdin", daemon=True))
@@ -278,6 +290,7 @@ class GatewayDaemon:
                 code, body = self.crm.heartbeat({
                     "version": "1.0",
                     "perco_status": "configured" if self.cfg.perco_configured() else "missing",
+                    "perco_events": "enabled" if (self.perco is not None and self.cfg.perco_events_enabled) else "disabled",
                 })
                 if code != 200:
                     LOG.warning("heartbeat HTTP %s: %s", code, body)
@@ -316,6 +329,137 @@ class GatewayDaemon:
             if not cmds:
                 # Сервер сам выдержал паузу до 25c; короткая страховка от штормов.
                 self._stop.wait(0.2)
+
+    # perco events -----------------------------------------------------------
+
+    def _loop_perco_events(self) -> None:
+        if self.perco is None:
+            return
+
+        LOG.info(
+            "PERCo events poller включен: interval=%ss, page_size=%s, only_fitnessclub_qr=%s",
+            self.cfg.perco_events_poll_interval,
+            self.cfg.perco_events_page_size,
+            self.cfg.perco_only_fitnessclub_qr,
+        )
+        while not self._stop.is_set():
+            try:
+                params: dict[str, Any] = {"limit": self.cfg.perco_events_page_size}
+                if self._perco_last_numeric_id is not None:
+                    params["fromId"] = self._perco_last_numeric_id
+                payload = self.perco.events_identifications(**params)
+                events = self._normalize_perco_events(payload)
+                processed = self._consume_perco_events(events)
+                if processed == 0:
+                    self._stop.wait(self.cfg.perco_events_poll_interval)
+            except PercoApiError as e:
+                LOG.warning("PERCo events API error: %s", e)
+                self._stop.wait(max(2.0, self.cfg.perco_events_poll_interval))
+            except Exception as e:
+                LOG.warning("PERCo events poll unexpected: %s", e)
+                self._stop.wait(max(2.0, self.cfg.perco_events_poll_interval))
+
+    def _normalize_perco_events(self, payload: Any) -> list[dict[str, Any]]:
+        if isinstance(payload, list):
+            return [x for x in payload if isinstance(x, dict)]
+        if not isinstance(payload, dict):
+            return []
+
+        for key in ("items", "rows", "events", "data", "result"):
+            node = payload.get(key)
+            if isinstance(node, list):
+                return [x for x in node if isinstance(x, dict)]
+        return []
+
+    def _consume_perco_events(self, events: list[dict[str, Any]]) -> int:
+        processed = 0
+        for event in events:
+            uid = self._event_uid(event)
+            if uid in self._perco_seen_uids:
+                continue
+
+            self._perco_seen_uids.add(uid)
+            if len(self._perco_seen_uids) > 5000:
+                self._perco_seen_uids = set(list(self._perco_seen_uids)[-2000:])
+
+            ev_id = self._event_numeric_id(event)
+            if ev_id is not None and (self._perco_last_numeric_id is None or ev_id > self._perco_last_numeric_id):
+                self._perco_last_numeric_id = ev_id
+
+            qr = self._extract_qr_from_perco_event(event)
+            if not qr:
+                continue
+            if self.cfg.perco_only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
+                LOG.debug("PERCo event пропущен: идентификатор не FITNESSCLUB (%s)", qr[:48])
+                continue
+
+            LOG.info("PERCo event → QR найден: %s", qr[:96])
+            self.handle_qr(qr)
+            processed += 1
+        return processed
+
+    def _event_numeric_id(self, event: dict[str, Any]) -> Optional[int]:
+        for key in ("id", "eventId", "event_id"):
+            value = event.get(key)
+            try:
+                if value is not None:
+                    return int(value)
+            except (ValueError, TypeError):
+                continue
+        return None
+
+    def _event_uid(self, event: dict[str, Any]) -> str:
+        for key in ("id", "eventId", "event_id", "guid", "uuid"):
+            value = event.get(key)
+            if value is not None and str(value).strip() != "":
+                return f"{key}:{value}"
+
+        stamp = event.get("createdAt") or event.get("created_at") or event.get("time") or event.get("timestamp") or ""
+        ident = event.get("identifier") or event.get("code") or event.get("card") or ""
+        return f"fallback:{stamp}:{ident}:{hash(json.dumps(event, ensure_ascii=False, sort_keys=True))}"
+
+    def _extract_qr_from_perco_event(self, event: dict[str, Any]) -> Optional[str]:
+        candidates: list[str] = []
+
+        def collect(value: Any) -> None:
+            if value is None:
+                return
+            if isinstance(value, str):
+                s = value.strip()
+                if s:
+                    candidates.append(s)
+                return
+            if isinstance(value, (int, float)):
+                candidates.append(str(value))
+                return
+            if isinstance(value, dict):
+                for v in value.values():
+                    collect(v)
+                return
+            if isinstance(value, list):
+                for v in value:
+                    collect(v)
+
+        for key in (
+            "identifier",
+            "identification",
+            "identificationCode",
+            "code",
+            "cardCode",
+            "rawData",
+            "raw",
+            "text",
+            "data",
+            "payload",
+        ):
+            if key in event:
+                collect(event.get(key))
+
+        for s in candidates:
+            if "FITNESSCLUB:" in s:
+                idx = s.find("FITNESSCLUB:")
+                return s[idx:]
+        return None
 
     def _execute(self, cmd: dict) -> None:
         cmd_id = cmd.get("id")

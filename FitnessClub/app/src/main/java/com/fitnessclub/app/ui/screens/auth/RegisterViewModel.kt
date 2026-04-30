@@ -99,13 +99,13 @@ class RegisterViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val clubRepository: ClubRepository
 ) : ViewModel() {
-
+    
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
-
+    
     private val _events = MutableSharedFlow<RegisterEvent>()
     val events: SharedFlow<RegisterEvent> = _events.asSharedFlow()
-
+    
     private val displayDateFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
     init {
@@ -284,7 +284,7 @@ class RegisterViewModel @Inject constructor(
     fun clearPassportError() {
         _uiState.value = _uiState.value.copy(passportError = null)
     }
-
+    
     fun register() {
         _uiState.value = _uiState.value.copy(submitAttempted = true)
         val state = _uiState.value
@@ -353,7 +353,7 @@ class RegisterViewModel @Inject constructor(
             confirmPasswordError = "Пароли не совпадают"
             hasError = true
         }
-
+        
         if (hasError) {
             _uiState.value = state.copy(
                 lastNameError = lastNameError,
@@ -398,7 +398,7 @@ class RegisterViewModel @Inject constructor(
             newsletter = state.newsletter,
             clubId = state.selectedClub?.id
         )
-
+        
         viewModelScope.launch {
             authRepository.register(request).collect { result ->
                 when (result) {
@@ -419,7 +419,7 @@ class RegisterViewModel @Inject constructor(
             }
         }
     }
-
+    
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }

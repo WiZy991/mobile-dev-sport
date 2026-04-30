@@ -30,7 +30,6 @@ import com.fitnessclub.app.ui.screens.referral.ReferralScreen
 import com.fitnessclub.app.ui.screens.lockers.LockerScreen
 import com.fitnessclub.app.ui.screens.settings.SettingsScreen
 import com.fitnessclub.app.ui.screens.help.HelpScreen
-import com.fitnessclub.app.ui.screens.help.HelpViewModel
 import com.fitnessclub.app.ui.screens.about.AboutScreen
 import com.fitnessclub.app.ui.screens.shop.ShopScreen
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPlansScreen
@@ -184,11 +183,7 @@ fun NavGraph(
         
         // Help & About
         composable(Screen.Help.route) {
-            val helpViewModel: HelpViewModel = hiltViewModel()
-            HelpScreen(
-                viewModel = helpViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
+            HelpScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(Screen.About.route) {
             AboutScreen(onNavigateBack = { navController.popBackStack() })
