@@ -13,3 +13,10 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+### CRM Symfony: секреты шлюза и случайные артефакты ###
+crm-backend-symfony/scripts/turnstile_gateway/config.ini
+crm-backend-symfony/scripts/turnstile_gateway/__pycache__/
+crm-backend-symfony/config.ini
+crm-backend-symfony/-H
+crm-backend-symfony/-d

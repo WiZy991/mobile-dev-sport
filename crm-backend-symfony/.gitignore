@@ -1,3 +1,9 @@
+### Turnstile gateway (секреты только локально) ###
+/scripts/turnstile_gateway/config.ini
+/scripts/turnstile_gateway/__pycache__/
+/config.ini
+/-H
+/-d
 
 ###> symfony/framework-bundle ###
 /.env.local
