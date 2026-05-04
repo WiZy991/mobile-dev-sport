@@ -5,8 +5,9 @@ import com.fitnessclub.app.R
 import com.fitnessclub.app.data.api.ClubItem
 
 /**
- * Три зала при регистрации. [clubId] совпадает с `clubs.id` на сервере после миграций
- * (1 — ТЦ Формат, 2 — ТЦ Новый де фриз, 3 — зал ул. Купера, 2).
+ * Три зала при регистрации. [clubId] совпадает с `clubs.id` на сервере.
+ * Синхронизация строк в БД CRM: `php bin/console app:clubs:sync-registration-venues`
+ * (см. crm-backend-symfony `SyncRegistrationVenuesCommand`).
  */
 data class RegistrationVenueCard(
     val clubId: String,
