@@ -133,7 +133,7 @@ class GatewayController extends AbstractController
             return $club;
         }
 
-        $club->setGatewayLastSeenAt(new \DateTimeImmutable());
+        $club->setGatewayLastSeenAt(new \DateTime());
         $this->em->flush();
 
         $body = json_decode($request->getContent(), true);
@@ -156,7 +156,7 @@ class GatewayController extends AbstractController
             return $club;
         }
 
-        $club->setGatewayLastSeenAt(new \DateTimeImmutable());
+        $club->setGatewayLastSeenAt(new \DateTime());
         $this->em->flush();
 
         $deadline = microtime(true) + self::LONG_POLL_SECONDS;
