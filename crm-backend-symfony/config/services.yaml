@@ -9,6 +9,8 @@
 parameters:
     # Пустой redirect по умолчанию, если переменная не задана (см. env var processors).
     sber_id_mobile_redirect_default: ''
+    # Deep link после HTTPS callback Сбер ID (если SBER_ID_NATIVE_APP_BRIDGE_URI не задана в .env).
+    sber_native_app_bridge_default: 'worldfitness://auth/callback'
 
 services:
     # default configuration for services in *this* file
@@ -36,6 +38,7 @@ services:
     App\Controller\Api\SberAuthController:
         bind:
             $nativeRedirectUri: '%env(string:SBER_ID_NATIVE_REDIRECT_URI)%'
+            $nativeAppBridgeUri: '%env(default:sber_native_app_bridge_default:SBER_ID_NATIVE_APP_BRIDGE_URI)%'
             $sberClientId: '%env(SBER_ID_CLIENT_ID)%'
 
     App\Controller\Admin\AdminSberIdController:

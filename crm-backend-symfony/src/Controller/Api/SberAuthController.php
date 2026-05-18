@@ -11,6 +11,7 @@ use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -24,6 +25,7 @@ class SberAuthController extends AbstractController
         private readonly SberOAuthPkceStateService $pkceState,
         private readonly MobileAuthTokenIssuer $mobileTokens,
         private readonly string $nativeRedirectUri,
+        private readonly string $nativeAppBridgeUri,
         private readonly string $sberClientId,
     ) {}
 
@@ -85,7 +87,7 @@ class SberAuthController extends AbstractController
         if ($expectedRedirect === '') {
             return $this->json([
                 'error' => 'sber_native_redirect_missing',
-                'message' => 'Укажите SBER_ID_NATIVE_REDIRECT_URI (как зарегистрировано в кабинете Сбер ID, например worldfitness://auth/callback).',
+                'message' => 'Укажите SBER_ID_NATIVE_REDIRECT_URI — HTTPS из кабинета Сбер ID (например https://…/api/v1/auth/sber/callback). Без второго URI в кабинете используйте SBER_ID_NATIVE_APP_BRIDGE_URI (deep link на приложение).',
             ], 503);
         }
 
@@ -204,6 +206,15 @@ class SberAuthController extends AbstractController
     public function callback(Request $request): Response
     {
         $state = (string) $request->query->get('state', '');
+        // PKCE: в кабинете Сбер ID может быть только HTTPS redirect — приходим сюда с code/state,
+        // затем перенаправляем на кастомную схему для завершения ASWebAuthenticationSession.
+        if ($state !== '' && $this->pkceState->verify($state) !== null) {
+            $bridge = trim($this->nativeAppBridgeUri);
+            if ($bridge !== '') {
+                return new RedirectResponse($this->buildNativeAppBridgeUrl($bridge, $request));
+            }
+        }
+
         $userId = $this->mobileAuth->parseUserIdFromState($state);
         if ($userId === null) {
             return new Response(
@@ -254,6 +265,19 @@ class SberAuthController extends AbstractController
         $this->em->flush();
 
         return new Response($this->htmlResult(true, 'Верификация успешна. Вернитесь в приложение и нажмите «Купить» ещё раз — затем откроется оплата (когда будет подключён эквайринг).'));
+    }
+
+    private function buildNativeAppBridgeUrl(string $bridgeBase, Request $request): string
+    {
+        $params = $request->query->all();
+        $qs = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+        if ($qs === '') {
+            return $bridgeBase;
+        }
+
+        $sep = str_contains($bridgeBase, '?') ? '&' : '?';
+
+        return $bridgeBase . $sep . $qs;
     }
 
     private function htmlResult(bool $ok, string $message): string
