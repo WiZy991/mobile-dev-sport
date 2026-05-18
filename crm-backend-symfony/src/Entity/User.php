@@ -83,6 +83,14 @@ class User
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $passportVerificationAuditJson = null;
 
+    /** Стабильный идентификатор Сбер ID (sub из id_token). */
+    #[ORM\Column(name: 'sber_id', type: 'string', length: 128, nullable: true, unique: true)]
+    private ?string $sberId = null;
+
+    /** Верифицирован ли профиль через Сбер ID (упрощённый флаг для CRM/API). */
+    #[ORM\Column(name: 'is_verified', type: 'boolean')]
+    private bool $verified = false;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -390,6 +398,28 @@ class User
     public function setPassportVerificationAuditJson(?string $passportVerificationAuditJson): self
     {
         $this->passportVerificationAuditJson = $passportVerificationAuditJson;
+        return $this;
+    }
+
+    public function getSberId(): ?string
+    {
+        return $this->sberId;
+    }
+
+    public function setSberId(?string $sberId): self
+    {
+        $this->sberId = $sberId;
+        return $this;
+    }
+
+    public function isVerified(): bool
+    {
+        return $this->verified;
+    }
+
+    public function setVerified(bool $verified): self
+    {
+        $this->verified = $verified;
         return $this;
     }
 

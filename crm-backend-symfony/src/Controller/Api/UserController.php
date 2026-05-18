@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\AccessLog;
 use App\Entity\Sale;
 use App\Entity\User;
+use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\CurrentUserResolver;
 use App\Service\MobileClientPayloadApplier;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,6 +20,8 @@ class UserController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
+        private readonly MobileClientPayloadApplier $mobileClientPayloadApplier,
+        private readonly MobileAuthTokenIssuer $mobileTokens,
     ) {}
 
     #[Route('/stats', name: 'api_user_stats', methods: ['GET'])]
@@ -141,23 +144,14 @@ class UserController extends AbstractController
     /** @return array<string, mixed> */
     private function serializeUserProfile(User $user): array
     {
-        return [
-            'id' => 'user-' . $user->getId(),
-            'email' => $user->getEmail(),
-            'name' => $user->getName(),
-            'phone' => $user->getPhone(),
-            'avatar_url' => $user->getAvatarUrl(),
-            'bonus_points' => $user->getBonusPoints(),
-            'date_of_birth' => $user->getDateOfBirth()?->format('Y-m-d'),
+        return array_merge($this->mobileTokens->userArray($user), [
             'gender' => $user->getGender(),
             'passport_series' => $user->getPassportSeries(),
             'passport_number' => $user->getPassportNumber(),
             'passport_issued_by' => $user->getPassportIssuedBy(),
             'passport_issue_date' => $user->getPassportIssueDate()?->format('Y-m-d'),
             'registration_address' => $user->getRegistrationAddress(),
-            'passport_verification_status' => $user->getPassportVerificationStatus(),
-            'created_at' => $user->getCreatedAt()->format('Y-m-d\TH:i:s'),
-        ];
+        ]);
     }
 
     private function computeStreak(User $user): int

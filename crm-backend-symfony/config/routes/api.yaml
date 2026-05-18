@@ -28,6 +28,31 @@ api_auth_logout:
   controller: App\Controller\Api\AuthController::logout
   methods: [POST]
 
+api_auth_sber_authorize_url:
+  path: /api/v1/auth/sber/authorize-url
+  controller: App\Controller\Api\SberAuthController::authorizeUrl
+  methods: [GET]
+
+api_auth_sber_login_get:
+  path: /api/v1/auth/sber/login
+  controller: App\Controller\Api\SberAuthController::loginGet
+  methods: [GET]
+
+api_auth_sber_login_post:
+  path: /api/v1/auth/sber/login
+  controller: App\Controller\Api\SberAuthController::loginPost
+  methods: [POST]
+
+api_auth_sber_callback_post:
+  path: /api/v1/auth/sber/callback
+  controller: App\Controller\Api\SberAuthController::nativeCallback
+  methods: [POST]
+
+api_auth_sber_callback_get:
+  path: /api/v1/auth/sber/callback
+  controller: App\Controller\Api\SberAuthController::callback
+  methods: [GET]
+
 api_user_purchases:
   path: /api/v1/user/purchases
   controller: App\Controller\Api\UserController::purchases

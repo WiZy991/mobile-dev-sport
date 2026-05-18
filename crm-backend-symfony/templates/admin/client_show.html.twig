@@ -37,10 +37,17 @@
                 <div class="small text-secondary">Верификация документа (Сбер ID)</div>
                 <div>
                     {% set st = client.passportVerificationStatus %}
+                    {% if client.verified %}
+                        <span class="badge bg-info text-dark me-1">Верифицирован</span>
+                    {% endif %}
                     {% if st == 'verified' %}
                         <span class="badge bg-success">Подтверждено</span>
                         {% if client.passportVerifiedAt %}<span class="small text-secondary ms-1">{{ client.passportVerifiedAt|date('d.m.Y H:i') }}</span>{% endif %}
-                        {% if client.passportVerificationSubject %}<span class="small text-secondary ms-1">sub: {{ client.passportVerificationSubject }}</span>{% endif %}
+                        {% if client.sberId %}
+                            <span class="small text-secondary ms-1">Сбер ID: {{ client.sberId }}</span>
+                        {% elseif client.passportVerificationSubject %}
+                            <span class="small text-secondary ms-1">sub: {{ client.passportVerificationSubject }}</span>
+                        {% endif %}
                     {% elseif st == 'pending' %}
                         <span class="badge bg-warning text-dark">В процессе</span>
                     {% elseif st == 'rejected' %}

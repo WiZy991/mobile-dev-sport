@@ -99,6 +99,8 @@ final class AdminSberIdController extends AbstractController
         $sub = isset($claims['sub']) && is_string($claims['sub']) ? $claims['sub'] : null;
 
         $client
+            ->setVerified(true)
+            ->setSberId($sub)
             ->setPassportVerificationStatus('verified')
             ->setPassportVerifiedAt(new \DateTimeImmutable())
             ->setPassportVerificationProvider('sber_id')

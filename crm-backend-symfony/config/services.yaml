@@ -27,6 +27,16 @@ services:
             $clientSecret: '%env(SBER_ID_CLIENT_SECRET)%'
             $authorizeUrl: '%env(SBER_ID_AUTHORIZE_URL)%'
             $tokenUrl: '%env(SBER_ID_TOKEN_URL)%'
+            $userInfoUrl: '%env(string:SBER_ID_USERINFO_URL)%'
+
+    App\Service\Api\SberOAuthPkceStateService:
+        arguments:
+            $secret: '%kernel.secret%'
+
+    App\Controller\Api\SberAuthController:
+        bind:
+            $nativeRedirectUri: '%env(string:SBER_ID_NATIVE_REDIRECT_URI)%'
+            $sberClientId: '%env(SBER_ID_CLIENT_ID)%'
 
     App\Controller\Admin\AdminSberIdController:
         bind:

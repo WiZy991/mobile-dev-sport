@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\User;
+use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\MobileClientPayloadApplier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -16,6 +17,7 @@ class AuthController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly MobileClientPayloadApplier $mobileClientPayloadApplier,
+        private readonly MobileAuthTokenIssuer $mobileTokens,
     ) {}
 
     #[Route('/login', name: 'api_auth_login', methods: ['POST'])]
@@ -49,7 +51,7 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Access denied', 'code' => 'user_blocked'], 403);
         }
 
-        return $this->json($this->issueTokenPayload($user, false));
+        return $this->json($this->mobileTokens->issue($user, false));
     }
 
     #[Route('/register', name: 'api_auth_register', methods: ['POST'])]
@@ -84,22 +86,7 @@ class AuthController extends AbstractController
         $this->em->persist($user);
         $this->em->flush();
 
-        return $this->json($this->issueTokenPayload($user, true));
-    }
-
-    private function serializeUser(User $user): array
-    {
-        return [
-            'id' => 'user-' . $user->getId(),
-            'email' => $user->getEmail(),
-            'name' => $user->getName(),
-            'phone' => $user->getPhone(),
-            'avatar_url' => $user->getAvatarUrl(),
-            'bonus_points' => $user->getBonusPoints(),
-            'passport_verification_status' => $user->getPassportVerificationStatus(),
-            'date_of_birth' => $user->getDateOfBirth()?->format('Y-m-d'),
-            'created_at' => $user->getCreatedAt()->format('Y-m-d\TH:i:s'),
-        ];
+        return $this->json($this->mobileTokens->issue($user, true));
     }
 
     #[Route('/refresh', name: 'api_auth_refresh', methods: ['POST'])]
@@ -115,7 +102,7 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Недействительный refresh-токен', 'code' => 'invalid_refresh'], 401);
         }
 
-        return $this->json($this->issueTokenPayload($user, false));
+        return $this->json($this->mobileTokens->issue($user, false));
     }
 
     #[Route('/logout', name: 'api_auth_logout', methods: ['POST'])]
@@ -124,29 +111,6 @@ class AuthController extends AbstractController
         // Refresh-токен в БД не сбрасываем: клиент после «Выйти» может снова войти по отпечатку
         // (в SecureStore лежит тот же refresh). Полная смена сессии — через смену пароля/отключение биометрии в приложении.
         return $this->json(['success' => true]);
-    }
-
-    /**
-     * @return array{token: string, refresh_token: string, user: array<string, mixed>}
-     *
-     * При входе по паролю и при /auth/refresh refresh-токен в БД не меняем — в приложении в SecureStore
-     * остаётся тот же refresh, что был зашифрован при включении биометрии. Иначе после «Выйти» → вход по паролю
-     * отпечаток отправлял бы старый токен и получал 401.
-     */
-    private function issueTokenPayload(User $user, bool $rotateRefresh): array
-    {
-        $accessToken = bin2hex(random_bytes(16));
-        if ($rotateRefresh || $user->getApiRefreshToken() === null || $user->getApiRefreshToken() === '') {
-            $user->setApiRefreshToken(bin2hex(random_bytes(16)));
-        }
-        $this->em->flush();
-        $refreshToken = (string) $user->getApiRefreshToken();
-
-        return [
-            'token' => $accessToken,
-            'refresh_token' => $refreshToken,
-            'user' => $this->serializeUser($user),
-        ];
     }
 
     private function extractBearerToken(Request $request): ?string

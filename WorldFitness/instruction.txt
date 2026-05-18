@@ -1,0 +1,1105 @@
+Шаг 1. Запрос кода авторизации через SDK
+Конфигурация настроек проекта:
+Важно: Если вы используете Xcode версии 15 и выше, убедитесь, что флаг ENABLE_USER_SCRIPT_SANDBOXING в настройках вашего проекта установлен в значение NO. Это обеспечит корректное выполнение скриптов сборки, которые могут быть необходимы для правильной работы SDK.
+Конфигурация Info.plist для подключения к Сбер ID﻿
+Чтобы обеспечить стабильную работу вашего приложения с сервисами Сбер ID, необходимо выполнить настройку Info.plist. Это позволит поддерживать подключение даже в случае изменений со стороны сервера, связанных с сертификатами безопасности.
+1. Разрешение нешифрованных запросов﻿
+Для обеспечения подключения к сервису Сбер ID в условиях, когда может быть изменена или отозвана валидность сертификатов безопасности на сервере, необходимо разрешить вашему приложению осуществлять нешифрованные запросы. Это не означает отказ от безопасности, а является гарантией стабильного подключения в любых условиях. В Info.plist добавьте следующие параметры:
+<key>NSAppTransportSecurity</key>
+<dict>
+   <key>NSExceptionDomains</key>
+   <dict>
+      <key>id.sber.ru</key>
+      <dict>
+         <key>NSExceptionAllowsInsecureHTTPLoads</key>
+         <true/>
+      </dict>
+   </dict>
+</dict>
+Это позволит приложению поддерживать работу с сервисом Сбер ID даже в случае изменений на стороне сертификатов безопасности сервера. Важно подходить к этой настройке с пониманием потенциальных рисков для безопасности и использовать ее только как временное решение или в условиях высокого доверия к сервису.
+2. Регистрация кастомного URL Scheme для вашего приложения﻿
+Для того чтобы приложение Сбербанк Онлайн могло перенаправить пользователя обратно в ваше приложение после авторизации, необходимо зарегистрировать кастомный URL Scheme.
+<key>CFBundleURLTypes</key>
+<array>
+   <dict>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>CFBundleURLName</key>
+      <string>com.example.app</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+         <string>myapp</string>
+      </array>
+   </dict>
+</array>
+Замените "myapp" на уникальный идентификатор, который будет использоваться как ваш URL Scheme. Это позволит SDK корректно возвращать пользователя в ваше приложение после процесса авторизации.
+Инициализация и базовая настройка:
+Для использования основного функционала SDK обратитесь к статическим свойствам класса SID.
+Вызовы всех методов SDK должны выполняться из главного (UI) потока приложения. Поскольку эти методы тесно связаны с UI и внутренними процессами SDK, их вызов из других потоков приводят к непредсказуемому поведению приложения.
+Инициализация﻿
+Инициализируйте SDK Sber ID при старте вашего приложения. Это позволит загрузить необходимые данные для авторизации еще до их использования.
+/// Инициализация ID SDK
+/// - Parameters:
+///   - stand: Тип стенда (используется для тестирования)
+///   - completion: Обработчик событий
+SID.initializer.initialize(stand: .prom) { result in
+  switch result {
+  case .success:
+    print("Инициализация прошла успешно")
+  case .fail:
+    print("Инициализация завершилась с ошибкой: часть функционала будет недоступна")
+  case .unknown:
+    print("Инициализация завершилась с ошибкой: часть функционала будет недоступна")
+  @unknown default:
+    print("Инициализация завершилась с ошибкой: часть функционала будет недоступна")
+  }
+}
+Для параметра stand доступны следующие значения: .prom (продакшн), .ift, .iftCloud.
+Установка настроек﻿
+После инициализации - введите основные параметры, как только они станут известны. Особенно важно своевременно передать clientID. Остальные параметры можно настроить позже, используя тот же метод. Передача нового значения параметра приведет к его перезаписи.
+/// Применить основные настройки
+/// - Parameters:
+///   - clientID: ClientID приложения
+///   - userID: ID пользователя
+///   - partnerName: Имя / название приложения
+///   - partnerProfileUrl: URL для дополнительного запроса данных
+SID.settings.applyMainPreferences(
+  clientID: "clientID",
+  userID: "userID",
+  partnerName: "partnerName",
+  partnerProfileUrl: "partnerProfileUrl",
+)
+Настройка UI﻿
+Настройте параметры UI перед их использованием. Если параметры не заданы, будут использоваться значения по умолчанию.
+/// Инициализатор класса с возможностью задания начальных значений для настроек интерфейса.
+/// При отсутствии значений используются значения по умолчанию.
+/// - Parameters:
+///   - texts: Тексты, используемые в интерфейсе.
+///   - themeColor: Основной цвет темы интерфейса.
+///   - primaryColor: Основной цвет элементов интерфейса.
+///   - secondaryColor: Вторичный цвет элементов интерфейса.
+///   - fonts: Шрифты, используемые в интерфейсе.
+///   - elkErrorType: Типы ошибок, используемых в едином личном кабинете.
+///   - widgetBackgroundColor: Цвет подложки у виджетов
+///   - network: Настройки сетевых запросов
+///   - webViewColor: Цвет интерфейса WebView
+///   - elkHorizontalPadding: Расстояние от краев экрана для ЕЛК
+let preferences = SIDUIPreferences(
+  texts: SIDTexts(
+    titleError: "titleError",
+    descriptionError: "descriptionError",
+    buttonError: "buttonError"
+  ),
+  themeColor: SIDColor(
+    light: .black,
+    dark: .white
+  ),
+  primaryColor: SIDColor(
+    light: .black,
+    dark: .white
+  ),
+  secondaryColor: SIDColor(
+    light: .black,
+    dark: .white
+  ),
+  webViewColor: SIDColor(
+    light: .black,
+    dark: .white),
+  fonts: SIDFonts(
+    semiboldFont: UIFont(name: "1stFont", size: 15),
+    mediumFont: UIFont(name: "2ndFont", size: 15)
+  ),
+  elkErrorType: .type1,
+  elkHorizontalPadding: 0,
+  widgetBackgroundColor: SIDColor(
+    light: .black,
+    dark: .white),
+  network: SIDNetwork(
+    versionELK: nil,
+    headersELK: [:])
+)
+
+SID.settings.applyUIPreferences(preferences: preferences)
+Интеграция кнопки входа:
+Для успешной интеграции кнопки входа Сбер ID, следуйте пошаговой инструкции, начиная с создания и настройки кнопки, заканчивая обработкой действий пользователя.
+Возможные вариации кнопки, а также рекомендуемые размеры можно найти в гайдбуке по кнопке авторизации
+Создание и настройка кнопки﻿
+1. Создание кнопки﻿
+Выберите подходящий стиль и текст для кнопки, используя перечисления SIDLoginButtonStyle и SIDLoginButtonTextType. Создайте экземпляр кнопки, указав необходимые параметры.
+// Создание кнопки с заданным стилем и наблюдателем
+let loginButton = SIDLoginButton(type: .green, observer: observer)
+
+// Создание кнопки с дополнительными настройками
+let loginButtonCustom = SIDLoginButton(type: .white,
+                                       textType: .short,
+                                       desiredSize: CGSize(width: 200, height: 50),
+                                       observer: observer)
+Тексты поддерживают английскую локализацию на устройстве. При выборе локализации, отличной от русской и английской, тексты будут на русском.
+ 
+2. Кастомизация внешнего вида﻿
+SDK включает методы для настройки внешнего вида кнопки, позволяя выбрать предпочтительные визуальные настройки из доступных вариантов.
+Cкругление углов и цвет обводки кнопки (для белой кнопки)
+loginButton.setCornerRadius(.normal)
+ 
+Установка цвета обводки для белой кнопки
+if loginButton.style == .white {
+    loginButton.setBorderColor(.green)
+}
+Управление лоадером на кнопке
+Используйте свойство isLoaderHidden для управления отображением лоадера на кнопке "Войти по Сбер ID". По умолчанию лоадер не отображается (true). Измените это свойство, чтобы показать или скрыть лоадер в зависимости от необходимости. Включение лоадера может быть полезно при ожидании завершения операций, требующих времени, например, при авторизации пользователя.
+// Показать лоадер
+loginButton.isLoaderHidden = false
+
+// Скрыть лоадер
+loginButton.isLoaderHidden = true
+ 
+Персонализация кнопки
+Функционал персонализации кнопки "Войти по Сбер ID" временно недоступен из-за текущих ограничений платформы.
+3. Наблюдение за состоянием кнопки﻿
+В SDK работает механизм оповещений о выпуске новых версий. Эта функциональность автоматически информирует разработчиков о необходимости обновления до последней версии, чтобы обеспечить стабильность работы и доступ к новым функциям.
+Важно: При обнаружении критической необходимости обновления (например, устаревшая версия SDK в вашем приложении), кнопка входа через Сбер ID может быть автоматически скрыта для предотвращения возможных проблем в процессе авторизации.
+Реагирование на скрытие кнопки﻿
+Для обработки ситуаций, когда кнопка входа скрыта (например, при критической необходимости обновления SDK), рекомендуется использовать специальный механизм обратного вызова:
+При инициализации кнопки SIDLoginButton в качестве параметра observer передайте объект, который реализует протокол LoginButtonObserverProtocol.
+Реализуйте метод loginButtonWasHidden() этого протокола, чтобы определить логику вашего приложения при скрытии кнопки (например, отображение уведомления для пользователя или скрытие элементов интерфейса).
+class LoginButtonObserver: SIDLoginButtonObserverProtocol {
+    func loginButtonWasHidden() {
+        // Здесь может быть ваш код для обработки скрытия кнопки
+    }
+}
+
+let sberIdButton = SIDLoginButton(type: .white, 
+                                  textType: .short, 
+                                  clientId: "clientId", 
+                                  desiredSize: CGSize(), 
+                                  observer: SIDLoginButtonObserver())
+Процесс авторизации:
+Авторизация пользователей через Сбер ID в вашем приложении включает несколько ключевых шагов, начиная с подготовки запроса и заканчивая обработкой полученного ответа.
+Вызовы всех методов SDK должны выполняться из главного (UI) потока приложения. Поскольку эти методы тесно связаны с UI и внутренними процессами SDK, их вызов из других потоков приводят к непредсказуемому поведению приложения.
+При возникновении вопросов рекомендуем заглянуть в наш раздел FAQ по сценарию OIDC to App
+1. Подготовка запроса на авторизацию﻿
+Для начала процесса авторизации необходимо создать объект SIDAuthRequest, который будет содержать все необходимые параметры для выполнения авторизации.
+let verifier = SIDUtils.createVerifier()
+let challenge = SIDUtils.createChallenge(verifier)
+let challengeMethod = SIDAuthRequest.challengeMethod
+
+/// Инициализатор
+/// - Parameters:
+///   - scope: Наименование групп данных, на которые подписана система
+///   - state: Значение для предотвращения подделки межсайтовых запросов, случайно сгенерированное
+///   - nonce: Значение, сгенерированное внешней АС для предотвращения атак повторения
+///   - ssoBaseUrl: URI, который будет использован для запуска авторизации взамен дефолтного (бесшовная авторизация)
+///   - redirectUri: Url на который будет перенаправлен клиент после успешной аутентификации (deeplink)
+///   - codeChallenge: Хэшированное значение секретного кода
+///   - codeChallengeMethod: Метод преобразования секретного кода
+///   - standType: Тип стэнда к которому будет выполняться подключение
+///   - loginHint: Номер телефона пользователя "79ХХХХХХХХХ"
+let request = SIDAuthRequest(scope: "openid profile email",
+               state: "random_state",
+               nonce: "random_nonce",
+               redirectUri: "myapp://callback",
+               ssoBaseUrl: nil,
+               codeChallenge: challenge,
+               codeChallengeMethod: challengeMethod,
+               loginHint: "79012345678")
+Полный перечень параметров scope доступен в разделе Перечень допустимых параметров Scope
+2. Запуск процесса авторизации﻿
+После подготовки объекта SIDAuthRequest, используйте его для запуска авторизации. Вы можете выбрать один из двух доступных методов: стандартную авторизацию через Сбербанк Онлайн или через единый web-портал авторизации (OIDC).
+Стандартная авторизация через Сбербанк Онлайн:﻿
+Метод откроет приложение Сбербанка для авторизации, если приложение на устройстве отсутствует, откроется единое web-окно авторизации.
+/// Приоритетная авторизоваться с помощью мобильного приложения банка
+/// - Parameters:
+///  - request: модель запроса
+///  - viewController: viewController для открытия SVC для авторизации через Web при отсутсвии приложения банка
+SID.login.auth(withSberId: request, viewController: viewController)
+Авторизация напрямую (без UI) через Сбербанк Онлайн﻿
+Используйте для фоновой инициализации авторизации(пользователь не нажимает на кнопку авторизации) через приложение Сбербанка. Передайте замыкание, для обработки случая, когда приложение Сбербанка отсутствует на устройстве.
+/// Авторизация напрямую (без UI) с помощью мобильного приложения банка
+/// - Parameters:
+///  - request: модель запроса
+///  - completion: Обработчик результата открытия приложения банка
+SID.login.autoAuth(request: request) { success in
+    if success {
+        print("Аутентификация успешна")
+        // Выполнить действия после успешной аутентификации
+    } else {
+        print("Ошибка аутентификации")
+        // Обработать ошибку аутентификации
+    }
+}
+Запуск авторизации через единый web-портал (OIDC):﻿
+Использование единого web-портала авторизации по Сбер ID (OIDC) через встроенное веб-окно в приложении позволяет пользователям проходить авторизацию без необходимости покидать ваше приложение. Благодаря кэшированию веб-окна и использованию SafariViewController, время, необходимое для авторизации, сокращается, так как повторные авторизации выполняются еще быстрее.
+Используйте метод webAuth для авторизации через единый web-портал, который обеспечивает унифицированный пользовательский опыт на различных платформах.
+class YourViewController: UIViewController, SIDSafariViewControllerDelegate {
+
+    /// SafariViewController для отслеживания состояния из делегата SIDSafariViewControllerDelegate
+  var safariViewController: SFSafariViewController?
+
+    func startSberIDAuthorization() {
+        let request = SIDAuthRequest(/* Настройка запроса */)
+
+    /// Приоритетная авторизация с помощью единого веб окна.
+  /// - Parameters:
+  ///  - request: модель запроса
+  ///  - svcRedirectUrlString: URL для возврата из приложения банка в МП партнера на
+  ///  открытый SVC со страницей единого портала авторизации
+  ///  - viewController: viewController необходимый для открытия SafariViewController
+  /// - Returns: статус успеха запуска авторизации
+        let success = SID.login.webAuth(
+            sberIdRequest: request,
+            svcRedirectUrlString: "Ваш диплинк",
+            viewController: self
+            )
+        if success {
+            // Авторизация была успешно инициирована
+        } else {
+            // Обработка ошибки инициации авторизации
+        }
+    }
+}
+Подписка на протокол SIDSafariViewControllerDelegate не является обязательной, но может предоставить дополнительные возможности для контроля над процессом авторизации:
+Обработка закрытия веб-окна: Позволяет отслеживать момент закрытия SafariViewController пользователем. Это может быть полезно для реализации дополнительной логики в вашем приложении, например, для возвращения пользователя на определенный экран или отображения сообщения после попытки авторизации.
+Возврат на предыдущий экран: Если в вашем приложении предусмотрена последовательность экранов или определенный путь пользователя, подписка на делегата позволит вам точно контролировать возвращение пользователя на экран, с которого была инициирована авторизация, поддерживая непрерывность пользовательского опыта.
+Запуск авторизации через WebView﻿
+Использование авторизации через WebView позволяет нативно авторизовать пользователя без необходимости покидать приложение или переключаться на браузер.
+Применяйте метод loginWithIDToWebView если хотите дать пользователю user friendly experience во время авторизации. В случае если на каком-то этапе произойдет ошибка или пользователь сам закроет экран - web окно закроется и на делегат SIDWebViewDelegateProtocol отправится событие webViewReject.
+class YourViewController: UIViewController, SIDWebViewDelegateProtocol {
+
+  func startSberIDAuthorization() {
+    let request = SIDAuthRequest(/* Настройка запроса */)
+
+    /// Авторизация через WebView
+    /// - Parameters:
+    ///  - request: модель запроса
+    ///  - viewController: viewController необходимый для открытия окна доавторизации
+    ///  - delegate: Обработчик событий для webView
+    SID.login.loginWithIDToWebView(request: request, viewController: self, delegate: self)
+  }
+
+  func webViewReject() {
+    // Обработка закрытия webView
+  }
+}
+Обработка ответа авторизации﻿
+После успешной авторизации пользователь будет перенаправлен обратно в ваше приложение. Вам необходимо обработать ответ, используя URL, на который произошло перенаправление, и извлечь из него данные авторизации.
+func application(_ app: UIApplication,
+                 open url: URL,
+                 options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+    SID.login.getResponseFrom(url) { response in
+        if response.isSuccess {
+            // Обработка успешной авторизации
+        } else {
+            // Обработка ошибки авторизации
+        }
+    }
+    return true
+}
+Модель ответа:
+class SIDAuthResponse : NSObject {
+
+    /// Значение, сгенерированное внешней АС для предотвращения атак повторения
+    var nonce: String { get }
+
+    /// Значение для предотвращения подделки межсайтовых запросов, случайно сгенерированное
+    var state: String? { get }
+
+    /// Код авторизации клиента
+    var authCode: String? { get }
+
+    /// Текст ошибки
+    var error: String? { get }
+
+    /// Статус операции
+    var isSuccess: Bool { get }
+
+    /// AppToken для бесшовной авторизации
+  var appToken: String? { get }
+}
+Бесшовная авторизация﻿
+Автоматическая авторизация пользователей, приходящих из приложения Сбербанка, без необходимости нажимать на кнопку "Войти по Сбер ID". Этот процесс называется бесшовной авторизацией.
+Как это работает:﻿
+Получение специальной ссылки: Когда пользователь переходит из приложения Сбербанка в ваше приложение, система отправляет вам специальную ссылку (диплинк), которая содержит sberIDRedirect для авторизации.
+Извлечение базового URL из ссылки: Чтобы начать процесс авторизации, вам нужно извлечь из этой ссылки специальный параметр — базовый URL (ssoBaseUrl).
+    let ssoBaseUrl = SIDUtils.getSSOUrlStringFrom(receivedUrl)
+Использование базового URL: Далее, вам нужно передать этот базовый URL в объект SIDAuthRequest, который используется для настройки запроса на авторизацию.
+    let request = SIDAuthRequest()
+    request.scope = "openid profile email"
+    request.state = "unique_state_value"
+    request.nonce = "unique_nonce_value"
+    request.ssoBaseUrl = ssoBaseUrl
+    request.redirectUri = "yourAppScheme://callback"
+    request.codeChallenge = "generated_code_challenge"
+Запуск авторизации: С этими настройками вы готовы запустить процесс авторизации, вызвав соответствующий метод SDK Сбер ID.
+Этот процесс позволяет вашему приложению эффективно работать с авторизацией пользователей, которые пришли из приложения Сбербанка, обеспечивая более гладкий и удобный опыт входа.
+Перечень допустимых параметров Scope﻿
+Параметры scope в SIDAuthRequest позволяют указать, к каким данным пользователя вы хотите получить доступ в процессе авторизации. Это важно для соблюдения принципов минимальной необходимости и прозрачности обработки персональных данных. Ниже в таблице представлен список всех доступных scope для Сбер ID:
+Scope
+Наименование поля в ответе
+Описание
+Пример
+Пакет Light
+openid (обязательно)
+sub
+Неизменный уникальный идентификатор клиента, передаваемый внешним потребителям.
+"sub":"e327493e-979a-461f-9ca5-edfab9d6fbab"
+email
+email
+Адрес электронной почты
+"email":“personal@mail.ru”
+mobile
+phone_number
+Номер телефона
+"phone_number":"+7 (000) 000000”
+Пакет Standart
+birthdate
+birthdate
+Дата рождения (формат ГГГГ-ММ-ДД)
+ "birthdate":"0000-00-00"
+name
+family_name, given_name, middle_name
+Фамилия Имя Отчество
+"family_name":"Фамилия"
+"given_name":"Имя"
+"middle_name":"Отчество"
+gender
+gender
+Пол: 1 – мужчина; 2 – женщина;
+"gender":1,
+Пакет Professional
+maindoc
+identification
+Полные данные паспорта: серия,номер,орган, выдавший паспорт,дата выдачи паспорта (формат ГГГГ-ММ-ДД),код подразделения
+"identification":{
+"series":"00 00",
+"number":"000000",
+"issued_by":"Орган выдавший документ",
+"issued_date":"0000-00-00",
+"code":"000-000"
+}
+inn
+inn
+ИНН номер
+"inn":{
+"number":"0000000"
+}
+snils
+snils
+СНИЛС номер
+"snils":{
+"number":"0000000"
+}
+driving_license
+driving_license
+Номер водительского удостоверения
+"driving_license":{
+"number":"111111"
+}
+international_passport
+international_passport
+Заграничный паспорт гражданина РФ:серия документа (формат 00 00),номер документа(формат 000000),кем выдан, дата выдачи (формат ГГГГ-ММ-ДД),дата окончания (формат ГГГГ-ММ-ДД),имя,фамилия
+"international_passport":{
+"series":"777",
+"number":"333",
+"issued_by":"рога и копыта",
+"issued_date":"1981-01-01",
+"planned_end_date":"1999-02-01",
+"name":"name",
+"surname":"surname"
+}
+priority_doc
+priority_doc
+Данные документа, удостоверяющего личность:тип,серия документа (формат 00 00),номер документа (формат 000000),кем выдан, дата выдачи (формат ГГГГ-ММ-ДД),код. Выводится один документ в соответствии со списком приоритетов:Паспорт РФ, Загранпаспорт гражданина РФ, Военный билет, Паспорт моряка, Временное удостоверение, Паспорт иностранного граданина, Вид на жительство иностранного гражданина.
+Доступные типы документов:
+17 - Паспортгражданина РФ
+18 - Загранпаспортгражданина РФ
+7 - Военный билетвоеннослужащего
+21 - Удостоверениеличности моряка
+14 - Временное удостоверение личности гражданина РФ
+10 - Паспорт иностранного гражданина
+75 - Вид на жительство в РФ иностранного гражданина
+"priority_doc":{
+"type":17,
+"series":"777",
+"number":"333",
+"issued_by":"рога и копыта",
+"issued_date":"1981-01-01",
+"code":"adasd"
+}
+citizenship
+citizenship
+Гражданство: последняя по актуальности страна гражданства (наименование на русском языке) и ее код (ОКСМ, буквенное обозначение – Альфа-3)
+"citizenship":{
+"country_code":"countryCode",
+"country_name":"countryName"
+}
+place_of_birth
+place_of_birth
+Место рождения – город рождения клиента (текстовое поле, не кодируется)
+"place_of_birth":”Nsk”
+address_reg
+address_reg
+Адрес регистрации: полный адрес, код ФИАС, почтовый индекс, страна, регион, район, город, поселение, улица, дом, строение, корпус, квартира
+"address_reg":{
+"full_address":"fullAddress",
+"fias_code":"fiasCode",
+"post_index":"postIndex",
+"country":"country",
+"region":"region",
+"district":"district",
+"city":"city",
+"settlement":"settlement",
+"street":"street",
+"house":"house",
+"building":"building",
+"bulk":"bulk",
+"apartment":"apartment"
+}
+work_address
+work_address
+Рабочий адрес: полный адрес, код ФИАС, почтовый индекс, страна, регион, район, город, поселение, улица, дом, строение, корпус, квартира
+"work_address":{
+"full_address":"fullAddress",
+"fias_code":"fiasCode",
+"post_index":"postIndex",
+"country":"country",
+"region":"region",
+"district":"district",
+"city":"city",
+"settlement":"settlement",
+"street":"street",
+"house":"house",
+"building":"building",
+"bulk":"bulk",
+"apartment":"apartment"
+}
+address_of_actual_residence
+address_of_actual_residence
+Адрес места жительства/доставки: полный адрес,код ФИАС,почтовый индекс,страна,регион,район,город,поселение,улица,дом,строение,корпус,квартира
+"address_of_actual_residence":{
+"full_address":"fullAddress",
+"fias_code":"fiasCode",
+"post_index":"postIndex",
+"country":"country",
+"region":"region",
+"district":"district",
+"city":"city",
+"settlement":"settlement",
+"street":"street",
+"house":"house",
+"building":"building",
+"bulk":"bulk",
+"apartment":"apartment"
+}
+delivery_address
+delivery_address
+Адрес для доставки: полный адрес,код ФИАС,почтовый индекс,страна,регион,район,город,поселение,улица,дом,строение,корпус,квартира
+"delivery_address":{
+"full_address":"fullAddress",
+"fias_code":"fiasCode",
+"post_index":"postIndex",
+"country":"country",
+"region":"region",
+"district":"district",
+"city":"city",
+"settlement":"settlement",
+"street":"street",
+"house":"house",
+"building":"building",
+"bulk":"bulk",
+"apartment":"apartment"
+}
+sts
+sts
+Номер СТС
+"sts":{
+"number":"00 00 00000"
+}
+previous_identification
+previous_identification
+Реквизиты ранее выданного паспорта гражданина РФ: Серия документа, Номер документа, Кем выдан, Дата выдачи
+"previous_identification":{
+"series":"00 00",
+"number":"000 000",
+"issued_by":"Орган выдавший документ",
+"issued_date":"0000-00-00"
+}
+previous_name
+previous_family_name, previous_given_name, previous_middle_name
+Предыдущие фамилия, имя, отчество
+"previous_family_name":"Фамилия"
+"previous_given_name":"Имя"
+"previous_middle_name":"Отчество"
+education
+education
+Сведения об образовании:Код + описание,начальное,среднее,среднее специальное,высшее,магистратура и пр.
+"education":{
+"code":"1",
+"description":"начальное"
+}
+place_of_work
+place_of_work
+Наименование организации(место работы)
+"place_of_work": "место работы",
+job_title
+job_title
+Наименование занимаемой должности
+"job_title": "должность"
+marital_status
+marital_status
+Семейное положение:Код + описание,холост,женат,разведен,вдовец/ вдова,раздельное проживание,гражданский брак и пр.
+"marital_status":{
+"code":"1",
+"description":"холост"
+}
+is_self_employed
+is_self_employed
+Признак самозанятого
+"is_self_employed":true
+Развернуть таблицу
+Шаг 2. Запрос access token и id token
+Параметры запроса﻿
+Для успешного выполнения запроса необходимо использовать сертификат, полученый при регистрации приложения на портале Сбер ID﻿ , по нашей документации.
+Back-end Партнера инициирует запрос в back-end Банка на получение access token и Id token, направляя в запросе полученный ранее код авторизации.
+Партнер также может получить длинноживущий (30 дней) refresh token, который в дальнейшем позволяет обновлять короткоживущий access token. Для этого в запросе на авторизацию Партнер должен передать дополнительный scope со значением offline_access.
+Пример запроса на получение access token, refresh token и Id token:
+POST 'https://oauth-ift.sber.ru/ru/prod/tokens/v2/oidc' \
+--header 'accept: application/json' \
+--header 'rquid: 012345678901234567890123456789FF' \
+--header 'content-Type: application/x-www-form-urlencoded' \
+--data-urlencode 'grant_type=authorization_code' \
+--data-urlencode 'code=FC49F1EA-245A-0FCD-2077-F3F73******' \
+--data-urlencode 'client_id=5e7ee80a-6724-4078-8ee4-1dd63******' \
+--data-urlencode 'client_secret=L4hE5nH3wB5lC6sP0bO7bA6yM5bH5hA3lN3******' \
+--data-urlencode 'redirect_uri=https://api.developer.sber.ru/'
+Важно!
+Время timeout для ответа Сбер API — 10 сек.
+Описание полей  запроса на получение access token и id token
+№   п/п
+Наименование заголовка/поля
+Заголовок / Поле
+Описание
+Обязательность поля
+1
+RqUID
+Заголовок
+Уникальный идентификатор сообщения, «length=32 и pattern=([0-9][a-f][A-F])32)», переданный во входящем сообщении. Необходим для журналирования входящих вызовов и удобства разбора инцидентов. Чтобы обеспечить уникальность, можно использовать стандартные библиотеки и классы для генерации UUID/GUID (https://ru.wikipedia.org/wiki/UUID﻿ ), убрав из результата разделители «-».
+Да
+2
+content-type
+Заголовок
+Всегда принимает значение "application/x-www-form-urlencoded"
+Нет
+3
+accept
+Заголовок
+Может принимать значения application/json или application/jwt.
+Нет
+4
+grant_type
+Поле
+Указывается равным authorization_code.
+Да
+5
+code
+Поле
+Код авторизации, полученный от Банка. (См. Ответ на запрос кода авторизации).
+` Да
+6
+redirect_uri
+Поле
+Значение параметра redirect_uri было указано в запросе кода авторизации. Параметр redirect_uri должен быть передан в Сбер ID без изменений, символ в символ (RFC 6749, раздел 4.1.3)﻿ . Например, https://site.ru, HTTPS://SITE.RU и https://site.ru/ в запросах к Сбер ID считываются, как три разных редиректа.
+Да
+7
+client_id
+Поле
+Идентификатор системы Партнера, полученный партнером в личном кабинете после регистрации приложения.
+Да
+8
+client_secret
+Поле
+Пароль системы Партнера, полученный партнером в личном кабинете после регистрации приложения.
+Да
+9
+code_verifier
+Поле
+Обязательный параметр, если партнер при реализации входа в приложение использует протокол PKCE и в запросе кода авторизации указывают code_challenge и code_challenge_method. Если партнер не использует протокол PKCE, параметр указывать не нужно.
+Нет
+Развернуть таблицу
+Параметры ответа﻿
+В случае успешной обработки запроса Back партнера получает access token и Id token. Ответ типа HTTP 200 OK. Описание полей ответа приведено в таблице Описание полей ответа.
+Пример JSON сообщения - ответа в случае успешной обработки запроса:
+HTTP/1.1 200 OK rquid: 012345678901234567890123456789FF { "access_token":"f213a511-58d7-4e7c-88b3-a6de380c81da",
+"token_type":"bearer", "expires_in":60, "scope": "openid name email",
+"id_token":"eyJhbGciOiJub25lIn0.eyJzdWIiOiI5ODg5YmQ2NDAzYzk0Nzg4ZGI0ZDY5ODVjY2U4MWViNz
+c4MDE5NTU5ZTc3MWQyNTczMzFjODljMWUzMGY5NzRmZGJlOTQwODQ0YTg2ZGRjMyIsImF1dGhfdGltZSI6MTU2
+ODk4MzE0Niwibm9uY2UiOiJMaXdrZEtoSU9ockRLdkpYMXNndkI1eGtrRlVWMm01am5BWUs3ZlhUSFNFIiwiaX
+NzIjoiaHR0cHM6Ly9pZnQtY3NhLnRlc3RvbmxpbmUuc2JlcmJhbmsucnU6NDQ1Ni9DU0FGcm9udC9pbmRleC5k
+byIsImlhdCI6MTU2ODk4MzE1OSwiZXhwIjoxNTY4OTgzNDQ2LCJhdWQiOiJFMzJCODZDMi1FNTUxLUREODMtNT JGRi1GREE2MjA2Q0VBM0MifQ.", "refresh_token": "06728b1a-1ecb-4dd6-b462-9e11c24f9efd" }
+Описание полей ответа
+№   п/п
+Наименование поля
+Описание
+Пример
+1
+access_token
+Сгенерированный Access token.
+f213a511-58d7-4e7c-88b3-a6de380c81da
+2
+token_type
+Тип запрашиваемого токена. Всегда передается значение «Bearer».
+Bearer
+3
+expires_in
+Время в секундах, в течение которого действует Access Token.
+60
+4
+scope
+Список групп персональных данных, на получение которых выдан данный токен. В список так же по умолчанию включается название сервиса API
+openid name https://api.sberbank.ru/sberbankid/userinfo
+5
+id_token
+Закодированный набор атрибутов пользователя в формате base64_url, необходимый для идентификации пользователя.
+eyJhbGciOi-IgZ29zdDM0LTEwLjIwMTIifQ.ewogImlzcyI6ICJodHRwOi8vc2VydmVyLmV4YW1wbGUuY29tIiwKICJzdWIiOiAiMjQ4Mjg5NzYxMDAxIiwKICJhdWQiOiAiMTAwMSIsCi-Aibm9uY2UiOiAibi0wUzZfV3pBMk1qIiwKICJleHAiOiAxMzExMjg0NTcwLAogImlhdCI6IDEzMTEyODA5NzAK4oCcc2lkMuKAnTrigJ0xMjM0NTY4Nzk5MjU14oCdIAog4oCcbmFtZSI6IOKAnNCY0LLQsNC90L7QsiDQmNCy0LDQvSDQmNCy0LDQvdC+0LLQuNGH4oCdCn0.EJqZnRKZVo0Q1ZQLW1COTJLMjd1aGJVSlUxcDFyX3dXMWdGV0ZPRWpYaw
+6
+refresh_token
+Токен, используемый для получения нового access token. Срок жизни составляет 30 дней.
+06728b1a-1ecb-4dd6-b462-9e11c24f9efd
+Развернуть таблицу
+Пример ID Token:
+{
+    "iss": "id.sber.ru",
+    "sub": "74c64d08bdd5e6f2b94770e9fed9342b9054f22bea1571e68448c8cae83e0d80ec206549e11d13fc",
+    "sub_alt": "33ab606d1f18743e9f6cdfe2246525cda981513a118381046541be8e183e0d80ec206549e11d13fc",
+    "aud": "DA5278AC - A07F - C01A -B2D3 - C231DBB2E20F",
+    "exp": 141254872,
+    "iat": 1411250872,
+    "auth_time": 1411250871,
+    "nonce": "n - 0 S6_WzA2Mj",
+    "acr": "urn:sber:id:loa35"
+}
+Шаг 3. Запрос получения данных пользователя
+Параметры запроса﻿
+Для успешного выполнения запроса необходимо использовать сертификат, полученый при регистрации приложения на портале Сбер ID﻿ , по нашей документации.
+Back-end партнера инициирует запрос в back-end банка на получение профиля клиента. Тип запроса - GET.
+Пример запроса:
+Пример
+curl --request GET \
+--url https://oauth-ift.sber.ru/ru/prod/sberbankid/v2.1/userinfo \
+--header 'authorization: Bearer DC3641EC-A0C1-F61A-B2DE-A331C0B2E20F' \
+--header 'x-introspect-rquid:L4hE5nH3wB5lC6sP0bO7bA666yM5bH5h'
+Описание полей  запроса на получение профиля клиента
+№   п/п
+Наименование поля
+Заголовок/поле
+Описание
+Обязательность поля 
+1
+Authorization
+Заголовок
+Полученный ранее access_token, см. Ответ на запрос access token и Id token.В начало необходимо добавить «Bearer», например: Bearer DC3641EC-A0C1-F61A-B2DE-A331C0B2E20F
+Да
+2
+x-introspect-rquid
+Заголовок
+Уникальный идентификатор сообщения, «length=32 и pattern=([0-9][a-f][A-F])32)», переданный во входящем сообщении. Необходим для журналирования входящих вызовов и удобства разбора инцидентов.Чтобы обеспечить уникальность, можно использовать стандартные библиотеки и классы для генерации UUID/GUID(https://ru.wikipedia.org/wiki/UUID﻿ ), убрав из результата разделители «-».
+Да
+Параметры ответа﻿
+При успешной проверке запроса, Банк формирует ответ, содержащий данные клиента, и возвращает его в ответе типа HTTP 200 OK. Ниже приведен пример сообщения.
+Важно!
+Если по клиенту в банке нет запрошенных данных или клиент запретил передачу этих данных, то данный скоуп в ответе будет отсутствовать
+При запросе неразрешенных данному партнеру скоупов будет возвращена ошибка invalid_scope
+Ответ содержит JSON-объект, в котором находятся запрошенные данные пользователя.
+{
+  "sub": "2db933f8184f1f525a338b04e7ac1218a432f",
+  "family_name": "Фамилия",
+  "given_name": "Имя",
+  "middle_name": "Отчество",
+  "birthdate": "01.01.2001",
+  "identification": {
+    "series": "9999",
+    "number": "112233",
+    "issued_by": "Кем выдан",
+    "issued_date": "2001-01-01",
+    "code": "000-000"
+  },
+  "inn": {
+    "number": "771400000000"
+  },
+  "snils": {
+    "number": "999 999 999 99"
+  },
+  "driving_license": {
+    "number": "9999999999"
+  },
+  "priority_doc": {
+    "series": "9999",
+    "number": "112233",
+    "issued_by": "Кем выдан",
+    "issued_date": "2001-01-01",
+    "code": "000-000",
+    "type": 1
+  },
+  "international_passport": {
+    "series": "Z9999",
+    "number": "999999",
+    "issued_by": "Кем выдан",
+    "issued_date": "2001-01-01",
+    "planned_end_date": "2001-01-01"
+  },
+  "sts": {
+    "number": "12345678"
+  },
+  "phone_number": "+7 (903) 1111111",
+  "email": "qwer@qwer.ru",
+  "gender": 1,
+  "citizenship": {
+    "country_code": "Код страны",
+    "country_name": "Наименование страны"
+  },
+  "place_of_birth": "Место рождения",
+  "address": {
+    "full_address": "Полный адрес",
+    "fias_code": "Идентификационный код объекта по ФИАС",
+    "post_index": "Почтовый индекс",
+    "country": "Страна",
+    "region": "Регион",
+    "district": "Район",
+    "city": "Город",
+    "settlement": "Населенный пункт",
+    "street": "Название улицы",
+    "house": "Дом",
+    "building": "Строение",
+    "bulk": "Корпус",
+    "apartment": "Квартира"
+  },
+  "address_of_actual_residence": {
+    "full_address": "Полный адрес",
+    "fias_code": "Идентификационный код объекта по ФИАС",
+    "post_index": "Почтовый индекс",
+    "country": "Страна",
+    "region": "Регион",
+    "district": "Район",
+    "city": "Город",
+    "settlement": "Населенный пункт",
+    "street": "Название улицы",
+    "house": "Дом",
+    "building": "Строение",
+    "bulk": "Корпус",
+    "apartment": "Квартира"
+  },
+  "address_reg": {
+    "full_address": "Полный адрес",
+    "fias_code": "Идентификационный код объекта по ФИАС",
+    "post_index": "Почтовый индекс",
+    "country": "Страна",
+    "region": "Регион",
+    "district": "Район",
+    "city": "Город",
+    "settlement": "Населенный пункт",
+    "street": "Название улицы",
+    "house": "Дом",
+    "building": "Строение",
+    "bulk": "Корпус",
+
+    "apartment": "Квартира"
+  },
+  "work_address": {
+    "full_address": "Полный адрес",
+    "fias_code": "Идентификационный код объекта по ФИАС",
+    "post_index": "Почтовый индекс",
+    "country": "Страна",
+    "region": "Регион",
+    "district": "Район",
+    "city": "Город",
+    "settlement": "Населенный пункт",
+    "street": "Название улицы",
+    "house": "Дом",
+    "building": "Строение",
+    "bulk": "Корпус",
+    "apartment": "Квартира"
+  },
+  "delivery_address": {
+    "full_address": "Полный адрес",
+    "fias_code": "Идентификационный код объекта по ФИАС",
+    "post_index": "Почтовый индекс",
+    "country": "Страна",
+    "region": "Регион",
+    "district": "Район",
+    "city": "Город",
+    "settlement": "Населенный пункт",
+    "street": "Название улицы",
+    "house": "Дом",
+    "building": "Строение",
+    "bulk": "Корпус",
+    "apartment": "Квартира"
+  },
+  "previous_family_name": "Предыдущая фамилия",
+  "previous_given_name": "Предыдущее имя",
+  "previous_middle_name": "Предыдущее отчество",
+  "job_title": "Должность",
+  "place_of_work": "Наименование организации (место работы)",
+  "marital_status": {
+    "code": 1,
+    "description": "Описание"
+  },
+  "education": {
+    "code": 1,
+    "description": "Описание"
+  },
+  "is_self_employed": false,
+  "previous_identification": {
+    "series": "9999",
+    "number": "112233",
+    "issued_by": "Кем выдан",
+    "issued_date": "2001-01-01",
+    "code": "000-000"
+  }
+}
+Описание полей данных пользователя
+Scope
+Наименование поля в ответе
+Описание
+Пример
+Пакет Light
+openid (обязательно)
+sub
+Неизменный уникальный идентификатор клиента, передаваемый внешним потребителям.
+"sub":"e327493e-979a-461f-9ca5-edfab9d6fbab"
+email
+email
+Адрес электронной почты
+"email":“personal@mail.ru”
+mobile
+phone_number
+Номер телефона
+"phone_number":"+7 (000) 000000”
+Пакет Standart
+birthdate
+birthdate
+Дата рождения (формат ГГГГ-ММ-ДД)
+ "birthdate":"0000-00-00"
+name
+family_name, given_name, middle_name
+Фамилия Имя Отчество
+"family_name":"Фамилия"
+"given_name":"Имя"
+"middle_name":"Отчество"
+gender
+gender
+Пол: 1 – мужчина; 2 – женщина;
+"gender":1,
+Пакет Professional
+maindoc
+identification
+Полные данные паспорта: серия,номер,орган, выдавший паспорт,дата выдачи паспорта (формат ГГГГ-ММ-ДД),код подразделения
+"identification":{
+"series":"00 00",
+"number":"000000",
+"issued_by":"Орган выдавший документ",
+"issued_date":"0000-00-00",
+"code":"000-000"
+}
+inn
+inn
+ИНН номер
+"inn":{
+"number":"0000000"
+}
+snils
+snils
+СНИЛС номер
+"snils":{
+"number":"0000000"
+}
+driving_license
+driving_license
+Номер водительского удостоверения
+"driving_license":{
+"number":"111111"
+}
+international_passport
+international_passport
+Заграничный паспорт гражданина РФ:серия документа (формат 00 00),номер документа(формат 000000),кем выдан, дата выдачи (формат ГГГГ-ММ-ДД),дата окончания (формат ГГГГ-ММ-ДД),имя,фамилия
+"international_passport":{
+"series":"777",
+"number":"333",
+"issued_by":"рога и копыта",
+"issued_date":"1981-01-01",
+"planned_end_date":"1999-02-01",
+"name":"name",
+"surname":"surname"
+}
+priority_doc
+priority_doc
+Данные документа, удостоверяющего личность:тип,серия документа (формат 00 00),номер документа (формат 000000),кем выдан, дата выдачи (формат ГГГГ-ММ-ДД),код. Выводится один документ в соответствии со списком приоритетов:Паспорт РФ, Загранпаспорт гражданина РФ, Военный билет, Паспорт моряка, Временное удостоверение, Паспорт иностранного граданина, Вид на жительство иностранного гражданина.
+Доступные типы документов:
+17 - Паспортгражданина РФ
+18 - Загранпаспортгражданина РФ
+7 - Военный билетвоеннослужащего
+21 - Удостоверениеличности моряка
+14 - Временное удостоверение личности гражданина РФ
+10 - Паспорт иностранного гражданина
+75 - Вид на жительство в РФ иностранного гражданина
+"priority_doc":{
+"type":17,
+"series":"777",
+"number":"333",
+"issued_by":"рога и копыта",
+"issued_date":"1981-01-01",
+"code":"adasd"
+}
+citizenship
+citizenship
+Гражданство: последняя по актуальности страна гражданства (наименование на русском языке) и ее код (ОКСМ, буквенное обозначение – Альфа-3)
+"citizenship":{
+"country_code":"countryCode",
+"country_name":"countryName"
+}
+place_of_birth
+place_of_birth
+Место рождения – город рождения клиента (текстовое поле, не кодируется)
+"place_of_birth":”Nsk”
+address_reg
+address_reg
+Адрес регистрации: полный адрес, код ФИАС, почтовый индекс, страна, регион, район, город, поселение, улица, дом, строение, корпус, квартира
+"address_reg":{
+"full_address":"fullAddress",
+"fias_code":"fiasCode",
+"post_index":"postIndex",
+"country":"country",
+"region":"region",
+"district":"district",
+"city":"city",
+"settlement":"settlement",
+"street":"street",
+"house":"house",
+"building":"building",
+"bulk":"bulk",
+"apartment":"apartment"
+}
+work_address
+work_address
+Рабочий адрес: полный адрес, код ФИАС, почтовый индекс, страна, регион, район, город, поселение, улица, дом, строение, корпус, квартира
+"work_address":{
+"full_address":"fullAddress",
+"fias_code":"fiasCode",
+"post_index":"postIndex",
+"country":"country",
+"region":"region",
+"district":"district",
+"city":"city",
+"settlement":"settlement",
+"street":"street",
+"house":"house",
+"building":"building",
+"bulk":"bulk",
+"apartment":"apartment"
+}
+address_of_actual_residence
+address_of_actual_residence
+Адрес места жительства/доставки: полный адрес,код ФИАС,почтовый индекс,страна,регион,район,город,поселение,улица,дом,строение,корпус,квартира
+"address_of_actual_residence":{
+"full_address":"fullAddress",
+"fias_code":"fiasCode",
+"post_index":"postIndex",
+"country":"country",
+"region":"region",
+"district":"district",
+"city":"city",
+"settlement":"settlement",
+"street":"street",
+"house":"house",
+"building":"building",
+"bulk":"bulk",
+"apartment":"apartment"
+}
+delivery_address
+delivery_address
+Адрес для доставки: полный адрес,код ФИАС,почтовый индекс,страна,регион,район,город,поселение,улица,дом,строение,корпус,квартира
+"delivery_address":{
+"full_address":"fullAddress",
+"fias_code":"fiasCode",
+"post_index":"postIndex",
+"country":"country",
+"region":"region",
+"district":"district",
+"city":"city",
+"settlement":"settlement",
+"street":"street",
+"house":"house",
+"building":"building",
+"bulk":"bulk",
+"apartment":"apartment"
+}
+sts
+sts
+Номер СТС
+"sts":{
+"number":"00 00 00000"
+}
+previous_identification
+previous_identification
+Реквизиты ранее выданного паспорта гражданина РФ: Серия документа, Номер документа, Кем выдан, Дата выдачи
+"previous_identification":{
+"series":"00 00",
+"number":"000 000",
+"issued_by":"Орган выдавший документ",
+"issued_date":"0000-00-00"
+}
+previous_name
+previous_family_name, previous_given_name, previous_middle_name
+Предыдущие фамилия, имя, отчество
+"previous_family_name":"Фамилия"
+"previous_given_name":"Имя"
+"previous_middle_name":"Отчество"
+education
+education
+Сведения об образовании:Код + описание,начальное,среднее,среднее специальное,высшее,магистратура и пр.
+"education":{
+"code":"1",
+"description":"начальное"
+}
+place_of_work
+place_of_work
+Наименование организации(место работы)
+"place_of_work": "место работы",
+job_title
+job_title
+Наименование занимаемой должности
+"job_title": "должность"
+marital_status
+marital_status
+Семейное положение:Код + описание,холост,женат,разведен,вдовец/ вдова,раздельное проживание,гражданский брак и пр.
+"marital_status":{
+"code":"1",
+"description":"холост"
+}
+is_self_employed
+is_self_employed
+Признак самозанятого
+"is_self_employed":true
+Развернуть таблицу
+Шаг 4. Подтверждение успешного входа
+Отправка подтверждения успешного завершения авторизации пользователя﻿
+Обязательно к реализации только на ПРОМ контуре!
+Запрос необходимо отправлять после шага "19. Результат обработки ПД клиента" на схеме взаимодействия. Back-end партнера инициирует запрос в back-end банка для подтверждения успешного завершения авторизации пользователя. Тип запроса - GET.
+Пример запроса
+curl --request GET \
+--url https://oauth-ift.sber.ru/api/v2/auth/completed \
+--header 'rquid: L4hE5nH3wB5lC6sP0bO7bA666yM5bH5h'
+--header 'authorization: Bearer DC3641EC-A0C1-F61A-B2DE-A331C0B2E20F'
+Описание полей запроса подтверждения успешной авторизации
+Наименование поля
+Заголовок/поле
+Описание
+Обязательность поля 
+Authorization
+Заголовок
+Полученный ранее access_token, см. Ответ на запрос access token и Id token.В начало необходимо добавить «Bearer», например: Bearer DC3641EC-A0C1-F61A-B2DE-A331C0B2E20F
+Да
+rquid
+Заголовок
+Уникальный идентификатор сообщения, «length=32 и pattern=([0-9][a-f][A-F])32», переданный во входящем сообщении. Необходим для журналирования входящих вызовов и удобства разбора инцидентов.Чтобы обеспечить уникальность, можно использовать стандартные библиотеки и классы для генерации UUID/GUID(https://ru.wikipedia.org/wiki/UUID﻿ ), убрав из результата разделители «-».
+Да
+Параметры ответа
+В случае успешной обработки запроса Back партнера получает ответ типа HTTP 204 No Content.
