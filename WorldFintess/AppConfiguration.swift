@@ -7,10 +7,11 @@ enum AppConfiguration {
     /// Для симулятора: бэкенд на той же машине. На реальном iPhone укажите LAN-IP компьютера (например `http://192.168.1.10:8000/api/v1/`).
     static let apiBaseURLString = "http://worldcashfit.ru/api/v1"
 
-    /// Должен совпадать с `SBER_ID_NATIVE_REDIRECT_URI` на Symfony и с redirect URI в кабинете Сбер ID.
-    static let sberRedirectURI = "worldfitness://auth/callback"
+    /// Совпадает с `SBER_ID_NATIVE_REDIRECT_URI` на бэкенде (HTTPS из кабинета Сбер ID).
+    /// После входа сервер делает 302 на `worldfitness://…` (`SBER_ID_NATIVE_APP_BRIDGE_URI`).
+    static let sberRedirectURI = "https://worldcashfit.ru/api/v1/auth/sber/callback"
 
-    /// Схема для `ASWebAuthenticationSession` (без `://…`).
+    /// Схема для завершения `ASWebAuthenticationSession` после серверного редиректа (без `://…`).
     static let sberURLScheme = "worldfitness"
 
     static let helpURL = URL(string: "https://fitnessclub.example.com/help")!

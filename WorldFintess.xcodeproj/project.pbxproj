@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		FD641A152FBB40F0001864B9 /* SIDSDK in Frameworks */ = {isa = PBXBuildFile; productRef = FD641A152FBB1FFA001864BC /* SIDSDK */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,7 +43,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FD641A152FBB40F0001864B9 /* SIDSDK in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -97,7 +95,6 @@
 			);
 			name = WorldFintess;
 			packageProductDependencies = (
-				FD641A152FBB1FFA001864BC /* SIDSDK */,
 			);
 			productName = WorldFintess;
 			productReference = FD1E64A42F88BCDF0047A5C7 /* WorldFintess.app */;
@@ -155,7 +152,6 @@
 			mainGroup = FD1E649B2F88BCDF0047A5C7;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				FD641A122FBB1FFA001864B9 /* XCRemoteSwiftPackageReference "SIDSDK" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = FD1E64A52F88BCDF0047A5C7 /* Products */;
@@ -462,24 +458,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		FD641A122FBB1FFA001864B9 /* XCRemoteSwiftPackageReference "SIDSDK" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sid-sdk/SIDSDK";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.0.7;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		FD641A152FBB1FFA001864BC /* SIDSDK */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = FD641A122FBB1FFA001864B9 /* XCRemoteSwiftPackageReference "SIDSDK" */;
-			productName = SIDSDK;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FD1E649C2F88BCDF0047A5C7 /* Project object */;
 }
