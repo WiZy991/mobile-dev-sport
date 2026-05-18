@@ -1,0 +1,24 @@
+{
+  "originHash" : "8728fb44e8c57db11a5b02c438d90d2206bb8e30c350042daa252ccc7fdbaf2f",
+  "pins" : [
+    {
+      "identity" : "ios-sdk-package",
+      "kind" : "remoteSourceControl",
+      "location" : "https://gitverse.ru/clickstream/iOS-SDK-Package.git",
+      "state" : {
+        "revision" : "05aac972b297f0bc90ab9e10b37132938337957a",
+        "version" : "1.6.1"
+      }
+    },
+    {
+      "identity" : "sidsdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sid-sdk/SIDSDK",
+      "state" : {
+        "revision" : "74d6856c7c92065b98cab5a6d57e307de231b64c",
+        "version" : "3.0.7"
+      }
+    }
+  ],
+  "version" : 3
+}

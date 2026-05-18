@@ -1,0 +1,79 @@
+import SwiftUI
+
+// MARK: - FitnessClub Android parity (`Color.kt`, `colors.xml`, Material 3 light scheme)
+
+enum Theme {
+    // Primary
+    static let primary = Color(hex: 0xFF6B35)
+    static let primaryVariant = Color(hex: 0xE85A2A)
+    static let onPrimary = Color.white
+
+    // Secondary
+    static let secondary = Color(hex: 0x2C3E50)
+    static let secondaryVariant = Color(hex: 0x1A252F)
+    static let onSecondary = Color.white
+
+    // Surfaces
+    static let background = Color(hex: 0xF5F5F5)
+    static let surface = Color.white
+    static let surfaceVariant = Color(hex: 0xF5F5F5) // Gray100
+    static let onBackground = Color(hex: 0x1C1B1F)
+    static let onSurface = Color(hex: 0x1C1B1F)
+    static let onSurfaceVariant = Color(hex: 0x757575) // Gray600-ish for secondary text
+    static let outlineVariant = Color(hex: 0xE0E0E0) // Gray300
+
+    // Status
+    static let success = Color(hex: 0x4CAF50)
+    static let warning = Color(hex: 0xFFC107)
+    static let error = Color(hex: 0xF44336)
+
+    // Accents
+    static let accentOrange = Color(hex: 0xFF6B35)
+    static let accentBlue = Color(hex: 0x3498DB)
+    static let accentGreen = Color(hex: 0x27AE60)
+
+    /// Экран входа (`LoginScreen.kt`): терракота и кнопка — не общий Primary.
+    static let loginBackground = Color(hex: 0xD35400)
+    static let loginButton = Color(hex: 0xB84A18)
+    static let loginOnBackground = Color.white
+
+    // Nav / top bar (status bar tint on Android = primary)
+    static let navigationBar = primary
+
+    // Radii (dp = pt) — `Shape.kt` AppShapes + screen-specific
+    static let radius12: CGFloat = 12
+    static let radius14: CGFloat = 14
+    static let radius16: CGFloat = 16
+    static let radius18: CGFloat = 18
+    static let radius20: CGFloat = 20
+    static let radius22: CGFloat = 22
+    static let radius28: CGFloat = 28
+}
+
+extension Color {
+    init(hex: UInt32, alpha: Double = 1) {
+        let r = Double((hex >> 16) & 0xFF) / 255
+        let g = Double((hex >> 8) & 0xFF) / 255
+        let b = Double(hex & 0xFF) / 255
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: alpha)
+    }
+}
+
+// MARK: - Typography (Material 3 `Type.kt` — system font = SF Pro, Android uses Roboto)
+
+enum FCTypography {
+    static func displayMedium() -> Font { .system(size: 45, weight: .bold) }
+    static func headlineLarge() -> Font { .system(size: 32, weight: .semibold) }
+    static func headlineMedium() -> Font { .system(size: 28, weight: .semibold) }
+    /// Material `headlineSmall`: 24 / 32 sp, SemiBold
+    static func headlineSmall() -> Font { .system(size: 24, weight: .semibold) }
+    static func titleLarge() -> Font { .system(size: 22, weight: .medium) }
+    static func titleMedium() -> Font { .system(size: 16, weight: .medium) }
+    static func titleSmall() -> Font { .system(size: 14, weight: .medium) }
+    static func bodyLarge() -> Font { .system(size: 16, weight: .regular) }
+    static func bodyMedium() -> Font { .system(size: 14, weight: .regular) }
+    static func bodySmall() -> Font { .system(size: 12, weight: .regular) }
+    static func labelLarge() -> Font { .system(size: 14, weight: .medium) }
+    static func labelMedium() -> Font { .system(size: 12, weight: .medium) }
+    static func labelSmall() -> Font { .system(size: 11, weight: .medium) }
+}

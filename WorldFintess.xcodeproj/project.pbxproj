@@ -6,8 +6,24 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		FD641A152FBB40F0001864B9 /* SIDSDK in Frameworks */ = {isa = PBXBuildFile; productRef = FD641A152FBB1FFA001864BC /* SIDSDK */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		FD2E65072F88BEEF0047A5C7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FD1E649C2F88BCDF0047A5C7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FD1E64A32F88BCDF0047A5C7;
+			remoteInfo = WorldFintess;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		FD1E64A42F88BCDF0047A5C7 /* WorldFintess.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WorldFintess.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FD2E65002F88BEEF0047A5C7 /* WorldFintessTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WorldFintessTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FD3E00012F88BEEF0047A5C7 /* MergedATS.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = MergedATS.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +32,23 @@
 			path = WorldFintess;
 			sourceTree = "<group>";
 		};
+		FD2E65012F88BEEF0047A5C7 /* WorldFintessTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = WorldFintessTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		FD1E64A12F88BCDF0047A5C7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FD641A152FBB40F0001864B9 /* SIDSDK in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FD2E65022F88BEEF0047A5C7 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -32,7 +61,9 @@
 		FD1E649B2F88BCDF0047A5C7 = {
 			isa = PBXGroup;
 			children = (
+				FD3E00012F88BEEF0047A5C7 /* MergedATS.plist */,
 				FD1E64A62F88BCDF0047A5C7 /* WorldFintess */,
+				FD2E65012F88BEEF0047A5C7 /* WorldFintessTests */,
 				FD1E64A52F88BCDF0047A5C7 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				FD1E64A42F88BCDF0047A5C7 /* WorldFintess.app */,
+				FD2E65002F88BEEF0047A5C7 /* WorldFintessTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -65,10 +97,34 @@
 			);
 			name = WorldFintess;
 			packageProductDependencies = (
+				FD641A152FBB1FFA001864BC /* SIDSDK */,
 			);
 			productName = WorldFintess;
 			productReference = FD1E64A42F88BCDF0047A5C7 /* WorldFintess.app */;
 			productType = "com.apple.product-type.application";
+		};
+		FD2E65052F88BEEF0047A5C7 /* WorldFintessTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FD2E650A2F88BEEF0047A5C7 /* Build configuration list for PBXNativeTarget "WorldFintessTests" */;
+			buildPhases = (
+				FD2E65042F88BEEF0047A5C7 /* Sources */,
+				FD2E65022F88BEEF0047A5C7 /* Frameworks */,
+				FD2E65032F88BEEF0047A5C7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FD2E65062F88BEEF0047A5C7 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				FD2E65012F88BEEF0047A5C7 /* WorldFintessTests */,
+			);
+			name = WorldFintessTests;
+			packageProductDependencies = (
+			);
+			productName = WorldFintessTests;
+			productReference = FD2E65002F88BEEF0047A5C7 /* WorldFintessTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -83,6 +139,10 @@
 					FD1E64A32F88BCDF0047A5C7 = {
 						CreatedOnToolsVersion = 16.2;
 					};
+					FD2E65052F88BEEF0047A5C7 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = FD1E64A32F88BCDF0047A5C7;
+					};
 				};
 			};
 			buildConfigurationList = FD1E649F2F88BCDF0047A5C7 /* Build configuration list for PBXProject "WorldFintess" */;
@@ -94,18 +154,29 @@
 			);
 			mainGroup = FD1E649B2F88BCDF0047A5C7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				FD641A122FBB1FFA001864B9 /* XCRemoteSwiftPackageReference "SIDSDK" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = FD1E64A52F88BCDF0047A5C7 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				FD1E64A32F88BCDF0047A5C7 /* WorldFintess */,
+				FD2E65052F88BEEF0047A5C7 /* WorldFintessTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		FD1E64A22F88BCDF0047A5C7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FD2E65032F88BEEF0047A5C7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +193,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FD2E65042F88BEEF0047A5C7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FD2E65062F88BEEF0047A5C7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FD1E64A32F88BCDF0047A5C7 /* WorldFintess */;
+			targetProxy = FD2E65072F88BEEF0047A5C7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		FD1E64B02F88BCE10047A5C7 /* Debug */ = {
@@ -254,7 +340,9 @@
 				DEVELOPMENT_ASSET_PATHS = "\"WorldFintess/Preview Content\"";
 				DEVELOPMENT_TEAM = P4W5H29L9Y;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MergedATS.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -283,7 +371,9 @@
 				DEVELOPMENT_ASSET_PATHS = "\"WorldFintess/Preview Content\"";
 				DEVELOPMENT_TEAM = P4W5H29L9Y;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MergedATS.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -299,6 +389,44 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		FD2E65082F88BEEF0047A5C7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P4W5H29L9Y;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.worldcashbox.WorldFintessTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WorldFintess.app/WorldFintess";
+			};
+			name = Debug;
+		};
+		FD2E65092F88BEEF0047A5C7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P4W5H29L9Y;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.worldcashbox.WorldFintessTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WorldFintess.app/WorldFintess";
 			};
 			name = Release;
 		};
@@ -323,7 +451,35 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		FD2E650A2F88BEEF0047A5C7 /* Build configuration list for PBXNativeTarget "WorldFintessTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FD2E65082F88BEEF0047A5C7 /* Debug */,
+				FD2E65092F88BEEF0047A5C7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FD641A122FBB1FFA001864B9 /* XCRemoteSwiftPackageReference "SIDSDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sid-sdk/SIDSDK";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.7;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FD641A152FBB1FFA001864BC /* SIDSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FD641A122FBB1FFA001864B9 /* XCRemoteSwiftPackageReference "SIDSDK" */;
+			productName = SIDSDK;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FD1E649C2F88BCDF0047A5C7 /* Project object */;
 }

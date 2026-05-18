@@ -1,24 +1,31 @@
-//
-//  ContentView.swift
-//  WorldFintess
-//
-//  Created by Степан on 10.04.2026.
-//
-
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var app: WorldFitnessAppState
+    @State private var showRegister = false
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        Group {
+            if app.isLoggedIn {
+                MainShellView()
+            } else {
+                LoginView {
+                    showRegister = true
+                }
+                .onChange(of: app.isLoggedIn) { _, loggedIn in
+                    if loggedIn { showRegister = false }
+                }
+                .sheet(isPresented: $showRegister) {
+                    RegisterClubPickView()
+                        .environmentObject(app)
+                }
+            }
         }
-        .padding()
+        .preferredColorScheme(.light)
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(WorldFitnessAppState())
 }
