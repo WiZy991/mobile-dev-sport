@@ -1,0 +1,20 @@
+# Подключение HTTPS через nginx перед приложением:
+#   bash scripts/nginx-self-signed-certs.sh
+#   docker compose -f compose.yaml -f compose.https.yaml up -d --build
+#
+# Продакшен (Let's Encrypt): смонтируйте fullchain.pem и privkey.pem в ./docker/nginx/certs/
+# или замените volume в этом файле на путь /etc/letsencrypt/live/<домен>/...
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: crm_backend_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - app

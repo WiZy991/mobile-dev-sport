@@ -3,6 +3,15 @@ framework:
     secret: '%env(APP_SECRET)%'
     http_client: true
 
+    # За nginx / TLS-terminator в Docker (compose.https.yaml): корректные URL и схема https.
+    trusted_proxies:
+        - PRIVATE_SUBNETS
+    trusted_headers:
+        - x-forwarded-for
+        - x-forwarded-port
+        - x-forwarded-proto
+        - x-forwarded-host
+
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 

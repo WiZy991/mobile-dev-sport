@@ -27,7 +27,8 @@ class SberAuthController extends AbstractController
         private readonly string $nativeRedirectUri,
         private readonly string $nativeAppBridgeUri,
         private readonly string $sberClientId,
-    ) {}
+    ) {
+    }
 
     /** Ссылка на авторизацию Сбер ID для текущего пользователя приложения (legacy HTTPS callback). */
     public function authorizeUrl(Request $request): JsonResponse
@@ -417,7 +418,7 @@ HTML;
         $given = isset($merged['given_name']) && is_string($merged['given_name']) ? trim($merged['given_name']) : '';
         $middle = isset($merged['middle_name']) && is_string($merged['middle_name']) ? trim($merged['middle_name']) : '';
 
-        $parts = array_filter([$family, $given, $middle], static fn ($x) => $x !== '');
+        $parts = array_filter([$family, $given, $middle], static fn($x) => $x !== '');
         if ($parts !== []) {
             return implode(' ', $parts);
         }
