@@ -4,8 +4,8 @@ import Foundation
 enum AppConfiguration {
     static let appVersion = "1.0.0"
 
-    /// Для симулятора: бэкенд на той же машине. На реальном iPhone укажите LAN-IP компьютера (например `http://192.168.1.10:8000/api/v1/`).
-    static let apiBaseURLString = "http://worldcashfit.ru/api/v1"
+    /// Публичный API: схема должна совпадать с тем, как открыт сайт (для Сбер ID redirect_uri нужен HTTPS).
+    static let apiBaseURLString = "https://worldcashfit.ru/api/v1"
 
     /// Совпадает с `SBER_ID_NATIVE_REDIRECT_URI` на бэкенде (HTTPS из кабинета Сбер ID).
     /// После входа сервер делает 302 на `worldfitness://…` (`SBER_ID_NATIVE_APP_BRIDGE_URI`).
