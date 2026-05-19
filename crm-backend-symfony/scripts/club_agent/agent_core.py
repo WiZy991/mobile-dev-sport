@@ -218,7 +218,16 @@ class ClubAgent:
             return False, "Укажите URL CRM и gateway_token"
         try:
             code, body = self._crm_client().heartbeat({"probe": True}, log=True)
-            return code == 200, f"HTTP {code} (см. журнал)"
+            if code == 200:
+                return True, f"HTTP {code} (см. журнал)"
+            hint = ""
+            if code == 401 and body.get("reason") == "unauthorized":
+                hint = (
+                    " — неверный или устаревший gateway_token. "
+                    "Админка CRM → «Франшиза» → клуб → скопируйте токен шлюза; "
+                    "после «Сгенерировать новый» вставьте новый токен в агент и «Сохранить всё»."
+                )
+            return False, f"HTTP {code}{hint} (см. журнал)"
         except Exception as e:
             return False, str(e)
 

@@ -14,7 +14,7 @@ from agent_core import ClubAgent
 from c01_configurator import apply_club_setup, read_net, read_state, write_net
 from c01_protocol import exdev_close
 from c01_simulator import C01Simulator
-from config import AgentConfig, config_file_path
+from config import AgentConfig, config_file_path, normalize_crm_base_url
 from equipment import EquipmentItem
 from gui_equipment_tab import build_equipment_tab
 from gui_passage_tab import build_passage_tab
@@ -128,7 +128,11 @@ class AgentApp(tk.Tk):
         self.var_only_fc.set(c.only_fitnessclub_qr)
 
     def _crm_from_fields(self) -> None:
-        self.cfg.crm_base_url = self.var_crm_url.get().strip()
+        raw_url = self.var_crm_url.get().strip()
+        norm_url = normalize_crm_base_url(raw_url)
+        if norm_url != raw_url:
+            self.var_crm_url.set(norm_url)
+        self.cfg.crm_base_url = norm_url
         self.cfg.gateway_token = self.var_token.get().strip()
         self.cfg.device_id = self.var_device_id.get().strip() or "club-agent"
         self.cfg.crm_verify_ssl = bool(self.var_ssl.get())
@@ -576,8 +580,6 @@ class AgentApp(tk.Tk):
         if not qr:
             return
         self._crm_from_fields()
-        self.cfg.crm_base_url = self.var_crm_url.get().strip()
-        self.cfg.gateway_token = self.var_token.get().strip()
         if self.agent and self._running:
             ok, msg = self.agent.submit_qr_manual(qr, self._selected_eq_id)
         else:

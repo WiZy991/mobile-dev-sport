@@ -43,7 +43,8 @@ admin_franchise_save:
 admin_franchise_regenerate_token:
   path: /admin/franchise/{id}/regenerate-token
   controller: App\Controller\Admin\AdminFranchiseController::regenerateToken
-  methods: [POST]
+  # GET: редирект (если открыли ссылку из адресной строки); POST: реальная генерация
+  methods: [GET, POST]
   requirements: { id: '\d+' }
 
 admin_franchise_open_door:

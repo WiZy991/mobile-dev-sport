@@ -1,5 +1,6 @@
 {
-  "crm_base_url": "https://crm.worldcashfit.ru",
+  "_comment_crm_base_url": "Только https://домен без /admin и без /api/v1",
+  "crm_base_url": "https://worldcashfit.ru",
   "gateway_token": "PASTE_FROM_CRM_ADMIN",
   "device_id": "club-1-agent",
   "crm_verify_ssl": true,

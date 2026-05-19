@@ -11,6 +11,29 @@ from typing import Any, Optional
 from equipment import EquipmentItem
 
 
+def normalize_crm_base_url(url: str) -> str:
+    """
+    База для API — только origin, без /admin и без /api/v1 (пути добавляет CrmClient).
+
+    Частая ошибка: вставить из браузера https://домен/admin → 404 на gateway/*.
+    """
+    u = (url or "").strip().rstrip("/")
+    if not u:
+        return u
+    lower = u.lower()
+    while True:
+        changed = False
+        for suffix in ("/admin", "/api/v1", "/api"):
+            if lower.endswith(suffix):
+                u = u[: -len(suffix)].rstrip("/")
+                lower = u.lower()
+                changed = True
+                break
+        if not changed:
+            break
+    return u
+
+
 def _config_dir() -> Path:
     if getattr(sys, "frozen", False):
         portable = Path(sys.executable).parent / "config"
@@ -52,6 +75,9 @@ class AgentConfig:
     heartbeat_interval_sec: float = 30.0
     crm_poll_enabled: bool = True
     only_fitnessclub_qr: bool = True
+
+    def __post_init__(self) -> None:
+        self.crm_base_url = normalize_crm_base_url(self.crm_base_url)
 
     def enabled_equipment(self) -> list[EquipmentItem]:
         return [e for e in self.equipment if e.enabled]

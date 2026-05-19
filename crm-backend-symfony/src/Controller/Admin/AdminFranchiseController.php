@@ -108,9 +108,18 @@ class AdminFranchiseController extends AbstractController
         return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
     }
 
-    public function regenerateToken(int $id): Response
+    public function regenerateToken(int $id, Request $request): Response
     {
         $club = $this->findClubOrFail($id);
+        if (!$request->isMethod('POST')) {
+            $this->addFlash(
+                'warning',
+                'Смена токена выполняется только кнопкой «Сгенерировать токен» на странице клуба (открытие этого адреса в строке браузера не меняет токен).',
+            );
+
+            return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
+        }
+
         $club->setGatewayToken($this->generateToken());
         $this->em->flush();
 
