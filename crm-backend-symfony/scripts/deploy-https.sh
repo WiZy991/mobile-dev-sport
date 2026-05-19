@@ -6,8 +6,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
-# --no-compose-override: на сервере в compose.override.yaml мог остаться app ports "80:8000"
-COMPOSE=(docker compose --no-compose-override -f compose.yaml -f compose.https.yaml)
+# Только эти два файла — без compose.override.yaml (на сервере там мог остаться app ports "80:8000").
+export COMPOSE_FILE="compose.yaml:compose.https.yaml"
+COMPOSE=(docker compose)
 HTTP_PORT="${NGINX_HTTP_PORT:-80}"
 HTTPS_PORT="${NGINX_HTTPS_PORT:-443}"
 

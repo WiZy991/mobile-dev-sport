@@ -2,7 +2,7 @@
 #   bash scripts/deploy-https.sh
 # или вручную:
 #   bash scripts/nginx-self-signed-certs.sh
-#   docker compose --no-compose-override -f compose.yaml -f compose.https.yaml up -d --build
+#   COMPOSE_FILE=compose.yaml:compose.https.yaml docker compose up -d --build
 #
 # Если «Bind for 0.0.0.0:80 failed: port is already allocated» — на хосте уже слушает
 # nginx/apache или другой контейнер. deploy-https.sh останавливает их автоматически.
