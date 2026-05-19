@@ -2,7 +2,7 @@
 #   bash scripts/deploy-https.sh
 # или вручную:
 #   bash scripts/nginx-self-signed-certs.sh
-#   docker compose -f compose.yaml -f compose.https.yaml up -d --build
+#   docker compose --no-compose-override -f compose.yaml -f compose.https.yaml up -d --build
 #
 # Если «Bind for 0.0.0.0:80 failed: port is already allocated» — на хосте уже слушает
 # nginx/apache или другой контейнер. deploy-https.sh останавливает их автоматически.
@@ -10,6 +10,12 @@
 # или замените volume в этом файле на путь /etc/letsencrypt/live/<домен>/...
 
 services:
+  # Только nginx публикует 80/443 на хост. app доступен снаружи лишь на :8000 (отладка).
+  # Если app мапит 80:8000 (старый прод без nginx) — nginx не стартует: «port is already allocated».
+  app:
+    ports:
+      - "8000:8000"
+
   nginx:
     image: nginx:alpine
     container_name: crm_backend_nginx

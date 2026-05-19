@@ -6,7 +6,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
-COMPOSE=(docker compose -f compose.yaml -f compose.https.yaml)
+# --no-compose-override: на сервере в compose.override.yaml мог остаться app ports "80:8000"
+COMPOSE=(docker compose --no-compose-override -f compose.yaml -f compose.https.yaml)
 HTTP_PORT="${NGINX_HTTP_PORT:-80}"
 HTTPS_PORT="${NGINX_HTTPS_PORT:-443}"
 
@@ -63,6 +64,13 @@ ensure_port_free() {
 if [[ ! -f docker/nginx/certs/fullchain.pem || ! -f docker/nginx/certs/privkey.pem ]]; then
   echo "TLS certs not found, generating self-signed..."
   bash scripts/nginx-self-signed-certs.sh
+fi
+
+if "${COMPOSE[@]}" config 2>/dev/null | grep -qE '"80:8000"|80:8000'; then
+  echo "ERROR: сервис app всё ещё мапит 80:8000."
+  echo "Уберите \"80:8000\" из compose.yaml и compose.override.yaml на сервере."
+  echo "С HTTPS порт 80 занимает только nginx."
+  exit 1
 fi
 
 ensure_port_free "${HTTP_PORT}"
