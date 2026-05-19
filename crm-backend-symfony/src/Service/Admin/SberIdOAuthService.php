@@ -198,12 +198,26 @@ final class SberIdOAuthService
 
         $pkcs12 = trim($this->mtlsPkcs12Path);
         if ($pkcs12 !== '') {
-            // Symfony HttpClient: нельзя задавать CURLOPT_SSLCERT / пароль к сертификату через extra.curl
-            // (@see CurlHttpClient::validateExtraCurlOptions) — нужны ключи запроса local_cert и passphrase.
-            // Тип PKCS#12 libcurl обычно определяёт по содержимому файла без CURLOPT_SSLCERTTYPE.
+            // Путь только через local_cert (+ passphrase) — иначе validateExtraCurlOptions ругается на CURLOPT_SSLCERT.
+            // Тип PKCS#12 обязателен: без CURLOPT_SSLCERTTYPE=P12 openssl пытается читать .p12 как PEM → «no start line».
             $options['local_cert'] = $pkcs12;
-            if ($this->mtlsPkcs12Password !== '') {
-                $options['passphrase'] = $this->mtlsPkcs12Password;
+            $pass = $this->mtlsPkcs12Password;
+            if ($pass !== '') {
+                $options['passphrase'] = $pass;
+            }
+
+            $extra = $options['extra'] ?? [];
+            $curl = $extra['curl'] ?? [];
+            if (\defined('CURLOPT_SSLCERTTYPE')) {
+                $curl[\CURLOPT_SSLCERTTYPE] = 'P12';
+            }
+            // Пароль контейнера .p12: для PEM достаточно CURLOPT_KEYPASSWD (Symfony «passphrase»), для PKCS12 иногда нужен SSLCERTPASSWD.
+            if ($pass !== '' && \defined('CURLOPT_SSLCERTPASSWD')) {
+                $curl[\CURLOPT_SSLCERTPASSWD] = $pass;
+            }
+            if ($curl !== []) {
+                $extra['curl'] = $curl;
+                $options['extra'] = $extra;
             }
         }
 
