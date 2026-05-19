@@ -15,6 +15,10 @@ RUN apt-get update \
     && update-ca-certificates \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install curl gd intl pdo_mysql zip \
+    && printf '%s\n' \
+        'openssl.cafile=/etc/ssl/certs/ca-certificates.crt' \
+        'curl.cainfo=/etc/ssl/certs/ca-certificates.crt' \
+        > /usr/local/etc/php/conf.d/99-ca.ini \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

@@ -17,6 +17,7 @@ final class SberIdOAuthService
         private readonly string $authorizeUrl,
         private readonly string $tokenUrl,
         private readonly ?string $userInfoUrl,
+        private readonly bool $verifySsl = true,
     ) {
     }
 
@@ -98,14 +99,14 @@ final class SberIdOAuthService
 
         $rquid = strtoupper(bin2hex(random_bytes(16)));
 
-        $response = $this->httpClient->request('POST', $this->tokenUrl, [
+        $response = $this->httpClient->request('POST', $this->tokenUrl, $this->withTlsOptions([
             'headers' => [
                 'Content-Type' => 'application/x-www-form-urlencoded',
                 'Accept' => 'application/json',
                 'rquid' => $rquid,
             ],
             'body' => http_build_query($body),
-        ]);
+        ]));
 
         $data = $response->toArray(false);
         if (($data['error'] ?? null) !== null) {
@@ -124,17 +125,34 @@ final class SberIdOAuthService
         }
 
         $rquid = strtoupper(bin2hex(random_bytes(16)));
-        $response = $this->httpClient->request('GET', $url, [
+        $response = $this->httpClient->request('GET', $url, $this->withTlsOptions([
             'headers' => [
                 'Accept' => 'application/json',
                 'Authorization' => 'Bearer ' . $accessToken,
                 'rquid' => $rquid,
             ],
-        ]);
+        ]));
 
         $data = $response->toArray(false);
 
         return is_array($data) ? $data : [];
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function withTlsOptions(array $options): array
+    {
+        if ($this->verifySsl) {
+            return $options;
+        }
+
+        return array_merge($options, [
+            'verify_peer' => false,
+            'verify_host' => false,
+        ]);
     }
 
     /** @return array<string, mixed> */
