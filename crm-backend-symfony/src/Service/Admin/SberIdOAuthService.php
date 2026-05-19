@@ -110,10 +110,46 @@ final class SberIdOAuthService
 
         $data = $response->toArray(false);
         if (($data['error'] ?? null) !== null) {
-            throw new \RuntimeException('Сбер ID token error: ' . ($data['error_description'] ?? $data['error']));
+            throw new \RuntimeException('Сбер ID token error: ' . self::stringifyTokenErrorMessage($data));
         }
 
         return $data;
+    }
+
+    /**
+     * У Сбера поля error / error_description иногда приходят объектом/массивом в JSON — строковая конкатенация давала Warning.
+     *
+     * @param array<string, mixed> $data
+     */
+    private static function stringifyTokenErrorMessage(array $data): string
+    {
+        $parts = [];
+        foreach (['error_description', 'error'] as $key) {
+            if (!array_key_exists($key, $data)) {
+                continue;
+            }
+            $v = $data[$key];
+            if (is_string($v)) {
+                $parts[] = trim($v);
+
+                continue;
+            }
+            if (is_scalar($v)) {
+                $parts[] = (string) $v;
+
+                continue;
+            }
+            if ($v !== null) {
+                $encoded = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                if ($encoded !== false && $encoded !== '') {
+                    $parts[] = $encoded;
+                }
+            }
+        }
+
+        $merged = trim(implode(' — ', array_filter($parts, static fn ($s) => $s !== '')), " \t\n\r\0\x0B—");
+
+        return $merged !== '' ? $merged : 'unknown_error';
     }
 
     /** @return array<string, mixed> */
