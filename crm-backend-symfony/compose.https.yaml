@@ -1,10 +1,11 @@
 # Подключение HTTPS через nginx перед приложением:
+#   bash scripts/deploy-https.sh
+# или вручную:
 #   bash scripts/nginx-self-signed-certs.sh
 #   docker compose -f compose.yaml -f compose.https.yaml up -d --build
 #
-# ВАЖНО: у сервиса app в compose.yaml должны быть только "8000:8000" (или без публикации порта).
-# Не ставьте "80:8000" на app — порт 80 занимает только nginx, иначе Bind for 0.0.0.0:80 failed.
-#
+# Если «Bind for 0.0.0.0:80 failed: port is already allocated» — на хосте уже слушает
+# nginx/apache или другой контейнер. deploy-https.sh останавливает их автоматически.
 # Продакшен (Let's Encrypt): смонтируйте fullchain.pem и privkey.pem в ./docker/nginx/certs/
 # или замените volume в этом файле на путь /etc/letsencrypt/live/<домен>/...
 
@@ -16,8 +17,8 @@ services:
     networks:
       - crm_backend_net
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./docker/nginx/certs:/etc/nginx/certs:ro
