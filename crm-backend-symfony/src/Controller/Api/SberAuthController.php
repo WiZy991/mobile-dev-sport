@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\User;
 use App\Service\Admin\SberIdOAuthService;
 use App\Service\Api\MobileAuthTokenIssuer;
+use App\Service\Api\SberIdProfileApplicator;
 use App\Service\Api\SberMobileAuthService;
 use App\Service\Api\SberOAuthPkceStateService;
 use App\Service\CurrentUserResolver;
@@ -24,6 +25,7 @@ class SberAuthController extends AbstractController
         private readonly SberIdOAuthService $sberId,
         private readonly SberOAuthPkceStateService $pkceState,
         private readonly MobileAuthTokenIssuer $mobileTokens,
+        private readonly SberIdProfileApplicator $sberProfile,
         private readonly string $nativeRedirectUri,
         private readonly string $nativeAppBridgeUri,
         private readonly string $sberClientId,
@@ -237,8 +239,8 @@ class SberAuthController extends AbstractController
             return $this->json(['error' => 'account_conflict', 'message' => $e->getMessage()], 409);
         }
 
-        $this->applySberProfile($user, $merged);
-        $this->markSberVerified($user, $claims, $sub);
+        $this->sberProfile->apply($user, $merged);
+        $this->markSberVerified($user, $claims, $sub, $merged);
 
         $this->em->persist($user);
         $this->em->flush();
@@ -305,9 +307,9 @@ class SberAuthController extends AbstractController
         $accessToken = isset($tokens['access_token']) && is_string($tokens['access_token']) ? $tokens['access_token'] : '';
         $userinfo = $accessToken !== '' ? $this->sberId->fetchUserInfo($accessToken) : [];
         $merged = array_merge($claims, $userinfo);
-        $this->applySberProfile($user, $merged);
+        $this->sberProfile->apply($user, $merged);
 
-        $this->markSberVerified($user, $claims, $sub);
+        $this->markSberVerified($user, $claims, $sub, $merged);
         $this->em->flush();
 
         return new Response($this->htmlResult(true, 'Верификация успешна. Вернитесь в приложение и нажмите «Купить» ещё раз — затем откроется оплата (когда будет подключён эквайринг).'));
@@ -358,8 +360,8 @@ HTML;
             return $sessionUser;
         }
 
-        $email = $this->pickEmail($merged);
-        $phone = $this->pickPhone($merged);
+        $email = $this->sberProfile->extractEmailForLookup($merged);
+        $phone = $this->sberProfile->extractPhoneForLookup($merged);
 
         $candidates = [];
         if ($email !== null) {
@@ -384,37 +386,15 @@ HTML;
         $user
             ->setEmail($email ?? $this->placeholderEmail($sub))
             ->setPhone($phone ?? '+7 900 000-00-00')
-            ->setName($this->pickDisplayName($merged))
+            ->setName($this->sberProfile->extractDisplayName($merged))
             ->setBonusPoints(0)
             ->setIsBlocked(false);
 
         return $user;
     }
 
-    /** @param array<string, mixed> $merged */
-    private function applySberProfile(User $user, array $merged): void
-    {
-        $email = $this->pickEmail($merged);
-        if ($email !== null && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $other = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
-            if ($other === null || $other->getId() === $user->getId()) {
-                $user->setEmail($email);
-            }
-        }
-
-        $phone = $this->pickPhone($merged);
-        if ($phone !== null && $phone !== '') {
-            $user->setPhone($phone);
-        }
-
-        $name = $this->pickDisplayName($merged);
-        if ($name !== '' && $name !== 'Клиент Сбер ID') {
-            $user->setName($name);
-        }
-    }
-
-    /** @param array<string, mixed> $claims */
-    private function markSberVerified(User $user, array $claims, ?string $sub): void
+    /** @param array<string, mixed> $claims Claims id_token; $profileMerged — merge с ответом userinfo для аудита CRM. */
+    private function markSberVerified(User $user, array $claims, ?string $sub, array $profileMerged = []): void
     {
         $user
             ->setVerified(true)
@@ -423,58 +403,10 @@ HTML;
             ->setPassportVerifiedAt(new \DateTimeImmutable())
             ->setPassportVerificationProvider('sber_id')
             ->setPassportVerificationSubject($sub)
-            ->setPassportVerificationAuditJson((string) json_encode($claims, JSON_UNESCAPED_UNICODE));
-    }
-
-    /** @param array<string, mixed> $merged */
-    private function pickEmail(array $merged): ?string
-    {
-        foreach (['email', 'preferred_username'] as $k) {
-            if (isset($merged[$k]) && is_string($merged[$k])) {
-                $e = trim($merged[$k]);
-                if ($e !== '') {
-                    return $e;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /** @param array<string, mixed> $merged */
-    private function pickPhone(array $merged): ?string
-    {
-        foreach (['phone_number', 'mobile', 'tel'] as $k) {
-            if (isset($merged[$k]) && is_string($merged[$k])) {
-                $p = trim($merged[$k]);
-                if ($p !== '') {
-                    return $this->formatRussianPhoneDigits($p);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /** @param array<string, mixed> $merged */
-    private function pickDisplayName(array $merged): string
-    {
-        $family = isset($merged['family_name']) && is_string($merged['family_name']) ? trim($merged['family_name']) : '';
-        $given = isset($merged['given_name']) && is_string($merged['given_name']) ? trim($merged['given_name']) : '';
-        $middle = isset($merged['middle_name']) && is_string($merged['middle_name']) ? trim($merged['middle_name']) : '';
-
-        $parts = array_filter([$family, $given, $middle], static fn($x) => $x !== '');
-        if ($parts !== []) {
-            return implode(' ', $parts);
-        }
-        if (isset($merged['name']) && is_string($merged['name'])) {
-            $n = trim($merged['name']);
-            if ($n !== '') {
-                return $n;
-            }
-        }
-
-        return 'Клиент Сбер ID';
+            ->setPassportVerificationAuditJson((string) json_encode([
+                'id_token' => $claims,
+                'userinfo_merge' => $profileMerged,
+            ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
     }
 
     private function placeholderEmail(string $sub): string
@@ -482,26 +414,6 @@ HTML;
         $hash = substr(hash('sha256', $sub), 0, 20);
 
         return 'sber-' . $hash . '@placeholder.worldfitness.local';
-    }
-
-    private function formatRussianPhoneDigits(string $raw): string
-    {
-        $digits = preg_replace('/\D+/', '', $raw) ?? '';
-        if ($digits === '') {
-            return $raw;
-        }
-        if (strlen($digits) === 10) {
-            $digits = '7' . $digits;
-        }
-        if (strlen($digits) === 11 && $digits[0] === '8') {
-            $digits = '7' . substr($digits, 1);
-        }
-        if (strlen($digits) !== 11 || $digits[0] !== '7') {
-            return $raw;
-        }
-        $n = substr($digits, 1);
-
-        return sprintf('+7 %s %s-%s-%s', substr($n, 0, 3), substr($n, 3, 3), substr($n, 6, 2), substr($n, 8, 2));
     }
 
     private function normalizePhoneKey(string $phone): string

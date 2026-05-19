@@ -15,6 +15,8 @@ parameters:
     sber_id_ssl_verify_default: true
     sber_id_mtls_pkcs12_default: ''
     sber_id_mtls_pass_default: ''
+    # Scope авторизации OIDC — набор должен быть подключён в кабинете Сбер ID (см. WorldFitness/instruction.txt).
+    sber_id_oidc_scope_default: 'openid profile email mobile name birthdate gender maindoc priority_doc'
 
 services:
     # default configuration for services in *this* file
@@ -37,6 +39,7 @@ services:
             $verifySsl: '%env(bool:default:sber_id_ssl_verify_default:SBER_ID_SSL_VERIFY)%'
             $mtlsPkcs12Path: '%env(default:sber_id_mtls_pkcs12_default:SBER_ID_MTLS_PKCS12)%'
             $mtlsPkcs12Password: '%env(default:sber_id_mtls_pass_default:SBER_ID_MTLS_PKCS12_PASS)%'
+            $oidcAuthorizeScope: '%env(default:sber_id_oidc_scope_default:SBER_ID_OIDC_SCOPE)%'
 
     App\Service\Api\SberOAuthPkceStateService:
         arguments:

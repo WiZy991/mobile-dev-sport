@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 
 use App\Entity\User;
 use App\Service\Admin\SberIdOAuthService;
+use App\Service\Api\SberIdProfileApplicator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,6 +18,7 @@ final class AdminSberIdController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SberIdOAuthService $sberId,
+        private readonly SberIdProfileApplicator $sberProfile,
         private readonly string $sberRedirectUri,
     ) {
     }
@@ -98,6 +100,12 @@ final class AdminSberIdController extends AbstractController
         $claims = $this->sberId->decodeIdTokenPayload($idToken);
         $sub = isset($claims['sub']) && is_string($claims['sub']) ? $claims['sub'] : null;
 
+        $accessToken = isset($tokens['access_token']) && is_string($tokens['access_token']) ? $tokens['access_token'] : '';
+        $userinfo = $accessToken !== '' ? $this->sberId->fetchUserInfo($accessToken) : [];
+        $merged = array_merge($claims, $userinfo);
+
+        $this->sberProfile->apply($client, $merged);
+
         $client
             ->setVerified(true)
             ->setSberId($sub)
@@ -105,7 +113,10 @@ final class AdminSberIdController extends AbstractController
             ->setPassportVerifiedAt(new \DateTimeImmutable())
             ->setPassportVerificationProvider('sber_id')
             ->setPassportVerificationSubject($sub)
-            ->setPassportVerificationAuditJson((string) json_encode($claims, JSON_UNESCAPED_UNICODE));
+            ->setPassportVerificationAuditJson((string) json_encode([
+                'id_token' => $claims,
+                'userinfo_merge' => $merged,
+            ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
 
         $this->em->flush();
         $this->addFlash('success', 'Клиент отмечен как верифицированный через Сбер ID.');

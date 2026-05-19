@@ -25,10 +25,19 @@ final class SberIdOAuthService
         private readonly bool $verifySsl = true,
         private readonly string $mtlsPkcs12Path = '',
         private readonly string $mtlsPkcs12Password = '',
+        private readonly string $oidcAuthorizeScope = '',
     ) {
         $this->clientId = trim($clientId);
         $this->clientSecret = trim($clientSecret);
     }
+
+    private function effectiveOidcScope(): string
+    {
+        $s = trim($this->oidcAuthorizeScope);
+
+        return $s !== '' ? $s : 'openid profile email mobile name birthdate gender maindoc priority_doc';
+    }
+
     public function isConfigured(): bool
     {
         return $this->clientId !== '' && $this->clientSecret !== '';
@@ -36,14 +45,17 @@ final class SberIdOAuthService
 
     /**
      * Авторизация без PKCE (CRM / legacy mobile redirect на HTTPS callback).
+     * Scope должен включать нужные продукты согласия в Сбер ID (email, mobile, name, maindoc…).
      */
     public function buildAuthorizeUrl(string $redirectUri, string $state, string $nonce): string
     {
-        return $this->buildAuthorizeUrlInternal($redirectUri, $state, $nonce, null, null, 'openid');
+        return $this->buildAuthorizeUrlInternal($redirectUri, $state, $nonce, null, null, $this->effectiveOidcScope());
     }
 
     /**
      * Авторизация с PKCE (нативное приложение).
+     *
+     * @param non-empty-string|null $scope Если null — из SBER_ID_OIDC_SCOPE или дефолт с нужными наборами от Сбер ID.
      */
     public function buildAuthorizeUrlWithPkce(
         string $redirectUri,
@@ -51,7 +63,7 @@ final class SberIdOAuthService
         string $nonce,
         string $codeChallenge,
         string $codeChallengeMethod,
-        string $scope = 'openid profile email mobile',
+        ?string $scope = null,
     ): string {
         return $this->buildAuthorizeUrlInternal(
             $redirectUri,
@@ -59,7 +71,7 @@ final class SberIdOAuthService
             $nonce,
             $codeChallenge,
             $codeChallengeMethod,
-            $scope,
+            $scope ?? $this->effectiveOidcScope(),
         );
     }
 
@@ -174,6 +186,7 @@ final class SberIdOAuthService
                 'Accept' => 'application/json',
                 'Authorization' => 'Bearer ' . $accessToken,
                 'rquid' => $rquid,
+                'x-introspect-rquid' => $rquid,
             ],
         ]));
 
