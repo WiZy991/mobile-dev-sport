@@ -1,0 +1,23 @@
+{
+  "crm_base_url": "https://crm.worldcashfit.ru",
+  "gateway_token": "PASTE_FROM_CRM_ADMIN",
+  "device_id": "club-1-agent",
+  "crm_verify_ssl": true,
+  "equipment": [
+    {
+      "id": "a1b2c3d4",
+      "name": "Турникет вход",
+      "device_type": "perco_c01",
+      "enabled": true,
+      "listen_host": "0.0.0.0",
+      "listen_port": 8765,
+      "password": "",
+      "exdev_number": 0,
+      "exdev_direction": 0,
+      "open_type": "open once",
+      "open_time_ms": 3000,
+      "notes": ""
+    }
+  ],
+  "only_fitnessclub_qr": true
+}
