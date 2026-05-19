@@ -211,10 +211,7 @@ final class SberIdOAuthService
             if (\defined('CURLOPT_SSLCERTTYPE')) {
                 $curl[\CURLOPT_SSLCERTTYPE] = 'P12';
             }
-            // Пароль контейнера .p12: для PEM достаточно CURLOPT_KEYPASSWD (Symfony «passphrase»), для PKCS12 иногда нужен SSLCERTPASSWD.
-            if ($pass !== '' && \defined('CURLOPT_SSLCERTPASSWD')) {
-                $curl[\CURLOPT_SSLCERTPASSWD] = $pass;
-            }
+            // Пароль P12 задаётся только через «passphrase» → CURLOPT_KEYPASSWD (CURLOPT_SSLCERTPASSWD через extra запрещён Symfony).
             if ($curl !== []) {
                 $extra['curl'] = $curl;
                 $options['extra'] = $extra;
