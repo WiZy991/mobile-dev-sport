@@ -118,7 +118,10 @@ class AuthRepository @Inject constructor(
         return humanizeKnownAuthMessages(base)
     }
 
-    private fun humanizeKnownAuthMessages(text: String): String = when (text.trim()) {
+    private fun humanizeKnownAuthMessages(text: String): String = when {
+        text.contains("Method Not Allowed", ignoreCase = true) ->
+            "Ошибка соединения с сервером. Обновите приложение или проверьте интернет."
+        else -> when (text.trim()) {
         "User with this email already exists",
         "Пользователь с таким email уже существует",
         "Пользователь с таким email уже зарегистрирован" ->
@@ -127,5 +130,6 @@ class AuthRepository @Inject constructor(
         "User not found" -> "Неверный email или пароль"
         "Access denied" -> "Доступ запрещён"
         else -> text
+        }
     }
 }

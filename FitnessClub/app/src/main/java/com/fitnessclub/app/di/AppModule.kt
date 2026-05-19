@@ -24,9 +24,9 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
     
-    // Прод: порт 80 (на VPS Docker маппит 80->8000 внутри контейнера; снаружи :8000 не слушается).
-    // Локально с compose «ports: 8000:8000» — временно поставьте http://10.0.2.2:8000/api/v1/ (эмулятор).
-    private const val BASE_URL = "http://worldcashfit.ru/api/v1/"
+    // Прод: только HTTPS. http:// даёт 301→https, OkHttp при редиректе превращает POST в GET → 405 на /auth/login.
+    // Локально с compose «ports: 8000:8000» — http://10.0.2.2:8000/api/v1/ (эмулятор).
+    private const val BASE_URL = "https://worldcashfit.ru/api/v1/"
     
     @Provides
     @Singleton
