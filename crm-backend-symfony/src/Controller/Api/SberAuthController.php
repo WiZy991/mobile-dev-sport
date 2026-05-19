@@ -58,7 +58,7 @@ class SberAuthController extends AbstractController
      */
     public function loginGet(Request $request): JsonResponse
     {
-        return $this->buildLoginJsonResponse($request->query->all());
+        return $this->buildLoginJsonResponse($this->normalizePkceLoginParams($request->query->all()));
     }
 
     /**
@@ -66,13 +66,54 @@ class SberAuthController extends AbstractController
      */
     public function loginPost(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true);
+        $data = $this->decodeJsonBody($request);
 
-        return $this->buildLoginJsonResponse(is_array($data) ? $data : []);
+        return $this->buildLoginJsonResponse($this->normalizePkceLoginParams($data));
     }
 
     /**
-     * Нативный callback: приложение передаёт authorization code + code_verifier.
+     * @return array<string, mixed>
+     */
+    private function decodeJsonBody(Request $request): array
+    {
+        $raw = $request->getContent();
+        if ($raw === '') {
+            return [];
+        }
+        try {
+            $data = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * iOS/Android иногда шлют camelCase без snake_case; принимаем оба варианта.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizePkceLoginParams(array $params): array
+    {
+        $aliases = [
+            'codeChallenge' => 'code_challenge',
+            'codeChallengeMethod' => 'code_challenge_method',
+            'redirectUri' => 'redirect_uri',
+        ];
+        foreach ($aliases as $from => $to) {
+            if (!isset($params[$to]) && array_key_exists($from, $params) && is_scalar($params[$from])) {
+                $params[$to] = (string) $params[$from];
+            }
+        }
+
+        return $params;
+    }
+
+    /**
+     * Собирает JSON с authorize_url для PKCE (GET/POST /auth/sber/login).
      *
      * @param array<string, mixed> $params
      */
@@ -130,7 +171,11 @@ class SberAuthController extends AbstractController
             return $this->json(['error' => 'sber_native_redirect_missing'], 503);
         }
 
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $this->decodeJsonBody($request);
+        $data = $this->normalizePkceLoginParams($data);
+        if (!isset($data['code_verifier']) && isset($data['codeVerifier']) && is_string($data['codeVerifier'])) {
+            $data['code_verifier'] = $data['codeVerifier'];
+        }
         $code = isset($data['code']) && is_string($data['code']) ? trim($data['code']) : '';
         $verifier = isset($data['code_verifier']) && is_string($data['code_verifier']) ? trim($data['code_verifier']) : '';
         $redirectUri = isset($data['redirect_uri']) && is_string($data['redirect_uri']) ? trim($data['redirect_uri']) : '';
