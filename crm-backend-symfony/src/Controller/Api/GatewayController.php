@@ -79,8 +79,13 @@ class GatewayController extends AbstractController
 
         // Окно валидности QR — 15 секунд (синхронно с мобильным приложением).
         $nowMs = (int) (microtime(true) * 1000);
-        if (abs($nowMs - $timestamp) > 15_000) {
-            return $this->denied($log, 'qr_expired', 400);
+        $deltaMs = abs($nowMs - $timestamp);
+        if ($deltaMs > 15_000) {
+            return $this->denied($log, 'qr_expired', 400, [
+                'delta_ms' => $deltaMs,
+                'server_now_ms' => $nowMs,
+                'qr_timestamp_ms' => $timestamp,
+            ]);
         }
 
         $userId = str_starts_with($userExternalId, 'user-')
@@ -303,16 +308,19 @@ class GatewayController extends AbstractController
         ]));
     }
 
-    private function denied(AccessLog $log, string $reason, int $status): JsonResponse
+    /**
+     * @param  array<string, mixed>  $extra  Доп. поля в JSON (например отладка qr_expired для шлюза).
+     */
+    private function denied(AccessLog $log, string $reason, int $status, array $extra = []): JsonResponse
     {
         $log->setReason($reason);
         $this->em->persist($log);
         $this->em->flush();
 
-        return $this->json([
+        return $this->json(array_merge([
             'access_granted' => false,
             'reason' => $reason,
-        ], $status);
+        ], $extra), $status);
     }
 
     /**

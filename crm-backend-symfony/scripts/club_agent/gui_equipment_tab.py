@@ -68,8 +68,12 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
     _row(conn, "Порт (для C01)", ttk.Entry(conn, textvariable=app.var_eq_port), 2)
     _row(conn, "IP контроллера", ttk.Entry(conn, textvariable=app.var_c01_ip), 3)
     _row(conn, "Порт WS на C01", ttk.Entry(conn, textvariable=app.var_c01_ws_port), 4)
-
-    auth = ttk.LabelFrame(right, text="2. Пароль доступа", padding=8)
+    ttk.Label(
+        conn,
+        text="Если в журнале «HTTP 200» при подключении — это не WebSocket (часто порт 80 = веб-страница). Укажите порт WS из документации C01 или перейдите в режим «Слушать» (8765) после записи net.server.",
+        foreground="gray",
+        wraplength=560,
+    ).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(4, 0))
     auth.pack(fill=tk.X, pady=(0, 8))
     auth.columnconfigure(1, weight=1)
     app.var_eq_pwd = tk.StringVar()

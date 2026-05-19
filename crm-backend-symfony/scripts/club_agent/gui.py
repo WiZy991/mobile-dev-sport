@@ -22,6 +22,23 @@ from gui_protocol import run_in_thread, run_with_session
 from net_util import get_lan_ip
 
 
+def _format_ws_connect_error(exc: BaseException) -> str:
+    """Пояснение к частой ошибке: на порту 80 отвечает HTTP, а не WebSocket C01."""
+    msg = str(exc)
+    if "WebSocket" in msg and "200" in msg:
+        return (
+            msg
+            + "\n\n——————————————————————————————————\n"
+            "По этому адресу приходит обычный HTTP (часто порт 80 — веб-страница), "
+            "а не ответ WebSocket C01 (нужен код 101 Switching Protocols).\n\n"
+            "Что сделать:\n"
+            "• Укажите порт WebSocket из документации PERCo для вашей прошивки; или\n"
+            "• Режим «Слушать», порт 8765 на ПК → «Записать net» (net.server = IP этого ПК) → "
+            "«Сохранить всё» → перезапуск агента — контроллер сам подключится к ПК."
+        )
+    return msg
+
+
 class AgentApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -258,7 +275,7 @@ class AgentApp(tk.Tk):
                     ),
                 )
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("net", str(e)))
+                self.after(0, lambda err=e: messagebox.showerror("Сеть C01 (net)", _format_ws_connect_error(err)))
 
         self._proto_worker(work)
 
@@ -276,7 +293,7 @@ class AgentApp(tk.Tk):
                 )
                 self.after(0, lambda: messagebox.showinfo("net", "Записано (answer net ok)"))
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("net", str(e)))
+                self.after(0, lambda err=e: messagebox.showerror("Сеть C01 (net)", _format_ws_connect_error(err)))
 
         self._proto_worker(work)
 
@@ -300,7 +317,7 @@ class AgentApp(tk.Tk):
                     ),
                 )
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("state", str(e)))
+                self.after(0, lambda err=e: messagebox.showerror("Состояние C01 (state)", _format_ws_connect_error(err)))
 
         self._proto_worker(work)
 
@@ -330,7 +347,7 @@ class AgentApp(tk.Tk):
                     ),
                 )
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Мастер", str(e)))
+                self.after(0, lambda err=e: messagebox.showerror("Мастер настройки C01", _format_ws_connect_error(err)))
 
         self._proto_worker(work)
 

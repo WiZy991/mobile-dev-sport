@@ -14,7 +14,27 @@ from equipment import EquipmentItem
 
 LOG = logging.getLogger("agent")
 
-Endpoint = Union[C01Server, C01Outbound]
+
+def _repair_mojibake_utf8(value: Any) -> Any:
+    """
+    Если строка — это UTF-8-текст, ошибочно прочитанный как Latin-1 (частая ошибка MySQL/клиента),
+    восстанавливаем нормальный Unicode для отображения в журнале.
+    """
+    if isinstance(value, str):
+        if not value or all(ord(c) < 128 for c in value):
+            return value
+        try:
+            repaired = value.encode("latin-1").decode("utf-8")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            return value
+        if repaired != value and any("\u0400" <= c <= "\u04FF" for c in repaired):
+            return repaired
+        return value
+    if isinstance(value, dict):
+        return {k: _repair_mojibake_utf8(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_repair_mojibake_utf8(v) for v in value]
+    return value
 
 
 class ClubAgent:
@@ -61,12 +81,14 @@ class ClubAgent:
         if request_body is not None:
             self._emit("info", f"  тело: {json.dumps(request_body, ensure_ascii=False)}")
         self._emit("info", f"← HTTP {status}")
-        self._emit("info", f"  тело: {json.dumps(response, ensure_ascii=False)}")
+        display = _repair_mojibake_utf8(response) if isinstance(response, dict) else response
+        self._emit("info", f"  тело: {json.dumps(display, ensure_ascii=False)}")
         granted = response.get("access_granted")
         reason = response.get("reason", "")
         if granted is True:
             user = response.get("user") or {}
-            self._emit("info", f"  итог: ДОПУСК — {user.get('name') or user.get('id', '')}")
+            name = _repair_mojibake_utf8(user.get("name") or user.get("id", ""))
+            self._emit("info", f"  итог: ДОПУСК — {name}")
         elif granted is False:
             self._emit("warning", f"  итог: ОТКАЗ — reason={reason}")
 
@@ -251,7 +273,17 @@ class ClubAgent:
                 self._emit("warning", "CRM разрешил, но C01 не подключён — дверь не открыта")
         reason = body.get("reason", "")
         name = (body.get("user") or {}).get("name", "")
+        if isinstance(name, str):
+            name = _repair_mojibake_utf8(name)
         summary = f"HTTP {code}, granted={granted}, reason={reason}"
+        if reason == "qr_expired":
+            summary += (
+                " — окно 15 с: метка в QR и время сервера CRM разлишком сильно "
+                "(см. в теле ответа delta_ms, server_now_ms, qr_timestamp_ms). "
+                "Обновите QR на вкладке «Проход» / в приложении; на VPS проверьте `date` и NTP."
+            )
+        elif reason == "no_active_subscription":
+            summary += " — у клиента в CRM нет действующего абонемента (админка → клиент → абонемент)."
         if name:
             summary += f", клиент={name}"
         return granted, summary
