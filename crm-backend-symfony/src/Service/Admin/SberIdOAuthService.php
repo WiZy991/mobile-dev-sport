@@ -198,18 +198,13 @@ final class SberIdOAuthService
 
         $pkcs12 = trim($this->mtlsPkcs12Path);
         if ($pkcs12 !== '') {
-            // См. https://developers.sber.ru/docs/ru/sberid/faq/a2-work-with-certificates — без клиентского P12 oauth.sber.ru часто отвечает 401.
-            $curlTls = [
-                \CURLOPT_SSLCERTTYPE => 'P12',
-                \CURLOPT_SSLCERT => $pkcs12,
-            ];
-            $pass = $this->mtlsPkcs12Password;
-            if ($pass !== '') {
-                $curlTls[\CURLOPT_SSLCERTPASSWD] = $pass;
+            // Symfony HttpClient: нельзя задавать CURLOPT_SSLCERT / пароль к сертификату через extra.curl
+            // (@see CurlHttpClient::validateExtraCurlOptions) — нужны ключи запроса local_cert и passphrase.
+            // Тип PKCS#12 libcurl обычно определяёт по содержимому файла без CURLOPT_SSLCERTTYPE.
+            $options['local_cert'] = $pkcs12;
+            if ($this->mtlsPkcs12Password !== '') {
+                $options['passphrase'] = $this->mtlsPkcs12Password;
             }
-            $extra = $options['extra'] ?? [];
-            $extra['curl'] = array_merge($extra['curl'] ?? [], $curlTls);
-            $options['extra'] = $extra;
         }
 
         return $options;
