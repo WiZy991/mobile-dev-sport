@@ -1,8 +1,8 @@
 FROM php:8.4-cli
 
-# ca-certificates + PHP curl (+ бинарь curl для отладки). CA bundle Mozilla — иногда надёжнее только Debian при обращении к oauth.sber.ru.
-# Если curl (60) остаётся — на сети VPS часто HTTPS-инспекция; тогда свой корень в /usr/local/share/ca-certificates/*.crt + update-ca-certificates
-# или временно SBER_ID_SSL_VERIFY=0 в .env.local (небезопасно).
+# Сертификаты oauth.sber.ru выдаются «Russian Trusted Sub CA» (Минцифры). В международных и старых бандлах этих корней нет —
+# добавляем официальные PEM с gu-st.ru, затем единый /etc/ssl/certs/ca-certificates.crt для curl, PHP openssl и Symfony.
+# См. также: developers.sber.ru/help/certificates
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -15,20 +15,22 @@ RUN apt-get update \
         libpng-dev \
         libzip-dev \
         unzip \
+    && curl -fsSL https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt \
+        -o /usr/local/share/ca-certificates/russian-trusted-root.crt \
+    && curl -fsSL https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt \
+        -o /usr/local/share/ca-certificates/russian-trusted-sub.crt \
     && update-ca-certificates \
-    && curl -fsSL https://curl.se/ca/cacert.pem -o /etc/ssl/certs/mozilla-cacert.pem \
-    && chmod 644 /etc/ssl/certs/mozilla-cacert.pem \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install curl gd intl pdo_mysql zip \
     && printf '%s\n' \
-        'openssl.cafile=/etc/ssl/certs/mozilla-cacert.pem' \
-        'curl.cainfo=/etc/ssl/certs/mozilla-cacert.pem' \
+        'openssl.cafile=/etc/ssl/certs/ca-certificates.crt' \
+        'curl.cainfo=/etc/ssl/certs/ca-certificates.crt' \
         > /usr/local/etc/php/conf.d/99-ca.ini \
     && rm -rf /var/lib/apt/lists/*
 
-ENV CURL_CA_BUNDLE=/etc/ssl/certs/mozilla-cacert.pem \
-    SSL_CERT_FILE=/etc/ssl/certs/mozilla-cacert.pem \
-    REQUESTS_CA_BUNDLE=/etc/ssl/certs/mozilla-cacert.pem
+ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
