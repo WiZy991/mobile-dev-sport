@@ -2,6 +2,9 @@
 #   bash scripts/nginx-self-signed-certs.sh
 #   docker compose -f compose.yaml -f compose.https.yaml up -d --build
 #
+# ВАЖНО: у сервиса app в compose.yaml должны быть только "8000:8000" (или без публикации порта).
+# Не ставьте "80:8000" на app — порт 80 занимает только nginx, иначе Bind for 0.0.0.0:80 failed.
+#
 # Продакшен (Let's Encrypt): смонтируйте fullchain.pem и privkey.pem в ./docker/nginx/certs/
 # или замените volume в этом файле на путь /etc/letsencrypt/live/<домен>/...
 
@@ -10,6 +13,8 @@ services:
     image: nginx:alpine
     container_name: crm_backend_nginx
     restart: unless-stopped
+    networks:
+      - crm_backend_net
     ports:
       - "80:80"
       - "443:443"

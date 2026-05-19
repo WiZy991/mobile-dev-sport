@@ -9,12 +9,15 @@ services:
     env_file:
       - .env
       - .env.dev
+    # С compose.https.yaml порт 80/443 открывает только nginx. Здесь только отладочный 8000 на хосте.
     ports:
       - "8000:8000"
     depends_on:
       database:
         condition: service_healthy
     command: sh -c "php bin/console doctrine:database:create --if-not-exists --no-interaction && php bin/console doctrine:schema:update --force --no-interaction && php -S 0.0.0.0:8000 -t public"
+    networks:
+      - crm_backend_net
 
   database:
     image: mysql:8.0
@@ -35,6 +38,13 @@ services:
       start_period: 30s
     volumes:
       - database_data:/var/lib/mysql
+    networks:
+      - crm_backend_net
+
+networks:
+  crm_backend_net:
+    name: crm_backend_symfony_net
+    driver: bridge
 
 volumes:
   database_data:
