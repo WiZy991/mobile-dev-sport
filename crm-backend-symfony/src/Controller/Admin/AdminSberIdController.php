@@ -5,6 +5,7 @@ namespace App\Controller\Admin;
 use App\Entity\User;
 use App\Service\Admin\SberIdOAuthService;
 use App\Service\Api\SberIdProfileApplicator;
+use App\Service\Api\SberIdUserinfoJsonLogger;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,6 +20,7 @@ final class AdminSberIdController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly SberIdOAuthService $sberId,
         private readonly SberIdProfileApplicator $sberProfile,
+        private readonly SberIdUserinfoJsonLogger $sberUserinfoLogger,
         private readonly string $sberRedirectUri,
     ) {
     }
@@ -132,6 +134,8 @@ final class AdminSberIdController extends AbstractController
             ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
 
         $this->em->flush();
+
+        $this->sberUserinfoLogger->log($userinfo);
 
         if ($client->getPassportSeries() && $client->getPassportNumber()) {
             $this->addFlash('success', 'Клиент верифицирован через Сбер ID, паспортные данные сохранены.');

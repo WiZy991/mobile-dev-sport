@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Service\Admin\SberIdOAuthService;
 use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\Api\SberIdProfileApplicator;
+use App\Service\Api\SberIdUserinfoJsonLogger;
 use App\Service\Api\SberMobileAuthService;
 use App\Service\Api\SberOAuthPkceStateService;
 use App\Service\CurrentUserResolver;
@@ -26,6 +27,7 @@ class SberAuthController extends AbstractController
         private readonly SberOAuthPkceStateService $pkceState,
         private readonly MobileAuthTokenIssuer $mobileTokens,
         private readonly SberIdProfileApplicator $sberProfile,
+        private readonly SberIdUserinfoJsonLogger $sberUserinfoLogger,
         private readonly string $nativeRedirectUri,
         private readonly string $nativeAppBridgeUri,
         private readonly string $sberClientId,
@@ -253,6 +255,8 @@ class SberAuthController extends AbstractController
         $this->em->persist($user);
         $this->em->flush();
 
+        $this->sberUserinfoLogger->log($userinfo);
+
         $authPayload = $this->mobileTokens->issue($user, true);
         if (!$user->getPassportSeries() || !$user->getPassportNumber()) {
             $authPayload['sber_profile_hint'] = $this->buildPassportMissingHint($tokens, $merged, $userinfoError);
@@ -332,6 +336,8 @@ class SberAuthController extends AbstractController
 
         $this->markSberVerified($user, $claims, $sub, $merged, $tokens, $userinfoError);
         $this->em->flush();
+
+        $this->sberUserinfoLogger->log($userinfo);
 
         return new Response($this->htmlResult(true, 'Верификация успешна. Вернитесь в приложение и нажмите «Купить» ещё раз — затем откроется оплата (когда будет подключён эквайринг).'));
     }

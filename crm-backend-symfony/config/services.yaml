@@ -63,6 +63,10 @@ services:
         arguments:
             $mobileRedirectUri: '%env(default:sber_id_mobile_redirect_default:SBER_ID_MOBILE_REDIRECT_URI)%'
 
+    App\Service\Api\SberIdUserinfoJsonLogger:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
     App\Controller\Api\SubscriptionController:
         bind:
             $requireSberVerificationBeforePurchase: '%env(bool:SUBSCRIPTION_REQUIRE_SBER)%'

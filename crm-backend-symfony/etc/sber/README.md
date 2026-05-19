@@ -10,3 +10,23 @@
 - **ФИО / телефон / email** — scope `name`, `mobile`, `email` (пакеты Standard / Light).
 - **Паспорт** — только scope **`maindoc`** → в JSON поле **`identification`** (пакет Professional в кабинете [id.sber.ru](https://id.sber.ru)). Без `maindoc` в выданном токене паспорт в CRM не появится, хотя вход будет успешным.
 - В списке клиентов зелёная галочка в колонке «Паспорт» — только если заполнены **серия и номер** в карточке.
+
+## Лог JSON userinfo (как в instruction.txt)
+
+После каждого входа через Сбер ID в контейнере пишется файл:
+
+`/app/var/log/sber-userinfo.log`
+
+Смотреть в реальном времени:
+
+```bash
+docker exec -it crm_backend_app tail -f /app/var/log/sber-userinfo.log
+```
+
+Последний блок (между разделителями `---`):
+
+```bash
+docker exec crm_backend_app tail -n 80 /app/var/log/sber-userinfo.log
+```
+
+Каждый блок между `---` — **тот же JSON**, что в ответе GET userinfo в инструкции (шаг 3): `sub`, `family_name`, `identification`, `phone_number`, … без дополнительных полей-обёрток.
