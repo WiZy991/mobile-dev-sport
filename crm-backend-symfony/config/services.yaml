@@ -9,6 +9,8 @@
 parameters:
     # Пустой redirect по умолчанию, если переменная не задана (см. env var processors).
     sber_id_mobile_redirect_default: ''
+    # Значение по умолчанию для bind SberAuthController::$nativeAppBridgeUri (%env(default:sber_native_app_bridge_default:SBER_ID_NATIVE_APP_BRIDGE_URI)%).
+    sber_native_app_bridge_default: 'worldfitness://auth/callback'
     # Проверка TLS к API Сбера (1/ true = вкл.). Если в сети подмена HTTPS — см. комментарий у SBER_ID_SSL_VERIFY в .env
     sber_id_ssl_verify_default: true
 
