@@ -31,6 +31,14 @@
         </div>
     </div>
 
+    {% if client.sberId and not (client.passportSeries and client.passportNumber) %}
+        <div class="alert alert-warning py-2 small mb-3">
+            <strong>Паспорт из Сбер ID не сохранён.</strong>
+            ФИО и телефон — scope <code>name</code> / <code>mobile</code>; паспорт — scope <code>maindoc</code> (пакет Professional в кабинете Сбер ID) и повторный вход.
+            Галочка в списке — только при заполненных серии и номере паспорта.
+        </div>
+    {% endif %}
+
     <div class="content-card mb-3">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
             <div>

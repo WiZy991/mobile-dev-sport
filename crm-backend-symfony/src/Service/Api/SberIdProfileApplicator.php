@@ -42,6 +42,12 @@ final class SberIdProfileApplicator
         return $this->pickDisplayName($merged);
     }
 
+    /** Есть ли в ответе Сбера блок паспорта (scope maindoc / priority_doc). */
+    public function hasPassportPayload(array $merged): bool
+    {
+        return $this->extractPassportDocument($merged) !== null;
+    }
+
     /** @param array<string, mixed> $merged */
     private function applyEmail(User $user, array $merged): void
     {
@@ -118,14 +124,7 @@ final class SberIdProfileApplicator
     /** @param array<string, mixed> $merged */
     private function applyPassportFromSberDocs(User $user, array $merged): void
     {
-        /** @var array<string, mixed>|null $doc */
-        $doc = null;
-        if (!empty($merged['identification']) && is_array($merged['identification'])) {
-            $doc = $merged['identification'];
-        } elseif (!empty($merged['priority_doc']) && is_array($merged['priority_doc'])) {
-            $doc = $merged['priority_doc'];
-        }
-
+        $doc = $this->extractPassportDocument($merged);
         if ($doc === null) {
             return;
         }
@@ -142,24 +141,95 @@ final class SberIdProfileApplicator
                 $user->setPassportNumber(mb_substr($n, 0, 10));
             }
         }
-        if (isset($doc['issued_by']) && is_string($doc['issued_by'])) {
-            $by = trim($doc['issued_by']);
+        if (isset($doc['issued_by']) && is_scalar($doc['issued_by'])) {
+            $by = trim((string) $doc['issued_by']);
             if ($by !== '') {
                 $user->setPassportIssuedBy(mb_substr($by, 0, 255));
             }
         }
-        if (isset($doc['issued_date']) && is_string($doc['issued_date'])) {
-            $id = self::parseSberFlexibleDate(trim($doc['issued_date']));
+        if (isset($doc['issued_date']) && is_scalar($doc['issued_date'])) {
+            $id = self::parseSberFlexibleDate(trim((string) $doc['issued_date']));
             if ($id !== null) {
                 $user->setPassportIssueDate($id);
             }
         }
-        if (isset($doc['code']) && is_string($doc['code'])) {
-            $c = preg_replace('/\s+/', '', trim($doc['code'])) ?: '';
+        if (isset($doc['code']) && is_scalar($doc['code'])) {
+            $c = preg_replace('/\s+/', '', trim((string) $doc['code'])) ?: '';
             if ($c !== '') {
                 $user->setPassportDepartmentCode(mb_substr($c, 0, 10));
             }
         }
+    }
+
+    /**
+     * Паспорт в userinfo: scope maindoc → identification, priority_doc (instruction.txt).
+     *
+     * @param array<string, mixed> $merged
+     *
+     * @return array<string, mixed>|null
+     */
+    private function extractPassportDocument(array $merged): ?array
+    {
+        foreach (['identification', 'priority_doc', 'maindoc', 'previous_identification'] as $key) {
+            if (!array_key_exists($key, $merged)) {
+                continue;
+            }
+            $doc = self::normalizeDocNode($merged[$key]);
+            if ($doc !== null && self::docLooksLikePassport($doc)) {
+                return $doc;
+            }
+        }
+
+        $series = isset($merged['passport_series']) && is_scalar($merged['passport_series'])
+            ? trim((string) $merged['passport_series']) : '';
+        $number = isset($merged['passport_number']) && is_scalar($merged['passport_number'])
+            ? trim((string) $merged['passport_number']) : '';
+        if ($series !== '' || $number !== '') {
+            return [
+                'series' => $series,
+                'number' => $number,
+                'issued_by' => $merged['passport_issued_by'] ?? null,
+                'issued_date' => $merged['passport_issue_date'] ?? null,
+                'code' => $merged['passport_department_code'] ?? null,
+            ];
+        }
+
+        return null;
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function normalizeDocNode(mixed $node): ?array
+    {
+        if (is_string($node)) {
+            $node = trim($node);
+            if ($node === '') {
+                return null;
+            }
+            try {
+                $decoded = json_decode($node, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                return null;
+            }
+
+            return is_array($decoded) ? $decoded : null;
+        }
+
+        return is_array($node) ? $node : null;
+    }
+
+    /** @param array<string, mixed> $doc */
+    private static function docLooksLikePassport(array $doc): bool
+    {
+        foreach (['number', 'series'] as $k) {
+            if (!isset($doc[$k]) || !is_scalar($doc[$k])) {
+                continue;
+            }
+            if (trim((string) $doc[$k]) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @param array<string, mixed> $merged */

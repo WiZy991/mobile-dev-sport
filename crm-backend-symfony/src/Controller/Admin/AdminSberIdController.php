@@ -101,10 +101,20 @@ final class AdminSberIdController extends AbstractController
         $sub = isset($claims['sub']) && is_string($claims['sub']) ? $claims['sub'] : null;
 
         $accessToken = isset($tokens['access_token']) && is_string($tokens['access_token']) ? $tokens['access_token'] : '';
-        $userinfo = $accessToken !== '' ? $this->sberId->fetchUserInfo($accessToken) : [];
+        $userinfo = [];
+        $userinfoError = null;
+        if ($accessToken !== '') {
+            try {
+                $userinfo = $this->sberId->fetchUserInfo($accessToken);
+            } catch (\Throwable $e) {
+                $userinfoError = $e->getMessage();
+            }
+        }
         $merged = array_merge($claims, $userinfo);
 
         $this->sberProfile->apply($client, $merged);
+
+        $grantedScope = isset($tokens['scope']) && is_string($tokens['scope']) ? $tokens['scope'] : '';
 
         $client
             ->setVerified(true)
@@ -116,10 +126,24 @@ final class AdminSberIdController extends AbstractController
             ->setPassportVerificationAuditJson((string) json_encode([
                 'id_token' => $claims,
                 'userinfo_merge' => $merged,
+                'granted_scope' => $grantedScope,
+                'has_passport_in_userinfo' => $this->sberProfile->hasPassportPayload($merged),
+                'userinfo_error' => $userinfoError,
             ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
 
         $this->em->flush();
-        $this->addFlash('success', 'Клиент отмечен как верифицированный через Сбер ID.');
+
+        if ($client->getPassportSeries() && $client->getPassportNumber()) {
+            $this->addFlash('success', 'Клиент верифицирован через Сбер ID, паспортные данные сохранены.');
+        } elseif ($userinfoError !== null) {
+            $this->addFlash('warning', 'Верификация Сбер ID выполнена, но userinfo недоступен: ' . $userinfoError);
+        } elseif (!str_contains($grantedScope, 'maindoc')) {
+            $this->addFlash('warning', 'Верификация выполнена, но в токене нет scope maindoc — подключите пакет паспорта в кабинете Сбер ID и повторите вход.');
+        } elseif (!$this->sberProfile->hasPassportPayload($merged)) {
+            $this->addFlash('warning', 'Верификация выполнена, но Сбер не передал паспорт (identification) — проверьте согласия пользователя и пакет maindoc.');
+        } else {
+            $this->addFlash('warning', 'Верификация выполнена, паспорт в ответе есть, но не записался в CRM — проверьте поля вручную.');
+        }
 
         return $this->redirectToRoute('admin_client_show', ['id' => $clientUserId]);
     }

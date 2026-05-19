@@ -226,7 +226,15 @@ class SberAuthController extends AbstractController
         }
 
         $accessToken = isset($tokens['access_token']) && is_string($tokens['access_token']) ? $tokens['access_token'] : '';
-        $userinfo = $accessToken !== '' ? $this->sberId->fetchUserInfo($accessToken) : [];
+        $userinfo = [];
+        $userinfoError = null;
+        if ($accessToken !== '') {
+            try {
+                $userinfo = $this->sberId->fetchUserInfo($accessToken);
+            } catch (\Throwable $e) {
+                $userinfoError = $e->getMessage();
+            }
+        }
 
         $merged = array_merge($claims, $userinfo);
 
@@ -240,12 +248,17 @@ class SberAuthController extends AbstractController
         }
 
         $this->sberProfile->apply($user, $merged);
-        $this->markSberVerified($user, $claims, $sub, $merged);
+        $this->markSberVerified($user, $claims, $sub, $merged, $tokens, $userinfoError);
 
         $this->em->persist($user);
         $this->em->flush();
 
-        return $this->json($this->mobileTokens->issue($user, true));
+        $authPayload = $this->mobileTokens->issue($user, true);
+        if (!$user->getPassportSeries() || !$user->getPassportNumber()) {
+            $authPayload['sber_profile_hint'] = $this->buildPassportMissingHint($tokens, $merged, $userinfoError);
+        }
+
+        return $this->json($authPayload);
     }
 
     /**
@@ -305,11 +318,19 @@ class SberAuthController extends AbstractController
         $sub = isset($claims['sub']) && is_string($claims['sub']) ? $claims['sub'] : null;
 
         $accessToken = isset($tokens['access_token']) && is_string($tokens['access_token']) ? $tokens['access_token'] : '';
-        $userinfo = $accessToken !== '' ? $this->sberId->fetchUserInfo($accessToken) : [];
+        $userinfo = [];
+        $userinfoError = null;
+        if ($accessToken !== '') {
+            try {
+                $userinfo = $this->sberId->fetchUserInfo($accessToken);
+            } catch (\Throwable $e) {
+                $userinfoError = $e->getMessage();
+            }
+        }
         $merged = array_merge($claims, $userinfo);
         $this->sberProfile->apply($user, $merged);
 
-        $this->markSberVerified($user, $claims, $sub, $merged);
+        $this->markSberVerified($user, $claims, $sub, $merged, $tokens, $userinfoError);
         $this->em->flush();
 
         return new Response($this->htmlResult(true, 'Верификация успешна. Вернитесь в приложение и нажмите «Купить» ещё раз — затем откроется оплата (когда будет подключён эквайринг).'));
@@ -393,9 +414,21 @@ HTML;
         return $user;
     }
 
-    /** @param array<string, mixed> $claims Claims id_token; $profileMerged — merge с ответом userinfo для аудита CRM. */
-    private function markSberVerified(User $user, array $claims, ?string $sub, array $profileMerged = []): void
-    {
+    /**
+     * @param array<string, mixed>      $claims
+     * @param array<string, mixed>      $profileMerged
+     * @param array<string, mixed>      $tokens
+     */
+    private function markSberVerified(
+        User $user,
+        array $claims,
+        ?string $sub,
+        array $profileMerged = [],
+        array $tokens = [],
+        ?string $userinfoError = null,
+    ): void {
+        $grantedScope = isset($tokens['scope']) && is_string($tokens['scope']) ? $tokens['scope'] : '';
+
         $user
             ->setVerified(true)
             ->setSberId($sub)
@@ -406,7 +439,29 @@ HTML;
             ->setPassportVerificationAuditJson((string) json_encode([
                 'id_token' => $claims,
                 'userinfo_merge' => $profileMerged,
+                'granted_scope' => $grantedScope,
+                'has_passport_in_userinfo' => $this->sberProfile->hasPassportPayload($profileMerged),
+                'userinfo_error' => $userinfoError,
             ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+    }
+
+    /** @param array<string, mixed> $tokens @param array<string, mixed> $merged */
+    private function buildPassportMissingHint(array $tokens, array $merged, ?string $userinfoError): string
+    {
+        if ($userinfoError !== null && $userinfoError !== '') {
+            return 'Профиль Сбера получен частично: ошибка userinfo — ' . $userinfoError;
+        }
+
+        $scope = isset($tokens['scope']) && is_string($tokens['scope']) ? $tokens['scope'] : '';
+        if ($scope !== '' && !str_contains($scope, 'maindoc')) {
+            return 'В токене нет scope maindoc — подключите пакет Professional (паспорт) в кабинете Сбер ID и войдите снова.';
+        }
+
+        if (!$this->sberProfile->hasPassportPayload($merged)) {
+            return 'Сбер ID не передал блок identification в userinfo (согласие на паспорт или пакет maindoc в кабинете партнёра).';
+        }
+
+        return 'Паспорт в ответе Сбера есть, но не удалось записать в CRM — проверьте формат полей.';
     }
 
     private function placeholderEmail(string $sub): string

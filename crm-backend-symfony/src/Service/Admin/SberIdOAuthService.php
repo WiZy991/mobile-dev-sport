@@ -190,6 +190,17 @@ final class SberIdOAuthService
             ],
         ]));
 
+        $status = $response->getStatusCode();
+        if ($status < 200 || $status >= 300) {
+            $body = $response->getContent(false);
+
+            throw new \RuntimeException(sprintf(
+                'Сбер ID userinfo HTTP %d: %s',
+                $status,
+                mb_substr(trim($body), 0, 500),
+            ));
+        }
+
         $data = $response->toArray(false);
 
         return is_array($data) ? $data : [];
