@@ -13,6 +13,8 @@ parameters:
     sber_native_app_bridge_default: 'worldfitness://auth/callback'
     # Проверка TLS к API Сбера (1/ true = вкл.). Если в сети подмена HTTPS — см. комментарий у SBER_ID_SSL_VERIFY в .env
     sber_id_ssl_verify_default: true
+    sber_id_mtls_pkcs12_default: ''
+    sber_id_mtls_pass_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -33,6 +35,8 @@ services:
             $tokenUrl: '%env(SBER_ID_TOKEN_URL)%'
             $userInfoUrl: '%env(string:SBER_ID_USERINFO_URL)%'
             $verifySsl: '%env(bool:default:sber_id_ssl_verify_default:SBER_ID_SSL_VERIFY)%'
+            $mtlsPkcs12Path: '%env(default:sber_id_mtls_pkcs12_default:SBER_ID_MTLS_PKCS12)%'
+            $mtlsPkcs12Password: '%env(default:sber_id_mtls_pass_default:SBER_ID_MTLS_PKCS12_PASS)%'
 
     App\Service\Api\SberOAuthPkceStateService:
         arguments:

@@ -7,20 +7,28 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * OIDC-клиент для Сбер ID.
  * Для продакшена рекомендуется проверка подписи id_token (JWKS).
+ * Запросы к oauth.sber.ru согласно документации Сбера выполняются с клиентским TLS-сертификатом (PKCS12), см. SBER_ID_MTLS_PKCS12.
  */
 final class SberIdOAuthService
 {
+    private string $clientId;
+
+    private string $clientSecret;
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
-        private readonly string $clientId,
-        private readonly string $clientSecret,
+        string $clientId,
+        string $clientSecret,
         private readonly string $authorizeUrl,
         private readonly string $tokenUrl,
         private readonly ?string $userInfoUrl,
         private readonly bool $verifySsl = true,
+        private readonly string $mtlsPkcs12Path = '',
+        private readonly string $mtlsPkcs12Password = '',
     ) {
+        $this->clientId = trim($clientId);
+        $this->clientSecret = trim($clientSecret);
     }
-
     public function isConfigured(): bool
     {
         return $this->clientId !== '' && $this->clientSecret !== '';
@@ -181,14 +189,30 @@ final class SberIdOAuthService
      */
     private function withTlsOptions(array $options): array
     {
-        if ($this->verifySsl) {
-            return $options;
+        if (!$this->verifySsl) {
+            $options = array_merge($options, [
+                'verify_peer' => false,
+                'verify_host' => false,
+            ]);
         }
 
-        return array_merge($options, [
-            'verify_peer' => false,
-            'verify_host' => false,
-        ]);
+        $pkcs12 = trim($this->mtlsPkcs12Path);
+        if ($pkcs12 !== '') {
+            // См. https://developers.sber.ru/docs/ru/sberid/faq/a2-work-with-certificates — без клиентского P12 oauth.sber.ru часто отвечает 401.
+            $curlTls = [
+                \CURLOPT_SSLCERTTYPE => 'P12',
+                \CURLOPT_SSLCERT => $pkcs12,
+            ];
+            $pass = $this->mtlsPkcs12Password;
+            if ($pass !== '') {
+                $curlTls[\CURLOPT_SSLCERTPASSWD] = $pass;
+            }
+            $extra = $options['extra'] ?? [];
+            $extra['curl'] = array_merge($extra['curl'] ?? [], $curlTls);
+            $options['extra'] = $extra;
+        }
+
+        return $options;
     }
 
     /** @return array<string, mixed> */
