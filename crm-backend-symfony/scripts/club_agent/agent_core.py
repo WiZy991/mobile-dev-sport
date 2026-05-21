@@ -4,15 +4,36 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import urllib.error
 from typing import Any, Callable, Optional, Union
 
 from c01_client import C01Outbound
+from c01_protocol import access_deny, exdev_open
 from c01_server import C01Server
 from config import AgentConfig
 from crm_client import CrmClient
 from equipment import EquipmentItem
 
 LOG = logging.getLogger("agent")
+
+
+def _looks_like_numeric_reader_payload(qr: str) -> bool:
+    """Считыватель часто отдаёт только цифры вместо полной ASCII-строки QR из приложения."""
+    q = (qr or "").strip()
+    if not q or ":" in q:
+        return False
+    return q.isdigit() and len(q) <= 24
+
+
+def _hint_full_fitnessclub_qr() -> str:
+    return (
+        "Приложение отдаёт строку вида FITNESSCLUB:ENTRY:<id_пользователя>:<время_мс> — её должен "
+        "передать контроллер в поле id события card/pass_personal. Если видите только цифры "
+        "(например 14829991), настройте считыватель/reader в PERCo: режим полного текста QR, "
+        "не Wiegand-only, не обрезание до кода карты; проверьте тип reader (Barcode / QR). "
+        "Проверка: вкладка «Проход» — вставьте строку из приложения вручную — в журнале должен "
+        "появиться полный FITNESSCLUB:..."
+    )
 
 
 def _repair_mojibake_utf8(value: Any) -> Any:
@@ -98,21 +119,39 @@ class ClubAgent:
 
     async def _handle_card(self, qr: str, number: int, direction: int, equipment: EquipmentItem) -> bool:
         self._emit("info", "══════ ПРОХОД: скан QR ══════")
-        self._emit("info", f"← C01 event card | id={qr}")
+        self._emit("info", f"← C01 → CRM: строка доступа ({len(qr)} симв.) | id={qr[:200]}")
 
         if self.cfg.only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
-            self._emit("warning", "QR не FITNESSCLUB — в CRM не отправляем")
+            self._emit(
+                "warning",
+                "Строка не FITNESSCLUB: — в CRM не отправляем (галочка «Только QR FITNESSCLUB» на вкладке CRM). "
+                "API клуба принимает только формат из мобильного приложения.",
+            )
+            if _looks_like_numeric_reader_payload(qr):
+                self._emit("info", _hint_full_fitnessclub_qr())
             return False
         if not self.cfg.crm_ready():
-            self._emit("error", "CRM не настроен (URL / gateway_token)")
+            self._emit("error", "CRM не настроен (URL / gateway_token) — проход запрещён")
             return False
 
         import asyncio
 
-        code, body = await asyncio.to_thread(lambda: self._crm_client().submit_qr(qr))
-        granted = code == 200 and bool(body.get("access_granted"))
+        try:
+            code, body = await asyncio.to_thread(lambda: self._crm_client().submit_qr(qr))
+        except urllib.error.URLError as e:
+            self._emit("error", f"CRM сеть (нет ответа): {e}")
+            code, body = 0, {}
+        except Exception as e:
+            self._emit("error", f"CRM ошибка запроса: {e}")
+            code, body = 0, {}
 
-        from c01_protocol import access_deny, exdev_open
+        granted = code == 200 and bool(body.get("access_granted"))
+        if not granted and isinstance(body, dict):
+            reason = body.get("reason", "")
+            if reason and code != 0:
+                self._emit("warning", f"CRM: доступ не выдан — HTTP {code}, reason={reason!r}")
+            if reason == "invalid_format" and _looks_like_numeric_reader_payload(qr):
+                self._emit("info", _hint_full_fitnessclub_qr())
 
         if granted:
             cmd = exdev_open(

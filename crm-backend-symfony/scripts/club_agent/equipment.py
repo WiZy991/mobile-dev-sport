@@ -77,7 +77,8 @@ class EquipmentItem:
         return f"ws://{self.listen_host}:{self.listen_port}"
 
     def ws_connect_url(self) -> str:
-        return f"ws://{self.c01_host}:{self.c01_ws_port}"
+        # Эталон PERCo (ctl_websock): ws://host:port/tcp — не корень «/».
+        return f"ws://{self.c01_host}:{self.c01_ws_port}/tcp"
 
     def label(self) -> str:
         mode = "слушать" if self.connection_mode == "listen" else f"→{self.c01_host}"

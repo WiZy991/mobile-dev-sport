@@ -70,10 +70,12 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
     _row(conn, "Порт WS на C01", ttk.Entry(conn, textvariable=app.var_c01_ws_port), 4)
     ttk.Label(
         conn,
-        text="Если в журнале «HTTP 200» при подключении — это не WebSocket (часто порт 80 = веб-страница). Укажите порт WS из документации C01 или перейдите в режим «Слушать» (8765) после записи net.server.",
+        text="Если в журнале «HTTP 200» при подключении — это не WebSocket (часто порт 80 = веб-страница по пути /). Агент подключается к пути /tcp, как в примере PERCo ctl_websock. Укажите порт WS из документации C01 или перейдите в режим «Слушать» (8765) после записи net.server.",
         foreground="gray",
         wraplength=560,
     ).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(4, 0))
+
+    auth = ttk.LabelFrame(right, text="2. Пароль доступа", padding=8)
     auth.pack(fill=tk.X, pady=(0, 8))
     auth.columnconfigure(1, weight=1)
     app.var_eq_pwd = tk.StringVar()
@@ -102,8 +104,14 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
     _row(net, "net.mask", ttk.Entry(net, textvariable=app.var_net_mask), 3)
     _row(net, "net.gateway", ttk.Entry(net, textvariable=app.var_net_gw), 4)
     _row(net, "net.server (этот ПК)", ttk.Entry(net, textvariable=app.var_net_server), 5)
+    ttk.Label(
+        net,
+        text="Если C01 не подключается: в веб-интерфейсе PERCo в «Адрес сервера» укажите IP:порт, например 192.168.0.63:8765 (если поле принимает двоеточие). Иначе контроллер может ходить на порт 80, а агент слушает 8765.",
+        foreground="gray",
+        wraplength=560,
+    ).grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
     nf = ttk.Frame(net)
-    nf.grid(row=6, column=1, sticky=tk.W, pady=4)
+    nf.grid(row=7, column=1, sticky=tk.W, pady=4)
     ttk.Button(nf, text=f"Подставить IP ПК ({get_lan_ip()})", command=app._fill_lan_server).pack(
         side=tk.LEFT, padx=(0, 8)
     )

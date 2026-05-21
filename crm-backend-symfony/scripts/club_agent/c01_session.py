@@ -7,10 +7,48 @@ import json
 import logging
 from typing import Any, Awaitable, Callable, Optional
 
-from c01_protocol import auth_response
+from c01_protocol import access_deny, auth_response, exdev_open
 from equipment import EquipmentItem
 
 LOG = logging.getLogger("c01.session")
+
+# Считыватель/турникет может прислать не только event=card, но и pass_personal
+# (см. plugins/event.py в примере PERCo ctl_websock) — структура та же: number, direction, id.
+_PRESENTATION_EVENTS = frozenset({"card", "pass_personal"})
+
+
+def _parse_presented_credential(
+    data: dict[str, Any],
+    equipment: EquipmentItem,
+) -> tuple[str | None, int, int, str] | None:
+    """
+    Если это событие «предъявлен носитель / QR», вернуть
+    (строка_id, number, direction, имя_события), иначе None.
+    """
+    ev = data.get("event")
+    if ev not in _PRESENTATION_EVENTS:
+        return None
+    key = str(ev)
+    block = data.get(key)
+    if not isinstance(block, dict):
+        return (None, equipment.exdev_number, equipment.exdev_direction, key)
+    raw = (
+        block.get("id")
+        or block.get("code")
+        or block.get("data")
+        or block.get("text")
+        or ""
+    )
+    qr = str(raw).strip() if raw is not None else ""
+    try:
+        number = int(block.get("number", equipment.exdev_number))
+    except (TypeError, ValueError):
+        number = equipment.exdev_number
+    try:
+        direction = int(block.get("direction", equipment.exdev_direction))
+    except (TypeError, ValueError):
+        direction = equipment.exdev_direction
+    return (qr or None, number, direction, key)
 
 OnLog = Optional[Callable[[str, str], None]]
 CardHandler = Callable[[str, int, int, EquipmentItem], Awaitable[bool]]
@@ -86,8 +124,8 @@ class C01Session:
         raise TimeoutError(f"Нет ответа на {msg!r} за {timeout}s")
 
     async def handle_incoming(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
-        """Обработка сообщения от C01. Возвращает ответ для card, иначе None."""
-        if data.get("event") != "card":
+        """Обработка сообщения от C01. Для card/pass_personal — ответ access/exdev."""
+        if data.get("event") not in _PRESENTATION_EVENTS:
             self._emit("debug", f"← {json.dumps(data, ensure_ascii=False)[:400]}")
 
         if data.get("event") == "need_auth":
@@ -110,21 +148,22 @@ class C01Session:
         if data.get("answer") or data.get("result") or data.get("net") or data.get("state"):
             await self._reply_queue.put(data)
 
-        if data.get("event") == "card" and self.on_card:
-            card = data.get("card") or {}
-            qr = str(card.get("id") or "").strip()
-            number = int(card.get("number", self.equipment.exdev_number))
-            direction = int(card.get("direction", self.equipment.exdev_direction))
+        presented = _parse_presented_credential(data, self.equipment)
+        if presented is not None and self.on_card:
+            qr, number, direction, ev_name = presented
             if not qr:
-                return None
-            self._emit("info", f"Карта/QR: {qr[:120]}")
+                preview = json.dumps(data, ensure_ascii=False)[:500]
+                self._emit(
+                    "warning",
+                    f"{ev_name}: в событии нет id/code для CRM — проверьте reader/exdev в PERCo. JSON: {preview}",
+                )
+                return access_deny(number, direction)
+            self._emit("info", f"{ev_name}: данные для CRM ({len(qr)} симв.): {qr[:120]}")
             try:
                 granted = await self.on_card(qr, number, direction, self.equipment)
             except Exception as e:
-                self._emit("error", f"card: {e}")
+                self._emit("error", f"{ev_name} → CRM/C01: {e}")
                 granted = False
-            from c01_protocol import access_deny, exdev_open
-
             if granted:
                 return exdev_open(
                     number,
@@ -135,7 +174,7 @@ class C01Session:
             return access_deny(number, direction)
 
         ev = data.get("event")
-        if ev and ev not in ("need_auth",):
+        if ev and ev not in ("need_auth",) and ev not in _PRESENTATION_EVENTS:
             self._emit("info", f"Событие: {ev}")
 
         return None

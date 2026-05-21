@@ -11,6 +11,7 @@ import websockets
 
 from c01_session import C01Session, CardHandler
 from equipment import EquipmentItem
+from net_util import tcp_refused_c01_hint
 
 LOG = logging.getLogger("c01.client")
 
@@ -39,9 +40,17 @@ class C01Outbound:
     async def _run(self) -> None:
         url = self.equipment.ws_connect_url()
         self.session._emit("info", f"Подключение к C01 {url}")
+        # Эталон PERCo ctl_websock: connect(..., origin=IP_контроллера)
+        origin = self.equipment.c01_host.strip() or None
         while not self._stop.is_set():
             try:
-                async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+                async with websockets.connect(
+                    url,
+                    origin=origin,
+                    ping_interval=20,
+                    ping_timeout=20,
+                    compression=None,
+                ) as ws:
                     await self.session.attach(ws)
                     async for raw in ws:
                         if self._stop.is_set():
@@ -55,6 +64,9 @@ class C01Outbound:
                             await ws.send(json.dumps(reply))
             except Exception as e:
                 self.session._emit("warning", f"Связь потеряна: {e}")
+                hint = tcp_refused_c01_hint(e)
+                if hint:
+                    self.session._emit("info", hint)
             finally:
                 await self.session.detach()
             if not self._stop.is_set():
@@ -113,7 +125,14 @@ class C01Outbound:
         """Одноразовое подключение для настройки (из GUI)."""
         async def job() -> Any:
             url = self.equipment.ws_connect_url()
-            async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+            origin = self.equipment.c01_host.strip() or None
+            async with websockets.connect(
+                url,
+                origin=origin,
+                ping_interval=20,
+                ping_timeout=20,
+                compression=None,
+            ) as ws:
                 await self.session.attach(ws)
                 try:
                     # Дождаться auth (need_auth приходит первым)

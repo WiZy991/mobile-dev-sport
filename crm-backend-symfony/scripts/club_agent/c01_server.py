@@ -55,12 +55,33 @@ class C01Server:
     async def _run_server(self) -> None:
         eq = self.equipment
         self.session._emit("info", f"Сервер системы: ws://{eq.listen_host}:{eq.listen_port}")
+
+        async def log_process_request(connection: Any, request: Any) -> None:
+            """Диагностика: видно, доходит ли TCP/HTTP до порта (брандмауэр, порт)."""
+            peer = connection.remote_address
+            try:
+                hdrs = request.headers
+                up = hdrs.get("Upgrade", "")
+                conn_h = hdrs.get("Connection", "")
+                key = "да" if hdrs.get("Sec-WebSocket-Key") else "нет"
+                self.session._emit(
+                    "info",
+                    f"Запрос к WS с {peer}: path={request.path!r} Upgrade={up!r} "
+                    f"Connection={conn_h!r} Sec-WebSocket-Key={key}",
+                )
+            except Exception as e:
+                self.session._emit("warning", f"Запрос к WS с {peer}: не разобрать заголовки ({e})")
+            return None
+
         async with websockets.serve(
             self._handle_connection,
             eq.listen_host,
             eq.listen_port,
             ping_interval=20,
             ping_timeout=20,
+            # Встроенные клиенты (PERCo и др.) часто ломаются на permessage-deflate.
+            compression=None,
+            process_request=log_process_request,
         ):
             await self._stop.wait()
 
@@ -101,7 +122,7 @@ class C01Server:
         )
 
         async def send() -> None:
-            self.session._emit("info", f"→ C01: {payload}")
+            self.session._emit("info", f"→ C01: {msg}")
             await self.session.send_json(msg)
 
         try:

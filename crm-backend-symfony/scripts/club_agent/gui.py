@@ -16,10 +16,11 @@ from c01_protocol import exdev_close
 from c01_simulator import C01Simulator
 from config import AgentConfig, config_file_path, normalize_crm_base_url
 from equipment import EquipmentItem
+from gui_clipboard import install_edit_bindings
 from gui_equipment_tab import build_equipment_tab
 from gui_passage_tab import build_passage_tab
 from gui_protocol import run_in_thread, run_with_session
-from net_util import get_lan_ip
+from net_util import get_lan_ip, tcp_refused_c01_hint
 
 
 def _format_ws_connect_error(exc: BaseException) -> str:
@@ -36,6 +37,9 @@ def _format_ws_connect_error(exc: BaseException) -> str:
             "• Режим «Слушать», порт 8765 на ПК → «Записать net» (net.server = IP этого ПК) → "
             "«Сохранить всё» → перезапуск агента — контроллер сам подключится к ПК."
         )
+    hint = tcp_refused_c01_hint(exc)
+    if hint:
+        return msg + "\n\n——————————————————————————————————\n" + hint
     return msg
 
 
@@ -103,6 +107,8 @@ class AgentApp(tk.Tk):
         nb.add(tab_eq, text="Оборудование")
         build_equipment_tab(self, tab_eq)
 
+        install_edit_bindings(self)
+
         self.entry_qr = self.entry_qr_passage
 
         bottom = ttk.Frame(self, padding=8)
@@ -135,6 +141,14 @@ class AgentApp(tk.Tk):
         ttk.Checkbutton(grid, text="Только QR FITNESSCLUB:", variable=self.var_only_fc).grid(
             row=4, column=1, sticky=tk.W, pady=4
         )
+        ttk.Label(
+            grid,
+            text="Рекомендуется включить. Если в журнале при скане только цифры (без «FITNESSCLUB:») — "
+            "считыватель отрезает QR; CRM и приложение работают по полной строке.",
+            foreground="gray",
+            wraplength=560,
+            font=("", 8),
+        ).grid(row=5, column=1, sticky=tk.W, pady=(0, 4))
 
     def _load_crm_fields(self) -> None:
         c = self.cfg
