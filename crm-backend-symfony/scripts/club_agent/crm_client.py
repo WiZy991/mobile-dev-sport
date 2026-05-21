@@ -67,10 +67,15 @@ class CrmClient:
             self.on_exchange(method, path, json_body, status, parsed)
         return status, parsed
 
-    def submit_qr(self, qr: str) -> tuple[int, dict]:
+    def submit_qr(self, qr: str, *, passage: str = "entry") -> tuple[int, dict]:
+        path = (
+            "/api/v1/gateway/access/exit"
+            if (passage or "entry").lower() == "exit"
+            else "/api/v1/gateway/access/entry"
+        )
         return self._request(
             "POST",
-            "/api/v1/gateway/access/entry",
+            path,
             json_body={"qr": qr, "device_id": self.cfg.device_id},
         )
 

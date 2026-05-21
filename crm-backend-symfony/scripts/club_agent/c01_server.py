@@ -110,23 +110,23 @@ class C01Server:
             self._loop.call_soon_threadsafe(self._stop.set)
 
     def open_door_sync(self) -> bool:
-        from c01_protocol import exdev_open
-
         if not self.session.connected or not self._loop:
             return False
-        msg = exdev_open(
-            self.equipment.exdev_number,
-            self.equipment.exdev_direction,
-            open_type=self.equipment.open_type,
-            open_time_ms=self.equipment.open_time_ms,
-        )
+        pulse_ms = 0
+        if getattr(self.equipment, "relay_use_cross_reference", False) or getattr(
+            self.equipment, "relay_after_grant", False
+        ):
+            pulse_ms = max(pulse_ms, int(getattr(self.equipment, "relay_pulse_ms", 0)))
 
         async def send() -> None:
-            self.session._emit("info", f"→ C01: {msg}")
-            await self.session.send_json(msg)
+            await self.session.send_access_granted_actions(
+                self.equipment.exdev_number,
+                self.equipment.exdev_direction,
+            )
 
+        timeout = max(5.0, pulse_ms / 1000.0 + 2.0)
         try:
-            asyncio.run_coroutine_threadsafe(send(), self._loop).result(timeout=5.0)
+            asyncio.run_coroutine_threadsafe(send(), self._loop).result(timeout=timeout)
             return True
         except Exception:
             return False

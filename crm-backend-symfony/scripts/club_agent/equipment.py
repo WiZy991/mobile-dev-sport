@@ -58,6 +58,17 @@ class EquipmentItem:
     open_type: str = "open once"
     open_time_ms: int = 3000
 
+    # После допуска CRM: дополнительный импульс на дискретном выходе (реле и т.п., см. PDF п. 2.3, 5.9)
+    relay_after_grant: bool = False
+    relay_output_number: int = 0
+    relay_pulse_ms: int = 300
+    # Вместо control output — кратко включить внутреннюю реакцию (п. 4.4), если так настроен PERCo
+    relay_use_cross_reference: bool = False
+    relay_cross_number: int = 0
+
+    # Роль точки: вход (абонемент) или выход (тот же QR ENTRY без проверки абонемента → gateway/access/exit)
+    gate_role: str = "entry"
+
     notes: str = ""
 
     @classmethod
@@ -68,6 +79,8 @@ class EquipmentItem:
             filtered["id"] = uuid.uuid4().hex[:8]
         if filtered.get("connection_mode") not in ("listen", "connect"):
             filtered["connection_mode"] = "listen"
+        if filtered.get("gate_role") not in ("entry", "exit"):
+            filtered["gate_role"] = "entry"
         return cls(**filtered)
 
     def to_dict(self) -> dict[str, Any]:

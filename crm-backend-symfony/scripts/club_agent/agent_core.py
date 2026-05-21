@@ -8,7 +8,7 @@ import urllib.error
 from typing import Any, Callable, Optional, Union
 
 from c01_client import C01Outbound
-from c01_protocol import access_deny, exdev_open
+from c01_protocol import access_deny, control_cross_reference, control_output, exdev_open
 from c01_server import C01Server
 from config import AgentConfig
 from crm_client import CrmClient
@@ -109,7 +109,10 @@ class ClubAgent:
         if granted is True:
             user = response.get("user") or {}
             name = _repair_mojibake_utf8(user.get("name") or user.get("id", ""))
-            self._emit("info", f"  итог: ДОПУСК — {name}")
+            if response.get("passage") == "exit":
+                self._emit("info", f"  итог: ВЫХОД разрешён — {name}" if name else "  итог: ВЫХОД разрешён")
+            else:
+                self._emit("info", f"  итог: ДОПУСК — {name}")
         elif granted is False:
             self._emit("warning", f"  итог: ОТКАЗ — reason={reason}")
 
@@ -118,7 +121,11 @@ class ClubAgent:
         self._emit("info", f"→ {json.dumps(cmd, ensure_ascii=False)}")
 
     async def _handle_card(self, qr: str, number: int, direction: int, equipment: EquipmentItem) -> bool:
-        self._emit("info", "══════ ПРОХОД: скан QR ══════")
+        passage = (getattr(equipment, "gate_role", None) or "entry").lower()
+        if passage not in ("entry", "exit"):
+            passage = "entry"
+        title = "ВЫХОД" if passage == "exit" else "ВХОД"
+        self._emit("info", f"══════ {title}: скан QR ══════")
         self._emit("info", f"← C01 → CRM: строка доступа ({len(qr)} симв.) | id={qr[:200]}")
 
         if self.cfg.only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
@@ -137,7 +144,9 @@ class ClubAgent:
         import asyncio
 
         try:
-            code, body = await asyncio.to_thread(lambda: self._crm_client().submit_qr(qr))
+            code, body = await asyncio.to_thread(
+                lambda: self._crm_client().submit_qr(qr, passage=passage)
+            )
         except urllib.error.URLError as e:
             self._emit("error", f"CRM сеть (нет ответа): {e}")
             code, body = 0, {}
@@ -161,6 +170,28 @@ class ClubAgent:
                 open_time_ms=equipment.open_time_ms,
             )
             self._log_c01_command(equipment, cmd, "открыть турникет")
+            if getattr(equipment, "relay_use_cross_reference", False):
+                cn = int(equipment.relay_cross_number)
+                pulse = max(0, int(getattr(equipment, "relay_pulse_ms", 0)))
+                self._log_c01_command(
+                    equipment,
+                    control_cross_reference(number=cn, activate=True),
+                    f"внутренняя реакция №{cn} (вкл), затем пауза {pulse} мс и выкл",
+                )
+            elif getattr(equipment, "relay_after_grant", False):
+                out_n = int(equipment.relay_output_number)
+                pulse = max(0, int(equipment.relay_pulse_ms))
+                self._log_c01_command(
+                    equipment,
+                    control_output(out_n, True),
+                    f"реле/выход №{out_n} (вкл), импульс {pulse} мс",
+                )
+                if pulse > 0:
+                    self._log_c01_command(
+                        equipment,
+                        control_output(out_n, False),
+                        f"реле/выход №{out_n} (выкл)",
+                    )
         else:
             cmd = access_deny(number, direction)
             self._log_c01_command(equipment, cmd, "запрет прохода")
@@ -295,9 +326,25 @@ class ClubAgent:
     def submit_qr_manual(self, qr: str, equipment_id: Optional[str] = None) -> tuple[bool, str]:
         if not self.cfg.crm_ready():
             return False, "CRM не настроен"
-        self._emit("info", "══════ ПРОХОД: тест QR (вручную) ══════")
+        eq_item: Optional[EquipmentItem] = None
+        if equipment_id:
+            for e in self.cfg.equipment:
+                if e.id == equipment_id:
+                    eq_item = e
+                    break
+        if eq_item is None:
+            ep = self._pick_endpoint()
+            if ep is not None:
+                eq_item = ep.equipment
+            elif self.cfg.equipment:
+                eq_item = self.cfg.equipment[0]
+        passage = (eq_item.gate_role if eq_item else "entry") or "entry"
+        if passage not in ("entry", "exit"):
+            passage = "entry"
+        title = "ВЫХОД" if passage == "exit" else "ВХОД"
+        self._emit("info", f"══════ {title}: тест QR (вручную) ══════")
         self._emit("info", f"QR: {qr.strip()}")
-        code, body = self._crm_client().submit_qr(qr.strip())
+        code, body = self._crm_client().submit_qr(qr.strip(), passage=passage)
         granted = code == 200 and bool(body.get("access_granted"))
         if granted:
             ep = None

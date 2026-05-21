@@ -20,9 +20,11 @@ use Symfony\Component\Routing\Annotation\Route;
  * Авторизация: Authorization: Bearer <Club.gatewayToken>
  *
  * Архитектура:
- *  1. Шлюз получает QR (с приложения / считывателя) → POST /api/v1/gateway/access/entry.
- *     CRM валидирует QR, проверяет абонемент, пишет AccessLog, возвращает open_device — параметры
+ *  1. Шлюз получает QR (с приложения / считывателя) → POST /api/v1/gateway/access/entry (вход)
+ *     или POST /api/v1/gateway/access/exit (выход тем же форматом FITNESSCLUB:ENTRY:… что и на входе).
+ *     На входе CRM валидирует QR, проверяет абонемент, пишет AccessLog, возвращает open_device — параметры
  *     команды для локального PERCo. Шлюз сам шлёт команду в LAN PERCo-Web (см. perco_client.py).
+ *     На выходе — только фиксация события выхода в журнале (без проверки абонемента), ответ access_granted: true.
  *  2. Шлюз держит постоянный long-poll GET /api/v1/gateway/commands и выполняет приходящие команды
  *     (в т.ч. «Открыть дверь» из админки CRM), затем подтверждает /commands/{id}/ack.
  *  3. Шлюз шлёт heartbeat — POST /api/v1/gateway/heartbeat — для мониторинга связности.
@@ -128,6 +130,66 @@ class GatewayController extends AbstractController
                 'phone' => $user->getPhone(),
             ],
         ]));
+    }
+
+    /**
+     * Выход из зала по тому же QR, что и для входа (FITNESSCLUB:ENTRY:…), без проверки абонемента —
+     * как {@see AccessController::exit} для шлюза с Bearer gateway_token клуба.
+     */
+    #[Route('/access/exit', name: 'api_gateway_access_exit', methods: ['POST'])]
+    public function exit(Request $request): JsonResponse
+    {
+        $club = $this->authenticateClub($request);
+        if ($club instanceof JsonResponse) {
+            return $club;
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $qr = (string) ($data['qr'] ?? '');
+        $deviceId = isset($data['device_id']) ? (string) $data['device_id'] : ('club-' . $club->getId());
+
+        $log = (new AccessLog())
+            ->setRawData($qr)
+            ->setDeviceId($deviceId)
+            ->setEventType('exit')
+            ->setResult('denied')
+            ->setClub($club);
+
+        $parts = explode(':', $qr);
+        if (count($parts) < 3 || $parts[0] !== 'FITNESSCLUB' || $parts[1] !== 'ENTRY') {
+            return $this->denied($log, 'invalid_format', 400);
+        }
+
+        $userExternalId = $parts[2];
+        $userId = str_starts_with($userExternalId, 'user-')
+            ? (int) substr($userExternalId, 5)
+            : (int) $userExternalId;
+
+        /** @var User|null $user */
+        $user = $this->em->getRepository(User::class)->find($userId);
+        if ($user) {
+            $log->setUser($user);
+        }
+
+        $log->setResult('granted')->setReason('ok');
+        $this->em->persist($log);
+        $this->em->flush();
+
+        $payload = [
+            'access_granted' => true,
+            'reason' => 'ok',
+            'passage' => 'exit',
+            'success' => true,
+        ];
+        if ($user) {
+            $payload['user'] = [
+                'id' => 'user-' . $user->getId(),
+                'name' => $user->getName(),
+                'phone' => $user->getPhone(),
+            ];
+        }
+
+        return $this->json($this->grantedPayload($club, $payload));
     }
 
     #[Route('/heartbeat', name: 'api_gateway_heartbeat', methods: ['POST'])]

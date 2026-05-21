@@ -146,6 +146,53 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
         4,
     )
     _row(exdev, "open_time (мс)", ttk.Entry(exdev, textvariable=app.var_open_time), 5)
+    app.var_gate_role = tk.StringVar(value="entry")
+    _row(
+        exdev,
+        "Роль точки",
+        ttk.Combobox(
+            exdev,
+            textvariable=app.var_gate_role,
+            values=("entry", "exit"),
+            width=14,
+            state="readonly",
+        ),
+        6,
+    )
+    ttk.Label(
+        exdev,
+        text="entry — CRM /gateway/access/entry (абонемент, QR < 15 с). exit — выход тем же QR FITNESSCLUB:ENTRY:… → /gateway/access/exit (без абонемента).",
+        foreground="gray",
+        wraplength=560,
+    ).grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
+
+    relay = ttk.LabelFrame(right, text="5а. Реле / выход после допуска CRM", padding=8)
+    relay.pack(fill=tk.X, pady=(0, 8))
+    relay.columnconfigure(1, weight=1)
+    app.var_relay_after = tk.BooleanVar(value=False)
+    app.var_relay_out_n = tk.StringVar(value="0")
+    app.var_relay_pulse = tk.StringVar(value="300")
+    app.var_relay_cross = tk.BooleanVar(value=False)
+    app.var_relay_cross_n = tk.StringVar(value="0")
+    ttk.Checkbutton(
+        relay,
+        text="Импульс на дискретном выходе (control output, п. 5.9 PDF — номер выхода 0–7)",
+        variable=app.var_relay_after,
+    ).grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=2)
+    _row(relay, "Номер выхода", ttk.Entry(relay, textvariable=app.var_relay_out_n, width=8), 1)
+    _row(relay, "Длительность «вкл», мс (0 = только включить)", ttk.Entry(relay, textvariable=app.var_relay_pulse), 2)
+    ttk.Checkbutton(
+        relay,
+        text="Вместо выхода: внутренняя реакция cross reference (п. 4.4 PDF; номер 0–999)",
+        variable=app.var_relay_cross,
+    ).grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(8, 2))
+    _row(relay, "Номер реакции (cross)", ttk.Entry(relay, textvariable=app.var_relay_cross_n, width=8), 4)
+    ttk.Label(
+        relay,
+        text="В PDF реле на плате привязаны к контактам 8–9 (конфигурация pad, п. 2.3); логический номер выхода для события/управления — 0–7. Если прошивка не принимает control output, настройте реакцию в PERCo и включите cross reference.",
+        foreground="gray",
+        wraplength=560,
+    ).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(4, 0))
 
     ctrl = ttk.LabelFrame(right, text="6. Команды контроллеру", padding=8)
     ctrl.pack(fill=tk.X, pady=(0, 8))

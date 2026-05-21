@@ -112,6 +112,16 @@ class C01Simulator:
         if data.get("control") == "access":
             await ws.send(json.dumps({"result": {"access": "ok"}, "access": data.get("access")}))
             return
+        if data.get("control") == "output":
+            await ws.send(json.dumps({"result": {"output": "ok"}, "output": data.get("output")}))
+            return
+        if data.get("control") == "cross reference":
+            await ws.send(
+                json.dumps(
+                    {"result": {"cross reference": "ok"}, "cross reference": data.get("cross reference")}
+                )
+            )
+            return
 
     async def _session(self) -> None:
         url = self._url()

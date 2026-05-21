@@ -217,6 +217,12 @@ class AgentApp(tk.Tk):
         self.var_wait_cmd.set(str(eq.wait_command_time))
         self.var_access_mode.set(eq.access_mode)
         self.var_open_time.set(str(eq.open_time_ms))
+        self.var_gate_role.set(getattr(eq, "gate_role", "entry") or "entry")
+        self.var_relay_after.set(bool(eq.relay_after_grant) and not bool(eq.relay_use_cross_reference))
+        self.var_relay_out_n.set(str(eq.relay_output_number))
+        self.var_relay_pulse.set(str(eq.relay_pulse_ms))
+        self.var_relay_cross.set(bool(eq.relay_use_cross_reference))
+        self.var_relay_cross_n.set(str(eq.relay_cross_number))
         self.var_eq_notes.set(eq.notes)
         mode_txt = (
             f"Слушать: ws://{lan}:{eq.listen_port}  |  К C01: {eq.ws_connect_url()}"
@@ -251,6 +257,16 @@ class AgentApp(tk.Tk):
             wait_command_time=int(self.var_wait_cmd.get().strip()),
             access_mode=self.var_access_mode.get().strip() or "control",
             open_time_ms=int(self.var_open_time.get().strip()),
+            gate_role=(
+                gr
+                if (gr := self.var_gate_role.get().strip().lower()) in ("entry", "exit")
+                else "entry"
+            ),
+            relay_after_grant=bool(self.var_relay_after.get()) and not bool(self.var_relay_cross.get()),
+            relay_output_number=int(self.var_relay_out_n.get().strip() or "0"),
+            relay_pulse_ms=int(self.var_relay_pulse.get().strip() or "0"),
+            relay_use_cross_reference=bool(self.var_relay_cross.get()),
+            relay_cross_number=int(self.var_relay_cross_n.get().strip() or "0"),
             notes=self.var_eq_notes.get().strip(),
             open_type="open once",
         )

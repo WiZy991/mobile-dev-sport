@@ -17,6 +17,12 @@
       "exdev_direction": 0,
       "open_type": "open once",
       "open_time_ms": 3000,
+      "gate_role": "entry",
+      "relay_after_grant": false,
+      "relay_output_number": 0,
+      "relay_pulse_ms": 300,
+      "relay_use_cross_reference": false,
+      "relay_cross_number": 0,
       "notes": ""
     }
   ],

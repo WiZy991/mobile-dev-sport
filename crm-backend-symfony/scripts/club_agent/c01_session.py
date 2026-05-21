@@ -7,7 +7,13 @@ import json
 import logging
 from typing import Any, Awaitable, Callable, Optional
 
-from c01_protocol import access_deny, auth_response, exdev_open
+from c01_protocol import (
+    access_deny,
+    auth_response,
+    control_cross_reference,
+    control_output,
+    exdev_open,
+)
 from equipment import EquipmentItem
 
 LOG = logging.getLogger("c01.session")
@@ -88,6 +94,41 @@ class C01Session:
         self._emit("debug", f"→ {raw[:500]}")
         await self._ws.send(raw)
 
+    async def send_access_granted_actions(self, number: int, direction: int) -> None:
+        """
+        После успешной проверки в CRM: открыть ИУ (exdev) и при необходимости импульс на выходе / реакция cross.
+        Сообщения отправляются из сессии (не через return), чтобы можно было отправить несколько команд подряд.
+        """
+        eq = self.equipment
+        open_msg = exdev_open(
+            number,
+            direction,
+            open_type=eq.open_type,
+            open_time_ms=eq.open_time_ms,
+        )
+        await self.send_json(open_msg)
+
+        if getattr(eq, "relay_use_cross_reference", False):
+            cn = int(eq.relay_cross_number)
+            pulse = max(0, int(getattr(eq, "relay_pulse_ms", 0)))
+            self._emit("info", f"C01: внутренняя реакция (cross) №{cn}, импульс {pulse} мс")
+            await self.send_json(control_cross_reference(number=cn, activate=True))
+            if pulse > 0:
+                await asyncio.sleep(pulse / 1000.0)
+                await self.send_json(control_cross_reference(number=cn, activate=False))
+            return
+
+        if not getattr(eq, "relay_after_grant", False):
+            return
+
+        out_n = int(eq.relay_output_number)
+        pulse = max(0, int(eq.relay_pulse_ms))
+        self._emit("info", f"C01: реле/выход №{out_n}, импульс {pulse} мс (control output)")
+        await self.send_json(control_output(out_n, True))
+        if pulse > 0:
+            await asyncio.sleep(pulse / 1000.0)
+            await self.send_json(control_output(out_n, False))
+
     async def request(
         self,
         msg: dict[str, Any],
@@ -165,12 +206,8 @@ class C01Session:
                 self._emit("error", f"{ev_name} → CRM/C01: {e}")
                 granted = False
             if granted:
-                return exdev_open(
-                    number,
-                    direction,
-                    open_type=self.equipment.open_type,
-                    open_time_ms=self.equipment.open_time_ms,
-                )
+                await self.send_access_granted_actions(number, direction)
+                return None
             return access_deny(number, direction)
 
         ev = data.get("event")

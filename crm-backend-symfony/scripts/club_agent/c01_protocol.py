@@ -147,6 +147,25 @@ def access_deny(number: int, direction: int) -> dict[str, Any]:
     }
 
 
+def control_output(number: int, on: bool) -> dict[str, Any]:
+    """
+    Управление выходом (в т.ч. реле на разъёме выходов — см. C01_Protocol.pdf п. 2.3 и событие 5.9).
+    Номер выхода 0–7; структура блока output как в п. 5.9 (контроллер → сервер), зеркально для control.
+    """
+    return {
+        "control": "output",
+        "output": {"function": "output", "on": bool(on), "number": int(number)},
+    }
+
+
+def control_cross_reference(*, number: int, activate: bool) -> dict[str, Any]:
+    """П. 4.4 протокола — активация заранее настроенной внутренней реакции (альтернатива реле)."""
+    return {
+        "control": "cross reference",
+        "cross reference": {"activate": bool(activate), "number": int(number)},
+    }
+
+
 READER_TYPES = (
     "Wiegand",
     "Barcode",
