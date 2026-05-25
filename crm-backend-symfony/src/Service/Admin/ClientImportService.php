@@ -3,6 +3,7 @@
 namespace App\Service\Admin;
 
 use App\Entity\Booking;
+use App\Entity\Club;
 use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
 use App\Entity\Training;
@@ -763,6 +764,11 @@ final class ClientImportService
         array $data,
     ): void {
         $sub->setPlan($plan)->setStartDate($start)->setEndDate($end)->setStatus($status);
+
+        if (isset($data['subscription_club_id']) && $data['subscription_club_id'] !== '' && $data['subscription_club_id'] !== '—') {
+            $cid = (int) $data['subscription_club_id'];
+            $sub->setClub($cid > 0 ? $this->em->getRepository(Club::class)->find($cid) : null);
+        }
 
         if (isset($data['visits_total']) && $data['visits_total'] !== '' && $data['visits_total'] !== '—') {
             $sub->setVisitsTotal(max(0, (int) $data['visits_total']));

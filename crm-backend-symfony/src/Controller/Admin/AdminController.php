@@ -471,10 +471,13 @@ class AdminController extends AbstractController
             ->setParameter('user', $client)
             ->getQuery()->getSingleScalarResult();
 
-        $activeSubsCount = (int) $this->em->getRepository(Subscription::class)->count([
-            'user' => $client,
-            'status' => 'active',
-        ]);
+        $today = new \DateTimeImmutable('today');
+        $activeSubsCount = 0;
+        foreach ($subscriptions as $s) {
+            if ($s->isEffectiveActiveOn($today)) {
+                ++$activeSubsCount;
+            }
+        }
 
         // Лента активности — объединённая хронология
         $activities = [];
@@ -1202,6 +1205,20 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
         }
 
+        $clubRepo = $this->em->getRepository(Club::class);
+        $clubCount = (int) $clubRepo->count([]);
+        $clubId = (int) $request->request->get('club_id');
+        /** @var Club|null $issueClub */
+        $issueClub = $clubId > 0 ? $clubRepo->find($clubId) : null;
+        if ($issueClub === null && $clubCount === 1) {
+            $issueClub = $clubRepo->findOneBy([]);
+        }
+        if ($clubCount >= 2 && !$issueClub instanceof Club) {
+            $this->addFlash('danger', 'В CRM несколько клубов: при выдаче абонемента обязательно выберите клуб (тот же, что у шлюза с gateway_token).');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
         $returnStatus = $request->request->get('return_status', '');
         if (!$user->hasRequiredDataForSubscription()) {
             $this->addFlash('warning', 'Заполните паспортные данные и дату рождения клиента перед выдачей абонемента.');
@@ -1230,7 +1247,8 @@ class AdminController extends AbstractController
                     ? (int) $freezeDaysTotalRaw
                     : 14
             )
-            ->setFreezeDaysUsed(0);
+            ->setFreezeDaysUsed(0)
+            ->setClub($issueClub);
 
         if ($plan->getDurationDays() !== null) {
             $subscription->setEndDate(
@@ -1897,6 +1915,7 @@ class AdminController extends AbstractController
                 'current' => $section,
                 'plans' => $plans,
                 'users' => $users,
+                'clubs' => $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']),
                 'subscriptions' => $subscriptions,
                 'statusFilter' => $statusFilter,
             ]);

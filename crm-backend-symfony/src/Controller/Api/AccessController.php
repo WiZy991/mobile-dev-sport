@@ -5,10 +5,10 @@ namespace App\Controller\Api;
 use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\GuestPass;
-use App\Entity\Subscription;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\PercoWebClient;
+use App\Service\Integration\SubscriptionGateResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,6 +21,7 @@ class AccessController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PercoWebClient $percoWebClient,
+        private readonly SubscriptionGateResolver $subscriptionGateResolver,
         private readonly string $accessGateToken = '',
         private readonly string $percoOpenFromCrm = '1',
     ) {}
@@ -36,11 +37,13 @@ class AccessController extends AbstractController
         $qr = (string) ($data['qr'] ?? '');
         $deviceId = $data['device_id'] ?? null;
 
+        $gateClub = $this->resolveDefaultClub();
+
         $log = new AccessLog();
         $log->setRawData($qr)
             ->setDeviceId($deviceId)
             ->setResult('denied')
-            ->setClub($this->resolveDefaultClub());
+            ->setClub($gateClub);
 
         $response = [
             'access_granted' => false,
@@ -125,31 +128,16 @@ class AccessController extends AbstractController
             return $this->json($response, 403);
         }
 
-        // Проверяем наличие активного абонемента
-        $today = new \DateTimeImmutable('today');
-        $subsRepo = $this->em->getRepository(Subscription::class);
-        /** @var Subscription[] $subs */
-        $subs = $subsRepo->findBy(['user' => $user, 'status' => 'active']);
-
-        $activeSub = null;
-        foreach ($subs as $sub) {
-            $start = $sub->getStartDate();
-            $end = $sub->getEndDate();
-
-            if ($today < $start) {
-                continue;
-            }
-            if ($end !== null && $today > $end) {
-                continue;
-            }
-
-            $activeSub = $sub;
-            break;
-        }
+        // Проверяем наличие активного абонемента (календарь + клуб при известном контексте клуба)
+        [$activeSub, $deny] = $this->subscriptionGateResolver->resolveForEntry($user, $gateClub);
 
         if (!$activeSub) {
-            $log->setReason('no_active_subscription');
-            $response['reason'] = 'no_active_subscription';
+            $reason = $deny === 'wrong_club' ? 'subscription_wrong_club' : 'no_active_subscription';
+            $log->setReason($reason);
+            $response['reason'] = $reason;
+            if ($deny === 'wrong_club' && $gateClub !== null) {
+                $response['club_id'] = $gateClub->getId();
+            }
             $this->em->persist($log);
             $this->em->flush();
 

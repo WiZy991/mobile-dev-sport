@@ -6,9 +6,9 @@ use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\GatewayCommand;
 use App\Entity\GuestPass;
-use App\Entity\Subscription;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
+use App\Service\Integration\SubscriptionGateResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -42,6 +42,7 @@ class GatewayController extends AbstractController
 
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly SubscriptionGateResolver $subscriptionGateResolver,
     ) {
     }
 
@@ -111,9 +112,11 @@ class GatewayController extends AbstractController
             return $this->denied($log, 'user_blocked', 403);
         }
 
-        $activeSub = $this->findActiveSubscription($user);
+        [$activeSub, $deny] = $this->subscriptionGateResolver->resolveForEntry($user, $club);
         if (!$activeSub) {
-            return $this->denied($log, 'no_active_subscription', 403);
+            $reason = $deny === 'wrong_club' ? 'subscription_wrong_club' : 'no_active_subscription';
+
+            return $this->denied($log, $reason, 403, $deny === 'wrong_club' ? ['club_id' => $club->getId()] : []);
         }
 
         if ($activeSub->getVisitsTotal() !== null) {
@@ -315,29 +318,6 @@ class GatewayController extends AbstractController
         }
 
         return trim((string) $request->headers->get('X-Gateway-Token', ''));
-    }
-
-    private function findActiveSubscription(User $user): ?Subscription
-    {
-        $today = new \DateTimeImmutable('today');
-        /** @var Subscription[] $subs */
-        $subs = $this->em->getRepository(Subscription::class)
-            ->findBy(['user' => $user, 'status' => 'active']);
-
-        foreach ($subs as $sub) {
-            $start = $sub->getStartDate();
-            $end = $sub->getEndDate();
-            if ($today < $start) {
-                continue;
-            }
-            if ($end !== null && $today > $end) {
-                continue;
-            }
-
-            return $sub;
-        }
-
-        return null;
     }
 
     /**

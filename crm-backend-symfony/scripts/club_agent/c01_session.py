@@ -54,6 +54,9 @@ def _parse_presented_credential(
         qr = str(int(raw))
     else:
         qr = str(raw).strip() if raw is not None else ""
+    # Считыватель/контроллер иногда добавляет CR/LF в конец поля id.
+    if qr:
+        qr = qr.replace("\r", "").replace("\n", "").strip()
     try:
         number = int(block.get("number", equipment.exdev_number))
     except (TypeError, ValueError):

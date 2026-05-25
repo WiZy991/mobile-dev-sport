@@ -67,8 +67,7 @@ class GuestPassController extends AbstractController
             ['user' => $user, 'status' => 'active']
         );
         foreach ($subs as $sub) {
-            if ($sub->getStartDate() <= $today
-                && ($sub->getEndDate() === null || $sub->getEndDate() >= $today)) {
+            if ($sub->coversCalendarDay($today)) {
                 return true;
             }
         }

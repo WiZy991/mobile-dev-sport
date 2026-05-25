@@ -259,6 +259,7 @@
                         <tr>
                             <th>ID</th>
                             <th>План</th>
+                            <th>Клуб</th>
                             <th>Статус</th>
                             <th>Период</th>
                             <th>Посещений</th>
@@ -267,13 +268,22 @@
                         </tr>
                         </thead>
                         <tbody>
+                        {% set ymd = 'now'|date('Y-m-d') %}
                         {% for sub in subscriptions %}
+                            {% set subStart = sub.startDate|date('Y-m-d') %}
+                            {% set subEnd = sub.endDate ? sub.endDate|date('Y-m-d') : null %}
+                            {% set inPeriod = ymd >= subStart and (subEnd is null or ymd <= subEnd) %}
                             <tr>
                                 <td>{{ sub.id }}</td>
                                 <td>{{ sub.plan.name }}</td>
+                                <td>{% if sub.club %}{{ sub.club.name }}{% else %}<span class="text-secondary">Все</span>{% endif %}</td>
                                 <td>
-                                    {% if sub.status == 'active' %}
+                                    {% if sub.status == 'active' and inPeriod %}
                                         <span class="badge bg-success">Активен</span>
+                                    {% elseif sub.status == 'active' and ymd < subStart %}
+                                        <span class="badge bg-info text-dark">Ожидает начала</span>
+                                    {% elseif sub.status == 'active' and not inPeriod %}
+                                        <span class="badge bg-warning text-dark" title="В БД статус active, но текущая дата вне периода — турникет не пустит">По датам не действует</span>
                                     {% elseif sub.status == 'frozen' %}
                                         <span class="badge bg-warning text-dark">Заморожен</span>
                                     {% else %}
@@ -316,7 +326,7 @@
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="7" class="text-center text-secondary">
+                                <td colspan="8" class="text-center text-secondary">
                                     У клиента пока нет абонементов.
                                 </td>
                             </tr>

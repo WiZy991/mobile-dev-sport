@@ -171,6 +171,18 @@ class ClubAgent:
             reason = body.get("reason", "")
             if reason and code != 0:
                 self._emit("warning", f"CRM: доступ не выдан — HTTP {code}, reason={reason!r}")
+            if reason == "no_active_subscription":
+                self._emit(
+                    "info",
+                    "CRM: у этого пользователя нет действующего абонемента (не ошибка турникета). "
+                    "В админке CRM откройте клиента по id из QR и оформите/активируйте абонемент, проверьте даты и клуб.",
+                )
+            if reason == "subscription_wrong_club":
+                self._emit(
+                    "info",
+                    "CRM: абонемент есть, но привязан к другому клубу (или в БД не тот club). "
+                    "В админке → Абонементы укажите клуб как у шлюза (gateway_token этого ПК), либо перевыдайте абонемент с выбором клуба.",
+                )
             if reason == "qr_expired":
                 tail = _fitnessclub_entry_timestamp_tail(qr)
                 if len(tail) == 7 and tail.isalnum() and not tail.isdigit():
@@ -405,6 +417,8 @@ class ClubAgent:
             )
         elif reason == "no_active_subscription":
             summary += " — у клиента в CRM нет действующего абонемента (админка → клиент → абонемент)."
+        elif reason == "subscription_wrong_club":
+            summary += " — абонемент не на этот клуб (CRM: subscriptions.club_id vs клуб шлюза по gateway_token)."
         if name:
             summary += f", клиент={name}"
         return granted, summary
