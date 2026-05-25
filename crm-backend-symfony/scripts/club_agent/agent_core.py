@@ -36,6 +36,14 @@ def _hint_full_fitnessclub_qr() -> str:
     )
 
 
+def _fitnessclub_entry_timestamp_tail(qr: str) -> str:
+    """Последний сегмент FITNESSCLUB:ENTRY:user-x:<ts> — в приложении это System.currentTimeMillis()."""
+    parts = (qr or "").strip().split(":")
+    if len(parts) == 4 and parts[0] == "FITNESSCLUB" and parts[1] == "ENTRY":
+        return parts[3]
+    return ""
+
+
 def _repair_mojibake_utf8(value: Any) -> Any:
     """
     Если строка — это UTF-8-текст, ошибочно прочитанный как Latin-1 (частая ошибка MySQL/клиента),
@@ -126,7 +134,11 @@ class ClubAgent:
             passage = "entry"
         title = "ВЫХОД" if passage == "exit" else "ВХОД"
         self._emit("info", f"══════ {title}: скан QR ══════")
-        self._emit("info", f"← C01 → CRM: строка доступа ({len(qr)} симв.) | id={qr[:200]}")
+        prev = qr[:200] + ("…" if len(qr) > 200 else "")
+        self._emit(
+            "info",
+            f"← C01 → CRM: строка доступа {len(qr)} симв. (превью до 200 для журнала; в HTTP уходит полностью): {prev}",
+        )
 
         if self.cfg.only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
             self._emit(
@@ -159,6 +171,29 @@ class ClubAgent:
             reason = body.get("reason", "")
             if reason and code != 0:
                 self._emit("warning", f"CRM: доступ не выдан — HTTP {code}, reason={reason!r}")
+            if reason == "qr_expired":
+                tail = _fitnessclub_entry_timestamp_tail(qr)
+                if len(tail) == 7 and tail.isalnum() and not tail.isdigit():
+                    self._emit(
+                        "info",
+                        "Последний сегмент из 7 символов (есть буквы) — компактное время base62. "
+                        "Если отказ сохраняется — проверьте часы телефона/сервера и окно 15 с.",
+                    )
+                elif tail.isdigit() and len(tail) < 11:
+                    self._emit(
+                        "warning",
+                        "Короткая только-цифровая метка в конце QR — часто лимит длины поля id на PERCo/C01 "
+                        f"(~32 символа): полные миллисекунды не помещаются, пришло «{tail}». "
+                        "Обновите CRM и приложение (время в 7 символах base62) или настройте передачу полного id.",
+                    )
+                elif tail.isdigit() and len(tail) >= 11:
+                    self._emit(
+                        "info",
+                        "Если метка времени в QR полная, отказ qr_expired значит: прошло больше ~15 с между "
+                        "моментом генерации QR в приложении и проверкой на сервере CRM, либо часы телефона/сервера "
+                        "сильно расходятся. Покажите свежий QR и убедитесь, что запрос до CRM уходит сразу после скана "
+                        "(сеть, wait_command_time на C01).",
+                    )
             if reason == "invalid_format" and _looks_like_numeric_reader_payload(qr):
                 self._emit("info", _hint_full_fitnessclub_qr())
 

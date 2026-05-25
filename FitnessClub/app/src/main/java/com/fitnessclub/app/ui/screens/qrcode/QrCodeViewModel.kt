@@ -80,6 +80,27 @@ class QrCodeViewModel @Inject constructor(
     }
 
     private fun generateQrData(userId: String, timestamp: Long): String {
-        return "FITNESSCLUB:ENTRY:$userId:$timestamp"
+        // PERCo/C01 часто ограничивает длину поля id (~32 символа на всю строку). Полные 13 цифр ms
+        // обрезаются → CRM видит «левое» время. Кодируем ms в 7 символов base62; user-123 → 123.
+        val uid = if (userId.lowercase().startsWith("user-")) {
+            userId.substring(5)
+        } else {
+            userId
+        }
+        val t = encodeTimestampBase62(timestamp)
+        return "FITNESSCLUB:ENTRY:$uid:$t"
+    }
+
+    /** Тот же алфавит, что в CRM (`FitnessClubEntryQrTimestamp`). */
+    private fun encodeTimestampBase62(ms: Long): String {
+        val alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        var v = ms.coerceAtLeast(0L)
+        val sb = StringBuilder(7)
+        repeat(7) {
+            val idx = (v % 62L).toInt()
+            sb.insert(0, alphabet[idx])
+            v /= 62L
+        }
+        return sb.toString()
     }
 }

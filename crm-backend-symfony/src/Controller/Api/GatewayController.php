@@ -8,6 +8,7 @@ use App\Entity\GatewayCommand;
 use App\Entity\GuestPass;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -77,7 +78,10 @@ class GatewayController extends AbstractController
         }
 
         $userExternalId = $parts[2];
-        $timestamp = (int) $parts[3];
+        $timestamp = FitnessClubEntryQrTimestamp::parseToUnixMs($parts[3]);
+        if ($timestamp === null) {
+            return $this->denied($log, 'invalid_format', 400);
+        }
 
         // Окно валидности QR — 15 секунд (синхронно с мобильным приложением).
         $nowMs = (int) (microtime(true) * 1000);
@@ -87,6 +91,7 @@ class GatewayController extends AbstractController
                 'delta_ms' => $deltaMs,
                 'server_now_ms' => $nowMs,
                 'qr_timestamp_ms' => $timestamp,
+                'qr_time_segment' => $parts[3],
             ]);
         }
 

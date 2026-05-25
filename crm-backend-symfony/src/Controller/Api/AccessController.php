@@ -7,6 +7,7 @@ use App\Entity\Club;
 use App\Entity\GuestPass;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\PercoWebClient;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -72,8 +73,16 @@ class AccessController extends AbstractController
             return $this->json($response, 400);
         }
 
-        $userExternalId = $parts[2]; // например, user-123
-        $timestamp = (int) $parts[3];
+        $userExternalId = $parts[2]; // например, user-123 или 123 (короткий сегмент для PERCo)
+        $timestamp = FitnessClubEntryQrTimestamp::parseToUnixMs($parts[3]);
+        if ($timestamp === null) {
+            $log->setReason('invalid_format');
+            $response['reason'] = 'invalid_format';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 400);
+        }
 
         // Проверка времени (15 секунд — синхронно с мобильным приложением)
         $nowMs = (int) (microtime(true) * 1000);
