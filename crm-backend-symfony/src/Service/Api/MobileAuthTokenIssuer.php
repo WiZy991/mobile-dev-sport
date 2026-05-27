@@ -45,6 +45,7 @@ final class MobileAuthTokenIssuer
             'created_at' => $user->getCreatedAt()->format('Y-m-d\TH:i:s'),
             'is_verified' => $user->isVerified(),
             'sber_id' => $user->getSberId(),
+            'club_id' => $user->getClub()?->getId(),
         ];
     }
 }
