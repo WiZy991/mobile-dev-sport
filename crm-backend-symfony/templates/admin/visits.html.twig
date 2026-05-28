@@ -5,7 +5,7 @@
 {% block body %}
     <div class="content-header">
         <h1 class="h4 mb-0">Посещения — входы по QR</h1>
-        <a href="{{ path('admin_visits_export') }}?date_from={{ dateFrom }}&date_to={{ dateTo }}" class="btn btn-sm btn-outline-success">Скачать CSV</a>
+        <a href="{{ path('admin_visits_export', visitPeriod.queryParams) }}" class="btn btn-sm btn-outline-success">Скачать CSV</a>
     </div>
 
     <div class="content-card mb-3">
@@ -50,22 +50,106 @@
     </div>
 
     <div class="content-card mb-3">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-auto">
-                <label class="form-label small text-secondary mb-0">С</label>
-                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ dateFrom }}">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+                <div class="text-primary small fw-semibold text-uppercase">Посещения за период</div>
+                <div class="h4 mb-0">{{ visitStats.total|default(0) }}</div>
+                <div class="small text-secondary">{{ visitPeriod.label }} ({{ visitPeriod.dateFromDisplay }} — {{ visitPeriod.dateToDisplay }})</div>
             </div>
-            <div class="col-auto">
-                <label class="form-label small text-secondary mb-0">По</label>
-                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ dateTo }}">
+            <div class="btn-group btn-group-sm">
+                <a href="{{ path('admin_section', {section: 'visits', period: 'month'}) }}"
+                   class="btn {{ visitPeriod.type == 'month' ? 'btn-primary' : 'btn-outline-secondary' }}">Месяц</a>
+                <a href="{{ path('admin_section', {section: 'visits', period: 'quarter'}) }}"
+                   class="btn {{ visitPeriod.type == 'quarter' ? 'btn-primary' : 'btn-outline-secondary' }}">Квартал</a>
+                <a href="{{ path('admin_section', {section: 'visits', period: 'custom', date_from: visitPeriod.dateFromYmd, date_to: visitPeriod.dateToYmdInclusive}) }}"
+                   class="btn {{ visitPeriod.type == 'custom' ? 'btn-primary' : 'btn-outline-secondary' }}">Период</a>
             </div>
+        </div>
+
+        <form method="get" class="row g-2 align-items-end mb-3">
+            <input type="hidden" name="period" value="{{ visitPeriod.type }}">
+            {% if visitPeriod.type == 'month' %}
+                <div class="col-auto">
+                    <label class="form-label small text-secondary mb-0">Месяц</label>
+                    <input type="month" name="month" class="form-control form-control-sm" value="{{ visitPeriod.month }}">
+                </div>
+            {% elseif visitPeriod.type == 'quarter' %}
+                <div class="col-auto">
+                    <label class="form-label small text-secondary mb-0">Год</label>
+                    <input type="number" name="year" class="form-control form-control-sm" value="{{ visitPeriod.year }}" min="2000" max="2100" style="width: 6rem;">
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small text-secondary mb-0">Квартал</label>
+                    <select name="quarter" class="form-select form-select-sm">
+                        {% for q in 1..4 %}
+                            <option value="{{ q }}" {{ visitPeriod.quarter == q ? 'selected' }}>{{ q }} кв.</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% else %}
+                <div class="col-auto">
+                    <label class="form-label small text-secondary mb-0">С</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ visitPeriod.dateFromYmd }}">
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small text-secondary mb-0">По</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ visitPeriod.dateToYmdInclusive }}">
+                </div>
+            {% endif %}
             <div class="col-auto">
                 <button type="submit" class="btn btn-sm btn-primary">Применить</button>
             </div>
         </form>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Клуб</th>
+                    <th class="text-end" style="width: 140px;">Посещений</th>
+                    <th class="text-end" style="width: 100px;">Доля</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in visitStats.rows %}
+                    <tr>
+                        <td>
+                            {% if row.club_id %}
+                                <a href="{{ path('admin_franchise_edit', {id: row.club_id}) }}" class="link-light text-decoration-none">{{ row.club_name }}</a>
+                            {% else %}
+                                {{ row.club_name }}
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-semibold">{{ row.count }}</td>
+                        <td class="text-end text-secondary">
+                            {% if visitStats.total > 0 %}
+                                {{ (row.count / visitStats.total * 100)|number_format(1, '.', ' ') }}%
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-secondary">Нет клубов в системе.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                {% if visitStats.rows|length > 0 %}
+                    <tfoot>
+                    <tr class="border-top border-secondary">
+                        <td class="fw-semibold">Итого</td>
+                        <td class="text-end fw-semibold">{{ visitStats.total }}</td>
+                        <td class="text-end text-secondary">100%</td>
+                    </tr>
+                    </tfoot>
+                {% endif %}
+            </table>
+        </div>
     </div>
 
     <div class="content-card">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Журнал входов за выбранный период</div>
         <div class="table-responsive">
             <table class="table table-sm table-dark align-middle mb-0">
                 <thead>
@@ -73,6 +157,7 @@
                     <th>ID</th>
                     <th>Клиент</th>
                     <th>Телефон</th>
+                    <th>Клуб</th>
                     <th>Устройство</th>
                     <th>Дата и время</th>
                 </tr>
@@ -89,13 +174,14 @@
                             {% endif %}
                         </td>
                         <td>{{ visit.user ? visit.user.phone : '—' }}</td>
+                        <td>{{ visit.club ? visit.club.name : '—' }}</td>
                         <td>{{ visit.deviceId ?? '—' }}</td>
                         <td>{{ visit.createdAt|date('d.m.Y H:i:s') }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="5" class="text-center text-secondary">
-                            Пока нет ни одного посещения (входов по QR).
+                        <td colspan="6" class="text-center text-secondary">
+                            За выбранный период нет успешных входов по QR.
                         </td>
                     </tr>
                 {% endfor %}
@@ -104,4 +190,3 @@
         </div>
     </div>
 {% endblock %}
-

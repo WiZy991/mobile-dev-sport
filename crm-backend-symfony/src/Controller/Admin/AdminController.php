@@ -28,6 +28,8 @@ use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
+use App\Service\Reports\VisitPeriodResolver;
+use App\Service\Reports\VisitReportService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -47,6 +49,8 @@ class AdminController extends AbstractController
         private readonly PercoWebClient $percoWebClient,
         private readonly ClientImportService $clientImportService,
         private readonly OccupancyService $occupancy,
+        private readonly VisitPeriodResolver $visitPeriodResolver,
+        private readonly VisitReportService $visitReport,
     ) {}
 
     private function buildMenu(): array
@@ -1693,31 +1697,35 @@ class AdminController extends AbstractController
     #[Route('/visits/export', name: 'admin_visits_export', methods: ['GET'])]
     public function exportVisits(Request $request): StreamedResponse
     {
-        $dateFrom = $request->query->get('date_from') ? new \DateTimeImmutable($request->query->get('date_from')) : (new \DateTimeImmutable('today'))->modify('-7 days');
-        $dateToRaw = $request->query->get('date_to') ?: (new \DateTimeImmutable('today'))->format('Y-m-d');
-        $dateTo = (new \DateTimeImmutable($dateToRaw))->modify('+1 day');
+        $period = $this->visitPeriodResolver->resolve($request->query->all());
         $qb = $this->em->createQueryBuilder()
             ->select('a')
             ->from(AccessLog::class, 'a')
+            ->leftJoin('a.club', 'c')
+            ->addSelect('c')
             ->where('a.result = :result')
+            ->andWhere('a.eventType = :eventType')
             ->andWhere('a.createdAt >= :from')
             ->andWhere('a.createdAt < :to')
             ->setParameter('result', 'granted')
-            ->setParameter('from', $dateFrom)
-            ->setParameter('to', $dateTo)
+            ->setParameter('eventType', 'entry')
+            ->setParameter('from', $period->from)
+            ->setParameter('to', $period->toExclusive)
             ->orderBy('a.createdAt', 'DESC');
         $visits = $qb->getQuery()->getResult();
 
         $response = new StreamedResponse(function () use ($visits) {
             $handle = fopen('php://output', 'w');
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($handle, ['ID', 'Клиент', 'Телефон', 'Устройство', 'Дата и время'], ';');
+            fputcsv($handle, ['ID', 'Клиент', 'Телефон', 'Клуб', 'Устройство', 'Дата и время'], ';');
             foreach ($visits as $v) {
                 $user = $v->getUser();
+                $club = $v->getClub();
                 fputcsv($handle, [
                     $v->getId(),
                     $user ? $user->getName() : '—',
                     $user ? $user->getPhone() : '—',
+                    $club ? $club->getName() : '—',
                     $v->getDeviceId() ?? '—',
                     $v->getCreatedAt()->format('d.m.Y H:i:s'),
                 ], ';');
@@ -1725,7 +1733,7 @@ class AdminController extends AbstractController
             fclose($handle);
         });
         $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
-        $response->headers->set('Content-Disposition', 'attachment; filename="visits_' . $dateFrom->format('Y-m-d') . '_' . $dateToRaw . '.csv"');
+        $response->headers->set('Content-Disposition', 'attachment; filename="visits_' . $period->dateFromYmd() . '_' . $period->dateToYmdInclusive() . '.csv"');
 
         return $response;
     }
@@ -2066,18 +2074,21 @@ class AdminController extends AbstractController
         }
 
         if ($section === 'visits') {
-            $dateFrom = $request->query->get('date_from') ? new \DateTimeImmutable($request->query->get('date_from')) : (new \DateTimeImmutable('today'))->modify('-7 days');
-            $dateToRaw = $request->query->get('date_to') ?: (new \DateTimeImmutable('today'))->format('Y-m-d');
-            $dateTo = (new \DateTimeImmutable($dateToRaw))->modify('+1 day');
+            $period = $this->visitPeriodResolver->resolve($request->query->all());
+            $visitStats = $this->visitReport->countByClub($period->from, $period->toExclusive);
             $qb = $this->em->createQueryBuilder()
                 ->select('a')
                 ->from(AccessLog::class, 'a')
+                ->leftJoin('a.club', 'c')
+                ->addSelect('c')
                 ->where('a.result = :result')
+                ->andWhere('a.eventType = :eventType')
                 ->andWhere('a.createdAt >= :from')
                 ->andWhere('a.createdAt < :to')
                 ->setParameter('result', 'granted')
-                ->setParameter('from', $dateFrom)
-                ->setParameter('to', $dateTo)
+                ->setParameter('eventType', 'entry')
+                ->setParameter('from', $period->from)
+                ->setParameter('to', $period->toExclusive)
                 ->orderBy('a.createdAt', 'DESC');
             $accessLogs = $qb->getQuery()->getResult();
 
@@ -2085,8 +2096,8 @@ class AdminController extends AbstractController
                 'menu' => $menu,
                 'current' => $section,
                 'visits' => $accessLogs,
-                'dateFrom' => $dateFrom->format('Y-m-d'),
-                'dateTo' => $dateToRaw,
+                'visitPeriod' => $period,
+                'visitStats' => $visitStats,
                 'currentlyInside' => $this->occupancy->countCurrentlyInside(),
                 'currentlyInsideList' => $this->occupancy->listCurrentlyInside(null, 100),
             ]);
