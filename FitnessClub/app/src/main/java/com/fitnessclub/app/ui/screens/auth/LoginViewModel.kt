@@ -2,8 +2,10 @@ package com.fitnessclub.app.ui.screens.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
 import androidx.fragment.app.FragmentActivity
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.auth.SberPkce
 import com.fitnessclub.app.data.local.BiometricLoginCoordinator
 import com.fitnessclub.app.data.local.BiometricLoginStore
 import com.fitnessclub.app.data.local.TokenManager
@@ -25,6 +27,8 @@ class LoginViewModel @Inject constructor(
     private val biometricLoginStore: BiometricLoginStore,
     private val tokenManager: TokenManager,
 ) : ViewModel() {
+    private val sberRedirectUri = "https://worldcashfit.ru/api/v1/auth/sber/callback"
+    private var sberCodeVerifier: String? = null
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -176,6 +180,81 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun loginWithSberId() {
+        viewModelScope.launch {
+            val verifier = SberPkce.createCodeVerifier()
+            val challenge = SberPkce.createCodeChallenge(verifier)
+            authRepository.getSberAuthorizeUrl(
+                codeChallenge = challenge,
+                redirectUri = sberRedirectUri,
+            ).collect { result ->
+                when (result) {
+                    is ApiResult.Loading -> {
+                        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                    }
+                    is ApiResult.Success -> {
+                        sberCodeVerifier = verifier
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+                        _events.emit(LoginEvent.OpenExternalUrl(result.data))
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
+                    }
+                }
+            }
+        }
+    }
+
+    fun handleSberDeepLink(uri: Uri) {
+        val error = uri.getQueryParameter("error")
+        if (!error.isNullOrBlank()) {
+            val desc = uri.getQueryParameter("error_description")
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                error = desc ?: "Сбер ID: $error",
+            )
+            return
+        }
+
+        val code = uri.getQueryParameter("code")
+        val state = uri.getQueryParameter("state")
+        val verifier = sberCodeVerifier
+        if (code.isNullOrBlank() || state.isNullOrBlank() || verifier.isNullOrBlank()) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                error = "Не удалось завершить вход через Сбер ID. Попробуйте ещё раз.",
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            authRepository.loginWithSberCode(
+                code = code,
+                codeVerifier = verifier,
+                redirectUri = sberRedirectUri,
+                state = state,
+            ).collect { result ->
+                when (result) {
+                    is ApiResult.Loading -> {
+                        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                    }
+                    is ApiResult.Success -> {
+                        sberCodeVerifier = null
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            biometricLoginConfigured = biometricLoginStore.shouldShowBiometricLoginButton(),
+                            biometricHardwareReady = biometricLoginStore.canUseDeviceBiometric(),
+                        )
+                        _events.emit(LoginEvent.Success(result.data))
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
+                    }
+                }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
@@ -221,4 +300,5 @@ sealed class LoginEvent {
         /** Если отпечаток уже был включён — заново зашифровать refresh после входа по паролю. */
         val refreshToReEncryptForBiometric: String? = null,
     ) : LoginEvent()
+    data class OpenExternalUrl(val url: String) : LoginEvent()
 }

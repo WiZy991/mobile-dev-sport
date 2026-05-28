@@ -49,6 +49,11 @@ class Subscription
     #[ORM\JoinColumn(nullable: true)]
     private ?PromoCode $promoCode = null;
 
+    /** null = действует в любом клубе (наследие до привязки по франшизе). */
+    #[ORM\ManyToOne(targetEntity: Club::class)]
+    #[ORM\JoinColumn(name: 'club_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?Club $club = null;
+
     /** @var Collection<int, Sale> */
     #[ORM\OneToMany(targetEntity: Sale::class, mappedBy: 'subscription')]
     private Collection $sales;
@@ -171,5 +176,55 @@ class Subscription
 
     public function getPromoCode(): ?PromoCode { return $this->promoCode; }
     public function setPromoCode(?PromoCode $promo): self { $this->promoCode = $promo; return $this; }
+
+    public function getClub(): ?Club
+    {
+        return $this->club;
+    }
+
+    public function setClub(?Club $club): self
+    {
+        $this->club = $club;
+        return $this;
+    }
+
+    /**
+     * Допуск на турникете клуба $gateClub: если абонемент без клуба — во всех; иначе только в своём.
+     * $gateClub = null (legacy /api/v1/access/entry без контекста клуба) — не фильтруем по клубу.
+     */
+    public function isValidAtClub(?Club $gateClub): bool
+    {
+        if ($gateClub === null) {
+            return true;
+        }
+        if ($this->club === null) {
+            return true;
+        }
+
+        return $this->club->getId() === $gateClub->getId();
+    }
+
+    /**
+     * Календарный период [startDate, endDate] включительно (endDate null — без верхней границы).
+     * Сравнение по строке Y-m-d, чтобы совпадать с логикой API и не зависеть от полуночи в часовом поясе.
+     */
+    public function coversCalendarDay(\DateTimeImmutable $day): bool
+    {
+        $d = $day->format('Y-m-d');
+        if ($d < $this->startDate->format('Y-m-d')) {
+            return false;
+        }
+        if ($this->endDate !== null && $d > $this->endDate->format('Y-m-d')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Абонемент в БД «active» и сегодня попадает в календарный период (как при проверке на турникете). */
+    public function isEffectiveActiveOn(\DateTimeImmutable $day): bool
+    {
+        return $this->status === 'active' && $this->coversCalendarDay($day);
+    }
 }
 

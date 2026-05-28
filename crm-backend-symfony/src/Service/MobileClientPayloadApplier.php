@@ -100,6 +100,21 @@ final class MobileClientPayloadApplier
             $v = trim((string) ($data['registration_address'] ?? ''));
             $user->setRegistrationAddress($v === '' ? null : substr($v, 0, 255));
         }
+
+        if (\array_key_exists('club_id', $data)) {
+            $clubRaw = $data['club_id'];
+            if ($clubRaw === null || $clubRaw === '') {
+                $user->setClub(null);
+            } else {
+                $cid = (int) $clubRaw;
+                if ($cid > 0) {
+                    $club = $this->em->getRepository(Club::class)->find($cid);
+                    if ($club instanceof Club) {
+                        $user->setClub($club);
+                    }
+                }
+            }
+        }
     }
 
     private function hydratePassportFromRegistration(User $user, array $data): void

@@ -1,6 +1,8 @@
 package com.fitnessclub.app
 
+import android.content.Intent
 import android.os.Bundle
+import com.fitnessclub.app.data.auth.SberAuthDeepLinkBus
 import androidx.activity.compose.setContent
 import androidx.fragment.app.FragmentActivity
 import androidx.core.view.WindowCompat
@@ -26,6 +28,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
+        dispatchSberCallback(intent)
 
         setContent {
             FitnessClubTheme {
@@ -42,6 +45,19 @@ class MainActivity : FragmentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        dispatchSberCallback(intent)
+    }
+
+    private fun dispatchSberCallback(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "worldfitness" && data.host == "auth" && data.path == "/callback") {
+            SberAuthDeepLinkBus.publish(data)
         }
     }
 }

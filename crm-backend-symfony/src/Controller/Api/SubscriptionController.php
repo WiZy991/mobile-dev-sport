@@ -2,6 +2,7 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\Club;
 use App\Entity\PromoCode;
 use App\Entity\Sale;
 use App\Entity\Subscription;
@@ -51,6 +52,8 @@ class SubscriptionController extends AbstractController
                 'freeze_days_used' => $s->getFreezeDaysUsed(),
                 'is_frozen' => $s->getStatus() === 'frozen',
                 'price' => $plan->getPrice(),
+                'club_id' => $s->getClub()?->getId(),
+                'club_name' => $s->getClub()?->getName(),
             ];
         }, $subs);
 
@@ -153,6 +156,15 @@ class SubscriptionController extends AbstractController
         if ($promo) {
             $sub->setPromoCode($promo);
         }
+
+        $issueClub = $user->getClub();
+        if ($issueClub === null) {
+            $clubRepo = $this->em->getRepository(Club::class);
+            if ((int) $clubRepo->count([]) === 1) {
+                $issueClub = $clubRepo->findOneBy([]);
+            }
+        }
+        $sub->setClub($issueClub);
 
         $this->em->persist($sub);
         $this->em->flush();
@@ -267,6 +279,8 @@ class SubscriptionController extends AbstractController
             'freeze_days_used' => $s->getFreezeDaysUsed(),
             'is_frozen' => $s->getStatus() === 'frozen',
             'price' => $plan->getPrice(),
+            'club_id' => $s->getClub()?->getId(),
+            'club_name' => $s->getClub()?->getName(),
         ];
     }
 }

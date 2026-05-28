@@ -2,7 +2,11 @@ package com.fitnessclub.app.ui.navigation
 
 sealed class Screen(val route: String) {
     // Auth
-    data object Login : Screen("login")
+    data object Login : Screen("login") {
+        const val ARG_START_SBER = "startSber"
+        const val ROUTE_WITH_ARG = "login?startSber={startSber}"
+        fun createRoute(startSber: Boolean) = "login?startSber=$startSber"
+    }
     data object Register : Screen("register")
     
     // Main

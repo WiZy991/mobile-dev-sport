@@ -19,6 +19,12 @@ interface FitnessApi {
     
     @POST("auth/logout")
     suspend fun logout(): Response<Unit>
+
+    @POST("auth/sber/login")
+    suspend fun sberLogin(@Body request: SberLoginRequest): Response<SberLoginUrlResponse>
+
+    @POST("auth/sber/callback")
+    suspend fun sberCallback(@Body request: SberCallbackRequest): Response<AuthResponse>
     
     // User
     @GET("user/profile")

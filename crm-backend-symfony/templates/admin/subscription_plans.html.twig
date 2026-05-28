@@ -164,6 +164,19 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% if clubs is defined and clubs|length > 1 %}
+                <div class="col-md-2">
+                    <label class="form-label small text-secondary">Клуб абонемента</label>
+                    <select name="club_id" class="form-select form-select-sm" required>
+                        <option value="">— выберите —</option>
+                        {% for c in clubs %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% elseif clubs is defined and clubs|length == 1 %}
+                <input type="hidden" name="club_id" value="{{ clubs[0].id }}">
+                {% endif %}
                 <div class="col-md-2">
                     <label class="form-label small text-secondary">Дата начала</label>
                     <input type="date" name="start_date" class="form-control form-control-sm">
@@ -192,6 +205,7 @@
                     <th>ID</th>
                     <th>Клиент</th>
                     <th>План</th>
+                    <th>Клуб</th>
                     <th>Статус</th>
                     <th>Период</th>
                     <th>Продажа</th>
@@ -208,6 +222,7 @@
                             ({{ sub.user.phone }})
                         </td>
                         <td>{{ sub.plan.name }}</td>
+                        <td>{% if sub.club %}{{ sub.club.name }}{% else %}<span class="text-secondary">Все клубы</span>{% endif %}</td>
                         <td>{{ sub.status }}</td>
                         <td>
                             {{ sub.startDate|date('d.m.Y') }}
@@ -240,7 +255,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="8" class="text-center text-secondary">
+                        <td colspan="9" class="text-center text-secondary">
                             Абонементы клиентам пока не выданы.
                         </td>
                     </tr>

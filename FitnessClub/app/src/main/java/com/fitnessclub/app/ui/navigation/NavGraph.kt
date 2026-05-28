@@ -50,10 +50,21 @@ fun NavGraph(
         startDestination = startDestination
     ) {
         // Auth screens
-        composable(Screen.Login.route) {
+        composable(
+            route = Screen.Login.ROUTE_WITH_ARG,
+            arguments = listOf(
+                navArgument(Screen.Login.ARG_START_SBER) {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
+            val startWithSber = backStackEntry.arguments
+                ?.getBoolean(Screen.Login.ARG_START_SBER) ?: false
             val viewModel: LoginViewModel = hiltViewModel()
             LoginScreen(
                 viewModel = viewModel,
+                startWithSber = startWithSber,
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
                 },
@@ -84,7 +95,9 @@ fun NavGraph(
                         viewModel.onClubSelected(club)
                     },
                     onRequestSberRegistration = {
-                        // Пока Сбер ID не подключен: оставляем пользователя на этом шаге.
+                        navController.navigate(Screen.Login.createRoute(startSber = true)) {
+                            popUpTo(Screen.Register.route) { inclusive = true }
+                        }
                     },
                 )
             }

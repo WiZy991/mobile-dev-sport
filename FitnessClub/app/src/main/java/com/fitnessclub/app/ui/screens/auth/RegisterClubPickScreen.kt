@@ -253,8 +253,7 @@ fun RegisterClubPickScreen(
                 title = { Text("Зарегистрироваться с помощью Сбер ID") },
                 text = {
                     Text(
-                        "После подключения Сбер ID данные будут подставляться автоматически. "
-                            + "Сейчас выбор зала уже сохранён.",
+                        "Продолжим через Сбер ID. Откроется защищённый вход, после успешной авторизации вы вернётесь в приложение.",
                     )
                 },
                 confirmButton = {
@@ -265,7 +264,7 @@ fun RegisterClubPickScreen(
                             onRequestSberRegistration(clubId)
                         }
                     }) {
-                        Text("Продолжить")
+                        Text("Войти через Сбер ID")
                     }
                 },
                 dismissButton = {

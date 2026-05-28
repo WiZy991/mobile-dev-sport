@@ -12,9 +12,9 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * «Сколько людей сейчас в зале» и кто именно.
  *
- * Логика: за текущий день (с 00:00) для каждого клиента берём ПОСЛЕДНЕЕ событие
- * с result='granted'. Если оно eventType='entry' — клиент сейчас в зале.
- * Если eventType='exit' — он уже вышел.
+ * Логика: за текущий день (с 00:00) для каждой пары (клиент, клуб) берём ПОСЛЕДНЕЕ событие
+ * с result='granted'. Если оно eventType='entry' — клиент сейчас в зале этого клуба.
+ * Если eventType='exit' — он уже вышел (для этого клуба).
  *
  * Корректно работает в обоих сценариях:
  *  - читаем только entry (нет считывателя на выход) — каждый зашедший считается «в зале»;
@@ -33,7 +33,7 @@ final class OccupancyService
     /** Сколько клиентов сейчас в зале (опционально по конкретному клубу). */
     public function countCurrentlyInside(?Club $club = null): int
     {
-        $sql = $this->buildCurrentlyInsideSql($club, selectColumns: 'COUNT(DISTINCT a.user_id) AS cnt');
+        $sql = $this->buildCurrentlyInsideSql($club, selectColumns: 'COUNT(*) AS cnt');
         $row = $this->connection()->executeQuery($sql['sql'], $sql['params'])->fetchAssociative();
 
         return (int) ($row['cnt'] ?? 0);
@@ -84,9 +84,10 @@ final class OccupancyService
     }
 
     /**
-     * Сборщик SQL: «последнее за сегодня granted-событие пользователя — это entry».
-     * Группируем по (user_id, club_id), чтобы при мультиклубной франшизе клиент учитывался
-     * именно в том клубе, где он сейчас находится.
+     * Сборщик SQL: «последнее за сегодня granted-событие в разрезе (user_id, club_id) — entry».
+     * Раньше MAX(created_at) считался только по user_id (все клубы), затем фильтр по club_id —
+     * выход в клубе A не «перебивал» вход, если где-то была более поздняя запись без club_id
+     * или в другом клубе; счётчик «в зале» залипал на entry.
      *
      * @return array{sql: string, params: array<string, mixed>}
      */
@@ -101,30 +102,33 @@ final class OccupancyService
         $tomorrow = (new \DateTimeImmutable('today'))->modify('+1 day')->format('Y-m-d H:i:s');
 
         $clubFilter = '';
+        $innerClubFilter = '';
         $params = [
             'from' => $todayStart,
             'to' => $tomorrow,
         ];
         if ($club instanceof Club) {
             $clubFilter = ' AND a.club_id = :club_id';
+            $innerClubFilter = ' AND club_id = :club_id';
             $params['club_id'] = $club->getId();
         }
 
-        // Подзапрос: последний timestamp granted-события за сегодня для каждого пользователя.
-        // Затем берём только тех, у кого last event_type = 'entry'.
+        // Подзапрос: последний granted за сегодня отдельно для каждой пары (user_id, club_id).
+        // Соединяем с club_id (в т.ч. оба NULL для старых логов без клуба).
         $sql = "SELECT $selectColumns
                 FROM access_logs a
                 INNER JOIN (
-                    SELECT user_id, MAX(created_at) AS max_at
+                    SELECT user_id, club_id, MAX(created_at) AS max_at
                     FROM access_logs
                     WHERE result = 'granted'
                       AND user_id IS NOT NULL
                       AND created_at >= :from
-                      AND created_at < :to
-                    GROUP BY user_id
+                      AND created_at < :to" . $innerClubFilter . "
+                    GROUP BY user_id, club_id
                 ) last_events
                   ON last_events.user_id = a.user_id
                  AND last_events.max_at = a.created_at
+                 AND (last_events.club_id = a.club_id OR (last_events.club_id IS NULL AND a.club_id IS NULL))
                 WHERE a.result = 'granted'
                   AND a.user_id IS NOT NULL
                   AND a.event_type = 'entry'

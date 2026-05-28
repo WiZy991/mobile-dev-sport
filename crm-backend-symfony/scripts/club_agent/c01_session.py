@@ -45,7 +45,18 @@ def _parse_presented_credential(
         or block.get("text")
         or ""
     )
-    qr = str(raw).strip() if raw is not None else ""
+    # C01 может прислать id числом (редко); для метки времени важно не терять точность float→str.
+    if isinstance(raw, bool):
+        qr = ""
+    elif isinstance(raw, int):
+        qr = str(raw)
+    elif isinstance(raw, float) and raw.is_integer():
+        qr = str(int(raw))
+    else:
+        qr = str(raw).strip() if raw is not None else ""
+    # Считыватель/контроллер иногда добавляет CR/LF в конец поля id.
+    if qr:
+        qr = qr.replace("\r", "").replace("\n", "").strip()
     try:
         number = int(block.get("number", equipment.exdev_number))
     except (TypeError, ValueError):
@@ -199,7 +210,11 @@ class C01Session:
                     f"{ev_name}: в событии нет id/code для CRM — проверьте reader/exdev в PERCo. JSON: {preview}",
                 )
                 return access_deny(number, direction)
-            self._emit("info", f"{ev_name}: данные для CRM ({len(qr)} симв.): {qr[:120]}")
+            preview = qr[:120] + ("…" if len(qr) > 120 else "")
+            self._emit(
+                "info",
+                f"{ev_name}: для CRM длина строки {len(qr)} симв. (в журнале превью до 120 симв.; в CRM уходит полностью): {preview}",
+            )
             try:
                 granted = await self.on_card(qr, number, direction, self.equipment)
             except Exception as e:

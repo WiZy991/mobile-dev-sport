@@ -5,6 +5,8 @@ import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.local.TokenManager
 import com.fitnessclub.app.data.model.LoginRequest
 import com.fitnessclub.app.data.model.RegisterRequest
+import com.fitnessclub.app.data.model.SberCallbackRequest
+import com.fitnessclub.app.data.model.SberLoginRequest
 import com.fitnessclub.app.data.model.User
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +26,62 @@ class AuthRepository @Inject constructor(
     private val tokenManager: TokenManager,
     private val gson: Gson,
 ) {
+
+    fun getSberAuthorizeUrl(
+        codeChallenge: String,
+        redirectUri: String,
+    ): Flow<ApiResult<String>> = flow {
+        emit(ApiResult.Loading)
+        try {
+            val response = api.sberLogin(
+                SberLoginRequest(
+                    codeChallenge = codeChallenge,
+                    redirectUri = redirectUri,
+                )
+            )
+            if (response.isSuccessful && response.body() != null) {
+                val url = response.body()!!.authorizeUrl.trim()
+                if (url.isNotEmpty()) {
+                    emit(ApiResult.Success(url))
+                } else {
+                    emit(ApiResult.Error("Сервер не вернул ссылку Сбер ID"))
+                }
+            } else {
+                emit(ApiResult.Error(authErrorMessage(response, "Не удалось начать вход через Сбер ID"), response.code()))
+            }
+        } catch (e: Exception) {
+            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+        }
+    }
+
+    fun loginWithSberCode(
+        code: String,
+        codeVerifier: String,
+        redirectUri: String,
+        state: String,
+    ): Flow<ApiResult<User>> = flow {
+        emit(ApiResult.Loading)
+        try {
+            val response = api.sberCallback(
+                SberCallbackRequest(
+                    code = code,
+                    codeVerifier = codeVerifier,
+                    redirectUri = redirectUri,
+                    state = state,
+                )
+            )
+            if (response.isSuccessful && response.body() != null) {
+                val authResponse = response.body()!!
+                tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
+                tokenManager.saveUser(authResponse.user)
+                emit(ApiResult.Success(authResponse.user))
+            } else {
+                emit(ApiResult.Error(authErrorMessage(response, "Не удалось завершить вход через Сбер ID"), response.code()))
+            }
+        } catch (e: Exception) {
+            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+        }
+    }
     
     fun login(email: String, password: String): Flow<ApiResult<User>> = flow {
         emit(ApiResult.Loading)

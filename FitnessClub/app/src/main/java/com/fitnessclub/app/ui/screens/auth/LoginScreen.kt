@@ -23,13 +23,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,31 +39,24 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.collectAsState
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.fragment.app.FragmentActivity
+import com.fitnessclub.app.data.auth.SberAuthDeepLinkBus
 import com.fitnessclub.app.data.config.AppConfig
 
 /** Фон входа в духе макета (терракота). */
@@ -78,14 +67,14 @@ private val LoginSurfaceWhite = Color.White
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel,
+    startWithSber: Boolean = false,
     onNavigateToRegister: () -> Unit,
     onLoginSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val focusManager = LocalFocusManager.current
     val uriHandler = LocalUriHandler.current
-    var passwordVisible by remember { mutableStateOf(false) }
-    val activity = LocalContext.current as? FragmentActivity
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -100,12 +89,32 @@ fun LoginScreen(
                         onLoginSuccess()
                     }
                 }
+                is LoginEvent.OpenExternalUrl -> {
+                    runCatching {
+                        val customTabsIntent = CustomTabsIntent.Builder().build()
+                        customTabsIntent.launchUrl(context, android.net.Uri.parse(event.url))
+                    }.onFailure {
+                        runCatching { uriHandler.openUri(event.url) }
+                    }
+                }
             }
         }
     }
 
     LaunchedEffect(Unit) {
+        SberAuthDeepLinkBus.events.collect { uri ->
+            viewModel.handleSberDeepLink(uri)
+        }
+    }
+
+    LaunchedEffect(Unit) {
         viewModel.refreshBiometricOffer()
+    }
+
+    LaunchedEffect(startWithSber) {
+        if (startWithSber) {
+            viewModel.loginWithSberId()
+        }
     }
 
     Box(
@@ -139,7 +148,7 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(28.dp))
             Text(
-                text = "Какой ваш номер телефона?",
+                text = "Вход в аккаунт",
                 color = LoginSurfaceWhite,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -148,7 +157,7 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Вы уже являетесь клиентом клуба? Тогда просто подтвердите ваш номер телефона. Если нет, то пройдите регистрацию.",
+                text = "Войдите через Сбер ID. После первого входа можно использовать биометрию без браузера.",
                 color = LoginSurfaceWhite.copy(0.92f),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
@@ -156,125 +165,7 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(32.dp))
 
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "🇷🇺",
-                    fontSize = 22.sp,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                TextField(
-                    value = uiState.phoneNationalDigits,
-                    onValueChange = viewModel::onPhoneChange,
-                    modifier = Modifier.weight(1f),
-                    placeholder = {
-                        Text(
-                            "+7 (___) ___-__-__",
-                            color = LoginSurfaceWhite.copy(0.45f)
-                        )
-                    },
-                    visualTransformation = remember { RussianPhoneVisualTransformation() },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Phone,
-                        imeAction = if (uiState.credentialsStep) ImeAction.Next else ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            focusManager.clearFocus()
-                            if (!uiState.credentialsStep) viewModel.continueFromPhone()
-                        },
-                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                    ),
-                    singleLine = true,
-                    colors = loginFieldColors(),
-                    isError = uiState.phoneError != null,
-                    supportingText = uiState.phoneError?.let {
-                        {
-                            Text(it, color = LoginSurfaceWhite)
-                        }
-                    }
-                )
-            }
-
-            AnimatedVisibility(
-                visible = uiState.credentialsStep,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Column(Modifier.fillMaxWidth()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "Вход по email и паролю, указанным при регистрации.",
-                        color = LoginSurfaceWhite.copy(0.88f),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    TextField(
-                        value = uiState.email,
-                        onValueChange = viewModel::onEmailChange,
-                        label = { Text("E-mail", color = LoginSurfaceWhite.copy(0.85f)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        ),
-                        colors = loginFieldColors(),
-                        isError = uiState.emailError != null,
-                        supportingText = uiState.emailError?.let {
-                            { Text(it, color = LoginSurfaceWhite) }
-                        }
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    TextField(
-                        value = uiState.password,
-                        onValueChange = viewModel::onPasswordChange,
-                        label = { Text("Пароль", color = LoginSurfaceWhite.copy(0.85f)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        visualTransformation = if (passwordVisible) {
-                            VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) {
-                                        Icons.Default.VisibilityOff
-                                    } else {
-                                        Icons.Default.Visibility
-                                    },
-                                    contentDescription = null,
-                                    tint = LoginSurfaceWhite
-                                )
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                viewModel.login()
-                            }
-                        ),
-                        colors = loginFieldColors(),
-                        isError = uiState.passwordError != null,
-                        supportingText = uiState.passwordError?.let {
-                            { Text(it, color = LoginSurfaceWhite) }
-                        }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(20.dp))
             Text(
                 text = "Регистрация",
                 color = LoginSurfaceWhite,
@@ -303,41 +194,31 @@ fun LoginScreen(
             )
 
             Spacer(Modifier.height(20.dp))
-
             Button(
-                onClick = {
-                    if (!uiState.credentialsStep) {
-                        viewModel.continueFromPhone()
-                    } else {
-                        viewModel.login()
-                    }
-                },
+                onClick = { viewModel.loginWithSberId() },
                 enabled = !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = LoginButtonColor,
-                    contentColor = LoginSurfaceWhite,
-                    disabledContainerColor = LoginButtonColor.copy(0.5f)
-                )
+                    containerColor = LoginSurfaceWhite,
+                    contentColor = LoginBackground,
+                    disabledContainerColor = LoginSurfaceWhite.copy(0.5f),
+                ),
             ) {
                 if (uiState.isLoading) {
                     CircularProgressIndicator(
                         Modifier.size(24.dp),
-                        color = LoginSurfaceWhite,
+                        color = LoginBackground,
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text(
-                        text = if (uiState.credentialsStep) "ВОЙТИ" else "ПРОДОЛЖИТЬ",
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("ВОЙТИ ЧЕРЕЗ СБЕР ID", fontWeight = FontWeight.Bold)
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(14.dp))
             LoginBiometricButton(
                 configured = uiState.biometricLoginConfigured,
                 hardwareReady = uiState.biometricHardwareReady,
@@ -432,21 +313,3 @@ private fun loginLegalAnnotatedString(): AnnotatedString = buildAnnotatedString 
     append(" и соглашаетесь на обработку персональных данных")
 }
 
-@Composable
-private fun loginFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = Color.Transparent,
-    unfocusedContainerColor = Color.Transparent,
-    disabledContainerColor = Color.Transparent,
-    focusedIndicatorColor = LoginSurfaceWhite,
-    unfocusedIndicatorColor = LoginSurfaceWhite.copy(0.55f),
-    focusedTextColor = LoginSurfaceWhite,
-    unfocusedTextColor = LoginSurfaceWhite,
-    focusedLabelColor = LoginSurfaceWhite.copy(0.85f),
-    unfocusedLabelColor = LoginSurfaceWhite.copy(0.75f),
-    cursorColor = LoginSurfaceWhite,
-    focusedPlaceholderColor = LoginSurfaceWhite.copy(0.45f),
-    unfocusedPlaceholderColor = LoginSurfaceWhite.copy(0.45f),
-    errorIndicatorColor = LoginSurfaceWhite,
-    errorSupportingTextColor = LoginSurfaceWhite,
-    errorLabelColor = LoginSurfaceWhite
-)

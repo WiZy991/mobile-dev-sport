@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "com.fitnessclub.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.fitnessclub.app"
+        applicationId = "ru.worldcashfit.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 4
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
