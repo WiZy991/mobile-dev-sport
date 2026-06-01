@@ -9,11 +9,12 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Очередь команд от CRM к шлюзам клубов (открытие двери из админки и т.п.).
- * Шлюз клуба long-poll'ит /api/v1/gateway/commands.
+ * Очередь команд от CRM к шлюзам клубов.
  */
 final class Version20260427120100 extends AbstractMigration
 {
+    use MigrationHelpers;
+
     public function getDescription(): string
     {
         return 'Create gateway_commands table (queue from CRM to club gateways)';
@@ -21,6 +22,10 @@ final class Version20260427120100 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        if ($this->tableExists('gateway_commands')) {
+            return;
+        }
+
         $isSqlite = $this->connection->getDatabasePlatform() instanceof SQLitePlatform;
 
         if ($isSqlite) {
@@ -40,8 +45,8 @@ final class Version20260427120100 extends AbstractMigration
                     CONSTRAINT FK_gateway_commands_club FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE CASCADE
                 )
             SQL);
-            $this->addSql("CREATE INDEX IDX_gateway_commands_club_status ON gateway_commands (club_id, status)");
-            $this->addSql("CREATE INDEX IDX_gateway_commands_created ON gateway_commands (created_at)");
+            $this->addSql('CREATE INDEX IDX_gateway_commands_club_status ON gateway_commands (club_id, status)');
+            $this->addSql('CREATE INDEX IDX_gateway_commands_created ON gateway_commands (created_at)');
         } else {
             $this->addSql(<<<'SQL'
                 CREATE TABLE gateway_commands (
@@ -61,12 +66,12 @@ final class Version20260427120100 extends AbstractMigration
                     PRIMARY KEY (id)
                 ) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB
             SQL);
-            $this->addSql("ALTER TABLE gateway_commands ADD CONSTRAINT FK_gateway_commands_club FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE CASCADE");
+            $this->addSql('ALTER TABLE gateway_commands ADD CONSTRAINT FK_gateway_commands_club FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE CASCADE');
         }
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql("DROP TABLE gateway_commands");
+        $this->addSql('DROP TABLE gateway_commands');
     }
 }

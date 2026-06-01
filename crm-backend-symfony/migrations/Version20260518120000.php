@@ -9,6 +9,8 @@ use Doctrine\Migrations\AbstractMigration;
 
 final class Version20260518120000 extends AbstractMigration
 {
+    use MigrationHelpers;
+
     public function getDescription(): string
     {
         return 'Сбер ID: sber_id и is_verified для клиентов приложения.';
@@ -16,9 +18,15 @@ final class Version20260518120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE users ADD sber_id VARCHAR(128) DEFAULT NULL');
-        $this->addSql('ALTER TABLE users ADD is_verified TINYINT NOT NULL DEFAULT 0');
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_users_sber_id ON users (sber_id)');
+        if (!$this->columnExists('users', 'sber_id')) {
+            $this->addSql('ALTER TABLE users ADD sber_id VARCHAR(128) DEFAULT NULL');
+        }
+        if (!$this->columnExists('users', 'is_verified')) {
+            $this->addSql('ALTER TABLE users ADD is_verified TINYINT NOT NULL DEFAULT 0');
+        }
+        if (!$this->indexExists('users', 'UNIQ_users_sber_id')) {
+            $this->addSql('CREATE UNIQUE INDEX UNIQ_users_sber_id ON users (sber_id)');
+        }
     }
 
     public function down(Schema $schema): void
