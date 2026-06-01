@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
-namespace DoctrineMigrations;
+namespace App\Migration;
 
 use Doctrine\DBAL\Platforms\SQLitePlatform;
+use Doctrine\Migrations\AbstractMigration;
 
 /**
  * Проверки «уже есть в БД» — для prod, где schema:update мог опередить migrations.
+ *
+ * @mixin AbstractMigration
  */
 trait MigrationHelpers
 {
