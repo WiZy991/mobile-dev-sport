@@ -20,35 +20,56 @@ final class Version20260427121000 extends AbstractMigration
         return 'Add club_id to access_logs and reporting indexes';
     }
 
+    public function isTransactional(): bool
+    {
+        return false;
+    }
+
     public function up(Schema $schema): void
     {
         $isSqlite = $this->connection->getDatabasePlatform() instanceof SQLitePlatform;
 
         if ($isSqlite) {
             if (!$this->columnExists('access_logs', 'club_id')) {
-                $this->addSql('ALTER TABLE access_logs ADD COLUMN club_id INTEGER DEFAULT NULL REFERENCES clubs(id) ON DELETE SET NULL');
+                $this->connection->executeStatement(
+                    'ALTER TABLE access_logs ADD COLUMN club_id INTEGER DEFAULT NULL REFERENCES clubs(id) ON DELETE SET NULL',
+                );
             }
-            $this->addSql('CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs (created_at)');
-            $this->addSql('CREATE INDEX IF NOT EXISTS idx_access_logs_user_event_created ON access_logs (user_id, event_type, created_at)');
-            $this->addSql('CREATE INDEX IF NOT EXISTS idx_access_logs_club_created ON access_logs (club_id, created_at)');
+            $this->connection->executeStatement(
+                'CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs (created_at)',
+            );
+            $this->connection->executeStatement(
+                'CREATE INDEX IF NOT EXISTS idx_access_logs_user_event_created ON access_logs (user_id, event_type, created_at)',
+            );
+            $this->connection->executeStatement(
+                'CREATE INDEX IF NOT EXISTS idx_access_logs_club_created ON access_logs (club_id, created_at)',
+            );
 
             return;
         }
 
         if (!$this->columnExists('access_logs', 'club_id')) {
-            $this->addSql('ALTER TABLE access_logs ADD club_id INT DEFAULT NULL');
+            $this->connection->executeStatement('ALTER TABLE access_logs ADD club_id INT DEFAULT NULL');
         }
         if (!$this->foreignKeyExists('access_logs', 'FK_access_logs_club')) {
-            $this->addSql('ALTER TABLE access_logs ADD CONSTRAINT FK_access_logs_club FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE SET NULL');
+            $this->connection->executeStatement(
+                'ALTER TABLE access_logs ADD CONSTRAINT FK_access_logs_club FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE SET NULL',
+            );
         }
         if (!$this->indexExists('access_logs', 'idx_access_logs_created_at')) {
-            $this->addSql('CREATE INDEX idx_access_logs_created_at ON access_logs (created_at)');
+            $this->connection->executeStatement(
+                'CREATE INDEX idx_access_logs_created_at ON access_logs (created_at)',
+            );
         }
         if (!$this->indexExists('access_logs', 'idx_access_logs_user_event_created')) {
-            $this->addSql('CREATE INDEX idx_access_logs_user_event_created ON access_logs (user_id, event_type, created_at)');
+            $this->connection->executeStatement(
+                'CREATE INDEX idx_access_logs_user_event_created ON access_logs (user_id, event_type, created_at)',
+            );
         }
         if (!$this->indexExists('access_logs', 'idx_access_logs_club_created')) {
-            $this->addSql('CREATE INDEX idx_access_logs_club_created ON access_logs (club_id, created_at)');
+            $this->connection->executeStatement(
+                'CREATE INDEX idx_access_logs_club_created ON access_logs (club_id, created_at)',
+            );
         }
     }
 

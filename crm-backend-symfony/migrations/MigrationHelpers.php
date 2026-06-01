@@ -22,15 +22,35 @@ trait MigrationHelpers
             return false;
         }
 
-        $columns = $this->connection->createSchemaManager()->listTableColumns($table);
+        if ($this->connection->getDatabasePlatform() instanceof SQLitePlatform) {
+            $columns = $this->connection->createSchemaManager()->listTableColumns($table);
 
-        return isset($columns[$column]) || isset($columns[strtolower($column)]);
+            return isset($columns[$column]) || isset($columns[strtolower($column)]);
+        }
+
+        $count = $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+            [$table, $column],
+        );
+
+        return (int) $count > 0;
     }
 
     protected function indexExists(string $table, string $indexName): bool
     {
         if (!$this->tableExists($table)) {
             return false;
+        }
+
+        if (!$this->connection->getDatabasePlatform() instanceof SQLitePlatform) {
+            $count = $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?',
+                [$table, $indexName],
+            );
+
+            return (int) $count > 0;
         }
 
         $indexes = $this->connection->createSchemaManager()->listTableIndexes($table);
