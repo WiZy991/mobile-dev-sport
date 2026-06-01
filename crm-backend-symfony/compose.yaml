@@ -31,8 +31,8 @@ services:
       MYSQL_USER: app
       MYSQL_PASSWORD: app_password
       MYSQL_ROOT_PASSWORD: root_password
-    ports:
-      - "3306:3306"
+    # Порт 3306 не публикуется наружу — только docker-сеть (безопасность / опросник ДКБ).
+    # Для локальной отладки: COMPOSE_FILE=compose.yaml:compose.dev.yaml
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uapp", "-papp_password"]

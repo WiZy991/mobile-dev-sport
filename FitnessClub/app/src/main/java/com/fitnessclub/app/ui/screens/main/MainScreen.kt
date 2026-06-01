@@ -171,6 +171,7 @@ fun MainScreen(
                     onNavigateToTrainingDetails = { trainingId ->
                         navController.navigate(Screen.TrainingDetails.createRoute(trainingId))
                     },
+                    onNavigateToTrainingDiary = { navController.navigate(Screen.TrainingDiary.route) },
                     onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
                     onNavigateToReferral = { navController.navigate(Screen.Referral.route) }
                 )

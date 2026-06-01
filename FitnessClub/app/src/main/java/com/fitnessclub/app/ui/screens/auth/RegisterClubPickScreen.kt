@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -90,6 +91,7 @@ fun RegisterClubPickScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .navigationBarsPadding()
                 .verticalScroll(scroll)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
@@ -240,7 +242,7 @@ fun RegisterClubPickScreen(
                 enabled = selectedClubId != null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 18.dp),
+                    .padding(bottom = 28.dp),
                 shape = RoundedCornerShape(14.dp),
             ) {
                 Text("Выбрать зал")

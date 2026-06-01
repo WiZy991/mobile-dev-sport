@@ -42,6 +42,7 @@ fun HomeScreen(
     onNavigateToNotifications: () -> Unit,
     onNavigateToQrCode: () -> Unit = {},
     onNavigateToTrainingDetails: (String) -> Unit = {},
+    onNavigateToTrainingDiary: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     onNavigateToReferral: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
@@ -124,7 +125,8 @@ fun HomeScreen(
                     onShop = onNavigateToShop,
                     onClubInfo = onNavigateToClubInfo,
                     onLockers = onNavigateToLockers,
-                    onTrainers = onNavigateToTrainers
+                    onTrainers = onNavigateToTrainers,
+                    onTrainingDiary = onNavigateToTrainingDiary
                 )
             }
             
@@ -272,7 +274,8 @@ private fun QuickMenuSection(
     onShop: () -> Unit,
     onClubInfo: () -> Unit,
     onLockers: () -> Unit,
-    onTrainers: () -> Unit
+    onTrainers: () -> Unit,
+    onTrainingDiary: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -329,6 +332,13 @@ private fun QuickMenuSection(
                 title = "Наша команда",
                 subtitle = "Опытные тренеры",
                 onClick = onTrainers
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            QuickMenuItem(
+                icon = Icons.Default.MenuBook,
+                title = "Дневник тренировок",
+                subtitle = "Личные записи и прогресс",
+                onClick = onTrainingDiary
             )
         }
     }

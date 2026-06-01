@@ -67,6 +67,13 @@ class User
     #[ORM\Column(name: 'api_refresh_token', type: 'string', length: 64, nullable: true)]
     private ?string $apiRefreshToken = null;
 
+    /** Короткоживущий access для мобильного API (Bearer на /api/v1/*). */
+    #[ORM\Column(name: 'api_access_token', type: 'string', length: 64, nullable: true)]
+    private ?string $apiAccessToken = null;
+
+    #[ORM\Column(name: 'api_access_token_expires_at', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $apiAccessTokenExpiresAt = null;
+
     /** none | pending | verified | rejected — соответствие паспорта (Сбер ID / др.) */
     #[ORM\Column(type: 'string', length: 20)]
     private string $passportVerificationStatus = 'none';
@@ -421,6 +428,36 @@ class User
     {
         $this->verified = $verified;
         return $this;
+    }
+
+    public function getApiAccessToken(): ?string
+    {
+        return $this->apiAccessToken;
+    }
+
+    public function setApiAccessToken(?string $apiAccessToken): self
+    {
+        $this->apiAccessToken = $apiAccessToken;
+
+        return $this;
+    }
+
+    public function getApiAccessTokenExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->apiAccessTokenExpiresAt;
+    }
+
+    public function setApiAccessTokenExpiresAt(?\DateTimeImmutable $apiAccessTokenExpiresAt): self
+    {
+        $this->apiAccessTokenExpiresAt = $apiAccessTokenExpiresAt;
+
+        return $this;
+    }
+
+    public function isPassportLockedFromClientEdit(): bool
+    {
+        return $this->passportVerificationProvider === 'sber_id'
+            && $this->passportVerificationStatus === 'verified';
     }
 
     public function getCreatedAt(): \DateTimeImmutable

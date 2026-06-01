@@ -5,7 +5,7 @@ import com.fitnessclub.app.R
 import com.fitnessclub.app.data.api.ClubItem
 
 /**
- * Три зала при регистрации. [clubId] совпадает с `clubs.id` на сервере.
+ * Залы при регистрации. [clubId] совпадает с `clubs.id` на сервере.
  * Синхронизация строк в БД CRM: `php bin/console app:clubs:sync-registration-venues`
  * (см. crm-backend-symfony `SyncRegistrationVenuesCommand`).
  */
@@ -19,22 +19,16 @@ data class RegistrationVenueCard(
 object RegistrationVenues {
     val orderedCards: List<RegistrationVenueCard> = listOf(
         RegistrationVenueCard(
-            clubId = "3",
-            title = "ул. Купера, 2",
-            addressLines = "Основной зал",
-            imageRes = R.drawable.registration_club_kupera,
-        ),
-        RegistrationVenueCard(
             clubId = "1",
             title = "ТЦ Формат",
-            addressLines = "ул. Центральная, 18, 2 этаж",
+            addressLines = "ул. Центральная 18, 2 этаж",
             imageRes = R.drawable.registration_club_mall,
         ),
         RegistrationVenueCard(
             clubId = "2",
             title = "ТЦ Новый де Фриз",
-            addressLines = "ул. Купера, 2, 2 этаж",
-            imageRes = R.drawable.registration_club_mall,
+            addressLines = "ул. Купера 2, 2 этаж",
+            imageRes = R.drawable.registration_club_kupera,
         ),
     )
 

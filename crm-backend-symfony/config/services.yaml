@@ -17,6 +17,8 @@ parameters:
     sber_id_mtls_pass_default: ''
     # Scope авторизации OIDC — набор должен быть подключён в кабинете Сбер ID (см. WorldFitness/instruction.txt).
     sber_id_oidc_scope_default: 'openid profile email mobile name birthdate gender maindoc priority_doc'
+    mobile_api_access_ttl_default: 3600
+    sber_userinfo_log_default: false
 
 services:
     # default configuration for services in *this* file
@@ -63,9 +65,18 @@ services:
         arguments:
             $mobileRedirectUri: '%env(default:sber_id_mobile_redirect_default:SBER_ID_MOBILE_REDIRECT_URI)%'
 
+    App\Service\Api\MobileAuthTokenIssuer:
+        arguments:
+            $accessTokenTtlSeconds: '%env(int:default:mobile_api_access_ttl_default:MOBILE_API_ACCESS_TTL)%'
+
+    App\Service\Api\SberIdTokenValidator:
+        arguments:
+            $clientId: '%env(SBER_ID_CLIENT_ID)%'
+
     App\Service\Api\SberIdUserinfoJsonLogger:
         arguments:
             $projectDir: '%kernel.project_dir%'
+            $enabled: '%env(bool:default:sber_userinfo_log_default:SBER_USERINFO_LOG)%'
 
     App\Controller\Api\SubscriptionController:
         bind:

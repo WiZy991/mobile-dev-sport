@@ -5,6 +5,7 @@ namespace App\Controller\Admin;
 use App\Entity\User;
 use App\Service\Admin\SberIdOAuthService;
 use App\Service\Api\SberIdProfileApplicator;
+use App\Service\Api\SberIdTokenValidator;
 use App\Service\Api\SberIdUserinfoJsonLogger;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +21,7 @@ final class AdminSberIdController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly SberIdOAuthService $sberId,
         private readonly SberIdProfileApplicator $sberProfile,
+        private readonly SberIdTokenValidator $sberTokenValidator,
         private readonly SberIdUserinfoJsonLogger $sberUserinfoLogger,
         private readonly string $sberRedirectUri,
     ) {
@@ -99,7 +101,14 @@ final class AdminSberIdController extends AbstractController
             return $this->redirectToRoute('admin_client_show', ['id' => $clientUserId]);
         }
 
-        $claims = $this->sberId->decodeIdTokenPayload($idToken);
+        $expectedNonce = is_string($saved['nonce'] ?? null) ? $saved['nonce'] : null;
+        try {
+            $claims = $this->sberTokenValidator->validateAndDecode($idToken, $expectedNonce);
+        } catch (\InvalidArgumentException $e) {
+            $this->addFlash('danger', 'Сбер ID: недействительный id_token — ' . $e->getMessage());
+
+            return $this->redirectToRoute('admin_client_show', ['id' => $clientUserId]);
+        }
         $sub = isset($claims['sub']) && is_string($claims['sub']) ? $claims['sub'] : null;
 
         $accessToken = isset($tokens['access_token']) && is_string($tokens['access_token']) ? $tokens['access_token'] : '';

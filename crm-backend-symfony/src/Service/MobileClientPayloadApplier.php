@@ -52,6 +52,9 @@ final class MobileClientPayloadApplier
      */
     public function applyProfilePatch(User $user, array $data): void
     {
+        if ($user->isPassportLockedFromClientEdit() && $this->hasPassportPatchKeys($data)) {
+            throw new \DomainException('passport_locked');
+        }
         if (\array_key_exists('date_of_birth', $data)) {
             $dob = $data['date_of_birth'];
             if ($dob === null || $dob === '') {
@@ -141,6 +144,18 @@ final class MobileClientPayloadApplier
         if ($addr !== '') {
             $user->setRegistrationAddress(substr($addr, 0, 255));
         }
+    }
+
+    /** @param array<string, mixed> $data */
+    private function hasPassportPatchKeys(array $data): bool
+    {
+        foreach (['passport_series', 'passport_number', 'passport_issued_by', 'passport_issue_date'] as $key) {
+            if (\array_key_exists($key, $data)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function normalizeGender(mixed $raw): ?string

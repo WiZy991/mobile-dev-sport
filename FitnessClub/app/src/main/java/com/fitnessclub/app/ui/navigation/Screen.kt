@@ -44,6 +44,7 @@ sealed class Screen(val route: String) {
     data object GuestPass : Screen("guest_pass")
     data object Documents : Screen("documents")
     data object PurchaseHistory : Screen("purchase_history")
+    data object TrainingDiary : Screen("training_diary")
     data object Trainers : Screen("trainers")
 
     data object TrainerDetails : Screen("trainer_details/{trainerId}") {

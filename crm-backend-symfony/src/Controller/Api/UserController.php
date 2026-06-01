@@ -6,6 +6,7 @@ use App\Entity\AccessLog;
 use App\Entity\Sale;
 use App\Entity\User;
 use App\Service\Api\MobileAuthTokenIssuer;
+use App\Service\Api\UserAccountDeletionService;
 use App\Service\CurrentUserResolver;
 use App\Service\MobileClientPayloadApplier;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,6 +23,7 @@ class UserController extends AbstractController
         private readonly CurrentUserResolver $userResolver,
         private readonly MobileClientPayloadApplier $mobileClientPayloadApplier,
         private readonly MobileAuthTokenIssuer $mobileTokens,
+        private readonly UserAccountDeletionService $accountDeletion,
     ) {}
 
     #[Route('/stats', name: 'api_user_stats', methods: ['GET'])]
@@ -133,12 +135,35 @@ class UserController extends AbstractController
             $user->setPhone($data['phone']);
         }
 
-        $this->mobileClientPayloadApplier->applyProfilePatch($user, $data);
+        try {
+            $this->mobileClientPayloadApplier->applyProfilePatch($user, $data);
+        } catch (\DomainException $e) {
+            if ($e->getMessage() === 'passport_locked') {
+                return $this->json([
+                    'error' => 'Паспорт подтверждён через Сбер ID и не может быть изменён из приложения',
+                    'code' => 'passport_locked',
+                ], 403);
+            }
+            throw $e;
+        }
 
         $this->em->persist($user);
         $this->em->flush();
 
         return $this->json($this->serializeUserProfile($user));
+    }
+
+    #[Route('/account', name: 'api_user_account_delete', methods: ['DELETE'])]
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $this->accountDeletion->deleteAccount($user);
+
+        return $this->json(['success' => true]);
     }
 
     /** @return array<string, mixed> */

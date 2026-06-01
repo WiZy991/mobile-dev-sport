@@ -5,11 +5,13 @@ namespace App\Service\Api;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 
-/** Выдача пары access/refresh для мобильного API (как AuthController). */
+/** Выдача пары access/refresh для мобильного API. Access проверяется на каждом запросе. */
 final class MobileAuthTokenIssuer
 {
-    public function __construct(private readonly EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly int $accessTokenTtlSeconds = 3600,
+    ) {
     }
 
     /**
@@ -17,10 +19,15 @@ final class MobileAuthTokenIssuer
      */
     public function issue(User $user, bool $rotateRefresh): array
     {
-        $accessToken = bin2hex(random_bytes(16));
+        $accessToken = bin2hex(random_bytes(32));
+        $user
+            ->setApiAccessToken($accessToken)
+            ->setApiAccessTokenExpiresAt(new \DateTimeImmutable('+' . $this->accessTokenTtlSeconds . ' seconds'));
+
         if ($rotateRefresh || $user->getApiRefreshToken() === null || $user->getApiRefreshToken() === '') {
-            $user->setApiRefreshToken(bin2hex(random_bytes(16)));
+            $user->setApiRefreshToken(bin2hex(random_bytes(32)));
         }
+
         $this->em->flush();
 
         return [
@@ -28,6 +35,15 @@ final class MobileAuthTokenIssuer
             'refresh_token' => (string) $user->getApiRefreshToken(),
             'user' => $this->userArray($user),
         ];
+    }
+
+    public function revokeSession(User $user): void
+    {
+        $user
+            ->setApiAccessToken(null)
+            ->setApiAccessTokenExpiresAt(null)
+            ->setApiRefreshToken(null);
+        $this->em->flush();
     }
 
     /** @return array<string, mixed> */

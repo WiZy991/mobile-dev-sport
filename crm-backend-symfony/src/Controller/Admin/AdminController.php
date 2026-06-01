@@ -26,6 +26,7 @@ use App\Entity\StaffUser;
 use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
+use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
 use App\Service\Reports\VisitPeriodResolver;
@@ -51,6 +52,7 @@ class AdminController extends AbstractController
         private readonly OccupancyService $occupancy,
         private readonly VisitPeriodResolver $visitPeriodResolver,
         private readonly VisitReportService $visitReport,
+        private readonly PassportAccessPolicy $passportAccess,
     ) {}
 
     private function buildMenu(): array
@@ -520,6 +522,7 @@ class AdminController extends AbstractController
             'menu' => $menu,
             'current' => 'clients',
             'client' => $client,
+            'can_view_passport' => $this->passportAccess->canViewPassportDetails($this->getUser()),
             'subscriptions' => $subscriptions,
             'bookings' => $bookings,
             'sales' => $sales,
@@ -1616,6 +1619,10 @@ class AdminController extends AbstractController
     #[Route('/clients/export', name: 'admin_clients_export', methods: ['GET'])]
     public function exportClients(Request $request): Response
     {
+        if (!$this->passportAccess->canExportPassportDetails($this->getUser())) {
+            throw $this->createAccessDeniedException('Экспорт паспортных данных доступен только администратору.');
+        }
+
         $clients = $this->buildFilteredClientsList($request);
         $format = strtolower((string) $request->query->get('format', 'csv'));
         if ($format === 'xlsx') {

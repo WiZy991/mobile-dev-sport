@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Api;
 
 /**
- * Пишет в лог сырой JSON ответа GET …/userinfo (как в WorldFitness/instruction.txt, шаг 3).
+ * Пишет в лог ответ GET …/userinfo без блока identification (паспорт маскируется).
  */
 final class SberIdUserinfoJsonLogger
 {
@@ -13,15 +13,16 @@ final class SberIdUserinfoJsonLogger
 
     public function __construct(
         private readonly string $projectDir,
+        private readonly bool $enabled,
     ) {
     }
 
     /**
-     * @param array<string, mixed> $userinfo Тело ответа userinfo без обёрток (sub, family_name, identification, …).
+     * @param array<string, mixed> $userinfo
      */
     public function log(array $userinfo): void
     {
-        if ($userinfo === []) {
+        if (!$this->enabled || $userinfo === []) {
             return;
         }
 
@@ -30,11 +31,29 @@ final class SberIdUserinfoJsonLogger
             return;
         }
 
+        $safe = $this->redact($userinfo);
+
         $line = json_encode(
-            $userinfo,
+            $safe,
             JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR,
         ) . "\n---\n";
 
         @file_put_contents($dir . '/' . self::LOG_FILE, $line, FILE_APPEND | LOCK_EX);
+    }
+
+    /**
+     * @param array<string, mixed> $userinfo
+     *
+     * @return array<string, mixed>
+     */
+    private function redact(array $userinfo): array
+    {
+        foreach (['identification', 'priority_doc', 'maindoc', 'previous_identification'] as $key) {
+            if (array_key_exists($key, $userinfo)) {
+                $userinfo[$key] = '[REDACTED]';
+            }
+        }
+
+        return $userinfo;
     }
 }

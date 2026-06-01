@@ -7,28 +7,41 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Определяет текущего пользователя API по заголовку X-User-Id или токену.
- * Приложение после логина/регистрации должно передавать X-User-Id: user-123 (или просто 123).
+ * Текущий клиент мобильного API — только по валидному Bearer access-токену.
+ * Заголовок X-User-Id игнорируется (раньше позволял подмену пользователя).
  */
 class CurrentUserResolver
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
-    ) {}
+    ) {
+    }
 
     public function resolve(Request $request): ?User
     {
-        // Заголовок X-User-Id: user-123 или 123
-        $header = $request->headers->get('X-User-Id');
-        if ($header !== null && $header !== '') {
-            $userId = str_starts_with($header, 'user-') ? (int) substr($header, 5) : (int) $header;
-            if ($userId > 0) {
-                $user = $this->em->getRepository(User::class)->find($userId);
-                if ($user !== null && !$user->isBlocked()) {
-                    return $user;
-                }
-                return null; // blocked or not found
-            }
+        $token = $this->extractBearerToken($request);
+        if ($token === null || $token === '') {
+            return null;
+        }
+
+        $user = $this->em->getRepository(User::class)->findOneBy(['apiAccessToken' => $token]);
+        if ($user === null || $user->isBlocked()) {
+            return null;
+        }
+
+        $expires = $user->getApiAccessTokenExpiresAt();
+        if ($expires !== null && $expires < new \DateTimeImmutable()) {
+            return null;
+        }
+
+        return $user;
+    }
+
+    private function extractBearerToken(Request $request): ?string
+    {
+        $auth = $request->headers->get('Authorization', '');
+        if (preg_match('/Bearer\s+(\S+)/i', $auth, $m)) {
+            return trim($m[1], " \t\"'");
         }
 
         return null;

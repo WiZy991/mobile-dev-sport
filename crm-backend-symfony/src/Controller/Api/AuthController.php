@@ -106,11 +106,29 @@ class AuthController extends AbstractController
     }
 
     #[Route('/logout', name: 'api_auth_logout', methods: ['POST'])]
-    public function logout(): JsonResponse
+    public function logout(Request $request): JsonResponse
     {
-        // Refresh-токен в БД не сбрасываем: клиент после «Выйти» может снова войти по отпечатку
-        // (в SecureStore лежит тот же refresh). Полная смена сессии — через смену пароля/отключение биометрии в приложении.
+        $user = $this->resolveUserFromAccessOrRefresh($request);
+        if ($user !== null) {
+            $this->mobileTokens->revokeSession($user);
+        }
+
         return $this->json(['success' => true]);
+    }
+
+    private function resolveUserFromAccessOrRefresh(Request $request): ?User
+    {
+        $bearer = $this->extractBearerToken($request);
+        if ($bearer === null || $bearer === '') {
+            return null;
+        }
+
+        $byAccess = $this->em->getRepository(User::class)->findOneBy(['apiAccessToken' => $bearer]);
+        if ($byAccess !== null) {
+            return $byAccess;
+        }
+
+        return $this->em->getRepository(User::class)->findOneBy(['apiRefreshToken' => $bearer]);
     }
 
     private function extractBearerToken(Request $request): ?string

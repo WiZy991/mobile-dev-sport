@@ -2,6 +2,7 @@ package com.fitnessclub.app.di
 
 import android.util.Log
 import android.content.Context
+import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.local.TokenManager
 import com.google.gson.Gson
@@ -13,7 +14,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -44,13 +44,19 @@ object AppModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(tokenManager: TokenManager): OkHttpClient {
-        // Явный тег FC_HTTP — в Logcat ищите по нему; уровень Verbose, иначе строки OkHttp легко «теряются».
-        val loggingInterceptor = HttpLoggingInterceptor { message -> Log.d("FC_HTTP", message) }.apply {
-            level = HttpLoggingInterceptor.Level.BODY
+        val builder = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+
+        if (BuildConfig.DEBUG) {
+            val loggingInterceptor = HttpLoggingInterceptor { message -> Log.d("FC_HTTP", message) }.apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            }
+            builder.addInterceptor(loggingInterceptor)
         }
-        
-        return OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
+
+        return builder
             .addInterceptor { chain ->
                 val originalRequest = chain.request()
                 val requestBuilder = originalRequest.newBuilder()
@@ -62,19 +68,11 @@ object AppModule {
                             requestBuilder.header("Authorization", "Bearer $token")
                         }
                     }
-                    // Add X-User-Id for API to identify current user (after login/register)
-                    tokenManager.getUser().first()?.id?.let { userId ->
-                        requestBuilder.header("X-User-Id", userId)
-                    }
                 }
                 
                 chain.proceed(requestBuilder.build())
             }
-            // Add mock interceptor for testing without real backend
             .addInterceptor(MockInterceptor())
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
     

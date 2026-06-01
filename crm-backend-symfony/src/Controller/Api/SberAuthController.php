@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Service\Admin\SberIdOAuthService;
 use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\Api\SberIdProfileApplicator;
+use App\Service\Api\SberIdTokenValidator;
 use App\Service\Api\SberIdUserinfoJsonLogger;
 use App\Service\Api\SberMobileAuthService;
 use App\Service\Api\SberOAuthPkceStateService;
@@ -27,6 +28,7 @@ class SberAuthController extends AbstractController
         private readonly SberOAuthPkceStateService $pkceState,
         private readonly MobileAuthTokenIssuer $mobileTokens,
         private readonly SberIdProfileApplicator $sberProfile,
+        private readonly SberIdTokenValidator $sberTokenValidator,
         private readonly SberIdUserinfoJsonLogger $sberUserinfoLogger,
         private readonly string $nativeRedirectUri,
         private readonly string $nativeAppBridgeUri,
@@ -212,19 +214,15 @@ class SberAuthController extends AbstractController
             return $this->json(['error' => 'missing_id_token'], 502);
         }
 
-        $claims = $this->sberId->decodeIdTokenPayload($idToken);
+        try {
+            $claims = $this->sberTokenValidator->validateAndDecode($idToken, $expectedNonce);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => 'invalid_id_token', 'message' => $e->getMessage()], 400);
+        }
+
         $sub = isset($claims['sub']) && is_string($claims['sub']) ? $claims['sub'] : null;
         if ($sub === null || $sub === '') {
             return $this->json(['error' => 'missing_sub'], 502);
-        }
-
-        if (!$this->assertAudienceMatchesClient($claims)) {
-            return $this->json(['error' => 'invalid_aud'], 400);
-        }
-
-        $nonceClaim = $claims['nonce'] ?? null;
-        if (!is_string($nonceClaim) || !hash_equals($expectedNonce, $nonceClaim)) {
-            return $this->json(['error' => 'nonce_mismatch'], 400);
         }
 
         $accessToken = isset($tokens['access_token']) && is_string($tokens['access_token']) ? $tokens['access_token'] : '';
@@ -318,7 +316,11 @@ class SberAuthController extends AbstractController
             return new Response($this->htmlResult(false, 'Ответ Сбер ID без id_token.'), 502);
         }
 
-        $claims = $this->sberId->decodeIdTokenPayload($idToken);
+        try {
+            $claims = $this->sberTokenValidator->validateAndDecode($idToken);
+        } catch (\InvalidArgumentException $e) {
+            return new Response($this->htmlResult(false, 'Недействительный id_token: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')), 400);
+        }
         $sub = isset($claims['sub']) && is_string($claims['sub']) ? $claims['sub'] : null;
 
         $accessToken = isset($tokens['access_token']) && is_string($tokens['access_token']) ? $tokens['access_token'] : '';

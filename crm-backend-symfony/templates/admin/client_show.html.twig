@@ -129,6 +129,7 @@
                         </div>
                     </div>
                 </div>
+                {% if can_view_passport|default(false) %}
                 <div class="row g-2 mb-2">
                     <div class="col-md-2">
                         <label class="form-label small">Серия паспорта</label>
@@ -159,6 +160,9 @@
                         <input type="text" name="emergency_contact" class="form-control form-control-sm" value="{{ client.emergencyContact }}" placeholder="+7 999 123-45-67, ФИО">
                     </div>
                 </div>
+                {% else %}
+                <p class="small text-secondary mb-2">Паспортные поля доступны только администратору.</p>
+                {% endif %}
                 <button type="submit" class="btn btn-sm btn-primary">Сохранить</button>
             </form>
         </div>
@@ -241,11 +245,15 @@
             </div>
             <div class="content-card mb-3">
                 <div class="text-secondary small mb-2">Паспорт</div>
+                {% if can_view_passport|default(false) %}
                 <div class="mb-1"><strong>Серия/номер:</strong> {{ client.passportSeries and client.passportNumber ? client.passportSeries ~ ' ' ~ client.passportNumber : '—' }}</div>
                 <div class="mb-1"><strong>Кем выдан:</strong> {{ client.passportIssuedBy ?? '—' }}</div>
                 <div class="mb-1"><strong>Дата выдачи:</strong> {{ client.passportIssueDate ? client.passportIssueDate|date('d.m.Y') : '—' }}</div>
                 <div class="mb-1"><strong>Код подразделения:</strong> {{ client.passportDepartmentCode ?? '—' }}</div>
                 <div class="mb-1"><strong>Адрес регистрации:</strong> {{ client.registrationAddress ?? '—' }}</div>
+                {% else %}
+                <div class="mb-1 text-secondary">Доступ ограничен. Статус: {{ client.passportVerificationStatus == 'verified' ? 'подтверждён' : 'не подтверждён' }}</div>
+                {% endif %}
                 <div class="mb-1"><strong>Экстренная связь:</strong> {{ client.emergencyContact ?? '—' }}</div>
             </div>
         </div>

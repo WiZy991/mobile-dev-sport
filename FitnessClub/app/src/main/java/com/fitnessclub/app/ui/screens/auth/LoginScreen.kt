@@ -61,8 +61,8 @@ import com.fitnessclub.app.data.config.AppConfig
 
 /** Фон входа в духе макета (терракота). */
 private val LoginBackground = Color(0xFFD35400)
-private val LoginButtonColor = Color(0xFFB84A18)
 private val LoginSurfaceWhite = Color.White
+private val SberButtonGreen = Color(0xFF21A038)
 
 @Composable
 fun LoginScreen(
@@ -202,19 +202,19 @@ fun LoginScreen(
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = LoginSurfaceWhite,
-                    contentColor = LoginBackground,
-                    disabledContainerColor = LoginSurfaceWhite.copy(0.5f),
+                    containerColor = SberButtonGreen,
+                    contentColor = LoginSurfaceWhite,
+                    disabledContainerColor = SberButtonGreen.copy(0.5f),
                 ),
             ) {
                 if (uiState.isLoading) {
                     CircularProgressIndicator(
                         Modifier.size(24.dp),
-                        color = LoginBackground,
+                        color = LoginSurfaceWhite,
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("ВОЙТИ ЧЕРЕЗ СБЕР ID", fontWeight = FontWeight.Bold)
+                    Text("Войти через Сбер ID", fontWeight = FontWeight.Bold)
                 }
             }
 

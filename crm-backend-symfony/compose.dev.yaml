@@ -1,0 +1,11 @@
+# Локальная разработка: проброс портов MySQL и отладочного app на хост.
+#   COMPOSE_FILE=compose.yaml:compose.dev.yaml docker compose up -d
+
+services:
+  app:
+    ports:
+      - "8000:8000"
+
+  database:
+    ports:
+      - "3306:3306"
