@@ -1476,8 +1476,15 @@
                 <h5>Информация</h5>
                 <a href="#faq">FAQ</a>
                 <a href="#contact">Связаться с нами</a>
-                <a href="{{ path('legal_index') }}">Правовая информация</a>
                 <a href="{{ admin_url }}">Войти в админку</a>
+            </div>
+            <div>
+                <h5>Документы</h5>
+                <a href="{{ path('legal_license_agreement') }}">Договор-оферта</a>
+                <a href="{{ path('legal_privacy') }}">Политика конфиденциальности</a>
+                <a href="{{ path('legal_client_agreement') }}">Договор с клиентом</a>
+                <a href="{{ path('legal_trainer_agreement') }}">Договор с тренером</a>
+                <a href="{{ path('legal_personal_data_consent') }}">Согласие на обработку ПДн</a>
             </div>
             <div>
                 <h5>Контакты</h5>
@@ -1489,9 +1496,7 @@
         <div class="foot-bottom">
             <span>© 2026 WorldCashFit. Все права защищены.</span>
             <span>
-                <a href="{{ path('legal_privacy') }}">Политика конфиденциальности</a>
-                ·
-                <a href="{{ path('legal_license_agreement') }}">Договор-оферта</a>
+                <a href="{{ path('legal_index') }}">Правовая информация</a>
             </span>
         </div>
     </div>
