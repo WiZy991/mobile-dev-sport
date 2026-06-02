@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Правовая информация{% endblock %} — WorldCashFit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fafaf7;
+            --text: #15181f;
+            --muted: #6b7180;
+            --primary: #ff5b2e;
+            --border: #e5e2da;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: var(--text);
+            background: var(--bg);
+            line-height: 1.65;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: var(--primary); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header {
+            border-bottom: 1px solid var(--border);
+            background: #fff;
+        }
+
+        .header-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .logo {
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .nav {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            font-size: 0.92rem;
+        }
+
+        .nav a { color: var(--muted); }
+
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.25rem 3rem;
+        }
+
+        h1 {
+            font-size: clamp(1.5rem, 3vw, 2rem);
+            line-height: 1.2;
+            margin: 0 0 1rem;
+        }
+
+        .meta {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+            font-size: 0.92rem;
+            color: var(--muted);
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.55rem 1rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        .download-btn:hover {
+            border-color: var(--primary);
+            text-decoration: none;
+        }
+
+        .content {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem 1.25rem;
+        }
+
+        .content p {
+            margin: 0 0 0.85em;
+        }
+
+        .doc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .doc-list a {
+            display: block;
+            padding: 1rem 1.1rem;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: #fff;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .doc-list a:hover {
+            border-color: var(--primary);
+            text-decoration: none;
+        }
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 1.25rem;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+    </style>
+</head>
+<body>
+<header class="header">
+    <div class="header-inner">
+        <a href="{{ path('landing_page') }}" class="logo">WorldCashFit</a>
+        <nav class="nav">
+            <a href="{{ path('legal_index') }}">Все документы</a>
+            <a href="{{ path('legal_privacy') }}">Конфиденциальность</a>
+            <a href="{{ path('legal_license_agreement') }}">Оферта</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    {% block body %}{% endblock %}
+</main>
+
+<footer>
+    © {{ "now"|date("Y") }} WorldCashFit · <a href="{{ path('legal_index') }}">Правовая информация</a>
+</footer>
+</body>
+</html>

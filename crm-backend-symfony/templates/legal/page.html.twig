@@ -1,0 +1,13 @@
+{% extends 'legal/base.html.twig' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block body %}
+    <h1>{{ title }}</h1>
+    <div class="meta">
+        <a href="{{ download_url }}" class="download-btn">Скачать DOCX</a>
+    </div>
+    <article class="content">
+        {% include content_template %}
+    </article>
+{% endblock %}

@@ -228,14 +228,32 @@ fun SettingsScreen(
             SettingsSection(title = "Правовая информация") {
                 ClickableSettingItem(
                     icon = Icons.Default.Description,
-                    title = "Пользовательское соглашение",
+                    title = "Договор-оферта",
                     onClick = { uriHandler.openUri(AppConfig.TERMS_URL) }
                 )
-                
+
                 ClickableSettingItem(
                     icon = Icons.Default.PrivacyTip,
                     title = "Политика конфиденциальности",
                     onClick = { uriHandler.openUri(AppConfig.PRIVACY_URL) }
+                )
+
+                ClickableSettingItem(
+                    icon = Icons.Default.Article,
+                    title = "Договор с клиентом",
+                    onClick = { uriHandler.openUri(AppConfig.CLIENT_AGREEMENT_URL) }
+                )
+
+                ClickableSettingItem(
+                    icon = Icons.Default.Article,
+                    title = "Договор с тренером",
+                    onClick = { uriHandler.openUri(AppConfig.TRAINER_AGREEMENT_URL) }
+                )
+
+                ClickableSettingItem(
+                    icon = Icons.Default.Assignment,
+                    title = "Согласие на обработку персональных данных",
+                    onClick = { uriHandler.openUri(AppConfig.PERSONAL_DATA_CONSENT_URL) }
                 )
             }
             

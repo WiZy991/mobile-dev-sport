@@ -1,0 +1,15 @@
+{% extends 'legal/base.html.twig' %}
+
+{% block title %}Правовая информация{% endblock %}
+
+{% block body %}
+    <h1>Правовая информация</h1>
+    <p style="color: var(--muted); margin-bottom: 1.5rem;">
+        Официальные документы ООО «Ворлдкэшбокс» (WorldCashFit).
+    </p>
+    <ul class="doc-list">
+        {% for doc in documents %}
+            <li><a href="{{ doc.url }}">{{ doc.title }}</a></li>
+        {% endfor %}
+    </ul>
+{% endblock %}
