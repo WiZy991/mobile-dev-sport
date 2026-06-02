@@ -1,0 +1,3 @@
+<resources>
+    <style name="Base.Theme.StaffApp" parent="Theme.Material3.Light.NoActionBar" />
+</resources>

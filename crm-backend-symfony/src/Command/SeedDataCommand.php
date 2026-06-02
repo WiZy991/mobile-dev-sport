@@ -7,9 +7,12 @@ namespace App\Command;
 use App\Entity\Club;
 use App\Entity\ClubSetting;
 use App\Entity\Locker;
+use App\Entity\Booking;
 use App\Entity\Product;
+use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
 use App\Entity\Trainer;
+use App\Entity\Task;
 use App\Entity\Training;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,17 +41,30 @@ class SeedDataCommand extends Command
         // Проверяем, есть ли уже данные
         $userCount = $this->em->getRepository(User::class)->count([]);
         if ($userCount > 0) {
-            $io->note('Данные уже есть в БД. Для перезаписи: doctrine:schema:drop --full --force, миграции, затем app:seed-data.');
+            $this->seedMissingOperationalData($io);
+            $io->note('Основные данные уже есть в БД. Добавлены недостающие задачи/абонементы при необходимости.');
             return Command::SUCCESS;
         }
 
-        // 1. Пользователь
-        $user = (new User())
-            ->setEmail('user@example.com')
-            ->setName('Тестовый пользователь')
-            ->setPhone('+7 900 123-45-67')
-            ->setBonusPoints(100);
-        $this->em->persist($user);
+        // 1. Клиенты
+        $clients = [];
+        $seedClients = [
+            ['user@example.com', 'Тестовый пользователь', '+7 900 123-45-67'],
+            ['anna@example.com', 'Анна Смирнова', '+7 900 111-22-33'],
+            ['ivan@example.com', 'Иван Петров', '+7 900 222-33-44'],
+            ['olga@example.com', 'Ольга Новикова', '+7 900 333-44-55'],
+            ['max@example.com', 'Максим Егоров', '+7 900 444-55-66'],
+            ['kate@example.com', 'Екатерина Орлова', '+7 900 555-66-77'],
+        ];
+        foreach ($seedClients as [$email, $name, $phone]) {
+            $client = (new User())
+                ->setEmail($email)
+                ->setName($name)
+                ->setPhone($phone)
+                ->setBonusPoints(random_int(50, 300));
+            $this->em->persist($client);
+            $clients[] = $client;
+        }
 
         // 2. Тренеры (один тренер — как в типичной CRM; все слоты привязаны к нему)
         $trainers = [
@@ -75,6 +91,7 @@ class SeedDataCommand extends Command
             'Пилатес',
         ];
         $today = new \DateTimeImmutable('today');
+        $groupTrainings = [];
         for ($d = 0; $d < 7; $d++) {
             $date = $today->modify("+{$d} days");
             for ($i = 0; $i < 3; $i++) {
@@ -93,6 +110,7 @@ class SeedDataCommand extends Command
                     ->setMaxParticipants(15)
                     ->setCurrentParticipants(0);
                 $this->em->persist($t);
+                $groupTrainings[] = $t;
             }
         }
 
@@ -218,11 +236,43 @@ class SeedDataCommand extends Command
             $this->em->persist($l);
         }
 
+        // 9. Задачи для менеджера
+        $taskRows = [
+            ['Позвонить по продлению абонемента', 'Анна Смирнова'],
+            ['Подтвердить запись на HIIT', 'Иван Петров'],
+            ['Согласовать перенос тренировки', 'Ольга Новикова'],
+        ];
+        foreach ($taskRows as [$title, $clientName]) {
+            $task = (new Task())
+                ->setTitle($title)
+                ->setStatus('open')
+                ->setClientName($clientName)
+                ->setDueAt((new \DateTimeImmutable('today'))->modify('+1 day'));
+            $this->em->persist($task);
+        }
+
+        // 10. Бронирования на тренировки, чтобы в расписании были имена клиентов
+        foreach ($groupTrainings as $idx => $training) {
+            $slotClients = array_slice($clients, $idx % 3, 3);
+            $participants = 0;
+            foreach ($slotClients as $client) {
+                $booking = (new Booking())
+                    ->setTraining($training)
+                    ->setUser($client)
+                    ->setClientName($client->getName())
+                    ->setStatus('confirmed')
+                    ->setBookedAt(new \DateTimeImmutable());
+                $this->em->persist($booking);
+                $participants++;
+            }
+            $training->setCurrentParticipants($participants);
+        }
+
         $this->em->flush();
 
         $io->success('Тестовые данные успешно добавлены!');
         $io->listing([
-            '1 пользователь (user@example.com)',
+            count($clients) . ' клиентов',
             count($trainers) . ' тренер(ов)',
             'групповые + персональные + extra на горизонте из сида',
             '4 тарифных плана',
@@ -232,5 +282,51 @@ class SeedDataCommand extends Command
         ]);
 
         return Command::SUCCESS;
+    }
+
+    private function seedMissingOperationalData(SymfonyStyle $io): void
+    {
+        $changed = false;
+
+        if ($this->em->getRepository(Task::class)->count([]) === 0) {
+            $taskRows = [
+                ['Позвонить по продлению абонемента', 'Анна Смирнова'],
+                ['Подтвердить запись на HIIT', 'Иван Петров'],
+                ['Согласовать перенос тренировки', 'Ольга Новикова'],
+            ];
+            foreach ($taskRows as [$title, $clientName]) {
+                $this->em->persist(
+                    (new Task())
+                        ->setTitle($title)
+                        ->setStatus('open')
+                        ->setClientName($clientName)
+                        ->setDueAt((new \DateTimeImmutable('today'))->modify('+1 day'))
+                );
+            }
+            $changed = true;
+        }
+
+        if ($this->em->getRepository(Subscription::class)->count([]) === 0) {
+            $clients = $this->em->getRepository(User::class)->findBy([], ['id' => 'ASC'], 3);
+            $plan = $this->em->getRepository(SubscriptionPlan::class)->findOneBy([]);
+            if ($plan !== null) {
+                foreach ($clients as $client) {
+                    $this->em->persist(
+                        (new Subscription())
+                            ->setUser($client)
+                            ->setPlan($plan)
+                            ->setStartDate(new \DateTimeImmutable('today'))
+                            ->setEndDate((new \DateTimeImmutable('today'))->modify('+30 days'))
+                            ->setStatus('active')
+                    );
+                }
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            $this->em->flush();
+            $io->success('Добавлены недостающие операционные данные.');
+        }
     }
 }

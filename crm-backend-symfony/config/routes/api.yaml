@@ -274,3 +274,98 @@ api_documents_download:
   controller: App\Controller\Api\DocumentController::download
   methods: [GET]
 
+api_staff_auth_register:
+  path: /api/v1/staff/auth/register
+  controller: App\Controller\Api\StaffAuthController::register
+  methods: [POST]
+
+api_staff_auth_login:
+  path: /api/v1/staff/auth/login
+  controller: App\Controller\Api\StaffAuthController::login
+  methods: [POST]
+
+api_staff_auth_refresh:
+  path: /api/v1/staff/auth/refresh
+  controller: App\Controller\Api\StaffAuthController::refresh
+  methods: [POST]
+
+api_staff_auth_logout:
+  path: /api/v1/staff/auth/logout
+  controller: App\Controller\Api\StaffAuthController::logout
+  methods: [POST]
+
+api_staff_config:
+  path: /api/v1/staff/config
+  controller: App\Controller\Api\StaffConfigController::config
+  methods: [GET]
+
+api_staff_admin_action_check:
+  path: /api/v1/staff/admin/action-check
+  controller: App\Controller\Api\StaffAdminActionController::actionCheck
+  methods: [POST]
+
+api_staff_app_data:
+  path: /api/v1/staff/app/data
+  controller: App\Controller\Api\StaffDataController::appData
+  methods: [GET]
+
+api_staff_admin_data:
+  path: /api/v1/staff/admin/data
+  controller: App\Controller\Api\StaffDataController::adminData
+  methods: [GET]
+
+api_staff_section_data:
+  path: /api/v1/staff/section-data
+  controller: App\Controller\Api\StaffDataController::sectionData
+  methods: [GET]
+
+api_staff_schedule:
+  path: /api/v1/staff/schedule
+  controller: App\Controller\Api\StaffDataController::schedule
+  methods: [GET]
+
+api_staff_list:
+  path: /api/v1/staff/list
+  controller: App\Controller\Api\StaffDataController::list
+  methods: [GET]
+
+api_staff_support_tickets:
+  path: /api/v1/staff/support/tickets
+  controller: App\Controller\Api\StaffSupportController::tickets
+  methods: [GET]
+
+api_staff_support_ticket_status:
+  path: /api/v1/staff/support/tickets/{id}/status
+  controller: App\Controller\Api\StaffSupportController::updateStatus
+  methods: [POST]
+
+api_staff_notifications:
+  path: /api/v1/staff/notifications
+  controller: App\Controller\Api\StaffSupportController::notifications
+  methods: [GET]
+
+api_staff_notifications_read_all:
+  path: /api/v1/staff/notifications/read-all
+  controller: App\Controller\Api\StaffSupportController::readAllNotifications
+  methods: [POST]
+
+api_staff_notification_read:
+  path: /api/v1/staff/notifications/{id}/read
+  controller: App\Controller\Api\StaffSupportController::readNotification
+  methods: [POST]
+
+api_staff_clients:
+  path: /api/v1/staff/clients
+  controller: App\Controller\Api\StaffClientsController::list
+  methods: [GET]
+
+api_staff_client_detail:
+  path: /api/v1/staff/clients/{id}
+  controller: App\Controller\Api\StaffClientsController::detail
+  methods: [GET]
+
+api_staff_push_token:
+  path: /api/v1/staff/push-token
+  controller: App\Controller\Api\StaffPushController::register
+  methods: [POST]
+

@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\SupportTicket;
 use App\Service\CurrentUserResolver;
+use App\Service\Support\SupportTicketStaffNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,6 +17,7 @@ class SupportTicketController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
+        private readonly SupportTicketStaffNotifier $staffNotifier,
     ) {}
 
     #[Route('/tickets', name: 'api_support_ticket_create', methods: ['POST'])]
@@ -64,6 +66,8 @@ class SupportTicketController extends AbstractController
 
         $this->em->persist($ticket);
         $this->em->flush();
+
+        $this->staffNotifier->notifyNewTicket($ticket);
 
         return $this->json([
             'success' => true,

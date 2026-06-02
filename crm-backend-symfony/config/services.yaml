@@ -19,6 +19,7 @@ parameters:
     sber_id_oidc_scope_default: 'openid profile email mobile name birthdate gender maindoc priority_doc'
     mobile_api_access_ttl_default: 3600
     sber_userinfo_log_default: false
+    fcm_server_key_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -90,6 +91,10 @@ services:
     App\Service\Integration\PercoWebClient:
         bind:
             $percoOpenFromCrm: '%env(PERCO_OPEN_FROM_CRM)%'
+
+    App\Service\Push\FcmPushSender:
+        arguments:
+            $serverKey: '%env(default:fcm_server_key_default:FCM_SERVER_KEY)%'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

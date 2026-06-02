@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fc_primary">#FF6B35</color>
+    <color name="fc_primary_dark">#E85A2A</color>
+    <color name="fc_background">#F5F5F5</color>
+    <color name="fc_surface">#FFFFFF</color>
+    <color name="fc_text">#1C1B1F</color>
+    <color name="fc_text_secondary">#616161</color>
+    <color name="fc_button_disabled">#D8D3DE</color>
+</resources>

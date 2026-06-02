@@ -1,0 +1,28 @@
+<resources>
+    <style name="Base.Theme.StaffApp" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/fc_primary</item>
+        <item name="colorPrimaryContainer">@color/fc_primary_dark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="android:windowBackground">@color/fc_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/fc_surface</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <style name="Theme.StaffApp" parent="Base.Theme.StaffApp" />
+
+    <style name="StaffToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="StaffAppButton" parent="Widget.Material3.Button">
+        <item name="android:textColor">@android:color/white</item>
+        <item name="backgroundTint">@color/fc_primary</item>
+    </style>
+
+    <style name="StaffAppOutlinedCard" parent="Widget.Material3.CardView.Outlined">
+        <item name="cardBackgroundColor">@color/fc_surface</item>
+        <item name="strokeColor">@color/fc_text_secondary</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+</resources>

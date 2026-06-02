@@ -69,6 +69,10 @@ final class AdminMenuBuilder
         'ROLE_VIEWER' => [
             'dashboard', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits', 'analytics', 'app_support',
         ],
+        /** Линия поддержки: обращения и клиенты. */
+        'ROLE_SUPPORT' => [
+            'dashboard', 'app_support', 'clients', 'comments',
+        ],
     ];
 
     private const MUTATING_ROLES = [
@@ -84,6 +88,12 @@ final class AdminMenuBuilder
         'admin_trainer_update',
     ];
 
+    /** @return list<string> */
+    public function supportedRoles(): array
+    {
+        return array_values(array_keys(self::ROLE_TO_SECTIONS));
+    }
+
     /** Не только GET: создание клиентов, продаж, правки и т.д. */
     public function canMutateAdmin(StaffUser $user): bool
     {
@@ -93,6 +103,16 @@ final class AdminMenuBuilder
     public function hasTrainerRole(StaffUser $user): bool
     {
         return in_array('ROLE_TRAINER', $user->getRoles(), true);
+    }
+
+    public function hasSupportRole(StaffUser $user): bool
+    {
+        return in_array('ROLE_SUPPORT', $user->getRoles(), true);
+    }
+
+    public function canUpdateSupportTicket(StaffUser $user): bool
+    {
+        return $this->canMutateAdmin($user) || $this->hasSupportRole($user);
     }
 
     public function isTrainerWriteRoute(?string $route, string $method): bool
@@ -195,5 +215,34 @@ final class AdminMenuBuilder
             return false;
         }
         return in_array($section, $allowed, true);
+    }
+
+    /** @param list<string> $adminSections @return list<string> */
+    public function buildMobileAppSections(array $adminSections): array
+    {
+        $map = [
+            'dashboard' => 'dashboard',
+            'tasks' => 'tasks',
+            'clients' => 'clients',
+            'schedule' => 'schedule',
+            'bookings' => 'bookings',
+            'subscriptions' => 'subscriptions',
+            'visits' => 'visits',
+            'analytics' => 'analytics',
+            'finance' => 'finance',
+            'app_support' => 'app_support',
+        ];
+
+        $result = ['home', 'profile'];
+        foreach ($adminSections as $section) {
+            if (isset($map[$section])) {
+                $result[] = $map[$section];
+            }
+        }
+        if ($adminSections !== []) {
+            $result[] = 'admin';
+        }
+
+        return array_values(array_unique($result));
     }
 }

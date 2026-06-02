@@ -1,0 +1,39 @@
+com.example.staffapp-recyclerview-1.2.1-0 C:\Users\anton\.gradle\caches\9.1.0\transforms\0a0c1dee6907e446b0e8a2bfcc95c72f\workspace\transformed\recyclerview-1.2.1\res
+com.example.staffapp-startup-runtime-1.1.1-1 C:\Users\anton\.gradle\caches\9.1.0\transforms\1008cb486e63e13326a97c249f4fbfea\workspace\transformed\startup-runtime-1.1.1\res
+com.example.staffapp-navigationevent-2 C:\Users\anton\.gradle\caches\9.1.0\transforms\1bf57b28a081d4eb67f50627b93262f7\workspace\transformed\navigationevent\res
+com.example.staffapp-core-1.17.0-3 C:\Users\anton\.gradle\caches\9.1.0\transforms\1f37f9ed25473e8be47ca6e36b3b5866\workspace\transformed\core-1.17.0\res
+com.example.staffapp-core-viewtree-1.0.0-4 C:\Users\anton\.gradle\caches\9.1.0\transforms\1f4db59c842ef07cdd2ab38f26102936\workspace\transformed\core-viewtree-1.0.0\res
+com.example.staffapp-lifecycle-viewmodel-2.6.2-5 C:\Users\anton\.gradle\caches\9.1.0\transforms\23de32ae0e84ad40a1187ea42f79fe4f\workspace\transformed\lifecycle-viewmodel-2.6.2\res
+com.example.staffapp-activity-1.12.3-6 C:\Users\anton\.gradle\caches\9.1.0\transforms\27e03c0ac8626a7ea4cbb682551891cb\workspace\transformed\activity-1.12.3\res
+com.example.staffapp-drawerlayout-1.1.1-7 C:\Users\anton\.gradle\caches\9.1.0\transforms\30ba46a3736d8c67552b2c7cab63a6bc\workspace\transformed\drawerlayout-1.1.1\res
+com.example.staffapp-lifecycle-runtime-2.6.2-8 C:\Users\anton\.gradle\caches\9.1.0\transforms\387630ba7d9b3c4c1626e57c2c4180e5\workspace\transformed\lifecycle-runtime-2.6.2\res
+com.example.staffapp-lifecycle-viewmodel-savedstate-2.6.2-9 C:\Users\anton\.gradle\caches\9.1.0\transforms\437280d4be88170e86b05cd345d21feb\workspace\transformed\lifecycle-viewmodel-savedstate-2.6.2\res
+com.example.staffapp-lifecycle-livedata-core-2.6.2-10 C:\Users\anton\.gradle\caches\9.1.0\transforms\47eeda4816d3542173b98b83d365c040\workspace\transformed\lifecycle-livedata-core-2.6.2\res
+com.example.staffapp-lifecycle-process-2.6.2-11 C:\Users\anton\.gradle\caches\9.1.0\transforms\48893f5f5f32dcbc38528857c73db3a1\workspace\transformed\lifecycle-process-2.6.2\res
+com.example.staffapp-core-runtime-2.2.0-12 C:\Users\anton\.gradle\caches\9.1.0\transforms\513c0770378a65e1a918e967a5407c84\workspace\transformed\core-runtime-2.2.0\res
+com.example.staffapp-constraintlayout-2.2.1-13 C:\Users\anton\.gradle\caches\9.1.0\transforms\560311969ac8c6a6dd991265db909c1a\workspace\transformed\constraintlayout-2.2.1\res
+com.example.staffapp-emoji2-1.3.0-14 C:\Users\anton\.gradle\caches\9.1.0\transforms\56f70781d36bb73f23523928d30ab393\workspace\transformed\emoji2-1.3.0\res
+com.example.staffapp-fragment-1.5.4-15 C:\Users\anton\.gradle\caches\9.1.0\transforms\5806a3c68bf9b51a3f05d028572443f0\workspace\transformed\fragment-1.5.4\res
+com.example.staffapp-material-1.13.0-16 C:\Users\anton\.gradle\caches\9.1.0\transforms\5a2ef9e34aa0833fd327e1075096275f\workspace\transformed\material-1.13.0\res
+com.example.staffapp-profileinstaller-1.4.0-17 C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\res
+com.example.staffapp-viewpager2-1.0.0-18 C:\Users\anton\.gradle\caches\9.1.0\transforms\6ea33030a2553a2af0ba6876aa8189af\workspace\transformed\viewpager2-1.0.0\res
+com.example.staffapp-tracing-1.2.0-19 C:\Users\anton\.gradle\caches\9.1.0\transforms\7c973b0e65c60f7ce9821024c3def706\workspace\transformed\tracing-1.2.0\res
+com.example.staffapp-appcompat-1.7.1-20 C:\Users\anton\.gradle\caches\9.1.0\transforms\8383ddd20b166714fd93c2f34db0a1ae\workspace\transformed\appcompat-1.7.1\res
+com.example.staffapp-cardview-1.0.0-21 C:\Users\anton\.gradle\caches\9.1.0\transforms\8a10284b57d097f476737c14676bdd9c\workspace\transformed\cardview-1.0.0\res
+com.example.staffapp-dynamicanimation-1.1.0-22 C:\Users\anton\.gradle\caches\9.1.0\transforms\91a3c430c6f00e2216e30b96c4fa9b6b\workspace\transformed\dynamicanimation-1.1.0\res
+com.example.staffapp-emoji2-views-helper-1.3.0-23 C:\Users\anton\.gradle\caches\9.1.0\transforms\9400e5ca31921d542d61bafbbcb75edf\workspace\transformed\emoji2-views-helper-1.3.0\res
+com.example.staffapp-annotation-experimental-1.4.1-24 C:\Users\anton\.gradle\caches\9.1.0\transforms\967eb797f0bbf3b2735e64f5452c9ec8\workspace\transformed\annotation-experimental-1.4.1\res
+com.example.staffapp-lifecycle-livedata-2.6.2-25 C:\Users\anton\.gradle\caches\9.1.0\transforms\9921245c99a764348ae89f4a1f0da7d9\workspace\transformed\lifecycle-livedata-2.6.2\res
+com.example.staffapp-core-ktx-1.17.0-26 C:\Users\anton\.gradle\caches\9.1.0\transforms\ac91b91907a74fa9851296ffde31d954\workspace\transformed\core-ktx-1.17.0\res
+com.example.staffapp-graphics-shapes-release-27 C:\Users\anton\.gradle\caches\9.1.0\transforms\b624ea780e4d5b7e9b3ecf9ce3219ee8\workspace\transformed\graphics-shapes-release\res
+com.example.staffapp-appcompat-resources-1.7.1-28 C:\Users\anton\.gradle\caches\9.1.0\transforms\bf3fc7488cf667bda40d956fcc6f69cb\workspace\transformed\appcompat-resources-1.7.1\res
+com.example.staffapp-savedstate-1.2.1-29 C:\Users\anton\.gradle\caches\9.1.0\transforms\c842e45c6da26c0dd33b752bfe6222d1\workspace\transformed\savedstate-1.2.1\res
+com.example.staffapp-coordinatorlayout-1.1.0-30 C:\Users\anton\.gradle\caches\9.1.0\transforms\d67c78baff70fe879211b37ab5419676\workspace\transformed\coordinatorlayout-1.1.0\res
+com.example.staffapp-transition-1.5.0-31 C:\Users\anton\.gradle\caches\9.1.0\transforms\f6a19689141e835ddb4818626fe24078\workspace\transformed\transition-1.5.0\res
+com.example.staffapp-pngs-32 D:\project\mobile dev\staffapp\build\generated\res\pngs\debug
+com.example.staffapp-updated_navigation_xml-33 D:\project\mobile dev\staffapp\build\generated\updated_navigation_xml\debug
+com.example.staffapp-packageDebugResources-34 D:\project\mobile dev\staffapp\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.example.staffapp-packageDebugResources-35 D:\project\mobile dev\staffapp\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.example.staffapp-debug-36 D:\project\mobile dev\staffapp\build\intermediates\merged_res\debug\mergeDebugResources
+com.example.staffapp-debug-37 D:\project\mobile dev\staffapp\src\debug\res
+com.example.staffapp-main-38 D:\project\mobile dev\staffapp\src\main\res

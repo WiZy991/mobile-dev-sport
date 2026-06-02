@@ -1,0 +1,66 @@
+[
+    {
+        "merged": "com.example.staffapp-debug-35:/layout_include_staff_appbar.xml.flat",
+        "source": "com.example.staffapp-main-37:/layout/include_staff_appbar.xml"
+    },
+    {
+        "merged": "com.example.staffapp-debug-35:/layout_activity_admin_section.xml.flat",
+        "source": "com.example.staffapp-main-37:/layout/activity_admin_section.xml"
+    },
+    {
+        "merged": "com.example.staffapp-debug-35:/menu_staff_toolbar.xml.flat",
+        "source": "com.example.staffapp-main-37:/menu/staff_toolbar.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-debug-35:\\layout_activity_work.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-37:\\layout\\activity_work.xml"
+    },
+    {
+        "merged": "com.example.staffapp-debug-35:/layout_activity_client_detail.xml.flat",
+        "source": "com.example.staffapp-main-37:/layout/activity_client_detail.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-debug-35:\\layout_activity_admin_section.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-37:\\layout\\activity_admin_section.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-debug-35:\\layout_activity_admin.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-37:\\layout\\activity_admin.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-debug-35:\\layout_activity_client_detail.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-37:\\layout\\activity_client_detail.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-debug-35:\\xml_network_security_config.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-37:\\xml\\network_security_config.xml"
+    },
+    {
+        "merged": "com.example.staffapp-debug-35:/layout_activity_admin.xml.flat",
+        "source": "com.example.staffapp-main-37:/layout/activity_admin.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-debug-35:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-37:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-debug-35:\\menu_bottom_nav_menu.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-37:\\menu\\bottom_nav_menu.xml"
+    },
+    {
+        "merged": "com.example.staffapp-debug-35:/drawable_ic_staff_logout.xml.flat",
+        "source": "com.example.staffapp-main-37:/drawable/ic_staff_logout.xml"
+    },
+    {
+        "merged": "com.example.staffapp-debug-35:/drawable_ic_staff_back.xml.flat",
+        "source": "com.example.staffapp-main-37:/drawable/ic_staff_back.xml"
+    },
+    {
+        "merged": "com.example.staffapp-debug-35:/layout_activity_main.xml.flat",
+        "source": "com.example.staffapp-main-37:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.example.staffapp-debug-35:/layout_activity_work.xml.flat",
+        "source": "com.example.staffapp-main-37:/layout/activity_work.xml"
+    }
+]
