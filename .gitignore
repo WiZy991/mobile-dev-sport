@@ -13,6 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+staffapp/keystore.properties
+staffapp/*.keystore
+staffapp/*.jks
 
 ### CRM Symfony: секреты шлюза и случайные артефакты ###
 crm-backend-symfony/scripts/turnstile_gateway/config.ini
