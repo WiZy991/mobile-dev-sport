@@ -1,71 +1,61 @@
 package com.example.staffapp
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.content.Intent
 import android.os.Bundle
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.EditText
-import android.widget.Spinner
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import com.example.staffapp.ui.auth.LoginScreen
+import com.example.staffapp.ui.auth.LoginUiState
+import com.example.staffapp.ui.auth.RoleOptionUi
+import com.example.staffapp.ui.theme.StaffTheme
 import kotlin.concurrent.thread
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
     private lateinit var apiClient: StaffApiClient
+    private lateinit var store: StaffSessionStore
+    private var session: StaffSession? = null
 
-    private lateinit var emailInput: EditText
-    private lateinit var nameInput: EditText
-    private lateinit var passwordInput: EditText
-    private lateinit var roleSpinner: Spinner
-    private lateinit var configSummaryView: TextView
-    private lateinit var statusView: TextView
     private val roleOptions = listOf(
-        RoleOption("Тренер", "ROLE_TRAINER"),
-        RoleOption("Менеджер", "ROLE_MANAGER"),
-        RoleOption("Финансы", "ROLE_FINANCE"),
-        RoleOption("Наблюдатель", "ROLE_VIEWER"),
-        RoleOption("Поддержка", "ROLE_SUPPORT"),
-        RoleOption("Администратор", "ROLE_ADMIN"),
-        RoleOption("Суперадминистратор", "ROLE_SUPER_ADMIN"),
+        RoleOptionUi("Тренер", "ROLE_TRAINER"),
+        RoleOptionUi("Менеджер", "ROLE_MANAGER"),
+        RoleOptionUi("Финансы", "ROLE_FINANCE"),
+        RoleOptionUi("Наблюдатель", "ROLE_VIEWER"),
+        RoleOptionUi("Поддержка", "ROLE_SUPPORT"),
+        RoleOptionUi("Администратор", "ROLE_ADMIN"),
+        RoleOptionUi("Суперадминистратор", "ROLE_SUPER_ADMIN"),
     )
 
-    private var session: StaffSession? = null
-    private lateinit var store: StaffSessionStore
+    private var uiState by mutableStateOf(
+        LoginUiState(roles = roleOptions, selectedRole = roleOptions.first()),
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        StaffUi.enableEdgeToEdge(this, lightStatusBar = true)
-        val mainScroll = findViewById<android.view.View>(R.id.mainScroll)
-        ViewCompat.setOnApplyWindowInsetsListener(mainScroll) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left + 16, bars.top + 16, bars.right + 16, bars.bottom + 16)
-            insets
-        }
-        ViewCompat.requestApplyInsets(mainScroll)
-
         apiClient = StaffApiClient(StaffApiUrl.resolve(this))
         store = StaffSessionStore(this)
         session = store.loadSession()
 
-        emailInput = findViewById(R.id.emailInput)
-        nameInput = findViewById(R.id.nameInput)
-        passwordInput = findViewById(R.id.passwordInput)
-        roleSpinner = findViewById(R.id.roleSpinner)
-        configSummaryView = findViewById(R.id.configSummaryView)
-        statusView = findViewById(R.id.statusView)
-
-        setupRolePicker()
-
-        findViewById<Button>(R.id.registerButton).setOnClickListener { runRegister() }
-        findViewById<Button>(R.id.loginButton).setOnClickListener { runLogin() }
+        setContent {
+            StaffTheme {
+                LoginScreen(
+                    state = uiState,
+                    onEmailChange = { uiState = uiState.copy(email = it) },
+                    onNameChange = { uiState = uiState.copy(name = it) },
+                    onPasswordChange = { uiState = uiState.copy(password = it) },
+                    onRoleSelected = { uiState = uiState.copy(selectedRole = it) },
+                    onLogin = { runLogin() },
+                    onRegister = { runRegister() },
+                )
+            }
+        }
 
         StaffNotificationHelper.ensureChannel(this)
         requestNotificationPermissionIfNeeded()
@@ -80,21 +70,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupRolePicker() {
-        roleSpinner.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            roleOptions.map { it.title }
-        )
-    }
-
     private fun runRegister() {
         runAsync("Регистрация...") {
             session = apiClient.register(
-                email = emailInput.text.toString().trim(),
-                name = nameInput.text.toString().trim(),
-                password = passwordInput.text.toString(),
-                role = selectedRoleCode(),
+                email = uiState.email.trim(),
+                name = uiState.name.trim(),
+                password = uiState.password,
+                role = uiState.selectedRole?.role ?: roleOptions.first().role,
             )
             session?.let { store.saveSession(it) }
             store.clearConfig()
@@ -109,52 +91,51 @@ class MainActivity : AppCompatActivity() {
     private fun runLogin() {
         runAsync("Вход...") {
             session = apiClient.login(
-                email = emailInput.text.toString().trim(),
-                password = passwordInput.text.toString(),
+                email = uiState.email.trim(),
+                password = uiState.password,
             )
             session?.let { store.saveSession(it) }
             store.clearConfig()
             val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
             store.saveConfig(config)
-            renderConfigSummary(config)
+            runOnUiThread {
+                uiState = uiState.copy(
+                    configSummary = "Роли: ${config.roles.joinToString { UiLabels.roleTitle(it) }}\nДоступы загружены",
+                )
+            }
             StaffPushRegistrar.registerIfLoggedIn(this)
             openWorkScreen()
             "Выполнен вход"
         }
     }
 
-    private fun renderConfigSummary(config: RoleConfig) {
-        runOnUiThread {
-            configSummaryView.text = buildString {
-                append("Роли: ${config.roles.joinToString { UiLabels.roleTitle(it) }}\n")
-                append("Доступы загружены автоматически")
-            }
-        }
-    }
-
     private fun runAsync(progressText: String, action: () -> String) {
-        statusView.text = progressText
+        uiState = uiState.copy(isLoading = true, statusMessage = progressText, errorMessage = null)
         thread {
             try {
-                val result = action()
-                runOnUiThread { statusView.text = result }
+                action()
+                runOnUiThread {
+                    uiState = uiState.copy(isLoading = false, statusMessage = null)
+                }
             } catch (e: Exception) {
-                runOnUiThread { statusView.text = UserFacingError.message(e) }
+                runOnUiThread {
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        statusMessage = null,
+                        errorMessage = UserFacingError.message(e),
+                    )
+                }
             }
         }
     }
 
     private fun <T> executeWithRefresh(action: (token: String) -> T): T {
         val current = session
-        if (current == null) {
-            throw IllegalStateException("Сначала выполните вход или регистрацию.")
-        }
+            ?: throw IllegalStateException("Сначала выполните вход или регистрацию.")
         return try {
             action(current.accessToken)
         } catch (e: IllegalStateException) {
-            if (!e.message.orEmpty().contains("401")) {
-                throw e
-            }
+            if (!e.message.orEmpty().contains("401")) throw e
             val refreshed = apiClient.refresh(current.refreshToken)
             session = refreshed
             store.saveSession(refreshed)
@@ -167,11 +148,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, WorkActivity::class.java))
             finish()
         }
-    }
-
-    private fun selectedRoleCode(): String {
-        val idx = roleSpinner.selectedItemPosition.coerceAtLeast(0)
-        return roleOptions.getOrElse(idx) { roleOptions.first() }.code
     }
 
     private fun requestNotificationPermissionIfNeeded() {
@@ -187,6 +163,4 @@ class MainActivity : AppCompatActivity() {
             42,
         )
     }
-
-    private data class RoleOption(val title: String, val code: String)
 }

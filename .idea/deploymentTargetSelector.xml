@@ -8,6 +8,7 @@
       </SelectionState>
       <SelectionState runConfigName="staffapp">
         <option name="selectionMode" value="DROPDOWN" />
+        <DialogSelection />
       </SelectionState>
     </selectionStates>
   </component>

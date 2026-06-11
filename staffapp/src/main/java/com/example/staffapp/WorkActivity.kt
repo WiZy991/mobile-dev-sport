@@ -2,102 +2,158 @@ package com.example.staffapp
 
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
-import android.util.TypedValue
-import android.view.Gravity
-import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.google.android.material.appbar.AppBarLayout
-import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.example.staffapp.ui.theme.StaffTheme
+import com.example.staffapp.ui.work.ActionUi
+import com.example.staffapp.ui.work.ProfileSectionUi
+import com.example.staffapp.ui.work.SectionHints
+import com.example.staffapp.ui.work.BadgeColor
+import com.example.staffapp.ui.work.ClientsTabUi
+import com.example.staffapp.ui.work.DayChipUi
+import com.example.staffapp.ui.work.HomeTabUi
+import com.example.staffapp.ui.work.ListCardUi
+import com.example.staffapp.ui.work.MetricUi
+import com.example.staffapp.ui.work.ProfileTabUi
+import com.example.staffapp.ui.work.ScheduleDayUi
+import com.example.staffapp.ui.work.ScheduleSessionUi
+import com.example.staffapp.ui.work.ScheduleTabUi
+import com.example.staffapp.ui.work.SupportTabUi
+import com.example.staffapp.ui.work.WorkScreen
+import com.example.staffapp.ui.work.WorkUiState
 import kotlin.concurrent.thread
 import java.util.Calendar
 import java.util.Locale
 
-class WorkActivity : AppCompatActivity() {
+class WorkActivity : ComponentActivity() {
     private lateinit var apiClient: StaffApiClient
     private lateinit var store: StaffSessionStore
-    private lateinit var headerTitle: MaterialToolbar
-    private lateinit var contentView: TextView
-    private lateinit var listContainer: LinearLayout
-    private lateinit var statusView: TextView
-    private lateinit var dayStrip: View
-    private lateinit var daysContainer: LinearLayout
-    private lateinit var clientsSearchBar: View
-    private lateinit var clientsSearchInput: EditText
-    private lateinit var clientsSearchButton: Button
-    private lateinit var bottomNavigation: BottomNavigationView
 
     private var appData: StaffAppData? = null
     private var session: StaffSession? = null
     private var allowedSections: List<String> = emptyList()
     private var config: RoleConfig? = null
-    private var requestedTab: Int = R.id.nav_home
     private var scheduleData: ScheduleData? = null
     private var selectedScheduleDate: String? = null
+    private var selectedScheduleTypeFilter: String? = null
     private var selectedSupportFilter: String? = null
     private var clientsSearchQuery: String = ""
-    private var activeTab: Int = R.id.nav_home
     private var loadGeneration = 0
     private var initialDataLoaded = false
     private val sessionLock = Any()
 
+    private var uiState by mutableStateOf(WorkUiState())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_work)
-        StaffUi.enableEdgeToEdge(this)
         apiClient = StaffApiClient(StaffApiUrl.resolve(this))
         store = StaffSessionStore(this)
-        val appBar = findViewById<AppBarLayout>(R.id.staffAppBar)
-        headerTitle = findViewById(R.id.staffToolbar)
-        StaffUi.applyAppBarInsets(appBar)
-        StaffUi.applyBottomInsets(findViewById(R.id.bottomNavigation))
-        contentView = findViewById(R.id.workContentView)
-        listContainer = findViewById(R.id.workListContainer)
-        statusView = findViewById(R.id.workStatusView)
-        dayStrip = findViewById(R.id.scheduleDayStrip)
-        daysContainer = findViewById(R.id.scheduleDaysContainer)
-        clientsSearchBar = findViewById(R.id.clientsSearchBar)
-        clientsSearchInput = findViewById(R.id.clientsSearchInput)
-        clientsSearchButton = findViewById(R.id.clientsSearchButton)
         session = store.loadSession()
         config = store.loadConfig()
-        requestedTab = intent?.getIntExtra(EXTRA_INITIAL_TAB, R.id.nav_home) ?: R.id.nav_home
 
-        StaffUi.setupToolbar(
-            toolbar = headerTitle,
-            title = "Главная",
-            showBack = false,
-            showLogout = true,
-            onBack = null,
-            onLogout = { logout() },
+        val requestedTab = tabFromNavId(
+            intent?.getIntExtra(EXTRA_INITIAL_TAB, R.id.nav_home) ?: R.id.nav_home,
         )
 
-        bottomNavigation = findViewById(R.id.bottomNavigation)
-        updateBottomNavVisibility()
-        clientsSearchButton.setOnClickListener {
-            clientsSearchQuery = clientsSearchInput.text.toString().trim()
-            loadClientsList(clientsSearchQuery)
-        }
+        uiState = uiState.copy(selectedTab = requestedTab, screenTitle = tabTitle(requestedTab))
+        updateNavVisibility()
 
-        activeTab = requestedTab
-        bottomNavigation.selectedItemId = requestedTab
-        bottomNavigation.setOnItemSelectedListener { item -> selectTab(item.itemId) }
-        selectTab(requestedTab)
+        setContent {
+            StaffTheme {
+                WorkScreen(
+                    state = uiState,
+                    onTabSelected = { selectTab(it) },
+                    onLogout = { logout() },
+                    onAction = { handleAction(it) },
+                    onScheduleDaySelected = { date ->
+                        selectedScheduleDate = date
+                        scheduleData?.let { renderSchedule(it) }
+                    },
+                    onScheduleTypeFilterSelected = { filter ->
+                        selectedScheduleTypeFilter = filter
+                        scheduleData?.let { renderSchedule(it) }
+                    },
+                    onSupportFilterSelected = { filter ->
+                        selectedSupportFilter = filter.ifBlank { null }
+                        showSupportTab()
+                    },
+                    onClientSearchQueryChange = { query ->
+                        clientsSearchQuery = query
+                        uiState = uiState.copy(clients = uiState.clients.copy(query = query))
+                    },
+                    onClientSearch = {
+                        clientsSearchQuery = uiState.clients.query
+                        loadClientsList(clientsSearchQuery)
+                    },
+                    onListCardClick = { handleListCardClick(it) },
+                    onProfileSectionClick = { handleProfileSectionClick(it) },
+                )
+            }
+        }
 
         StaffNotificationHelper.ensureChannel(this)
         requestNotificationPermissionIfNeeded()
         StaffPushRegistrar.registerIfLoggedIn(this)
-
+        selectTab(requestedTab)
         loadData()
+    }
+
+    private fun handleListCardClick(card: ListCardUi) {
+        card.clientId?.let {
+            openClientCard(it)
+            return
+        }
+        when (card.refType) {
+            "client" -> card.feedId?.let { openClientCard(it) }
+            "ticket" -> selectTab(WorkUiState.TAB_SUPPORT)
+        }
+    }
+
+    private fun handleProfileSectionClick(sectionKey: String) {
+        when (sectionKey) {
+            "schedule" -> if (uiState.showScheduleNav) selectTab(WorkUiState.TAB_SCHEDULE)
+            "clients" -> if (uiState.showClientsNav) selectTab(WorkUiState.TAB_CLIENTS)
+            "app_support" -> if (uiState.showSupportNav) selectTab(WorkUiState.TAB_SUPPORT)
+            else -> {
+                val adminSections = config?.adminSections.orEmpty()
+                if (adminSections.contains(sectionKey)) {
+                    startActivity(
+                        Intent(this, AdminSectionActivity::class.java)
+                            .putExtra(AdminSectionActivity.EXTRA_SECTION, sectionKey),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun handleAction(actionId: String) {
+        when {
+            actionId == "open_admin" -> startActivity(Intent(this, AdminActivity::class.java))
+            actionId == "retry" -> selectTab(uiState.selectedTab)
+            actionId == "mark_notifications_read" -> {
+                runAsyncForTab(uiState.selectedTab, "Сохранение...") {
+                    withRefresh { token -> apiClient.markAllStaffNotificationsRead(token) }
+                    showSupportTab()
+                    ""
+                }
+            }
+            actionId.startsWith("ticket_status:") -> {
+                val parts = actionId.split(":")
+                if (parts.size == 3) {
+                    updateTicketStatus(parts[1].toInt(), parts[2])
+                }
+            }
+            actionId.startsWith("ticket_client:") -> {
+                openClientCard(actionId.removePrefix("ticket_client:").toInt())
+            }
+        }
     }
 
     private fun logout() {
@@ -108,20 +164,15 @@ class WorkActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun setScreenTitle(title: String) {
-        headerTitle.title = title
-    }
-
-    private fun updateBottomNavVisibility() {
+    private fun updateNavVisibility() {
         config = store.loadConfig() ?: config
         val sections = config?.appSections.orEmpty()
         val adminSections = config?.adminSections.orEmpty()
-        val canOpenSchedule = sections.contains("schedule") || adminSections.contains("schedule")
-        bottomNavigation.menu.findItem(R.id.nav_schedule)?.isVisible = canOpenSchedule
-        val canOpenSupport = sections.contains("app_support") || adminSections.contains("app_support")
-        bottomNavigation.menu.findItem(R.id.nav_support)?.isVisible = canOpenSupport
-        val canOpenClients = sections.contains("clients") || adminSections.contains("clients")
-        bottomNavigation.menu.findItem(R.id.nav_clients)?.isVisible = canOpenClients
+        uiState = uiState.copy(
+            showScheduleNav = sections.contains("schedule") || adminSections.contains("schedule"),
+            showClientsNav = sections.contains("clients") || adminSections.contains("clients"),
+            showSupportNav = sections.contains("app_support") || adminSections.contains("app_support"),
+        )
     }
 
     override fun onResume() {
@@ -139,16 +190,13 @@ class WorkActivity : AppCompatActivity() {
         StaffPushRegistrar.registerIfLoggedIn(this@WorkActivity)
         pollUnreadNotifications()
         runOnUiThread {
-            updateBottomNavVisibility()
+            updateNavVisibility()
             refreshActiveTab()
         }
         ""
     }
 
-    private fun refreshActiveTab() {
-        bottomNavigation.selectedItemId = activeTab
-        selectTab(activeTab)
-    }
+    private fun refreshActiveTab() = selectTab(uiState.selectedTab)
 
     private fun sectionAllowed(section: String): Boolean {
         if (allowedSections.contains(section)) return true
@@ -173,7 +221,6 @@ class WorkActivity : AppCompatActivity() {
                 }
                 store.setLastUnreadNotificationCount(notifications.unreadCount)
             } catch (_: Exception) {
-                // Фоновая проверка — не мешаем работе экрана.
             }
         }
     }
@@ -193,36 +240,26 @@ class WorkActivity : AppCompatActivity() {
     }
 
     private fun showHomeTab() {
-        setScreenTitle("Главная")
-        dayStrip.visibility = View.GONE
-        clientsSearchBar.visibility = View.GONE
-        clearList()
-
-        val data = appData
-        if (data == null) {
-            contentView.text = "Загрузка данных..."
-            return
-        }
-
+        uiState = uiState.copy(
+            screenTitle = "Главная",
+            errorMessage = null,
+            home = HomeTabUi(loading = appData == null),
+        )
+        val data = appData ?: return
         val role = primaryRole()
-        contentView.text = buildString {
-            append("Здравствуйте, ${data.employeeName}\n")
-            append("${UiLabels.roleTitle(role)}\n\n")
-            append("Сводка:\n")
-            if (data.metrics.isEmpty()) {
-                append("Нет показателей\n")
-            } else {
-                data.metrics.forEach { (key, value) ->
-                    append("${UiLabels.metricTitle(key)}: $value\n")
-                }
-            }
+        val showAdmin = !config?.adminSections.isNullOrEmpty() || allowedSections.contains("admin")
+        val metrics = data.metrics.map { (key, value) ->
+            MetricUi(UiLabels.metricTitle(key), value.toString())
         }
-
-        if (!config?.adminSections.isNullOrEmpty() || allowedSections.contains("admin")) {
-            addActionButton("Открыть админку") {
-                startActivity(Intent(this, AdminActivity::class.java))
-            }
-        }
+        uiState = uiState.copy(
+            home = HomeTabUi(
+                greeting = "Здравствуйте, ${data.employeeName}",
+                roleTitle = UiLabels.roleTitle(role),
+                metrics = metrics,
+                showAdminButton = showAdmin,
+                loading = true,
+            ),
+        )
 
         val homeSection = when (role) {
             "ROLE_TRAINER" -> "bookings"
@@ -234,295 +271,412 @@ class WorkActivity : AppCompatActivity() {
         }
 
         if (homeSection == "app_support" && sectionAllowed("app_support")) {
-            runAsyncForTab(R.id.nav_home, "Загрузка...") {
+            runAsyncForTab(WorkUiState.TAB_HOME, "Загрузка...") {
                 val tickets = withRefresh { token -> apiClient.loadSupportTickets(token) }
-                if (activeTab != R.id.nav_home) return@runAsyncForTab ""
+                if (uiState.selectedTab != WorkUiState.TAB_HOME) return@runAsyncForTab ""
+                val items = tickets.items.filter { it.status == "new" }.take(5).map { ticketToCard(it) }
                 runOnUiThread {
-                    appendSectionTitle("Новые обращения: ${tickets.newCount}")
-                    tickets.items.filter { it.status == "new" }.take(5).forEach { renderSupportTicket(it, false) }
-                    if (tickets.items.none { it.status == "new" }) {
-                        addListBlock("Новых обращений нет", "", "")
-                    }
+                    uiState = uiState.copy(
+                        home = uiState.home.copy(
+                            sectionTitle = "Новые обращения: ${tickets.newCount}",
+                            items = items,
+                            emptyMessage = if (items.isEmpty()) "Новых обращений нет" else null,
+                            loading = false,
+                        ),
+                    )
                 }
                 ""
             }
         } else if (homeSection != null && sectionAllowed(homeSection)) {
-            runAsyncForTab(R.id.nav_home, "Загрузка...") {
+            runAsyncForTab(WorkUiState.TAB_HOME, "Загрузка...") {
                 if (role == "ROLE_TRAINER" && sectionAllowed("schedule")) {
                     val schedule = loadScheduleCached()
-                    if (activeTab != R.id.nav_home) return@runAsyncForTab ""
+                    if (uiState.selectedTab != WorkUiState.TAB_HOME) return@runAsyncForTab ""
+                    val items = schedule.items.filter { it.date == todayDate() }.ifEmpty {
+                        schedule.items.take(5)
+                    }.map { scheduleToCard(it) }
                     runOnUiThread {
-                        appendSectionTitle("Ваши тренировки сегодня")
-                        renderScheduleItems(schedule.items.filter { it.date == todayDate() }.ifEmpty {
-                            schedule.items.take(5)
-                        })
+                        uiState = uiState.copy(
+                            home = uiState.home.copy(
+                                sectionTitle = "Ваши тренировки сегодня",
+                                items = items,
+                                emptyMessage = if (items.isEmpty()) "Нет тренировок" else null,
+                                loading = false,
+                            ),
+                        )
                     }
                 } else {
                     val items = withRefresh { token -> apiClient.loadList(token, homeSection) }
-                    if (activeTab != R.id.nav_home) return@runAsyncForTab ""
+                    if (uiState.selectedTab != WorkUiState.TAB_HOME) return@runAsyncForTab ""
                     runOnUiThread {
-                        appendSectionTitle(UiLabels.sectionTitle(homeSection))
-                        renderFeedItems(items.take(8))
+                        uiState = uiState.copy(
+                            home = uiState.home.copy(
+                                sectionTitle = UiLabels.sectionTitle(homeSection),
+                                items = items.take(8).map { feedToCard(it) },
+                                emptyMessage = if (items.isEmpty()) "Нет данных" else null,
+                                loading = false,
+                            ),
+                        )
                     }
                 }
                 ""
             }
         } else if (sectionAllowed("schedule")) {
-            runAsyncForTab(R.id.nav_home, "Загрузка...") {
+            runAsyncForTab(WorkUiState.TAB_HOME, "Загрузка...") {
                 val schedule = loadScheduleCached(forceRefresh = false)
-                if (activeTab != R.id.nav_home) return@runAsyncForTab ""
+                if (uiState.selectedTab != WorkUiState.TAB_HOME) return@runAsyncForTab ""
+                val items = schedule.items.take(5).map { scheduleToCard(it) }
                 runOnUiThread {
-                    appendSectionTitle("Ближайшие тренировки")
-                    renderScheduleItems(schedule.items.take(5))
+                    uiState = uiState.copy(
+                        home = uiState.home.copy(
+                            sectionTitle = "Ближайшие тренировки",
+                            items = items,
+                            emptyMessage = if (items.isEmpty()) "Нет тренировок" else null,
+                            loading = false,
+                        ),
+                    )
                 }
                 ""
             }
+        } else {
+            uiState = uiState.copy(home = uiState.home.copy(loading = false))
         }
     }
 
     private fun showScheduleTab() {
-        setScreenTitle("Расписание")
-        clientsSearchBar.visibility = View.GONE
-        contentView.text = "Загрузка расписания..."
-        clearList()
-        dayStrip.visibility = View.GONE
+        uiState = uiState.copy(
+            screenTitle = "Расписание",
+            schedule = ScheduleTabUi(loading = true),
+            errorMessage = null,
+        )
         if (!sectionAllowed("schedule")) {
-            contentView.text = if (initialDataLoaded) {
-                "Раздел «Расписание» недоступен для вашей должности."
-            } else {
-                "Загрузка данных..."
-            }
+            uiState = uiState.copy(
+                schedule = ScheduleTabUi(
+                    denied = true,
+                    deniedMessage = if (initialDataLoaded) {
+                        "Раздел «Расписание» недоступен для вашей должности."
+                    } else {
+                        "Загрузка данных..."
+                    },
+                    loading = false,
+                ),
+            )
             return
         }
-
-        runAsyncForTab(R.id.nav_schedule, "Загрузка расписания...") {
+        runAsyncForTab(WorkUiState.TAB_SCHEDULE, "Загрузка расписания...") {
             val schedule = loadScheduleCached(forceRefresh = true)
             if (selectedScheduleDate == null) {
                 selectedScheduleDate = schedule.days.firstOrNull { it.date == todayDate() }?.date
                     ?: schedule.days.firstOrNull()?.date
             }
             scheduleData = schedule
-            if (activeTab != R.id.nav_schedule) return@runAsyncForTab ""
-            runOnUiThread { renderScheduleCalendar(schedule) }
+            if (uiState.selectedTab != WorkUiState.TAB_SCHEDULE) return@runAsyncForTab ""
+            runOnUiThread { renderSchedule(schedule) }
             ""
         }
     }
 
-    private fun renderScheduleCalendar(schedule: ScheduleData) {
-        dayStrip.visibility = View.VISIBLE
-        daysContainer.removeAllViews()
-        clearList()
-
-        schedule.days.forEach { day ->
-            val chip = TextView(this).apply {
-                text = "${day.label}\n${day.count}"
-                gravity = Gravity.CENTER
-                setPadding(dp(12), dp(8), dp(12), dp(8))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                val selected = day.date == selectedScheduleDate
-                setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
-                setTextColor(
-                    ContextCompat.getColor(
-                        this@WorkActivity,
-                        if (selected) android.R.color.white else R.color.fc_text
-                    )
-                )
-                setBackgroundColor(
-                    ContextCompat.getColor(
-                        this@WorkActivity,
-                        if (selected) R.color.fc_primary else R.color.fc_background
-                    )
-                )
-                setOnClickListener {
-                    selectedScheduleDate = day.date
-                    renderScheduleCalendar(schedule)
-                }
-            }
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                marginEnd = dp(8)
-            }
-            daysContainer.addView(chip, params)
-        }
-
-        val selectedDate = selectedScheduleDate
-        val dayItems = schedule.items.filter { it.date == selectedDate }
-        val dayLabel = schedule.days.firstOrNull { it.date == selectedDate }?.label ?: selectedDate.orEmpty()
-
-        contentView.text = if (dayItems.isEmpty()) {
-            "$dayLabel\n\nНа этот день записей нет."
-        } else {
-            "$dayLabel\n\n${dayItems.size} занятий"
-        }
-        renderScheduleItems(dayItems)
-    }
-
-    private fun renderScheduleItems(items: List<ScheduleItem>) {
-        clearList()
-        items.forEach { item ->
-            val clients = if (item.clientNames.isNotEmpty()) {
-                item.clientNames.joinToString(", ")
-            } else {
-                item.participants.ifBlank { "нет записей" }
-            }
-            addListBlock(
-                title = "${item.startTime}–${item.endTime}  ${item.title}",
-                subtitle = "Клиенты: $clients",
-                meta = "${UiLabels.trainingType(item.type)} · ${item.trainer} · ${item.room}",
+    private fun renderSchedule(schedule: ScheduleData) {
+        val today = todayDate()
+        val typeFilter = selectedScheduleTypeFilter
+        val days = schedule.days.map { day ->
+            val (weekday, dayNumber) = parseDayLabel(day.label)
+            ScheduleDayUi(
+                date = day.date,
+                weekdayLabel = weekday,
+                dayNumber = dayNumber,
+                sessionCount = day.count,
+                selected = day.date == selectedScheduleDate,
+                isToday = day.date == today,
             )
         }
+        val selectedDate = selectedScheduleDate
+        val dayItems = schedule.items
+            .filter { it.date == selectedDate }
+            .filter { typeFilter == null || it.type == typeFilter }
+        uiState = uiState.copy(
+            schedule = ScheduleTabUi(
+                days = days,
+                sessions = dayItems.map { scheduleToSession(it) },
+                selectedTypeFilter = typeFilter,
+                loading = false,
+            ),
+        )
     }
 
     private fun showSupportTab() {
-        setScreenTitle("Обращения")
-        clientsSearchBar.visibility = View.GONE
-        contentView.text = "Загрузка обращений..."
-        clearList()
+        uiState = uiState.copy(
+            screenTitle = "Обращения",
+            support = SupportTabUi(loading = true, filters = supportFilters()),
+            errorMessage = null,
+        )
         if (!sectionAllowed("app_support")) {
-            dayStrip.visibility = View.GONE
-            contentView.text = if (initialDataLoaded) {
-                "Раздел «Обращения» недоступен для вашей должности."
-            } else {
-                "Загрузка данных..."
-            }
+            uiState = uiState.copy(
+                support = SupportTabUi(
+                    denied = true,
+                    deniedMessage = if (initialDataLoaded) {
+                        "Раздел «Обращения» недоступен для вашей должности."
+                    } else {
+                        "Загрузка данных..."
+                    },
+                    loading = false,
+                ),
+            )
             return
         }
-
-        renderSupportFilterStrip()
-
-        runAsyncForTab(R.id.nav_support, "Загрузка обращений...") {
+        runAsyncForTab(WorkUiState.TAB_SUPPORT, "Загрузка обращений...") {
             val tickets = withRefresh { token ->
                 apiClient.loadSupportTickets(token, selectedSupportFilter)
             }
             val notifications = withRefresh { token -> apiClient.loadStaffNotifications(token) }
             store.setLastUnreadNotificationCount(notifications.unreadCount)
-            if (activeTab != R.id.nav_support) return@runAsyncForTab ""
+            if (uiState.selectedTab != WorkUiState.TAB_SUPPORT) return@runAsyncForTab ""
+            val allowWrite = canWriteSupport()
+            val actions = buildList<ActionUi> {
+                if (notifications.unreadCount > 0 && allowWrite) {
+                    add(ActionUi("mark_notifications_read", "Отметить все уведомления прочитанными"))
+                }
+            }
+            val ticketActions = tickets.items.associate { ticket ->
+                ticket.id to buildTicketActions(ticket, allowWrite)
+            }
             runOnUiThread {
-                contentView.text = buildString {
-                    append("Новых обращений: ${tickets.newCount}\n")
-                    if (notifications.unreadCount > 0) {
-                        append("Непрочитанных уведомлений: ${notifications.unreadCount}\n")
-                    }
-                    append("\nСписок обращений из клиентского приложения:")
-                }
-                notifications.items.filter { !it.isRead }.take(5).forEach { n ->
-                    addListBlock(n.title, n.body, n.createdAt)
-                }
-                if (notifications.unreadCount > 0 && canWriteSupport()) {
-                    addActionButton("Отметить все уведомления прочитанными") {
-                        runAsyncForTab(R.id.nav_support, "Сохранение...") {
-                            withRefresh { token -> apiClient.markAllStaffNotificationsRead(token) }
-                            showSupportTab()
-                            ""
-                        }
-                    }
-                }
-                if (tickets.items.isEmpty()) {
-                    addListBlock("Обращений по фильтру нет", "", "")
-                } else {
-                    tickets.items.forEach { renderSupportTicket(it, canWriteSupport()) }
-                }
+                uiState = uiState.copy(
+                    support = SupportTabUi(
+                        newCount = tickets.newCount,
+                        unreadCount = notifications.unreadCount,
+                        filters = supportFilters(),
+                        notifications = notifications.items.filter { !it.isRead }.take(5).map {
+                            ListCardUi(title = it.title, subtitle = it.body, meta = it.createdAt)
+                        },
+                        tickets = tickets.items.map { ticketToCard(it) },
+                        ticketActions = ticketActions,
+                        actions = actions,
+                        loading = false,
+                    ),
+                )
             }
             ""
         }
     }
 
-    private fun renderSupportFilterStrip() {
-        dayStrip.visibility = View.VISIBLE
-        daysContainer.removeAllViews()
-        val filters = listOf(
-            null to "Все",
-            "new" to "Новые",
-            "in_progress" to "В работе",
-            "done" to "Закрыто",
-        )
-        filters.forEach { (value, label) ->
-            val chip = TextView(this).apply {
-                text = label
-                gravity = Gravity.CENTER
-                setPadding(dp(14), dp(8), dp(14), dp(8))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                val selected = selectedSupportFilter == value
-                setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
-                setTextColor(
-                    ContextCompat.getColor(
-                        this@WorkActivity,
-                        if (selected) android.R.color.white else R.color.fc_text,
-                    )
-                )
-                setBackgroundColor(
-                    ContextCompat.getColor(
-                        this@WorkActivity,
-                        if (selected) R.color.fc_primary else R.color.fc_background,
-                    )
-                )
-                setOnClickListener {
-                    selectedSupportFilter = value
-                    showSupportTab()
-                }
-            }
-            daysContainer.addView(
-                chip,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply { marginEnd = dp(8) },
-            )
-        }
-    }
+    private fun supportFilters(): List<DayChipUi> = listOf(
+        DayChipUi("", "Все", -1, selectedSupportFilter == null),
+        DayChipUi("new", "Новые", -1, selectedSupportFilter == "new"),
+        DayChipUi("in_progress", "В работе", -1, selectedSupportFilter == "in_progress"),
+        DayChipUi("done", "Закрыто", -1, selectedSupportFilter == "done"),
+    )
 
     private fun showClientsTab() {
-        setScreenTitle("Клиенты")
-        dayStrip.visibility = View.GONE
-        clearList()
+        uiState = uiState.copy(
+            screenTitle = "Клиенты",
+            clients = ClientsTabUi(query = clientsSearchQuery, loading = true),
+            errorMessage = null,
+        )
         if (!sectionAllowed("clients")) {
-            clientsSearchBar.visibility = View.GONE
-            contentView.text = if (initialDataLoaded) {
-                "Раздел «Клиенты» недоступен для вашей должности."
-            } else {
-                "Загрузка данных..."
-            }
+            uiState = uiState.copy(
+                clients = ClientsTabUi(
+                    denied = true,
+                    deniedMessage = if (initialDataLoaded) {
+                        "Раздел «Клиенты» недоступен для вашей должности."
+                    } else {
+                        "Загрузка данных..."
+                    },
+                    loading = false,
+                ),
+            )
             return
         }
-
-        clientsSearchBar.visibility = View.VISIBLE
-        clientsSearchInput.setText(clientsSearchQuery)
-        contentView.text = "Найдено клиентов: загрузка..."
         loadClientsList(clientsSearchQuery)
     }
 
     private fun loadClientsList(query: String) {
-        runAsyncForTab(R.id.nav_clients, "Загрузка клиентов...") {
+        uiState = uiState.copy(
+            clients = uiState.clients.copy(query = query, loading = true, summary = ""),
+        )
+        runAsyncForTab(WorkUiState.TAB_CLIENTS, "Загрузка клиентов...") {
             val clients = withRefresh { token -> apiClient.loadClients(token, query) }
-            if (activeTab != R.id.nav_clients) return@runAsyncForTab ""
+            if (uiState.selectedTab != WorkUiState.TAB_CLIENTS) return@runAsyncForTab ""
             runOnUiThread {
-                contentView.text = if (clients.isEmpty()) {
-                    "Клиенты не найдены"
-                } else {
-                    "Клиентов: ${clients.size}"
-                }
-                clearList()
-                clients.forEach { client ->
-                    val subtitle = buildString {
-                        if (client.email.isNotBlank()) append(client.email)
-                        if (client.phone.isNotBlank()) {
-                            if (isNotEmpty()) append("\n")
-                            append(client.phone)
-                        }
-                    }
-                    addClickableListBlock(
-                        title = client.name.ifBlank { "Клиент #${client.id}" },
-                        subtitle = subtitle,
-                        meta = "Открыть карточку",
-                    ) {
-                        openClientCard(client.id)
-                    }
-                }
+                uiState = uiState.copy(
+                    clients = ClientsTabUi(
+                        query = query,
+                        summary = if (clients.isEmpty()) "" else "Найдено: ${clients.size}",
+                        items = clients.map { client ->
+                            ListCardUi(
+                                title = client.name.ifBlank { "Клиент #${client.id}" },
+                                subtitle = listOf(client.email, client.phone).filter { it.isNotBlank() }.joinToString("\n"),
+                                meta = "Открыть карточку",
+                                clientId = client.id,
+                            )
+                        },
+                        loading = false,
+                    ),
+                )
             }
             ""
         }
+    }
+
+    private fun showProfileTab() {
+        config = store.loadConfig() ?: config
+        val data = appData
+        val sections = if (allowedSections.isNotEmpty()) allowedSections else config?.appSections.orEmpty()
+        val adminAvailable = !config?.adminSections.isNullOrEmpty() || sections.contains("admin")
+        uiState = uiState.copy(
+            screenTitle = "Профиль",
+            profile = ProfileTabUi(
+                name = data?.employeeName ?: session?.userEmail.orEmpty(),
+                email = data?.employeeEmail ?: "",
+                roleTitle = UiLabels.roleTitle(primaryRole()),
+                sections = sections
+                    .filterNot { it == "home" || it == "profile" || it == "admin" }
+                    .map { key ->
+                        ProfileSectionUi(
+                            key = key,
+                            title = UiLabels.sectionTitle(key),
+                            hint = SectionHints.forSection(key),
+                        )
+                    },
+                adminAvailable = adminAvailable,
+                showAdminButton = adminAvailable,
+                loading = data == null,
+            ),
+            errorMessage = null,
+        )
+
+        val extraSections = sections.filter {
+            it !in setOf("home", "profile", "schedule", "dashboard", "admin", "clients", "app_support")
+        }
+        if (extraSections.isNotEmpty()) {
+            runAsyncForTab(WorkUiState.TAB_PROFILE, "Загрузка...") {
+                val section = extraSections.first()
+                val items = withRefresh { token -> apiClient.loadList(token, section) }
+                if (uiState.selectedTab != WorkUiState.TAB_PROFILE) return@runAsyncForTab ""
+                runOnUiThread {
+                    uiState = uiState.copy(
+                        profile = uiState.profile.copy(
+                            sectionTitle = UiLabels.sectionTitle(section),
+                            items = items.take(10).map { feedToCard(it) },
+                            loading = false,
+                        ),
+                    )
+                }
+                ""
+            }
+        } else if (data != null) {
+            uiState = uiState.copy(profile = uiState.profile.copy(loading = false))
+        }
+    }
+
+    private fun buildTicketActions(ticket: SupportTicketItem, allowWrite: Boolean): List<ActionUi> {
+        val actions = mutableListOf<ActionUi>()
+        if (ticket.clientId != null && sectionAllowed("clients")) {
+            actions.add(ActionUi("ticket_client:${ticket.clientId}", "Карточка клиента"))
+        }
+        if (allowWrite && ticket.status != "done") {
+            if (ticket.status == "new") {
+                actions.add(ActionUi("ticket_status:${ticket.id}:in_progress", "Взять в работу"))
+            }
+            actions.add(ActionUi("ticket_status:${ticket.id}:done", "Закрыть обращение"))
+        }
+        return actions
+    }
+
+    private fun ticketToCard(ticket: SupportTicketItem): ListCardUi {
+        val client = ticket.clientName.ifBlank { ticket.contactEmail.ifBlank { "Клиент не указан" } }
+        val contact = listOf(ticket.contactEmail, ticket.clientPhone).filter { it.isNotBlank() }.joinToString(" · ")
+        return ListCardUi(
+            title = ticket.subject,
+            subtitle = "Клиент: $client\n${ticket.message}",
+            meta = "${UiLabels.ticketCategory(ticket.category)} · ${ticket.createdAt}" +
+                if (contact.isNotBlank()) "\n$contact" else "",
+            badge = UiLabels.ticketStatus(ticket.status),
+            badgeColor = ticketBadgeColor(ticket.status),
+            clientId = ticket.clientId,
+            ticketId = ticket.id,
+            refType = "ticket",
+        )
+    }
+
+    private fun ticketBadgeColor(status: String): BadgeColor = when (status) {
+        "new" -> BadgeColor.WARNING
+        "in_progress" -> BadgeColor.PRIMARY
+        "done" -> BadgeColor.SUCCESS
+        else -> BadgeColor.NEUTRAL
+    }
+
+    private fun scheduleToCard(item: ScheduleItem): ListCardUi {
+        val clients = if (item.clientNames.isNotEmpty()) {
+            item.clientNames.joinToString(", ")
+        } else {
+            item.participants.ifBlank { "нет записей" }
+        }
+        return ListCardUi(
+            title = "${item.startTime}–${item.endTime}  ${item.title}",
+            subtitle = "Клиенты: $clients",
+            meta = "${UiLabels.trainingType(item.type)} · ${item.trainer} · ${item.room}",
+        )
+    }
+
+    private fun scheduleToSession(item: ScheduleItem): ScheduleSessionUi {
+        val (booked, max) = parseParticipants(item.participants)
+        return ScheduleSessionUi(
+            title = item.title,
+            type = item.type,
+            typeLabel = UiLabels.trainingType(item.type),
+            startTime = item.startTime,
+            endTime = item.endTime,
+            durationMinutes = durationMinutes(item.startTime, item.endTime),
+            trainer = item.trainer,
+            room = item.room,
+            bookedCount = booked,
+            maxParticipants = max,
+            clientNames = item.clientNames,
+        )
+    }
+
+    private fun parseDayLabel(label: String): Pair<String, String> {
+        val parts = label.trim().split(Regex("\\s+"))
+        return when {
+            parts.size >= 2 -> parts[0] to parts[1]
+            parts.size == 1 -> "" to parts[0]
+            else -> "" to ""
+        }
+    }
+
+    private fun parseParticipants(participants: String): Pair<Int?, Int?> {
+        val match = Regex("""(\d+)\s*/\s*(\d+)""").find(participants) ?: return null to null
+        return match.groupValues[1].toIntOrNull() to match.groupValues[2].toIntOrNull()
+    }
+
+    private fun durationMinutes(start: String, end: String): Int {
+        fun toMinutes(value: String): Int? {
+            val parts = value.split(":")
+            if (parts.size < 2) return null
+            val hours = parts[0].toIntOrNull() ?: return null
+            val minutes = parts[1].toIntOrNull() ?: return null
+            return hours * 60 + minutes
+        }
+        val startMinutes = toMinutes(start)
+        val endMinutes = toMinutes(end)
+        if (startMinutes == null || endMinutes == null) return 60
+        val diff = endMinutes - startMinutes
+        return if (diff > 0) diff else 60
+    }
+
+    private fun feedToCard(item: FeedListItem): ListCardUi {
+        val clientId = if (item.refType == "client") item.id else null
+        val ticketId = if (item.refType == "ticket") item.id else null
+        return ListCardUi(
+            title = item.title,
+            subtitle = item.subtitle,
+            meta = item.meta,
+            clientId = clientId,
+            ticketId = ticketId,
+            refType = item.refType,
+            feedId = item.id,
+        )
     }
 
     private fun openClientCard(clientId: Int) {
@@ -532,43 +686,8 @@ class WorkActivity : AppCompatActivity() {
         )
     }
 
-    private fun renderSupportTicket(ticket: SupportTicketItem, allowStatusChange: Boolean) {
-        val client = ticket.clientName.ifBlank { ticket.contactEmail.ifBlank { "Клиент не указан" } }
-        val contact = buildString {
-            if (ticket.contactEmail.isNotBlank()) append(ticket.contactEmail)
-            if (ticket.clientPhone.isNotBlank()) {
-                if (isNotEmpty()) append(" · ")
-                append(ticket.clientPhone)
-            }
-        }
-        addListBlock(
-            title = "${UiLabels.ticketStatus(ticket.status)} · ${ticket.subject}",
-            subtitle = "Клиент: $client\n${ticket.message}",
-            meta = "${UiLabels.ticketCategory(ticket.category)} · ${ticket.createdAt}${if (contact.isNotBlank()) "\n$contact" else ""}",
-        )
-        if (ticket.clientId != null && sectionAllowed("clients")) {
-            addActionButton("Карточка клиента") { openClientCard(ticket.clientId) }
-        }
-        if (allowStatusChange && ticket.status != "done") {
-            if (ticket.status == "new") {
-                addActionButton("Взять в работу") { updateTicketStatus(ticket.id, "in_progress") }
-            }
-            if (ticket.status != "done") {
-                addActionButton("Закрыть обращение") { updateTicketStatus(ticket.id, "done") }
-            }
-        }
-    }
-
-    private fun addActionButton(label: String, action: () -> Unit) {
-        val button = Button(this).apply {
-            text = label
-            setOnClickListener { action() }
-        }
-        listContainer.addView(button)
-    }
-
     private fun updateTicketStatus(ticketId: Int, status: String) {
-        runAsyncForTab(R.id.nav_support, "Обновление статуса...") {
+        runAsyncForTab(WorkUiState.TAB_SUPPORT, "Обновление статуса...") {
             withRefresh { token -> apiClient.updateSupportTicketStatus(token, ticketId, status) }
             showSupportTab()
             ""
@@ -579,240 +698,52 @@ class WorkActivity : AppCompatActivity() {
         config?.adminActions?.contains("admin.write") == true
             || config?.adminActions?.contains("support.write") == true
 
-    private fun showProfileTab() {
-        setScreenTitle("Профиль")
-        dayStrip.visibility = View.GONE
-        clientsSearchBar.visibility = View.GONE
-        clearList()
-        config = store.loadConfig() ?: config
-
-        val data = appData
-        val sections = if (allowedSections.isNotEmpty()) {
-            allowedSections
-        } else {
-            config?.appSections.orEmpty()
-        }
-        contentView.text = if (data == null) {
-            buildString {
-                append("${session?.userEmail.orEmpty()}\n")
-                append("${UiLabels.roleTitle(primaryRole())}\n\n")
-                append("Загрузка профиля...")
-            }
-        } else {
-            buildString {
-                append("${data.employeeName}\n")
-                append("${data.employeeEmail}\n")
-                append("${UiLabels.roleTitle(primaryRole())}\n\n")
-                append("Доступные разделы:\n")
-                sections
-                    .filterNot { it == "home" || it == "profile" || it == "admin" }
-                    .forEach { append("• ${UiLabels.sectionTitle(it)}\n") }
-                append("\n")
-                append(
-                    if (!config?.adminSections.isNullOrEmpty() || sections.contains("admin")) {
-                        "Админка CRM доступна."
-                    } else {
-                        "Админка для вашей должности недоступна."
-                    }
-                )
-            }
-        }
-
-        if (!config?.adminSections.isNullOrEmpty() || sections.contains("admin")) {
-            addActionButton("Открыть админку") {
-                startActivity(Intent(this, AdminActivity::class.java))
-            }
-        }
-
-        val extraSections = sections.filter {
-            it !in setOf("home", "profile", "schedule", "dashboard", "admin", "clients", "app_support")
-        }
-        if (extraSections.isNotEmpty()) {
-            runAsyncForTab(R.id.nav_profile, "Загрузка...") {
-                val section = extraSections.first()
-                val items = withRefresh { token -> apiClient.loadList(token, section) }
-                if (activeTab != R.id.nav_profile) return@runAsyncForTab ""
-                runOnUiThread {
-                    appendSectionTitle(UiLabels.sectionTitle(section))
-                    renderFeedItems(items.take(10))
-                }
-                ""
-            }
+    private fun selectTab(tab: Int) {
+        uiState = uiState.copy(selectedTab = tab, screenTitle = tabTitle(tab), errorMessage = null)
+        when (tab) {
+            WorkUiState.TAB_HOME -> showHomeTab()
+            WorkUiState.TAB_SCHEDULE -> showScheduleTab()
+            WorkUiState.TAB_PROFILE -> showProfileTab()
+            WorkUiState.TAB_SUPPORT -> showSupportTab()
+            WorkUiState.TAB_CLIENTS -> showClientsTab()
         }
     }
 
-    private fun appendSectionTitle(title: String) {
-        val titleView = TextView(this).apply {
-            text = title
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_text))
-            setPadding(0, dp(12), 0, dp(4))
-        }
-        listContainer.addView(titleView)
+    private fun tabTitle(tab: Int): String = when (tab) {
+        WorkUiState.TAB_HOME -> "Главная"
+        WorkUiState.TAB_SCHEDULE -> "Расписание"
+        WorkUiState.TAB_CLIENTS -> "Клиенты"
+        WorkUiState.TAB_PROFILE -> "Профиль"
+        WorkUiState.TAB_SUPPORT -> "Обращения"
+        else -> "Главная"
     }
 
-    private fun renderFeedItems(items: List<FeedListItem>) {
-        if (items.isEmpty()) {
-            addListBlock("Нет данных", "", "")
-            return
-        }
-        items.forEach { item ->
-            addListBlock(item.title, item.subtitle, item.meta)
-        }
-    }
-
-    private fun addListBlock(title: String, subtitle: String, meta: String) {
-        val block = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(10), 0, dp(10))
-        }
-        block.addView(TextView(this).apply {
-            text = title
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_text))
-        })
-        if (subtitle.isNotBlank()) {
-            block.addView(TextView(this).apply {
-                text = subtitle
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-                setTextColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_text))
-            })
-        }
-        if (meta.isNotBlank()) {
-            block.addView(TextView(this).apply {
-                text = meta
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setTextColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_text_secondary))
-            })
-        }
-        val divider = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(1),
-            )
-            setBackgroundColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_text_secondary))
-            alpha = 0.25f
-        }
-        listContainer.addView(block)
-        listContainer.addView(divider)
-    }
-
-    private fun addClickableListBlock(
-        title: String,
-        subtitle: String,
-        meta: String,
-        onClick: () -> Unit,
-    ) {
-        val block = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(10), 0, dp(10))
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { onClick() }
-        }
-        block.addView(TextView(this).apply {
-            text = title
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_text))
-        })
-        if (subtitle.isNotBlank()) {
-            block.addView(TextView(this).apply {
-                text = subtitle
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-                setTextColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_text))
-            })
-        }
-        if (meta.isNotBlank()) {
-            block.addView(TextView(this).apply {
-                text = meta
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setTextColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_primary))
-            })
-        }
-        val divider = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(1),
-            )
-            setBackgroundColor(ContextCompat.getColor(this@WorkActivity, R.color.fc_text_secondary))
-            alpha = 0.25f
-        }
-        listContainer.addView(block)
-        listContainer.addView(divider)
-    }
-
-    private fun clearList() {
-        listContainer.removeAllViews()
-    }
-
-    private fun selectTab(itemId: Int): Boolean {
-        activeTab = itemId
-        statusView.visibility = View.GONE
-        if (itemId != R.id.nav_clients) {
-            clientsSearchBar.visibility = View.GONE
-        }
-        return when (itemId) {
-            R.id.nav_home -> {
-                showHomeTab()
-                true
-            }
-            R.id.nav_schedule -> {
-                showScheduleTab()
-                true
-            }
-            R.id.nav_profile -> {
-                showProfileTab()
-                true
-            }
-            R.id.nav_support -> {
-                showSupportTab()
-                true
-            }
-            R.id.nav_clients -> {
-                showClientsTab()
-                true
-            }
-            else -> false
-        }
+    private fun tabFromNavId(navId: Int): Int = when (navId) {
+        R.id.nav_schedule -> WorkUiState.TAB_SCHEDULE
+        R.id.nav_clients -> WorkUiState.TAB_CLIENTS
+        R.id.nav_profile -> WorkUiState.TAB_PROFILE
+        R.id.nav_support -> WorkUiState.TAB_SUPPORT
+        else -> WorkUiState.TAB_HOME
     }
 
     private fun primaryRole(): String {
         val roles = config?.roles.orEmpty()
         val priority = listOf(
-            "ROLE_SUPER_ADMIN",
-            "ROLE_ADMIN",
-            "ROLE_TRAINER",
-            "ROLE_MANAGER",
-            "ROLE_SUPPORT",
-            "ROLE_FINANCE",
-            "ROLE_VIEWER",
+            "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_TRAINER", "ROLE_MANAGER",
+            "ROLE_SUPPORT", "ROLE_FINANCE", "ROLE_VIEWER",
         )
         return priority.firstOrNull { roles.contains(it) } ?: roles.firstOrNull() ?: "ROLE_VIEWER"
     }
 
     private fun todayDate(): String {
         val cal = Calendar.getInstance()
-        return String.format(
-            Locale.US,
-            "%04d-%02d-%02d",
-            cal.get(Calendar.YEAR),
-            cal.get(Calendar.MONTH) + 1,
-            cal.get(Calendar.DAY_OF_MONTH),
-        )
+        return String.format(Locale.US, "%04d-%02d-%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
     }
 
     private fun loadScheduleCached(forceRefresh: Boolean = false): ScheduleData {
-        if (!forceRefresh) {
-            scheduleData?.let { return it }
-        }
+        if (!forceRefresh) scheduleData?.let { return it }
         return withRefresh { token -> apiClient.loadSchedule(token) }.also { scheduleData = it }
     }
-
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
 
     private fun <T> withRefresh(action: (String) -> T): T {
         synchronized(sessionLock) {
@@ -829,39 +760,29 @@ class WorkActivity : AppCompatActivity() {
         }
     }
 
-    private fun runAsyncForTab(tab: Int, progress: String, action: () -> String) {
+    private fun runAsyncForTab(tab: Int, @Suppress("UNUSED_PARAMETER") progress: String, action: () -> String) {
         val generation = ++loadGeneration
-        statusView.visibility = View.VISIBLE
-        statusView.text = progress
         thread {
             try {
-                val result = action()
+                action()
                 runOnUiThread {
-                    if (generation != loadGeneration || activeTab != tab) return@runOnUiThread
-                    if (result.isBlank()) {
-                        statusView.visibility = View.GONE
-                    } else {
-                        statusView.text = result
+                    if (generation != loadGeneration || uiState.selectedTab != tab) return@runOnUiThread
+                    if (uiState.errorMessage != null) {
+                        uiState = uiState.copy(errorMessage = null)
                     }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    if (generation != loadGeneration || activeTab != tab) return@runOnUiThread
-                    statusView.visibility = View.VISIBLE
-                    statusView.text = UserFacingError.message(e)
-                    if (tab == R.id.nav_schedule) {
-                        scheduleData = null
-                    }
-                    addActionButton("Повторить") {
-                        selectTab(tab)
-                    }
+                    if (generation != loadGeneration || uiState.selectedTab != tab) return@runOnUiThread
+                    uiState = uiState.copy(errorMessage = UserFacingError.message(e))
+                    if (tab == WorkUiState.TAB_SCHEDULE) scheduleData = null
                 }
             }
         }
     }
 
     private fun runAsync(progress: String, action: () -> String) {
-        runAsyncForTab(activeTab, progress, action)
+        runAsyncForTab(uiState.selectedTab, progress, action)
     }
 
     companion object {

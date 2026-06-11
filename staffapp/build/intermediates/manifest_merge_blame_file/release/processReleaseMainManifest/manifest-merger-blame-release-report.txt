@@ -1,0 +1,143 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.example.staffapp"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="27"
+9        android:targetSdkVersion="36" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:4:5-67
+11-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:4:22-64
+12    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+12-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:5:5-77
+12-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:5:22-74
+13
+14    <permission
+14-->[androidx.core:core:1.17.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\1f37f9ed25473e8be47ca6e36b3b5866\workspace\transformed\core-1.17.0\AndroidManifest.xml:22:5-24:47
+15        android:name="com.example.staffapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+15-->[androidx.core:core:1.17.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\1f37f9ed25473e8be47ca6e36b3b5866\workspace\transformed\core-1.17.0\AndroidManifest.xml:23:9-81
+16        android:protectionLevel="signature" />
+16-->[androidx.core:core:1.17.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\1f37f9ed25473e8be47ca6e36b3b5866\workspace\transformed\core-1.17.0\AndroidManifest.xml:24:9-44
+17
+18    <uses-permission android:name="com.example.staffapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+18-->[androidx.core:core:1.17.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\1f37f9ed25473e8be47ca6e36b3b5866\workspace\transformed\core-1.17.0\AndroidManifest.xml:26:5-97
+18-->[androidx.core:core:1.17.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\1f37f9ed25473e8be47ca6e36b3b5866\workspace\transformed\core-1.17.0\AndroidManifest.xml:26:22-94
+19
+20    <application
+20-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:7:5-26:19
+21        android:allowBackup="true"
+21-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:8:9-35
+22        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+22-->[androidx.core:core:1.17.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\1f37f9ed25473e8be47ca6e36b3b5866\workspace\transformed\core-1.17.0\AndroidManifest.xml:28:18-86
+23        android:extractNativeLibs="false"
+24        android:icon="@android:drawable/sym_def_app_icon"
+24-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:9:9-58
+25        android:label="@string/app_name"
+25-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:10:9-41
+26        android:networkSecurityConfig="@xml/network_security_config"
+26-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:11:9-69
+27        android:supportsRtl="true"
+27-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:12:9-35
+28        android:theme="@style/Theme.StaffApp" >
+28-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:13:9-46
+29        <activity android:name="com.example.staffapp.WorkActivity" />
+29-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:14:9-50
+29-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:14:19-47
+30        <activity android:name="com.example.staffapp.AdminActivity" />
+30-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:15:9-51
+30-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:15:19-48
+31        <activity android:name="com.example.staffapp.AdminSectionActivity" />
+31-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:16:9-58
+31-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:16:19-55
+32        <activity android:name="com.example.staffapp.ClientDetailActivity" />
+32-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:17:9-58
+32-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:17:19-55
+33        <activity
+33-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:18:9-25:20
+34            android:name="com.example.staffapp.MainActivity"
+34-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:19:13-41
+35            android:exported="true" >
+35-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:20:13-36
+36            <intent-filter>
+36-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:21:13-24:29
+37                <action android:name="android.intent.action.MAIN" />
+37-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:22:17-69
+37-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:22:25-66
+38
+39                <category android:name="android.intent.category.LAUNCHER" />
+39-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:23:17-77
+39-->D:\project\mobile dev\staffapp\src\main\AndroidManifest.xml:23:27-74
+40            </intent-filter>
+41        </activity>
+42
+43        <provider
+43-->[androidx.emoji2:emoji2:1.3.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\56f70781d36bb73f23523928d30ab393\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:24:9-32:20
+44            android:name="androidx.startup.InitializationProvider"
+44-->[androidx.emoji2:emoji2:1.3.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\56f70781d36bb73f23523928d30ab393\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:25:13-67
+45            android:authorities="com.example.staffapp.androidx-startup"
+45-->[androidx.emoji2:emoji2:1.3.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\56f70781d36bb73f23523928d30ab393\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:26:13-68
+46            android:exported="false" >
+46-->[androidx.emoji2:emoji2:1.3.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\56f70781d36bb73f23523928d30ab393\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:27:13-37
+47            <meta-data
+47-->[androidx.emoji2:emoji2:1.3.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\56f70781d36bb73f23523928d30ab393\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:29:13-31:52
+48                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+48-->[androidx.emoji2:emoji2:1.3.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\56f70781d36bb73f23523928d30ab393\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:30:17-75
+49                android:value="androidx.startup" />
+49-->[androidx.emoji2:emoji2:1.3.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\56f70781d36bb73f23523928d30ab393\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
+50            <meta-data
+50-->[androidx.lifecycle:lifecycle-process:2.6.2] C:\Users\anton\.gradle\caches\9.1.0\transforms\48893f5f5f32dcbc38528857c73db3a1\workspace\transformed\lifecycle-process-2.6.2\AndroidManifest.xml:29:13-31:52
+51                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+51-->[androidx.lifecycle:lifecycle-process:2.6.2] C:\Users\anton\.gradle\caches\9.1.0\transforms\48893f5f5f32dcbc38528857c73db3a1\workspace\transformed\lifecycle-process-2.6.2\AndroidManifest.xml:30:17-78
+52                android:value="androidx.startup" />
+52-->[androidx.lifecycle:lifecycle-process:2.6.2] C:\Users\anton\.gradle\caches\9.1.0\transforms\48893f5f5f32dcbc38528857c73db3a1\workspace\transformed\lifecycle-process-2.6.2\AndroidManifest.xml:31:17-49
+53            <meta-data
+53-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:29:13-31:52
+54                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+54-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:30:17-85
+55                android:value="androidx.startup" />
+55-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:31:17-49
+56        </provider>
+57
+58        <receiver
+58-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:34:9-52:20
+59            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+59-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:35:13-76
+60            android:directBootAware="false"
+60-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:36:13-44
+61            android:enabled="true"
+61-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:37:13-35
+62            android:exported="true"
+62-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:38:13-36
+63            android:permission="android.permission.DUMP" >
+63-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:39:13-57
+64            <intent-filter>
+64-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:40:13-42:29
+65                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+65-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:17-91
+65-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:25-88
+66            </intent-filter>
+67            <intent-filter>
+67-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:43:13-45:29
+68                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+68-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:17-85
+68-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:25-82
+69            </intent-filter>
+70            <intent-filter>
+70-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:46:13-48:29
+71                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+71-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:17-88
+71-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:25-85
+72            </intent-filter>
+73            <intent-filter>
+73-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:49:13-51:29
+74                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+74-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:17-95
+74-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\anton\.gradle\caches\9.1.0\transforms\5b5eca426e09d176662d04b290ca2989\workspace\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:25-92
+75            </intent-filter>
+76        </receiver>
+77    </application>
+78
+79</manifest>
