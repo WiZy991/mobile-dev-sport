@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">FitnessClub Staff</string>
+    <string name="app_name">Джимрум</string>
     <!-- Эмулятор Android: 10.0.2.2 = localhost на ПК -->
     <string name="base_api_url">http://10.0.2.2:8000</string>
     <!-- Прод-сервер для реальных устройств -->
