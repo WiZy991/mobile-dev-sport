@@ -26,6 +26,7 @@ use App\Entity\StaffUser;
 use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
+use App\Service\Admin\SubscriptionPlanCatalog;
 use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Security\PassportAccessPolicy;
@@ -57,6 +58,7 @@ class AdminController extends AbstractController
         private readonly PassportAccessPolicy $passportAccess,
         private readonly SubscriptionFreezePolicy $freezePolicy,
         private readonly SubscriptionFreezeService $freezeService,
+        private readonly SubscriptionPlanCatalog $planCatalog,
     ) {}
 
     private function buildMenu(): array
@@ -1328,12 +1330,7 @@ class AdminController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $plan->setName((string) $request->request->get('name'))
-            ->setPrice((float) $request->request->get('price'))
-            ->setDescription($request->request->get('description') ?: null)
-            ->setDurationDays($request->request->get('duration_days') !== '' ? (int) $request->request->get('duration_days') : null)
-            ->setVisitsCount($request->request->get('visits_count') !== '' ? (int) $request->request->get('visits_count') : null)
-            ->setType((string) $request->request->get('type', 'unlimited'))
+        $plan->setPrice((float) $request->request->get('price'))
             ->setIsPopular((bool) $request->request->get('is_popular', false));
 
         $this->em->flush();
@@ -1922,30 +1919,54 @@ class AdminController extends AbstractController
         }
 
         if ($section === 'subscriptions') {
-            // создание нового тарифного плана через форму
-            if ($request->isMethod('POST')) {
-                $plan = new SubscriptionPlan();
-                $plan
-                    ->setName($request->request->get('name'))
-                    ->setPrice((float) $request->request->get('price'))
-                    ->setDescription($request->request->get('description') ?: null)
-                    ->setDurationDays($request->request->get('duration_days') !== '' ? (int) $request->request->get('duration_days') : null)
-                    ->setVisitsCount($request->request->get('visits_count') !== '' ? (int) $request->request->get('visits_count') : null)
-                    ->setType($request->request->get('type', 'unlimited'))
-                    ->setIsPopular((bool) $request->request->get('is_popular', false));
+            $planRepo = $this->em->getRepository(SubscriptionPlan::class);
 
-                $this->em->persist($plan);
-                $this->em->flush();
+            if ($request->isMethod('POST')) {
+                if ($request->request->get('add_all_plan_templates')) {
+                    $added = 0;
+                    foreach ($this->planCatalog->all() as $key => $template) {
+                        if ($planRepo->findOneBy(['name' => $template['name']]) !== null) {
+                            continue;
+                        }
+                        $plan = new SubscriptionPlan();
+                        $this->planCatalog->applyTemplate($plan, $key);
+                        $this->em->persist($plan);
+                        ++$added;
+                    }
+                    $this->em->flush();
+                    $this->addFlash(
+                        $added > 0 ? 'success' : 'info',
+                        $added > 0
+                            ? 'Добавлено стандартных тарифов: ' . $added . '.'
+                            : 'Все стандартные тарифы уже есть в CRM.',
+                    );
+                } else {
+                    $templateKey = (string) $request->request->get('plan_template', '');
+                    $template = $this->planCatalog->find($templateKey);
+                    if ($template === null) {
+                        $this->addFlash('danger', 'Выберите тариф из списка.');
+                    } elseif ($planRepo->findOneBy(['name' => $template['name']]) !== null) {
+                        $this->addFlash('warning', 'Тариф «' . $template['name'] . '» уже добавлен в CRM.');
+                    } else {
+                        $plan = new SubscriptionPlan();
+                        $this->planCatalog->applyTemplate($plan, $templateKey);
+                        $plan->setIsPopular((bool) $request->request->get('is_popular', false));
+                        $this->em->persist($plan);
+                        $this->em->flush();
+                        $this->addFlash('success', 'Тариф «' . $plan->getName() . '» добавлен.');
+                    }
+                }
 
                 $redirect = $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
                 $sf = $request->query->get('status', '');
                 if ($sf !== '') {
                     $redirect->setTargetUrl($redirect->getTargetUrl() . '?status=' . urlencode($sf));
                 }
+
                 return $redirect;
             }
 
-            $plans = $this->em->getRepository(SubscriptionPlan::class)->findBy([], ['id' => 'ASC']);
+            $plans = $planRepo->findBy([], ['id' => 'ASC']);
             $users = $this->em->getRepository(User::class)->findBy([], ['id' => 'ASC']);
             $statusFilter = $request->query->get('status', '');
             $subsQb = $this->em->createQueryBuilder()->select('s')->from(Subscription::class, 's')->orderBy('s.id', 'DESC');
@@ -1963,6 +1984,8 @@ class AdminController extends AbstractController
                 'menu' => $menu,
                 'current' => $section,
                 'plans' => $plans,
+                'planTemplates' => $this->planCatalog->all(),
+                'availablePlanTemplates' => $this->planCatalog->availableFor($plans),
                 'users' => $users,
                 'clubs' => $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']),
                 'subscriptions' => $subscriptions,
