@@ -10,6 +10,7 @@ use App\Entity\SubscriptionPlan;
 use App\Entity\User;
 use App\Service\Api\SberMobileAuthService;
 use App\Service\Api\SubscriptionFreezePolicy;
+use App\Service\Api\SubscriptionFreezeService;
 use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -25,6 +26,7 @@ class SubscriptionController extends AbstractController
         private readonly CurrentUserResolver $userResolver,
         private readonly SberMobileAuthService $sberMobileAuth,
         private readonly SubscriptionFreezePolicy $freezePolicy,
+        private readonly SubscriptionFreezeService $freezeService,
         private readonly bool $requireSberVerificationBeforePurchase = false,
     ) {}
 
@@ -232,30 +234,10 @@ class SubscriptionController extends AbstractController
         }
 
         $days = (int) $request->query->get('days', 0);
-        if ($days <= 0) {
-            return $this->json(['error' => 'Укажите количество дней'], 400);
+        $error = $this->freezeService->freeze($sub, $days);
+        if ($error !== null) {
+            return $this->json(['error' => $error], 400);
         }
-
-        $total = $sub->getFreezeDaysTotal() ?? 0;
-        if ($total <= 0) {
-            return $this->json(['error' => 'Заморозка недоступна для этого абонемента'], 400);
-        }
-        if ($sub->getStatus() !== 'active') {
-            return $this->json(['error' => 'Абонемент уже заморожен или не активен'], 400);
-        }
-
-        $used = $sub->getFreezeDaysUsed() ?? 0;
-        $left = $total - $used;
-        if ($days > $left) {
-            return $this->json(['error' => 'Недостаточно дней заморозки. Осталось: ' . $left], 400);
-        }
-
-        if ($sub->getEndDate() !== null) {
-            $sub->setEndDate($sub->getEndDate()->modify('+' . $days . ' days'));
-        }
-
-        $sub->setFreezeDaysUsed($used + $days);
-        $sub->setStatus('frozen');
 
         $this->em->flush();
 
@@ -277,11 +259,12 @@ class SubscriptionController extends AbstractController
         if ($sub->getUser()->getId() !== $user->getId()) {
             return $this->json(['error' => 'Forbidden'], 403);
         }
-        if ($sub->getStatus() !== 'frozen') {
-            return $this->json(['error' => 'Абонемент не заморожен'], 400);
+
+        $error = $this->freezeService->unfreeze($sub);
+        if ($error !== null) {
+            return $this->json(['error' => $error], 400);
         }
 
-        $sub->setStatus('active');
         $this->em->flush();
 
         return $this->json($this->serializeSubscription($sub));

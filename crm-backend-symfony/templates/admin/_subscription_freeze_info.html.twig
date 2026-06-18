@@ -1,0 +1,9 @@
+{% if sub.freezeDaysTotal is not null and sub.freezeDaysTotal > 0 %}
+    {{ sub.freezeDaysUsed ?? 0 }} / {{ sub.freezeDaysTotal }} дн.
+    {% set left = subscription_freeze_days_left(sub) %}
+    {% if left > 0 %}
+        <span class="text-secondary">(ост. {{ left }})</span>
+    {% endif %}
+{% else %}
+    <span class="text-secondary">нет</span>
+{% endif %}

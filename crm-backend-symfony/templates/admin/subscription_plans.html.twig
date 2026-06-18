@@ -70,6 +70,7 @@
                     <th>Цена</th>
                     <th>Длительность</th>
                     <th>Посещений</th>
+                    <th>Заморозка</th>
                     <th></th>
                 </tr>
                 </thead>
@@ -86,6 +87,14 @@
                         <td>{{ plan.durationDays ?? '—' }}</td>
                         <td>{{ plan.visitsCount ?? '—' }}</td>
                         <td>
+                            {% set freezeDays = subscription_freeze_days_for_plan(plan) %}
+                            {% if freezeDays > 0 %}
+                                {{ freezeDays }} дн.
+                            {% else %}
+                                <span class="text-secondary">нет</span>
+                            {% endif %}
+                        </td>
+                        <td>
                             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#edit-plan-{{ plan.id }}">Изменить</button>
                             <form method="post" action="{{ path('admin_plan_delete', {id: plan.id}) }}" class="d-inline" onsubmit="return confirm('Удалить план «{{ plan.name }}»?');">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
@@ -93,7 +102,7 @@
                         </td>
                     </tr>
                     <tr class="collapse" id="edit-plan-{{ plan.id }}">
-                        <td colspan="7" class="bg-dark py-2">
+                        <td colspan="8" class="bg-dark py-2">
                             <form method="post" action="{{ path('admin_plan_update', {id: plan.id}) }}" class="row g-2 align-items-end">
                                 <div class="col-md-2">
                                     <input type="text" name="name" class="form-control form-control-sm" value="{{ plan.name }}" required placeholder="Название">
@@ -128,7 +137,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="7" class="text-center text-secondary">
+                        <td colspan="8" class="text-center text-secondary">
                             Пока нет ни одного абонемента.
                         </td>
                     </tr>
@@ -140,7 +149,10 @@
 
     <div class="content-card mb-3 mt-3">
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Выдать абонемент клиенту</div>
-        <div class="alert alert-info py-2 mb-2 small">Для выдачи абонемента у клиента должны быть заполнены: паспорт (серия, номер), дата рождения.</div>
+        <div class="alert alert-info py-2 mb-2 small">
+            Для выдачи абонемента у клиента должны быть заполнены: паспорт (серия, номер), дата рождения.<br>
+            <strong>Заморозка по тарифу:</strong> 1 мес — нет; 3 мес — 14 дн.; 6 мес — 20 дн.; 12 мес — 30 дн. (если поле «Дней заморозки» пустое — подставится автоматически).
+        </div>
         <form method="post" action="{{ path('admin_subscription_issue') }}">
             {% if statusFilter %}<input type="hidden" name="return_status" value="{{ statusFilter }}">{% endif %}
             <div class="row g-2 align-items-end">
@@ -157,10 +169,14 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small text-secondary">Тарифный план</label>
-                    <select name="plan_id" class="form-select form-select-sm" required>
+                    <select name="plan_id" class="form-select form-select-sm" required id="issue-plan-select">
                         <option value="">Выберите план</option>
                         {% for plan in plans %}
-                            <option value="{{ plan.id }}">{{ plan.name }} — {{ plan.price|number_format(0, '', ' ') }} ₽</option>
+                            <option value="{{ plan.id }}" data-freeze-days="{{ subscription_freeze_days_for_plan(plan) }}">
+                                {{ plan.name }} — {{ plan.price|number_format(0, '', ' ') }} ₽
+                                {% set fd = subscription_freeze_days_for_plan(plan) %}
+                                {% if fd > 0 %} (заморозка {{ fd }} дн.){% else %} (без заморозки){% endif %}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -187,7 +203,7 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small text-secondary">Дней заморозки</label>
-                    <input type="number" name="freeze_days_total" class="form-control form-control-sm" placeholder="14">
+                    <input type="number" name="freeze_days_total" id="issue-freeze-days" class="form-control form-control-sm" min="0" placeholder="по тарифу">
                 </div>
                 <div class="col-md-2 mt-2 mt-md-0">
                     <button type="submit" class="btn btn-sm btn-success w-100">Выдать абонемент</button>
@@ -211,6 +227,7 @@
                     <th>Продажа</th>
                     <th>Посещений</th>
                     <th>Заморозка</th>
+                    <th></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -246,16 +263,15 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if sub.freezeDaysTotal is not null %}
-                                {{ sub.freezeDaysUsed ?? 0 }} / {{ sub.freezeDaysTotal }} дн.
-                            {% else %}
-                                —
-                            {% endif %}
+                            {% include 'admin/_subscription_freeze_info.html.twig' with {sub: sub} %}
+                        </td>
+                        <td>
+                            {% include 'admin/_subscription_freeze_actions.html.twig' with {sub: sub, return_to: 'subscriptions', return_status: statusFilter} %}
                         </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="9" class="text-center text-secondary">
+                        <td colspan="10" class="text-center text-secondary">
                             Абонементы клиентам пока не выданы.
                         </td>
                     </tr>
@@ -264,5 +280,17 @@
             </table>
         </div>
     </div>
+    <script>
+        (function () {
+            var planSelect = document.getElementById('issue-plan-select');
+            var freezeInput = document.getElementById('issue-freeze-days');
+            if (!planSelect || !freezeInput) return;
+            planSelect.addEventListener('change', function () {
+                var opt = planSelect.options[planSelect.selectedIndex];
+                var days = opt ? opt.getAttribute('data-freeze-days') : '';
+                freezeInput.placeholder = days === '0' ? '0 (нет)' : (days ? days + ' (по тарифу)' : 'по тарифу');
+            });
+        })();
+    </script>
 {% endblock %}
 

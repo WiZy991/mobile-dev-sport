@@ -27,6 +27,7 @@ use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
 use App\Service\Api\SubscriptionFreezePolicy;
+use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
@@ -55,6 +56,7 @@ class AdminController extends AbstractController
         private readonly VisitReportService $visitReport,
         private readonly PassportAccessPolicy $passportAccess,
         private readonly SubscriptionFreezePolicy $freezePolicy,
+        private readonly SubscriptionFreezeService $freezeService,
     ) {}
 
     private function buildMenu(): array
@@ -740,31 +742,61 @@ class AdminController extends AbstractController
     }
 
     #[Route('/subscriptions/{id}/freeze', name: 'admin_subscription_freeze', methods: ['POST'])]
-    public function freezeSubscription(int $id): Response
+    public function freezeSubscription(int $id, Request $request): Response
     {
         $subscription = $this->em->getRepository(Subscription::class)->find($id);
-        if ($subscription && $subscription->getStatus() === 'active') {
-            $subscription->setStatus('frozen');
-            $this->em->flush();
+        if (!$subscription) {
+            $this->addFlash('danger', 'Абонемент не найден');
 
-            return $this->redirectToRoute('admin_client_show', ['id' => $subscription->getUser()->getId()]);
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
         }
 
-        return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        $days = (int) $request->request->get('days', 0);
+        $error = $this->freezeService->freeze($subscription, $days);
+        if ($error !== null) {
+            $this->addFlash('danger', $error);
+        } else {
+            $this->em->flush();
+            $this->addFlash('success', 'Абонемент заморожен на ' . $days . ' дн.');
+        }
+
+        return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
     }
 
     #[Route('/subscriptions/{id}/unfreeze', name: 'admin_subscription_unfreeze', methods: ['POST'])]
-    public function unfreezeSubscription(int $id): Response
+    public function unfreezeSubscription(int $id, Request $request): Response
     {
         $subscription = $this->em->getRepository(Subscription::class)->find($id);
-        if ($subscription && $subscription->getStatus() === 'frozen') {
-            $subscription->setStatus('active');
-            $this->em->flush();
+        if (!$subscription) {
+            $this->addFlash('danger', 'Абонемент не найден');
 
-            return $this->redirectToRoute('admin_client_show', ['id' => $subscription->getUser()->getId()]);
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
         }
 
-        return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        $error = $this->freezeService->unfreeze($subscription);
+        if ($error !== null) {
+            $this->addFlash('danger', $error);
+        } else {
+            $this->em->flush();
+            $this->addFlash('success', 'Абонемент разморожен.');
+        }
+
+        return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
+    }
+
+    private function redirectAfterSubscriptionFreezeAction(Subscription $subscription, Request $request): Response
+    {
+        if ($request->request->get('return_to') === 'subscriptions') {
+            $redirect = $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+            $statusFilter = $request->request->get('return_status', '');
+            if ($statusFilter !== '') {
+                $redirect->setTargetUrl($redirect->getTargetUrl() . '?status=' . urlencode((string) $statusFilter));
+            }
+
+            return $redirect;
+        }
+
+        return $this->redirectToRoute('admin_client_show', ['id' => $subscription->getUser()->getId()]);
     }
 
     #[Route('/bookings/{id}/cancel', name: 'admin_booking_cancel', methods: ['POST'])]

@@ -312,24 +312,10 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if sub.freezeDaysTotal is not null %}
-                                        {{ sub.freezeDaysUsed ?? 0 }} / {{ sub.freezeDaysTotal }} дн.
-                                    {% else %}
-                                        —
-                                    {% endif %}
+                                    {% include 'admin/_subscription_freeze_info.html.twig' with {sub: sub} %}
                                 </td>
                                 <td>
-                                    {% if admin_can_mutate() %}
-                                    {% if sub.status == 'active' %}
-                                        <form method="post" action="{{ path('admin_subscription_freeze', {id: sub.id}) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-outline-warning">Заморозить</button>
-                                        </form>
-                                    {% elseif sub.status == 'frozen' %}
-                                        <form method="post" action="{{ path('admin_subscription_unfreeze', {id: sub.id}) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-outline-success">Разморозить</button>
-                                        </form>
-                                    {% endif %}
-                                    {% else %}—{% endif %}
+                                    {% include 'admin/_subscription_freeze_actions.html.twig' with {sub: sub} %}
                                 </td>
                             </tr>
                         {% else %}
