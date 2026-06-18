@@ -6,6 +6,8 @@ color fc_primary_dark
 color fc_surface
 color fc_text
 color fc_text_secondary
+drawable ic_launcher_background
+drawable ic_launcher_foreground
 drawable ic_staff_back
 drawable ic_staff_logout
 id action_logout
@@ -53,6 +55,8 @@ layout activity_work
 layout include_staff_appbar
 menu bottom_nav_menu
 menu staff_toolbar
+mipmap ic_launcher
+mipmap ic_launcher_round
 string app_name
 string base_api_url
 string base_api_url_device

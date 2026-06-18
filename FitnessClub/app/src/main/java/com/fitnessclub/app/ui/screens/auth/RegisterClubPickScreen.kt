@@ -298,7 +298,7 @@ private fun PriceListRow(plan: SubscriptionPlan) {
             style = MaterialTheme.typography.bodyMedium,
             color = Color.White.copy(0.95f),
         )
-        subscriptionFreezeSubtitle(plan.safeId)?.let { line ->
+        LocalSubscriptionCatalog.freezeSubtitleForPlan(plan.safeId)?.let { line ->
             Text(
                 text = line,
                 style = MaterialTheme.typography.bodySmall,
@@ -307,14 +307,6 @@ private fun PriceListRow(plan: SubscriptionPlan) {
             )
         }
     }
-}
-
-private fun subscriptionFreezeSubtitle(planId: String): String? = when (planId) {
-    "plan-1" -> "+30 дней заморозки"
-    "plan-2" -> "+20 дней заморозки"
-    "plan-4" -> "+14 дней заморозки"
-    "plan-3" -> "+15 дней заморозки"
-    else -> null
 }
 
 private fun formatPriceRu(value: Double): String {

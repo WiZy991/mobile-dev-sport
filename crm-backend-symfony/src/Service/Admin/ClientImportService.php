@@ -8,6 +8,7 @@ use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
 use App\Entity\Training;
 use App\Entity\User;
+use App\Service\Api\SubscriptionFreezePolicy;
 use Doctrine\ORM\EntityManagerInterface;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
@@ -23,6 +24,7 @@ final class ClientImportService
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly SubscriptionFreezePolicy $freezePolicy,
     ) {
     }
 
@@ -782,6 +784,8 @@ final class ClientImportService
 
         if (isset($data['freeze_days_total']) && $data['freeze_days_total'] !== '' && $data['freeze_days_total'] !== '—') {
             $sub->setFreezeDaysTotal(max(0, (int) $data['freeze_days_total']));
+        } elseif ($sub->getFreezeDaysTotal() === null) {
+            $sub->setFreezeDaysTotal($this->freezePolicy->freezeDaysTotalForPlan($plan));
         }
 
         if (isset($data['freeze_days_used']) && $data['freeze_days_used'] !== '' && $data['freeze_days_used'] !== '—') {

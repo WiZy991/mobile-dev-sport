@@ -158,7 +158,7 @@ class NotificationsViewModel @Inject constructor(
                     id = "8",
                     type = NotificationType.SYSTEM,
                     title = "Добро пожаловать!",
-                    message = "Спасибо за регистрацию в FitnessClub! Вам начислено 50 приветственных бонусов.",
+                    message = "Спасибо за регистрацию в Доброзал! Вам начислено 50 приветственных бонусов.",
                     time = "Неделю",
                     isRead = true
                 )

@@ -43,7 +43,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var showFreezeDialog by remember { mutableStateOf<String?>(null) }
+    var freezeTarget by remember { mutableStateOf<Subscription?>(null) }
     
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -138,7 +138,7 @@ fun ProfileScreen(
                     items(uiState.subscriptions) { subscription ->
                         SubscriptionCard(
                             subscription = subscription,
-                            onFreezeClick = { showFreezeDialog = subscription.id },
+                            onFreezeClick = { freezeTarget = subscription },
                             onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) }
                         )
                     }
@@ -194,12 +194,13 @@ fun ProfileScreen(
     }
     
     // Freeze dialog
-    showFreezeDialog?.let { subscriptionId ->
+    freezeTarget?.let { subscription ->
         FreezeDialog(
-            onDismiss = { showFreezeDialog = null },
+            maxDaysLeft = subscription.freezeDaysLeft,
+            onDismiss = { freezeTarget = null },
             onConfirm = { days ->
-                viewModel.freezeSubscription(subscriptionId, days)
-                showFreezeDialog = null
+                viewModel.freezeSubscription(subscription.id, days)
+                freezeTarget = null
             }
         )
     }
@@ -756,30 +757,41 @@ private fun MenuItem(
 
 @Composable
 private fun FreezeDialog(
+    maxDaysLeft: Int,
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit
 ) {
-    var days by remember { mutableStateOf("7") }
+    val defaultDays = minOf(7, maxDaysLeft).coerceAtLeast(1)
+    var days by remember(maxDaysLeft) { mutableStateOf(defaultDays.toString()) }
     
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Заморозить абонемент") },
         text = {
             Column {
-                Text("Укажите количество дней заморозки:")
+                Text("Укажите количество дней заморозки (доступно: $maxDaysLeft):")
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = days,
-                    onValueChange = { days = it.filter { c -> c.isDigit() } },
+                    onValueChange = { raw ->
+                        val filtered = raw.filter { it.isDigit() }
+                        if (filtered.isEmpty()) {
+                            days = ""
+                            return@OutlinedTextField
+                        }
+                        val n = filtered.toIntOrNull() ?: return@OutlinedTextField
+                        days = minOf(n, maxDaysLeft).toString()
+                    },
                     label = { Text("Дни") },
-                    singleLine = true
+                    singleLine = true,
+                    supportingText = { Text("Максимум $maxDaysLeft дн.") }
                 )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    days.toIntOrNull()?.let { onConfirm(it) }
+                    days.toIntOrNull()?.takeIf { it in 1..maxDaysLeft }?.let { onConfirm(it) }
                 }
             ) {
                 Text("Заморозить")

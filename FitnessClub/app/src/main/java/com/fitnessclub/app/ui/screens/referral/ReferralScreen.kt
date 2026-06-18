@@ -175,7 +175,7 @@ fun ReferralScreen(
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
                                     putExtra(Intent.EXTRA_TEXT, 
-                                        "Присоединяйся к FitnessClub! Используй мой промокод ${uiState.referralCode} при регистрации и получи скидку! ${uiState.referralLink}")
+                                        "Присоединяйся к Доброзал! Используй мой промокод ${uiState.referralCode} при регистрации и получи скидку! ${uiState.referralLink}")
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, "Поделиться"))
                             },

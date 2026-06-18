@@ -5,6 +5,8 @@ int color fc_primary_dark 0x0
 int color fc_surface 0x0
 int color fc_text 0x0
 int color fc_text_secondary 0x0
+int drawable ic_launcher_background 0x0
+int drawable ic_launcher_foreground 0x0
 int drawable ic_staff_back 0x0
 int drawable ic_staff_logout 0x0
 int id action_logout 0x0
@@ -52,6 +54,8 @@ int layout activity_work 0x0
 int layout include_staff_appbar 0x0
 int menu bottom_nav_menu 0x0
 int menu staff_toolbar 0x0
+int mipmap ic_launcher 0x0
+int mipmap ic_launcher_round 0x0
 int string app_name 0x0
 int string base_api_url 0x0
 int string base_api_url_device 0x0

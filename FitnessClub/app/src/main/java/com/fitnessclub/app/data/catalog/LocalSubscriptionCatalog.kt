@@ -35,12 +35,12 @@ object LocalSubscriptionCatalog {
         SubscriptionPlan(
             id = "plan-3",
             name = "На 4 месяца",
-            description = "Неограниченное посещение. Заморозка: +15 дней.",
+            description = "Неограниченное посещение. Заморозка: +14 дней.",
             price = 18_000.0,
             durationDays = 120,
             visitsCount = null,
             type = SubscriptionType.UNLIMITED,
-            features = listOf("Тренажёрный зал", "Групповые программы", "Заморозка +15 дней"),
+            features = listOf("Тренажёрный зал", "Групповые программы", "Заморозка +14 дней"),
             isPopular = false,
         ),
         SubscriptionPlan(
@@ -87,4 +87,15 @@ object LocalSubscriptionCatalog {
         PLANS[4],
         PLANS[5],
     )
+
+    /** Дней заморозки по тарифу; null — заморозка недоступна. */
+    fun freezeDaysForPlan(planId: String): Int? = when (planId) {
+        "plan-1" -> 30
+        "plan-2" -> 20
+        "plan-3", "plan-4" -> 14
+        else -> null
+    }
+
+    fun freezeSubtitleForPlan(planId: String): String? =
+        freezeDaysForPlan(planId)?.let { "+$it дней заморозки" }
 }

@@ -16,6 +16,13 @@ import javax.inject.Singleton
 
 private val Context.trainingDiaryPrefs by preferencesDataStore(name = "training_diary_prefs")
 
+data class DiaryExercise(
+    val name: String,
+    val sets: Int? = null,
+    val reps: Int? = null,
+    val weightKg: Double? = null,
+)
+
 data class TrainingDiaryEntry(
     val id: String,
     val userId: String,
@@ -24,6 +31,8 @@ data class TrainingDiaryEntry(
     val durationMinutes: Int?,
     val notes: String,
     val createdAtMillis: Long,
+    val workoutType: String? = null,
+    val exercises: List<DiaryExercise>? = null,
 )
 
 data class NewTrainingDiaryEntry(
@@ -31,6 +40,8 @@ data class NewTrainingDiaryEntry(
     val title: String,
     val durationMinutes: Int?,
     val notes: String,
+    val workoutType: String = "custom",
+    val exercises: List<DiaryExercise> = emptyList(),
 )
 
 @Singleton
@@ -68,6 +79,28 @@ class TrainingDiaryRepository @Inject constructor(
                 durationMinutes = payload.durationMinutes,
                 notes = payload.notes.trim(),
                 createdAtMillis = System.currentTimeMillis(),
+                workoutType = payload.workoutType,
+                exercises = payload.exercises,
+            )
+            prefs[entriesKey] = gson.toJson(all)
+        }
+    }
+
+    suspend fun updateEntry(entryId: String, payload: NewTrainingDiaryEntry) {
+        val userId = tokenManager.getUser().first()?.id.orEmpty()
+        if (userId.isBlank()) return
+
+        context.trainingDiaryPrefs.edit { prefs ->
+            val all = decode(prefs[entriesKey]).toMutableList()
+            val index = all.indexOfFirst { it.id == entryId && it.userId == userId }
+            if (index < 0) return@edit
+            val existing = all[index]
+            all[index] = existing.copy(
+                title = payload.title.trim(),
+                durationMinutes = payload.durationMinutes,
+                notes = payload.notes.trim(),
+                workoutType = payload.workoutType,
+                exercises = payload.exercises,
             )
             prefs[entriesKey] = gson.toJson(all)
         }

@@ -9,6 +9,7 @@ use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
 use App\Entity\User;
 use App\Service\Api\SberMobileAuthService;
+use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,6 +24,7 @@ class SubscriptionController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
         private readonly SberMobileAuthService $sberMobileAuth,
+        private readonly SubscriptionFreezePolicy $freezePolicy,
         private readonly bool $requireSberVerificationBeforePurchase = false,
     ) {}
 
@@ -146,13 +148,8 @@ class SubscriptionController extends AbstractController
         if ($plan->getVisitsCount()) {
             $sub->setVisitsTotal($plan->getVisitsCount());
         }
-        if ($plan->getType() === 'personal') {
-            $sub->setFreezeDaysTotal(0);
-            $sub->setFreezeDaysUsed(0);
-        } else {
-            $sub->setFreezeDaysTotal(14);
-            $sub->setFreezeDaysUsed(0);
-        }
+        $sub->setFreezeDaysTotal($this->freezePolicy->freezeDaysTotalForPlan($plan));
+        $sub->setFreezeDaysUsed(0);
         if ($promo) {
             $sub->setPromoCode($promo);
         }
@@ -211,6 +208,7 @@ class SubscriptionController extends AbstractController
                 'type' => $p->getType(),
                 'features' => [], // можно заполнить позже
                 'is_popular' => $p->isPopular(),
+                'freeze_days_total' => $this->freezePolicy->freezeDaysTotalForPlan($p),
             ];
         }, $plans);
 
@@ -220,15 +218,43 @@ class SubscriptionController extends AbstractController
     #[Route('/{id}/freeze', name: 'api_subscriptions_freeze', methods: ['POST'])]
     public function freeze(string $id, Request $request): JsonResponse
     {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
         $sub = $this->findSubscriptionByApiId($id);
         if (!$sub) {
             return $this->json(['error' => 'Subscription not found'], 404);
         }
+        if ($sub->getUser()->getId() !== $user->getId()) {
+            return $this->json(['error' => 'Forbidden'], 403);
+        }
 
         $days = (int) $request->query->get('days', 0);
+        if ($days <= 0) {
+            return $this->json(['error' => 'Укажите количество дней'], 400);
+        }
 
-        $used = ($sub->getFreezeDaysUsed() ?? 0) + $days;
-        $sub->setFreezeDaysUsed($used);
+        $total = $sub->getFreezeDaysTotal() ?? 0;
+        if ($total <= 0) {
+            return $this->json(['error' => 'Заморозка недоступна для этого абонемента'], 400);
+        }
+        if ($sub->getStatus() !== 'active') {
+            return $this->json(['error' => 'Абонемент уже заморожен или не активен'], 400);
+        }
+
+        $used = $sub->getFreezeDaysUsed() ?? 0;
+        $left = $total - $used;
+        if ($days > $left) {
+            return $this->json(['error' => 'Недостаточно дней заморозки. Осталось: ' . $left], 400);
+        }
+
+        if ($sub->getEndDate() !== null) {
+            $sub->setEndDate($sub->getEndDate()->modify('+' . $days . ' days'));
+        }
+
+        $sub->setFreezeDaysUsed($used + $days);
         $sub->setStatus('frozen');
 
         $this->em->flush();
@@ -237,11 +263,22 @@ class SubscriptionController extends AbstractController
     }
 
     #[Route('/{id}/unfreeze', name: 'api_subscriptions_unfreeze', methods: ['POST'])]
-    public function unfreeze(string $id): JsonResponse
+    public function unfreeze(string $id, Request $request): JsonResponse
     {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
         $sub = $this->findSubscriptionByApiId($id);
         if (!$sub) {
             return $this->json(['error' => 'Subscription not found'], 404);
+        }
+        if ($sub->getUser()->getId() !== $user->getId()) {
+            return $this->json(['error' => 'Forbidden'], 403);
+        }
+        if ($sub->getStatus() !== 'frozen') {
+            return $this->json(['error' => 'Абонемент не заморожен'], 400);
         }
 
         $sub->setStatus('active');

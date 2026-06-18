@@ -36,7 +36,7 @@ fun ClubInfoScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(club?.name ?: "FitnessClub") },
+                title = { Text(club?.name ?: "Доброзал") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Назад")

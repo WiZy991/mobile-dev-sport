@@ -54,7 +54,7 @@ fun HomeScreen(
             TopAppBar(
                 title = { 
                     Text(
-                        "FitnessClub",
+                        "Доброзал",
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -337,7 +337,7 @@ private fun QuickMenuSection(
             QuickMenuItem(
                 icon = Icons.Default.MenuBook,
                 title = "Дневник тренировок",
-                subtitle = "Личные записи и прогресс",
+                subtitle = "Упражнения, прогресс и статистика",
                 onClick = onTrainingDiary
             )
         }

@@ -26,6 +26,7 @@ use App\Entity\StaffUser;
 use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
+use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
@@ -53,6 +54,7 @@ class AdminController extends AbstractController
         private readonly VisitPeriodResolver $visitPeriodResolver,
         private readonly VisitReportService $visitReport,
         private readonly PassportAccessPolicy $passportAccess,
+        private readonly SubscriptionFreezePolicy $freezePolicy,
     ) {}
 
     private function buildMenu(): array
@@ -1252,7 +1254,7 @@ class AdminController extends AbstractController
             ->setFreezeDaysTotal(
                 $freezeDaysTotalRaw !== null && $freezeDaysTotalRaw !== ''
                     ? (int) $freezeDaysTotalRaw
-                    : 14
+                    : $this->freezePolicy->freezeDaysTotalForPlan($plan)
             )
             ->setFreezeDaysUsed(0)
             ->setClub($issueClub);

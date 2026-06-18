@@ -140,7 +140,7 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "GYMroom",
+                text = "Доброзал",
                 color = LoginSurfaceWhite,
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,

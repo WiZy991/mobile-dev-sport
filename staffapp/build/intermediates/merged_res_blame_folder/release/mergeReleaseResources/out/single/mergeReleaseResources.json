@@ -1,0 +1,126 @@
+[
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\menu_staff_toolbar.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\menu\\staff_toolbar.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-xxhdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-xxhdpi\\ic_launcher_round.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\layout_activity_work.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\layout\\activity_work.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-xhdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-xhdpi\\ic_launcher_round.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable-xxhdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable-xxhdpi\\ic_launcher_foreground.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-hdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-hdpi\\ic_launcher.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\layout_activity_client_detail.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\layout\\activity_client_detail.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\xml_network_security_config.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\xml\\network_security_config.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable_ic_staff_logout.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable\\ic_staff_logout.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-anydpi_ic_launcher.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-anydpi\\ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-xhdpi\\ic_launcher.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\layout_activity_admin_section.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\layout\\activity_admin_section.xml"
+    },
+    {
+        "merged": "com.example.staffapp-release-53:/drawable_ic_launcher_background.xml.flat",
+        "source": "com.example.staffapp-main-54:/drawable/ic_launcher_background.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-anydpi_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-anydpi\\ic_launcher_round.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable_ic_launcher_background.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable\\ic_launcher_background.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-xxxhdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-xxxhdpi\\ic_launcher_round.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable-xxxhdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable-xxxhdpi\\ic_launcher_foreground.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable_ic_staff_back.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable\\ic_staff_back.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-mdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-mdpi\\ic_launcher.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable-hdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable-hdpi\\ic_launcher_foreground.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable-xhdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable-xhdpi\\ic_launcher_foreground.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\menu_bottom_nav_menu.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\menu\\bottom_nav_menu.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable_ic_launcher_foreground.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable\\ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\layout_include_staff_appbar.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\layout\\include_staff_appbar.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-xxxhdpi\\ic_launcher.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-hdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-hdpi\\ic_launcher_round.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\drawable-mdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\drawable-mdpi\\ic_launcher_foreground.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-mdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-mdpi\\ic_launcher_round.png"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\layout_activity_admin.xml.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\layout\\activity_admin.xml"
+    },
+    {
+        "merged": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-release-53:\\mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\anton\\.gradle\\daemon\\9.1.0\\com.example.staffapp-main-54:\\mipmap-xxhdpi\\ic_launcher.png"
+    }
+]

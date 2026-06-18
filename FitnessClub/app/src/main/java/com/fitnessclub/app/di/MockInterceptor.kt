@@ -475,7 +475,7 @@ class MockInterceptor : Interceptor {
             "status": "active",
             "visits_total": 10,
             "visits_used": 3,
-            "freeze_days_total": 7,
+            "freeze_days_total": 0,
             "freeze_days_used": 0,
             "is_frozen": false,
             "price": 15000.0
@@ -554,12 +554,12 @@ class MockInterceptor : Interceptor {
         {
             "id": "plan-3",
             "name": "На 4 месяца",
-            "description": "Неограниченное посещение. Заморозка: +15 дней.",
+            "description": "Неограниченное посещение. Заморозка: +14 дней.",
             "price": 18000.0,
             "duration_days": 120,
             "visits_count": null,
             "type": "unlimited",
-            "features": ["Тренажёрный зал", "Групповые программы", "Заморозка +15 дней"],
+            "features": ["Тренажёрный зал", "Групповые программы", "Заморозка +14 дней"],
             "is_popular": false
         },
         {
@@ -601,7 +601,7 @@ class MockInterceptor : Interceptor {
     private fun mockPurchaseResponse(): String = """
     {
         "id": "sub-new",
-        "name": "Безлимит на месяц",
+        "name": "На 1 месяц",
         "description": "Неограниченное посещение",
         "type": "unlimited",
         "start_date": "2026-02-10",
@@ -609,7 +609,7 @@ class MockInterceptor : Interceptor {
         "status": "active",
         "visits_total": null,
         "visits_used": 0,
-        "freeze_days_total": 14,
+        "freeze_days_total": 0,
         "freeze_days_used": 0,
         "is_frozen": false,
         "price": 5000.0
