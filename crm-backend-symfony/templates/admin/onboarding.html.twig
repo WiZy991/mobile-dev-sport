@@ -8,7 +8,7 @@
     <div class="content-header crm-onboarding-hero">
         <div>
             <h1>Обучение по CRM</h1>
-            <p class="text-secondary mb-0">Пройди квест с <strong>Залькой</strong> — как в Duolingo — или открой подробный справочник по всем разделам.</p>
+            <p class="text-secondary mb-0">Короткие уроки с Залькой — как в Duolingo. Или откройте <strong>Справочник</strong> для полного текста по всем разделам.</p>
         </div>
         <a href="{{ path('admin_section', {section: 'dashboard'}) }}" class="btn btn-sm btn-outline-secondary">На дашборд</a>
     </div>
@@ -460,9 +460,7 @@
     </div>
     </div>{# /dz-panel-guide #}
 
-    <script>
-{% include 'admin/partials/_dobrozal_onboarding_script.js.twig' %}
-    </script>
+    <script charset="UTF-8">{% include 'admin/partials/_dobrozal_onboarding_boot.js.twig' %}</script>
     <script>
         document.querySelectorAll('[data-dz-page-tab]').forEach(function (btn) {
             btn.addEventListener('click', function () {

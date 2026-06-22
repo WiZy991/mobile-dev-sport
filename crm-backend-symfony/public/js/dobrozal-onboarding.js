@@ -1,21 +1,41 @@
 /**
- * Dobrozal gamified onboarding — Duolingo-style quest engine.
- * Reusable in CRM, client app, and staff app.
+ * Dobrozal gamified onboarding engine (ASCII-only; UI strings from HTML data-* attrs).
  */
 (function (global) {
     'use strict';
 
     const STORAGE_PREFIX = 'dobrozal_onboarding_';
 
+    function readLabels(root) {
+        const d = root.dataset;
+        return {
+            continue: d.dzLblContinue || 'Continue',
+            backMap: d.dzLblBackMap || 'Back',
+            question: d.dzLblQuestion || 'Question',
+            correct: d.dzLblCorrect || 'OK',
+            excellent: d.dzLblExcellent || 'OK',
+            wrong: d.dzLblWrong || 'Wrong',
+            tryAgain: d.dzLblTryAgain || 'Try again',
+            heartsOut: d.dzLblHeartsOut || '',
+            resetConfirm: d.dzLblResetConfirm || 'Reset progress?',
+            mapLeft: d.dzLblMapLeft || 'Pick a lesson. {n} left.',
+            mapDone: d.dzLblMapDone || 'All lessons done!',
+            lessonDone: d.dzLblLessonDone || 'Lesson complete!',
+            proud: d.dzLblProud || 'is proud of you!',
+            continuePath: d.dzLblContinuePath || 'Continue',
+            pathError: d.dzLblPathError || 'Lessons failed to load.',
+            mascot: d.dzLblMascot || 'Zalka',
+            lessonStart: d.dzLblLessonStart || 'Start',
+            lessonDoneMark: d.dzLblLessonDoneMark || 'OK',
+        };
+    }
+
     class DobrozalOnboarding {
-        /**
-         * @param {HTMLElement} root
-         * @param {object} config
-         */
         constructor(root, config) {
             this.root = root;
             this.userId = config.userId || 'guest';
             this.quest = config.quest;
+            this.labels = readLabels(root);
             this.state = this.loadState();
             this.view = 'map';
             this.currentLesson = null;
@@ -37,10 +57,8 @@
                 hearts: this.root.querySelector('[data-dz-hearts]'),
                 path: this.root.querySelector('[data-dz-path]'),
                 mascot: this.root.querySelector('[data-dz-mascot]'),
-                bubble: this.root.querySelector('[data-dz-bubble]'),
                 bubbleTitle: this.root.querySelector('[data-dz-bubble-title]'),
                 bubbleText: this.root.querySelector('[data-dz-bubble-text]'),
-                stepCard: this.root.querySelector('[data-dz-step-card]'),
                 quizOptions: this.root.querySelector('[data-dz-quiz-options]'),
                 continueBtn: this.root.querySelector('[data-dz-continue]'),
                 backBtn: this.root.querySelector('[data-dz-back-map]'),
@@ -49,6 +67,7 @@
                 overlay: this.root.querySelector('[data-dz-overlay]'),
                 overlayContent: this.root.querySelector('[data-dz-overlay-content]'),
                 confetti: this.root.querySelector('[data-dz-confetti]'),
+                celebrationTpl: this.root.querySelector('[data-dz-celebration-template]'),
             };
         }
 
@@ -59,7 +78,6 @@
                 hearts: this.heartsMax,
                 completedLessons: [],
                 lastVisit: new Date().toISOString().slice(0, 10),
-                currentLessonId: null,
             };
         }
 
@@ -80,11 +98,7 @@
             const today = new Date().toISOString().slice(0, 10);
             const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
             if (state.lastVisit === today) return;
-            if (state.lastVisit === yesterday) {
-                state.streak = (state.streak || 1) + 1;
-            } else {
-                state.streak = 1;
-            }
+            state.streak = state.lastVisit === yesterday ? (state.streak || 1) + 1 : 1;
             state.lastVisit = today;
         }
 
@@ -106,6 +120,11 @@
             return this.allLessons().find((l) => l.id === id) || null;
         }
 
+        firstLessonId() {
+            const lessons = this.allLessons();
+            return lessons.length ? lessons[0].id : null;
+        }
+
         nextLessonId(afterId) {
             const lessons = this.allLessons();
             const idx = lessons.findIndex((l) => l.id === afterId);
@@ -117,23 +136,30 @@
             const lessons = this.allLessons();
             const idx = lessons.findIndex((l) => l.id === lessonId);
             if (idx === 0) return true;
-            const prev = lessons[idx - 1];
-            return this.state.completedLessons.includes(prev.id);
+            return this.state.completedLessons.includes(lessons[idx - 1].id);
         }
 
         isLessonCompleted(lessonId) {
             return this.state.completedLessons.includes(lessonId);
         }
 
+        isCurrentLesson(lessonId) {
+            const next = this.allLessons().find((l) => !this.isLessonCompleted(l.id) && this.isLessonUnlocked(l.id));
+            return next?.id === lessonId;
+        }
+
         progressPercent() {
             const total = this.quest.totalLessons || this.allLessons().length;
-            if (!total) return 0;
-            return Math.round((this.state.completedLessons.length / total) * 100);
+            return total ? Math.round((this.state.completedLessons.length / total) * 100) : 0;
         }
 
         bindEvents() {
             this.el.continueBtn?.addEventListener('click', () => this.onContinue());
             this.el.backBtn?.addEventListener('click', () => this.showMap());
+            this.root.querySelector('[data-dz-start-first]')?.addEventListener('click', () => {
+                const id = this.firstLessonId();
+                if (id) this.startLesson(id);
+            });
             this.el.path?.addEventListener('click', (e) => {
                 const node = e.target.closest('[data-lesson-id]');
                 if (!node || node.classList.contains('dz-lesson-locked')) return;
@@ -141,7 +167,7 @@
                 if (id) this.startLesson(id);
             });
             this.root.querySelector('[data-dz-reset]')?.addEventListener('click', () => {
-                if (confirm('Начать квест заново? XP и прогресс сбросятся.')) {
+                if (confirm(this.labels.resetConfirm)) {
                     this.state = this.defaultState();
                     this.saveState();
                     this.showMap();
@@ -162,11 +188,10 @@
         }
 
         renderHud() {
-            const pct = this.progressPercent();
-            if (this.el.progressFill) this.el.progressFill.style.width = pct + '%';
+            const total = this.quest.totalLessons || this.allLessons().length;
+            if (this.el.progressFill) this.el.progressFill.style.width = this.progressPercent() + '%';
             if (this.el.progressText) {
-                this.el.progressText.textContent =
-                    this.state.completedLessons.length + ' / ' + (this.quest.totalLessons || this.allLessons().length);
+                this.el.progressText.textContent = this.state.completedLessons.length + ' / ' + total;
             }
             if (this.el.xp) this.el.xp.textContent = String(this.state.xp);
             if (this.el.streak) this.el.streak.textContent = String(this.state.streak || 1);
@@ -174,80 +199,36 @@
                 this.el.hearts.innerHTML = '';
                 for (let i = 0; i < this.heartsMax; i++) {
                     const span = document.createElement('span');
-                    span.className = 'dz-heart' + (i < this.state.hearts ? ' dz-heart-full' : ' dz-heart-empty');
-                    span.textContent = '♥';
+                    span.className = 'dz-heart ' + (i < this.state.hearts ? 'dz-heart-full' : 'dz-heart-empty');
+                    span.setAttribute('aria-hidden', 'true');
                     this.el.hearts.appendChild(span);
                 }
             }
         }
 
-        renderPath() {
+        updatePathNodes() {
             if (!this.el.path) return;
-            if (!(this.quest.units || []).length) {
-                this.el.path.innerHTML =
-                    '<div class="dz-path-empty alert alert-warning mb-0">Уроки не загрузились. Обновите страницу (Ctrl+F5).</div>';
-                return;
-            }
-            this.el.path.innerHTML = '';
-            const lessons = this.allLessons();
-            let lessonNum = 0;
-
-            (this.quest.units || []).forEach((unit, ui) => {
-                const unitEl = document.createElement('div');
-                unitEl.className = 'dz-unit';
-                unitEl.innerHTML =
-                    '<div class="dz-unit-header" style="--unit-color:' +
-                    (unit.color || '#ff5b2e') +
-                    '">' +
-                    '<span class="dz-unit-badge">' +
-                    (ui + 1) +
-                    '</span>' +
-                    '<span class="dz-unit-title">' +
-                    this.escape(unit.title) +
-                    '</span></div>';
-
-                const track = document.createElement('div');
-                track.className = 'dz-lesson-track';
-
-                (unit.lessons || []).forEach((lesson, li) => {
-                    lessonNum++;
-                    const done = this.isLessonCompleted(lesson.id);
-                    const unlocked = this.isLessonUnlocked(lesson.id);
-                    const current = this.isCurrentLesson(lesson.id);
-
-                    const node = document.createElement('button');
-                    node.type = 'button';
-                    node.className = 'dz-lesson-node';
-                    node.dataset.lessonId = lesson.id;
-                    if (done) node.classList.add('dz-lesson-done');
-                    else if (!unlocked) node.classList.add('dz-lesson-locked');
-                    else if (current) node.classList.add('dz-lesson-current');
-
-                    const side = li % 2 === 0 ? 'left' : 'right';
-                    node.classList.add('dz-lesson-' + side);
-
-                    node.innerHTML =
-                        '<span class="dz-lesson-icon">' +
-                        (done ? '✓' : unlocked ? lesson.icon || '●' : '🔒') +
-                        '</span>' +
-                        '<span class="dz-lesson-label">' +
-                        this.escape(lesson.title) +
-                        '</span>';
-
-                    if (unlocked) {
-                        node.classList.remove('dz-lesson-locked');
-                    }
-                    track.appendChild(node);
-
-                    if (li < unit.lessons.length - 1) {
-                        const conn = document.createElement('div');
-                        conn.className = 'dz-lesson-connector dz-connector-' + side;
-                        track.appendChild(conn);
-                    }
-                });
-
-                unitEl.appendChild(track);
-                this.el.path.appendChild(unitEl);
+            this.el.path.querySelectorAll('[data-lesson-id]').forEach((node) => {
+                const id = node.getAttribute('data-lesson-id');
+                const lesson = this.lessonById(id);
+                if (!lesson) return;
+                const done = this.isLessonCompleted(id);
+                const unlocked = this.isLessonUnlocked(id);
+                const current = this.isCurrentLesson(id);
+                node.classList.toggle('dz-lesson-done', done);
+                node.classList.toggle('dz-lesson-locked', !unlocked && !done);
+                node.classList.toggle('dz-lesson-current', current && !done);
+                node.disabled = !unlocked;
+                const icon = node.querySelector('.dz-lesson-row-icon, .dz-lesson-icon');
+                if (icon && icon.classList.contains('dz-lesson-row-icon')) {
+                    icon.textContent = done ? '\u2713' : (lesson.icon || '\uD83D\uDCD8');
+                } else if (icon) {
+                    icon.textContent = done ? '\u2713' : unlocked ? (lesson.icon || '\u25CF') : '\uD83D\uDD12';
+                }
+                const action = node.querySelector('.dz-lesson-row-action');
+                if (action) {
+                    action.textContent = done ? this.labels.lessonDoneMark : unlocked ? this.labels.lessonStart : '\uD83D\uDD12';
+                }
             });
         }
 
@@ -257,17 +238,18 @@
             this.el.map?.classList.remove('d-none');
             this.el.lesson?.classList.add('d-none');
             this.root.querySelector('[data-dz-lesson-bar]')?.classList.add('d-none');
-            this.el.continueBtn?.closest('.dz-lesson-footer')?.classList.add('d-none');
+            this.root.querySelector('[data-dz-mascot-row]')?.classList.remove('d-none');
             this.renderHud();
-            this.renderPath();
+            this.updatePathNodes();
             this.setMood('happy');
-            if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.quest.mascot?.name || 'Залька';
+            const mascot = this.quest.mascot?.name || this.labels.mascot;
+            if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = mascot;
             if (this.el.bubbleText) {
                 const left = (this.quest.totalLessons || 0) - this.state.completedLessons.length;
                 this.el.bubbleText.textContent =
                     left > 0
-                        ? 'Выбери урок на пути! Осталось ' + left + ' — ты справишься 💪'
-                        : 'Все уроки пройдены! Ты чемпион клуба «Доброзал»! 🏆';
+                        ? this.labels.mapLeft.replace('{n}', String(left))
+                        : this.labels.mapDone;
             }
         }
 
@@ -280,15 +262,13 @@
             this.el.map?.classList.add('d-none');
             this.el.lesson?.classList.remove('d-none');
             this.root.querySelector('[data-dz-lesson-bar]')?.classList.remove('d-none');
-            this.el.continueBtn?.closest('.dz-lesson-footer')?.classList.remove('d-none');
             if (this.el.lessonTitle) this.el.lessonTitle.textContent = lesson.title;
             this.renderStep();
         }
 
-        isCurrentLesson(lessonId) {
-            const lessons = this.allLessons();
-            const next = lessons.find((l) => !this.isLessonCompleted(l.id) && this.isLessonUnlocked(l.id));
-            return next?.id === lessonId;
+        setContinueLabel(mode) {
+            if (!this.el.continueBtn) return;
+            this.el.continueBtn.textContent = mode === 'back' ? this.labels.backMap : this.labels.continue;
         }
 
         renderStep() {
@@ -302,22 +282,21 @@
             }
 
             this.el.continueBtn?.classList.remove('d-none');
-            this.el.continueBtn.disabled = false;
+            if (this.el.continueBtn) this.el.continueBtn.disabled = false;
             this.el.quizOptions?.classList.add('d-none');
-            this.el.quizOptions.innerHTML = '';
+            if (this.el.quizOptions) this.el.quizOptions.innerHTML = '';
 
             if (!step) {
                 this.completeLesson();
                 return;
             }
 
-            const mood = step.mood || 'neutral';
-            this.setMood(mood);
+            this.setMood(step.mood || 'neutral');
 
             if (step.type === 'quiz') {
-                this.el.continueBtn.classList.add('d-none');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Вопрос';
-                if (this.el.bubbleText) this.el.bubbleText.textContent = step.question;
+                this.el.continueBtn?.classList.add('d-none');
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.labels.question;
+                if (this.el.bubbleText) this.el.bubbleText.textContent = step.question || '';
                 this.renderQuiz(step);
                 return;
             }
@@ -329,14 +308,11 @@
                 this.el.bubbleText.textContent = step.text || '';
             }
 
-            if (step.type === 'checkpoint') {
-                this.el.continueBtn.textContent = 'На карту пути';
-            } else {
-                this.el.continueBtn.textContent = 'Продолжить';
-            }
+            this.setContinueLabel(step.type === 'checkpoint' ? 'back' : 'continue');
         }
 
         renderQuiz(step) {
+            if (!this.el.quizOptions) return;
             this.el.quizOptions.classList.remove('d-none');
             (step.options || []).forEach((opt, i) => {
                 const btn = document.createElement('button');
@@ -350,16 +326,15 @@
 
         answerQuiz(step, index, btn) {
             const correct = step.correct === index;
-            this.el.quizOptions.querySelectorAll('.dz-quiz-option').forEach((b) => {
+            this.el.quizOptions?.querySelectorAll('.dz-quiz-option').forEach((b) => {
                 b.disabled = true;
             });
 
             if (correct) {
                 btn.classList.add('dz-quiz-correct');
                 this.setMood('happy');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Верно!';
-                if (this.el.bubbleText) this.el.bubbleText.textContent = step.explain || 'Отлично!';
-                this.playSound('correct');
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.labels.correct;
+                if (this.el.bubbleText) this.el.bubbleText.textContent = step.explain || this.labels.excellent;
                 setTimeout(() => {
                     this.currentStepIndex++;
                     this.renderStep();
@@ -370,19 +345,18 @@
                 this.saveState();
                 this.renderHud();
                 this.setMood('sad');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Не совсем…';
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.labels.wrong;
                 if (this.el.bubbleText) {
-                    this.el.bubbleText.textContent =
-                        (step.explain || 'Попробуй ещё раз.') +
-                        (this.state.hearts <= 0 ? ' Сердечки закончились — они восстановятся.' : '');
+                    let msg = step.explain || this.labels.tryAgain;
+                    if (this.state.hearts <= 0) msg += this.labels.heartsOut;
+                    this.el.bubbleText.textContent = msg;
                 }
-                this.playSound('wrong');
                 if (this.state.hearts <= 0) {
                     this.state.hearts = this.heartsMax;
                     this.saveState();
                 }
                 setTimeout(() => {
-                    this.el.quizOptions.querySelectorAll('.dz-quiz-option').forEach((b) => {
+                    this.el.quizOptions?.querySelectorAll('.dz-quiz-option').forEach((b) => {
                         b.disabled = false;
                         b.classList.remove('dz-quiz-wrong', 'dz-quiz-correct');
                     });
@@ -422,33 +396,35 @@
 
         showCelebration(xpGain) {
             this.setMood('celebrate');
-            if (this.el.confetti) this.el.confetti.classList.remove('d-none');
+            this.el.confetti?.classList.remove('d-none');
             this.fireConfetti();
-            this.playSound('complete');
-            if (this.el.overlay && this.el.overlayContent) {
-                this.el.overlay.classList.remove('d-none');
-                this.el.overlayContent.innerHTML =
-                    '<div class="dz-celebration">' +
-                    '<div class="dz-celebration-xp">+' +
-                    xpGain +
-                    ' XP</div>' +
-                    '<div class="dz-celebration-title">Урок пройден!</div>' +
-                    '<p class="dz-celebration-text">' +
-                    (this.quest.mascot?.name || 'Залька') +
-                    ' гордится тобой!</p>' +
-                    '<button type="button" class="dz-btn dz-btn-primary" data-dz-celebration-close>Продолжить путь</button>' +
-                    '</div>';
-                this.el.overlayContent.querySelector('[data-dz-celebration-close]')?.addEventListener('click', () => {
-                    this.el.overlay.classList.add('d-none');
-                    this.el.confetti?.classList.add('d-none');
-                    const next = this.nextLessonId(this.currentLesson?.id);
-                    if (next && this.isLessonUnlocked(next)) {
-                        this.startLesson(next);
-                    } else {
-                        this.showMap();
-                    }
-                });
+            if (!this.el.overlay || !this.el.overlayContent) return;
+
+            const tpl = this.el.celebrationTpl;
+            if (tpl) {
+                const clone = tpl.content.cloneNode(true);
+                const xpEl = clone.querySelector('[data-dz-celebration-xp]');
+                const textEl = clone.querySelector('[data-dz-celebration-text]');
+                if (xpEl) xpEl.textContent = '+' + xpGain + ' XP';
+                if (textEl) {
+                    textEl.textContent =
+                        (this.quest.mascot?.name || this.labels.mascot) + ' ' + this.labels.proud;
+                }
+                this.el.overlayContent.innerHTML = '';
+                this.el.overlayContent.appendChild(clone);
             }
+
+            this.el.overlay.classList.remove('d-none');
+            this.el.overlayContent.querySelector('[data-dz-celebration-close]')?.addEventListener('click', () => {
+                this.el.overlay.classList.add('d-none');
+                this.el.confetti?.classList.add('d-none');
+                const next = this.nextLessonId(this.currentLesson?.id);
+                if (next && this.isLessonUnlocked(next)) {
+                    this.startLesson(next);
+                } else {
+                    this.showMap();
+                }
+            });
         }
 
         fireConfetti() {
@@ -488,17 +464,6 @@
                 else ctx.clearRect(0, 0, w, h);
             };
             draw();
-        }
-
-        playSound(type) {
-            /* Заглушка для будущих звуков в мобильных приложениях */
-            this.root.dispatchEvent(new CustomEvent('dz-onboarding-sound', { detail: { type } }));
-        }
-
-        escape(s) {
-            const d = document.createElement('div');
-            d.textContent = s;
-            return d.innerHTML;
         }
 
         render() {
