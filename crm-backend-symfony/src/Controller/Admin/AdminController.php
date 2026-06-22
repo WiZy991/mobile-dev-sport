@@ -29,6 +29,7 @@ use App\Service\Admin\ClientImportService;
 use App\Service\Admin\SubscriptionPlanCatalog;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
+use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
