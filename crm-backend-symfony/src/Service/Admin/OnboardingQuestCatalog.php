@@ -12,7 +12,7 @@ final class OnboardingQuestCatalog
         return [
             'name' => 'Залька',
             'tagline' => 'Твой тренер по CRM',
-            'description' => 'Дружелюбный помощник клуба «Доброзал». Знает CRM от и до и ведёт по шагам, как в Duolingo.',
+            'description' => 'Помощник по обучению работе в CRM клуба «Доброзал».',
         ];
     }
 
@@ -56,23 +56,25 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'welcome',
                     'title' => 'Знакомство',
+                    'summary' => 'Как устроено это обучение',
                     'icon' => '👋',
                     'steps' => [
                         [
                             'type' => 'story',
                             'mood' => 'happy',
-                            'text' => 'Привет! Я Залька — твой тренер по CRM клуба «Доброзал». Пройдём путь от новичка до профи — шаг за шагом, с наградами!',
+                            'text' => 'Привет! Я Залька. Это обучение по CRM: 16 коротких уроков. В каждом — объяснение раздела и пара вопросов. Нажимай «Продолжить».',
                         ],
                         [
                             'type' => 'story',
                             'mood' => 'excited',
-                            'text' => 'Здесь ты научишься работать с клиентами, абонементами, расписанием и приложением. Готов? Жми «Продолжить»!',
+                            'text' => 'Темы: клиенты, лиды, абонементы, расписание, приложение, касса. После урока откроется следующий. Поехали!',
                         ],
                     ],
                 ],
                 [
                     'id' => 'dashboard',
                     'title' => 'Дашборд',
+                    'summary' => 'Сводка на сегодня при входе в CRM',
                     'icon' => '📊',
                     'steps' => [
                         [
@@ -94,6 +96,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'menu',
                     'title' => 'Меню CRM',
+                    'summary' => 'Разделы слева и права по ролям',
                     'icon' => '🧭',
                     'steps' => [
                         [
@@ -128,6 +131,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'find-client',
                     'title' => 'Поиск',
+                    'summary' => 'Найти клиента по имени или телефону',
                     'icon' => '🔍',
                     'steps' => [
                         [
@@ -154,6 +158,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'client-card',
                     'title' => 'Карточка',
+                    'summary' => 'Абонементы, записи и заметки клиента',
                     'icon' => '📇',
                     'steps' => [
                         [
@@ -175,6 +180,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'new-client',
                     'title' => 'Новый клиент',
+                    'summary' => 'Регистрация на ресепшене',
                     'icon' => '➕',
                     'steps' => [
                         [
@@ -208,6 +214,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'leads-intro',
                     'title' => 'Что такое лид',
+                    'summary' => 'Заявки с сайта и приложения',
                     'icon' => '🎯',
                     'steps' => [
                         [
@@ -234,6 +241,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'funnel',
                     'title' => 'Воронка',
+                    'summary' => 'Этапы от заявки до клиента',
                     'icon' => '📈',
                     'steps' => [
                         [
@@ -268,6 +276,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'plans',
                     'title' => 'Тарифы',
+                    'summary' => 'Прайс-лист абонементов',
                     'icon' => '💳',
                     'steps' => [
                         [
@@ -289,6 +298,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'freeze',
                     'title' => 'Заморозка',
+                    'summary' => 'Сколько дней можно заморозить',
                     'icon' => '❄️',
                     'steps' => [
                         [
@@ -323,6 +333,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'trainings',
                     'title' => 'Занятия',
+                    'summary' => 'Групповые и персональные слоты',
                     'icon' => '🏋️',
                     'steps' => [
                         [
@@ -344,6 +355,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'bookings',
                     'title' => 'Записи',
+                    'summary' => 'Кто записан на тренировку',
                     'icon' => '📅',
                     'steps' => [
                         [
@@ -377,6 +389,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'qr-entry',
                     'title' => 'Вход по QR',
+                    'summary' => 'Пропуск клиента в зал',
                     'icon' => '📱',
                     'steps' => [
                         [
@@ -398,6 +411,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'app-support',
                     'title' => 'Поддержка',
+                    'summary' => 'Сообщения из приложения',
                     'icon' => '💬',
                     'steps' => [
                         [
@@ -432,6 +446,7 @@ final class OnboardingQuestCatalog
                 [
                     'id' => 'cashdesk',
                     'title' => 'Касса',
+                    'summary' => 'Продажи и операции за смену',
                     'icon' => '💰',
                     'steps' => [
                         [
@@ -444,7 +459,8 @@ final class OnboardingQuestCatalog
                 ],
                 [
                     'id' => 'graduate',
-                    'title' => 'Выпускной',
+                    'title' => 'Итог',
+                    'summary' => 'Завершение обучения',
                     'icon' => '🏆',
                     'steps' => [
                         [
@@ -455,7 +471,7 @@ final class OnboardingQuestCatalog
                         [
                             'type' => 'checkpoint',
                             'mood' => 'celebrate',
-                            'title' => 'Квест завершён!',
+                            'title' => 'Обучение пройдено!',
                             'text' => 'Справочник с подробностями — во вкладке «Справочник». Удачной смены!',
                         ],
                     ],

@@ -115,9 +115,53 @@
 .dz-heart-empty { background: #4a5060; opacity: 0.6; }
 
 /* ——— Intro ——— */
-.dz-intro-card { padding: 16px 18px !important; }
-.dz-intro-title { font-weight: 800; font-size: 1rem; color: var(--dz-text); margin-bottom: 8px; }
-.dz-intro-text { color: var(--dz-text-muted); font-size: 0.9rem; line-height: 1.55; margin: 0; }
+.dz-map-lead {
+    color: var(--dz-text-muted);
+    font-size: 0.9rem;
+    line-height: 1.55;
+    margin: 0 0 16px;
+    padding: 0 4px;
+}
+.dz-map-lead strong { color: var(--dz-text); }
+
+.dz-lesson-screen { display: flex; flex-direction: column; }
+.dz-lesson-context {
+    padding: 10px 16px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--dz-gold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--dz-border);
+    background: rgba(0, 0, 0, 0.2);
+}
+.dz-back-link {
+    background: none;
+    border: none;
+    color: var(--dz-text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+}
+.dz-back-link:hover { color: var(--dz-primary); }
+.dz-mascot-row-lesson { min-height: 120px; padding-top: 8px; }
+
+.dz-lesson-row-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.35);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    color: var(--dz-text);
+}
+.dz-lesson-current .dz-lesson-row-num { background: var(--dz-primary); color: #fff; }
+.dz-lesson-done .dz-lesson-row-num { background: var(--dz-gold); color: #5a4200; }
+
 .dz-btn-start { max-width: 360px; text-transform: none; letter-spacing: 0; font-size: 0.95rem; }
 
 /* ——— Lesson list (clearer than circles) ——— */

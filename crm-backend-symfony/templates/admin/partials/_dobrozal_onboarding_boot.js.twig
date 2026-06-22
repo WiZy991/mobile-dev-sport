@@ -28,6 +28,8 @@
             mascot: d.dzLblMascot || 'Zalka',
             lessonStart: d.dzLblLessonStart || 'Start',
             lessonDoneMark: d.dzLblLessonDoneMark || 'OK',
+            lessonOf: d.dzLblLessonOf || 'Lesson {n} of {total}',
+            stepOf: d.dzLblStepOf || 'step {s} of {st}',
         };
     }
 
@@ -48,23 +50,24 @@
         }
 
         cacheDom() {
+            const lessonRoot = this.root.querySelector('[data-dz-view="lesson"]');
             this.el = {
                 map: this.root.querySelector('[data-dz-view="map"]'),
-                lesson: this.root.querySelector('[data-dz-view="lesson"]'),
+                lesson: lessonRoot,
                 progressFill: this.root.querySelector('[data-dz-progress-fill]'),
                 progressText: this.root.querySelector('[data-dz-progress-text]'),
                 xp: this.root.querySelector('[data-dz-xp]'),
                 streak: this.root.querySelector('[data-dz-streak]'),
                 hearts: this.root.querySelector('[data-dz-hearts]'),
                 path: this.root.querySelector('[data-dz-path]'),
-                mascot: this.root.querySelector('[data-dz-mascot]'),
-                bubbleTitle: this.root.querySelector('[data-dz-bubble-title]'),
-                bubbleText: this.root.querySelector('[data-dz-bubble-text]'),
-                quizOptions: this.root.querySelector('[data-dz-quiz-options]'),
-                continueBtn: this.root.querySelector('[data-dz-continue]'),
-                backBtn: this.root.querySelector('[data-dz-back-map]'),
-                lessonTitle: this.root.querySelector('[data-dz-lesson-title]'),
-                lessonProgress: this.root.querySelector('[data-dz-lesson-progress]'),
+                lessonContext: this.root.querySelector('[data-dz-lesson-context]'),
+                mascot: lessonRoot?.querySelector('[data-dz-mascot]'),
+                bubbleTitle: lessonRoot?.querySelector('[data-dz-bubble-title]'),
+                bubbleText: lessonRoot?.querySelector('[data-dz-bubble-text]'),
+                quizOptions: lessonRoot?.querySelector('[data-dz-quiz-options]'),
+                continueBtn: lessonRoot?.querySelector('[data-dz-continue]'),
+                backBtn: lessonRoot?.querySelector('[data-dz-back-map]'),
+                lessonProgress: lessonRoot?.querySelector('[data-dz-lesson-progress]'),
                 overlay: this.root.querySelector('[data-dz-overlay]'),
                 overlayContent: this.root.querySelector('[data-dz-overlay-content]'),
                 confetti: this.root.querySelector('[data-dz-confetti]'),
@@ -154,13 +157,30 @@
             return total ? Math.round((this.state.completedLessons.length / total) * 100) : 0;
         }
 
+        lessonIndex(lessonId) {
+            const idx = this.allLessons().findIndex((l) => l.id === lessonId);
+            return idx >= 0 ? idx + 1 : 0;
+        }
+
+        updateLessonContext() {
+            if (!this.el.lessonContext || !this.currentLesson) return;
+            const total = this.quest.totalLessons || this.allLessons().length;
+            const n = this.lessonIndex(this.currentLesson.id);
+            const steps = this.currentLesson.steps || [];
+            const line =
+                this.labels.lessonOf.replace('{n}', String(n)).replace('{total}', String(total)) +
+                ' · ' +
+                this.currentLesson.title +
+                ' · ' +
+                this.labels.stepOf
+                    .replace('{s}', String(this.currentStepIndex + 1))
+                    .replace('{st}', String(steps.length));
+            this.el.lessonContext.textContent = line;
+        }
+
         bindEvents() {
             this.el.continueBtn?.addEventListener('click', () => this.onContinue());
             this.el.backBtn?.addEventListener('click', () => this.showMap());
-            this.root.querySelector('[data-dz-start-first]')?.addEventListener('click', () => {
-                const id = this.firstLessonId();
-                if (id) this.startLesson(id);
-            });
             this.el.path?.addEventListener('click', (e) => {
                 const node = e.target.closest('[data-lesson-id]');
                 if (!node || node.classList.contains('dz-lesson-locked')) return;
@@ -220,12 +240,8 @@
                 node.classList.toggle('dz-lesson-locked', !unlocked && !done);
                 node.classList.toggle('dz-lesson-current', current && !done);
                 node.disabled = !unlocked;
-                const icon = node.querySelector('.dz-lesson-row-icon, .dz-lesson-icon');
-                if (icon && icon.classList.contains('dz-lesson-row-icon')) {
-                    icon.textContent = done ? '\u2713' : (lesson.icon || '\uD83D\uDCD8');
-                } else if (icon) {
-                    icon.textContent = done ? '\u2713' : unlocked ? (lesson.icon || '\u25CF') : '\uD83D\uDD12';
-                }
+                const num = node.querySelector('.dz-lesson-row-num');
+                if (num && done) num.textContent = '\u2713';
                 const action = node.querySelector('.dz-lesson-row-action');
                 if (action) {
                     action.textContent = done ? this.labels.lessonDoneMark : unlocked ? this.labels.lessonStart : '\uD83D\uDD12';
@@ -238,20 +254,8 @@
             this.currentLesson = null;
             this.el.map?.classList.remove('d-none');
             this.el.lesson?.classList.add('d-none');
-            this.root.querySelector('[data-dz-lesson-bar]')?.classList.add('d-none');
-            this.root.querySelector('[data-dz-mascot-row]')?.classList.remove('d-none');
             this.renderHud();
             this.updatePathNodes();
-            this.setMood('happy');
-            const mascot = this.quest.mascot?.name || this.labels.mascot;
-            if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = mascot;
-            if (this.el.bubbleText) {
-                const left = (this.quest.totalLessons || 0) - this.state.completedLessons.length;
-                this.el.bubbleText.textContent =
-                    left > 0
-                        ? this.labels.mapLeft.replace('{n}', String(left))
-                        : this.labels.mapDone;
-            }
         }
 
         startLesson(lessonId) {
@@ -262,8 +266,6 @@
             this.view = 'lesson';
             this.el.map?.classList.add('d-none');
             this.el.lesson?.classList.remove('d-none');
-            this.root.querySelector('[data-dz-lesson-bar]')?.classList.remove('d-none');
-            if (this.el.lessonTitle) this.el.lessonTitle.textContent = lesson.title;
             this.renderStep();
         }
 
@@ -293,6 +295,7 @@
             }
 
             this.setMood(step.mood || 'neutral');
+            this.updateLessonContext();
 
             if (step.type === 'quiz') {
                 this.el.continueBtn?.classList.add('d-none');
