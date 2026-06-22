@@ -10,7 +10,7 @@
     class DobrozalOnboarding {
         /**
          * @param {HTMLElement} root
-         * @param {{ userId: string, quest: object }} config
+         * @param {object} config
          */
         constructor(root, config) {
             this.root = root;
