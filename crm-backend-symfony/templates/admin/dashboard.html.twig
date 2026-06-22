@@ -1,67 +1,46 @@
 {% extends 'admin/base.html.twig' %}
 
-{% block title %}CRM FitnessClub — Дашборд{% endblock %}
+{% block title %}CRM Доброзал — Дашборд{% endblock %}
 
 {% block body %}
     <div class="content-header">
-        <h1 class="h4 mb-0">Дашборд</h1>
-        <span class="text-secondary small">Сегодня {{ "now"|date("d.m.Y") }}</span>
+        <div>
+            <h1>Дашборд</h1>
+            <div class="text-secondary small">Сегодня {{ "now"|date("d.m.Y") }}</div>
+        </div>
     </div>
 
     {% if admin_can_mutate() %}
     <div class="content-card mb-3">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="text-primary small fw-semibold text-uppercase">Быстрые действия</span>
-        </div>
+        <div class="card-section-title">Быстрые действия</div>
         <div class="row g-2">
             <div class="col-6 col-md-3 col-lg-2">
-                <a href="{{ path('admin_client_new') }}"
-                   class="d-block w-100 text-center p-3 rounded-3 text-decoration-none"
-                   style="background: #212633; border: 1px solid #2f3645;">
-                    <div class="mb-2">
-                        <span class="badge bg-primary-subtle text-primary border border-primary"
-                              style="border-radius: 999px; font-size: 11px;">
-                            1
-                        </span>
-                    </div>
-                    <div class="small text-light">
-                        Новый клиент
-                    </div>
+                <a href="{{ path('admin_client_new') }}" class="crm-quick-action">
+                    <div class="num">1</div>
+                    <div class="small">Новый клиент</div>
                 </a>
             </div>
 
             {% set quickActions = [
                 {'label': 'Новый лид', 'type': 'modal', 'target': '#modalNewLead'},
                 {'label': 'Новая продажа', 'type': 'modal', 'target': '#modalNewSale'},
-                {'label': 'Массовое обслуживание', 'route': 'admin_section', 'params': {'section': 'visits'}} ,
+                {'label': 'Посещения', 'route': 'admin_section', 'params': {'section': 'visits'}},
                 {'label': 'Новая задача', 'type': 'modal', 'target': '#modalNewTask'},
                 {'label': 'Аналитика', 'route': 'admin_section', 'params': {'section': 'analytics'}},
                 {'label': 'Финансы', 'route': 'admin_section', 'params': {'section': 'finance'}},
-                {'label': 'Справка', 'route': 'admin_section', 'params': {'section': 'settings'}},
-                {'label': 'Чат поддержки', 'route': 'admin_section', 'params': {'section': 'messengers'}}
+                {'label': 'Настройки', 'route': 'admin_section', 'params': {'section': 'settings'}},
+                {'label': 'Поддержка', 'route': 'admin_section', 'params': {'section': 'messengers'}}
             ] %}
 
             {% for action in quickActions %}
                 <div class="col-6 col-md-3 col-lg-2">
                     {% if action.type is defined and action.type == 'modal' %}
-                        <button type="button"
-                                class="d-block w-100 text-center p-3 rounded-3 text-decoration-none btn btn-link border-0"
-                                style="background: #212633; border: 1px solid #2f3645;"
-                                data-bs-toggle="modal" data-bs-target="{{ action.target }}">
+                        <button type="button" class="crm-quick-action w-100 border-0" data-bs-toggle="modal" data-bs-target="{{ action.target }}">
                     {% else %}
-                        <a href="{{ path(action.route, action.params) }}"
-                           class="d-block text-center p-3 rounded-3 text-decoration-none"
-                           style="background: #212633; border: 1px solid #2f3645;">
+                        <a href="{{ path(action.route, action.params) }}" class="crm-quick-action">
                     {% endif %}
-                        <div class="mb-2">
-                            <span class="badge bg-primary-subtle text-primary border border-primary"
-                                  style="border-radius: 999px; font-size: 11px;">
-                                {{ loop.index + 1 }}
-                            </span>
-                        </div>
-                        <div class="small text-light">
-                            {{ action.label }}
-                        </div>
+                            <div class="num">{{ loop.index + 1 }}</div>
+                            <div class="small">{{ action.label }}</div>
                     {% if action.type is defined and action.type == 'modal' %}
                         </button>
                     {% else %}
