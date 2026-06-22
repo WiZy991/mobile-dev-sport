@@ -460,7 +460,9 @@
     </div>
     </div>{# /dz-panel-guide #}
 
-    <script src="/js/dobrozal-onboarding.js?v=1"></script>
+    <script>
+{% include 'admin/partials/_dobrozal_onboarding_script.js.twig' %}
+    </script>
     <script>
         document.querySelectorAll('[data-dz-page-tab]').forEach(function (btn) {
             btn.addEventListener('click', function () {

@@ -1906,11 +1906,13 @@ class AdminController extends AbstractController
         if ($section === 'onboarding') {
             $staff = $this->getUser();
             $userId = $staff instanceof StaffUser ? (string) $staff->getId() : 'guest';
+            $questData = $this->onboardingQuestCatalog->export();
 
             return $this->render('admin/onboarding.html.twig', [
                 'menu' => $menu,
                 'current' => $section,
-                'questData' => $this->onboardingQuestCatalog->export(),
+                'questData' => $questData,
+                'questDataJson' => json_encode($questData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP),
                 'userId' => $userId,
             ]);
         }

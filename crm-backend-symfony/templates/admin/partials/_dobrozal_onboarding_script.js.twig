@@ -1,5 +1,5 @@
-/**
- * Dobrozal gamified onboarding — Duolingo-style quest engine.
+﻿/**
+ * Dobrozal gamified onboarding вЂ” Duolingo-style quest engine.
  * Reusable in CRM, client app, and staff app.
  */
 (function (global) {
@@ -141,7 +141,7 @@
                 if (id) this.startLesson(id);
             });
             this.root.querySelector('[data-dz-reset]')?.addEventListener('click', () => {
-                if (confirm('Начать квест заново? XP и прогресс сбросятся.')) {
+                if (confirm('РќР°С‡Р°С‚СЊ РєРІРµСЃС‚ Р·Р°РЅРѕРІРѕ? XP Рё РїСЂРѕРіСЂРµСЃСЃ СЃР±СЂРѕСЃСЏС‚СЃСЏ.')) {
                     this.state = this.defaultState();
                     this.saveState();
                     this.showMap();
@@ -175,7 +175,7 @@
                 for (let i = 0; i < this.heartsMax; i++) {
                     const span = document.createElement('span');
                     span.className = 'dz-heart' + (i < this.state.hearts ? ' dz-heart-full' : ' dz-heart-empty');
-                    span.textContent = '♥';
+                    span.textContent = 'в™Ґ';
                     this.el.hearts.appendChild(span);
                 }
             }
@@ -185,7 +185,7 @@
             if (!this.el.path) return;
             if (!(this.quest.units || []).length) {
                 this.el.path.innerHTML =
-                    '<div class="dz-path-empty alert alert-warning mb-0">Уроки не загрузились. Обновите страницу (Ctrl+F5).</div>';
+                    '<div class="dz-path-empty alert alert-warning mb-0">РЈСЂРѕРєРё РЅРµ Р·Р°РіСЂСѓР·РёР»РёСЃСЊ. РћР±РЅРѕРІРёС‚Рµ СЃС‚СЂР°РЅРёС†Сѓ (Ctrl+F5).</div>';
                 return;
             }
             this.el.path.innerHTML = '';
@@ -228,7 +228,7 @@
 
                     node.innerHTML =
                         '<span class="dz-lesson-icon">' +
-                        (done ? '✓' : unlocked ? lesson.icon || '●' : '🔒') +
+                        (done ? 'вњ“' : unlocked ? lesson.icon || 'в—Џ' : 'рџ”’') +
                         '</span>' +
                         '<span class="dz-lesson-label">' +
                         this.escape(lesson.title) +
@@ -261,13 +261,13 @@
             this.renderHud();
             this.renderPath();
             this.setMood('happy');
-            if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.quest.mascot?.name || 'Залька';
+            if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.quest.mascot?.name || 'Р—Р°Р»СЊРєР°';
             if (this.el.bubbleText) {
                 const left = (this.quest.totalLessons || 0) - this.state.completedLessons.length;
                 this.el.bubbleText.textContent =
                     left > 0
-                        ? 'Выбери урок на пути! Осталось ' + left + ' — ты справишься 💪'
-                        : 'Все уроки пройдены! Ты чемпион клуба «Доброзал»! 🏆';
+                        ? 'Р’С‹Р±РµСЂРё СѓСЂРѕРє РЅР° РїСѓС‚Рё! РћСЃС‚Р°Р»РѕСЃСЊ ' + left + ' вЂ” С‚С‹ СЃРїСЂР°РІРёС€СЊСЃСЏ рџ’Є'
+                        : 'Р’СЃРµ СѓСЂРѕРєРё РїСЂРѕР№РґРµРЅС‹! РўС‹ С‡РµРјРїРёРѕРЅ РєР»СѓР±Р° В«Р”РѕР±СЂРѕР·Р°Р»В»! рџЏ†';
             }
         }
 
@@ -316,7 +316,7 @@
 
             if (step.type === 'quiz') {
                 this.el.continueBtn.classList.add('d-none');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Вопрос';
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Р’РѕРїСЂРѕСЃ';
                 if (this.el.bubbleText) this.el.bubbleText.textContent = step.question;
                 this.renderQuiz(step);
                 return;
@@ -330,9 +330,9 @@
             }
 
             if (step.type === 'checkpoint') {
-                this.el.continueBtn.textContent = 'На карту пути';
+                this.el.continueBtn.textContent = 'РќР° РєР°СЂС‚Сѓ РїСѓС‚Рё';
             } else {
-                this.el.continueBtn.textContent = 'Продолжить';
+                this.el.continueBtn.textContent = 'РџСЂРѕРґРѕР»Р¶РёС‚СЊ';
             }
         }
 
@@ -357,8 +357,8 @@
             if (correct) {
                 btn.classList.add('dz-quiz-correct');
                 this.setMood('happy');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Верно!';
-                if (this.el.bubbleText) this.el.bubbleText.textContent = step.explain || 'Отлично!';
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Р’РµСЂРЅРѕ!';
+                if (this.el.bubbleText) this.el.bubbleText.textContent = step.explain || 'РћС‚Р»РёС‡РЅРѕ!';
                 this.playSound('correct');
                 setTimeout(() => {
                     this.currentStepIndex++;
@@ -370,11 +370,11 @@
                 this.saveState();
                 this.renderHud();
                 this.setMood('sad');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Не совсем…';
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'РќРµ СЃРѕРІСЃРµРјвЂ¦';
                 if (this.el.bubbleText) {
                     this.el.bubbleText.textContent =
-                        (step.explain || 'Попробуй ещё раз.') +
-                        (this.state.hearts <= 0 ? ' Сердечки закончились — они восстановятся.' : '');
+                        (step.explain || 'РџРѕРїСЂРѕР±СѓР№ РµС‰С‘ СЂР°Р·.') +
+                        (this.state.hearts <= 0 ? ' РЎРµСЂРґРµС‡РєРё Р·Р°РєРѕРЅС‡РёР»РёСЃСЊ вЂ” РѕРЅРё РІРѕСЃСЃС‚Р°РЅРѕРІСЏС‚СЃСЏ.' : '');
                 }
                 this.playSound('wrong');
                 if (this.state.hearts <= 0) {
@@ -432,11 +432,11 @@
                     '<div class="dz-celebration-xp">+' +
                     xpGain +
                     ' XP</div>' +
-                    '<div class="dz-celebration-title">Урок пройден!</div>' +
+                    '<div class="dz-celebration-title">РЈСЂРѕРє РїСЂРѕР№РґРµРЅ!</div>' +
                     '<p class="dz-celebration-text">' +
-                    (this.quest.mascot?.name || 'Залька') +
-                    ' гордится тобой!</p>' +
-                    '<button type="button" class="dz-btn dz-btn-primary" data-dz-celebration-close>Продолжить путь</button>' +
+                    (this.quest.mascot?.name || 'Р—Р°Р»СЊРєР°') +
+                    ' РіРѕСЂРґРёС‚СЃСЏ С‚РѕР±РѕР№!</p>' +
+                    '<button type="button" class="dz-btn dz-btn-primary" data-dz-celebration-close>РџСЂРѕРґРѕР»Р¶РёС‚СЊ РїСѓС‚СЊ</button>' +
                     '</div>';
                 this.el.overlayContent.querySelector('[data-dz-celebration-close]')?.addEventListener('click', () => {
                     this.el.overlay.classList.add('d-none');
@@ -491,7 +491,7 @@
         }
 
         playSound(type) {
-            /* Заглушка для будущих звуков в мобильных приложениях */
+            /* Р—Р°РіР»СѓС€РєР° РґР»СЏ Р±СѓРґСѓС‰РёС… Р·РІСѓРєРѕРІ РІ РјРѕР±РёР»СЊРЅС‹С… РїСЂРёР»РѕР¶РµРЅРёСЏС… */
             this.root.dispatchEvent(new CustomEvent('dz-onboarding-sound', { detail: { type } }));
         }
 
@@ -537,3 +537,4 @@
         bootDobrozalOnboarding();
     }
 })(typeof window !== 'undefined' ? window : this);
+

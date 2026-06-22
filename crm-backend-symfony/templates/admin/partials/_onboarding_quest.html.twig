@@ -1,19 +1,19 @@
 <div class="dz-onboarding-root" id="dz-onboarding-root" data-user-id="{{ userId|default('guest') }}">
-    <script type="application/json" data-dz-quest-json>{{ questData|json_encode|raw }}</script>
+    <script type="application/json" id="dz-quest-json" data-dz-quest-json>{{ questDataJson|default('{}')|raw }}</script>
 
     <div class="dz-hud">
         <div class="dz-hud-progress-wrap">
             <div class="dz-hud-progress-bar">
                 <div class="dz-hud-progress-fill" data-dz-progress-fill style="width: 0%"></div>
             </div>
-            <div class="dz-hud-progress-label">Уроки: <span data-dz-progress-text>0 / 0</span></div>
+            <div class="dz-hud-progress-label">Уроки: <span data-dz-progress-text>0 / {{ questData.totalLessons|default(0) }}</span></div>
         </div>
         <div class="dz-hud-stat dz-stat-xp" title="Опыт">⚡ <span data-dz-xp>0</span> XP</div>
         <div class="dz-hud-stat dz-stat-streak" title="Серия дней">🔥 <span data-dz-streak>1</span></div>
-        <div class="dz-hud-stat" data-dz-hearts title="Сердечки"></div>
+        <div class="dz-hud-stat" data-dz-hearts title="Сердечки">♥♥♥♥♥</div>
     </div>
 
-    <canvas class="dz-confetti-canvas" data-dz-confetti aria-hidden="true"></canvas>
+    <canvas class="dz-confetti-canvas d-none" data-dz-confetti aria-hidden="true"></canvas>
 
     <div data-dz-overlay class="dz-overlay d-none">
         <div data-dz-overlay-content></div>
@@ -32,13 +32,42 @@
             {% include 'admin/partials/_zalka_mascot.html.twig' %}
         </div>
         <div class="dz-speech-bubble" data-dz-bubble>
-            <div class="dz-bubble-title" data-dz-bubble-title>{{ questData.mascot.name|default('Залька') }}</div>
-            <p class="dz-bubble-text" data-dz-bubble-text>Выбери урок на пути! Я помогу освоить CRM шаг за шагом.</p>
+            <div class="dz-bubble-title" data-dz-bubble-title">{{ questData.mascot.name|default('Залька') }}</div>
+            <p class="dz-bubble-text" data-dz-bubble-text">Нажми на первый кружок ниже — начнём с урока «Знакомство»!</p>
         </div>
     </div>
 
     <div data-dz-view="map" class="dz-map-view">
-        <div data-dz-path class="dz-lesson-path"></div>
+        <p class="dz-path-hint text-center small mb-3" data-dz-path-hint>↓ Путь уроков — нажми на оранжевый кружок</p>
+        <div data-dz-path class="dz-lesson-path">
+            {% for unit in questData.units|default([]) %}
+                <div class="dz-unit">
+                    <div class="dz-unit-header" style="--unit-color: {{ unit.color|default('#ff5b2e') }}">
+                        <span class="dz-unit-badge">{{ loop.index }}</span>
+                        <span class="dz-unit-title">{{ unit.title }}</span>
+                    </div>
+                    <div class="dz-lesson-track">
+                        {% for lesson in unit.lessons|default([]) %}
+                            {% set side = loop.index0 is even ? 'left' : 'right' %}
+                            <button type="button"
+                                    class="dz-lesson-node dz-lesson-{{ side }}{% if loop.first and loop.parent.loop.first %} dz-lesson-current{% elseif not loop.first %} dz-lesson-locked{% endif %}"
+                                    data-lesson-id="{{ lesson.id }}"
+                                    title="{{ lesson.title }}">
+                                <span class="dz-lesson-icon">{% if loop.first and loop.parent.loop.first %}{{ lesson.icon|default('👋') }}{% else %}🔒{% endif %}</span>
+                                <span class="dz-lesson-label">{{ lesson.title }}</span>
+                            </button>
+                            {% if not loop.last %}
+                                <div class="dz-lesson-connector dz-connector-{{ side }}"></div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="dz-path-empty alert alert-warning mb-0">
+                    Уроки не загрузились. Обновите страницу (Ctrl+F5) или обратитесь к администратору.
+                </div>
+            {% endfor %}
+        </div>
         <div class="dz-map-actions">
             <button type="button" data-dz-reset>Начать заново</button>
         </div>
