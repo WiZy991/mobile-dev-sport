@@ -1,0 +1,422 @@
+{# Стили игрового онбординга Dobrozal — переиспользуются в CRM и мобильных приложениях #}
+<style>
+:root {
+    --dz-primary: #ff5b2e;
+    --dz-primary-dark: #e84e1f;
+    --dz-success: #14b88a;
+    --dz-success-btn: #58cc02;
+    --dz-success-btn-dark: #46a302;
+    --dz-gold: #ffcb45;
+    --dz-bg-lesson: #1e2430;
+    --dz-bg-card: #2a3140;
+    --dz-text: #f7f6f1;
+    --dz-text-muted: #b8c0d0;
+    --dz-border: rgba(255, 255, 255, 0.1);
+    --dz-radius: 16px;
+    --dz-radius-sm: 12px;
+}
+
+.dz-onboarding-root {
+    border-radius: var(--dz-radius);
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(30, 36, 48, 0.95) 0%, rgba(21, 24, 31, 0.98) 100%);
+    border: 1px solid var(--dz-border);
+    min-height: 520px;
+    position: relative;
+}
+
+/* ——— Tabs ——— */
+.dz-onboarding-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.dz-onboarding-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 999px;
+    border: 2px solid var(--dz-border);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--dz-text-muted);
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-decoration: none !important;
+    transition: all 0.15s;
+    cursor: pointer;
+}
+
+.dz-onboarding-tab:hover { color: var(--dz-text); border-color: rgba(255, 91, 46, 0.4); }
+.dz-onboarding-tab.active {
+    background: linear-gradient(135deg, var(--dz-primary), #ff7a52);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 8px 24px -8px rgba(255, 91, 46, 0.55);
+}
+
+/* ——— HUD ——— */
+.dz-hud {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid var(--dz-border);
+    flex-wrap: wrap;
+}
+
+.dz-hud-progress-wrap { flex: 1; min-width: 140px; }
+.dz-hud-progress-bar {
+    height: 14px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 2px solid var(--dz-border);
+}
+.dz-hud-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--dz-success), #2dd4a8);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+.dz-hud-progress-label {
+    font-size: 0.7rem;
+    color: var(--dz-text-muted);
+    margin-top: 4px;
+}
+
+.dz-hud-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--dz-border);
+    font-weight: 800;
+    font-size: 0.85rem;
+    color: var(--dz-text);
+}
+.dz-hud-stat.dz-stat-xp { color: var(--dz-gold); }
+.dz-hud-stat.dz-stat-streak { color: #ff9a5c; }
+
+.dz-hearts { display: flex; gap: 2px; }
+.dz-heart { font-size: 1rem; line-height: 1; }
+.dz-heart-full { color: #ff4d6d; }
+.dz-heart-empty { color: #4a5060; }
+
+/* ——— Map path ——— */
+.dz-map-view { padding: 20px 16px 24px; max-height: 70vh; overflow-y: auto; }
+
+.dz-unit { margin-bottom: 28px; }
+.dz-unit-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 8px 14px;
+    border-radius: var(--dz-radius-sm);
+    background: color-mix(in srgb, var(--unit-color, var(--dz-primary)) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--unit-color, var(--dz-primary)) 35%, transparent);
+}
+.dz-unit-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--unit-color, var(--dz-primary));
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.85rem;
+    display: grid;
+    place-items: center;
+}
+.dz-unit-title { font-weight: 800; color: var(--dz-text); }
+
+.dz-lesson-track {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 0 20px;
+}
+
+.dz-lesson-node {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 4px solid #4a5060;
+    background: linear-gradient(180deg, #3a4254 0%, #2a3140 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    position: relative;
+    z-index: 1;
+    padding: 0;
+    color: var(--dz-text);
+}
+.dz-lesson-node:hover:not(.dz-lesson-locked) { transform: scale(1.06); }
+.dz-lesson-icon { font-size: 1.4rem; line-height: 1; }
+.dz-lesson-label {
+    position: absolute;
+    top: 100%;
+    margin-top: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--dz-text-muted);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dz-lesson-done {
+    border-color: var(--dz-gold);
+    background: linear-gradient(180deg, #ffe08a 0%, var(--dz-gold) 100%);
+    box-shadow: 0 0 0 4px rgba(255, 203, 69, 0.25);
+}
+.dz-lesson-done .dz-lesson-icon { color: #8b6914; font-weight: 900; }
+
+.dz-lesson-current {
+    border-color: var(--dz-primary);
+    background: linear-gradient(180deg, #ff8a5c 0%, var(--dz-primary) 100%);
+    box-shadow: 0 0 0 6px rgba(255, 91, 46, 0.3), 0 12px 28px -8px rgba(255, 91, 46, 0.5);
+    animation: dz-pulse 2s ease-in-out infinite;
+}
+.dz-lesson-locked {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.4);
+}
+
+.dz-lesson-left { align-self: flex-start; margin-left: 15%; }
+.dz-lesson-right { align-self: flex-end; margin-right: 15%; }
+
+.dz-lesson-connector {
+    width: 4px;
+    height: 36px;
+    background: #4a5060;
+    border-radius: 2px;
+}
+.dz-connector-left { align-self: flex-start; margin-left: calc(15% + 34px); }
+.dz-connector-right { align-self: flex-end; margin-right: calc(15% + 34px); }
+
+@keyframes dz-pulse {
+    0%, 100% { box-shadow: 0 0 0 6px rgba(255, 91, 46, 0.3), 0 12px 28px -8px rgba(255, 91, 46, 0.5); }
+    50% { box-shadow: 0 0 0 10px rgba(255, 91, 46, 0.15), 0 12px 28px -8px rgba(255, 91, 46, 0.6); }
+}
+
+/* ——— Mascot + bubble ——— */
+.dz-mascot-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 16px 16px 8px;
+    min-height: 200px;
+}
+.dz-mascot-wrap {
+    flex-shrink: 0;
+    width: 120px;
+}
+.dz-mascot-svg { width: 100%; height: auto; display: block; }
+.dz-mascot-bounce { animation: dz-bounce 0.6s ease infinite; }
+.dz-mascot-wiggle { animation: dz-wiggle 0.4s ease; }
+@keyframes dz-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+@keyframes dz-wiggle {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-4deg); }
+    75% { transform: rotate(4deg); }
+}
+
+.dz-speech-bubble {
+    flex: 1;
+    background: var(--dz-bg-card);
+    border: 2px solid var(--dz-border);
+    border-radius: var(--dz-radius);
+    border-bottom-left-radius: 4px;
+    padding: 16px 18px;
+    position: relative;
+    min-height: 100px;
+}
+.dz-speech-bubble::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    bottom: 24px;
+    border: 10px solid transparent;
+    border-right-color: var(--dz-bg-card);
+}
+.dz-bubble-title {
+    font-weight: 800;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dz-primary);
+    margin-bottom: 8px;
+}
+.dz-bubble-text {
+    color: var(--dz-text);
+    font-size: 1.05rem;
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* ——— Lesson view ——— */
+.dz-lesson-view { display: flex; flex-direction: column; min-height: 480px; }
+.dz-lesson-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--dz-border);
+}
+.dz-lesson-top-bar {
+    flex: 1;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.dz-lesson-top-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--dz-primary);
+    border-radius: 999px;
+    transition: width 0.3s;
+}
+.dz-lesson-top-title { font-weight: 700; font-size: 0.85rem; color: var(--dz-text-muted); white-space: nowrap; }
+
+.dz-lesson-footer {
+    padding: 16px;
+    border-top: 1px solid var(--dz-border);
+    margin-top: auto;
+}
+.dz-btn {
+    display: block;
+    width: 100%;
+    padding: 14px 20px;
+    border: none;
+    border-radius: var(--dz-radius-sm);
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 0.12s, transform 0.1s;
+}
+.dz-btn:active { transform: translateY(2px); }
+.dz-btn-primary {
+    background: linear-gradient(180deg, #6ee020 0%, var(--dz-success-btn) 50%, var(--dz-success-btn-dark) 100%);
+    color: #fff;
+    box-shadow: 0 4px 0 var(--dz-success-btn-dark), 0 8px 20px -6px rgba(88, 204, 2, 0.5);
+    border-bottom: 3px solid var(--dz-success-btn-dark);
+}
+.dz-btn-primary:hover { filter: brightness(1.05); }
+.dz-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.dz-btn-ghost {
+    background: transparent;
+    color: var(--dz-text-muted);
+    border: 2px solid var(--dz-border);
+    margin-top: 8px;
+    text-transform: none;
+    font-size: 0.85rem;
+}
+
+/* ——— Quiz ——— */
+.dz-quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 16px 8px;
+}
+.dz-quiz-option {
+    padding: 14px 18px;
+    border-radius: var(--dz-radius-sm);
+    border: 2px solid var(--dz-border);
+    background: var(--dz-bg-card);
+    color: var(--dz-text);
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s, transform 0.1s;
+}
+.dz-quiz-option:hover:not(:disabled) {
+    border-color: var(--dz-primary);
+    background: rgba(255, 91, 46, 0.08);
+}
+.dz-quiz-correct {
+    border-color: var(--dz-success) !important;
+    background: rgba(20, 184, 138, 0.2) !important;
+}
+.dz-quiz-wrong {
+    border-color: #ff4d6d !important;
+    background: rgba(255, 77, 109, 0.15) !important;
+}
+
+/* ——— Overlay / celebration ——— */
+.dz-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    backdrop-filter: blur(4px);
+}
+.dz-celebration { text-align: center; padding: 32px; }
+.dz-celebration-xp {
+    font-size: 3rem;
+    font-weight: 900;
+    color: var(--dz-gold);
+    text-shadow: 0 4px 20px rgba(255, 203, 69, 0.4);
+    animation: dz-pop 0.5s ease;
+}
+.dz-celebration-title { font-size: 1.5rem; font-weight: 800; color: #fff; margin: 12px 0 8px; }
+.dz-celebration-text { color: var(--dz-text-muted); margin-bottom: 20px; }
+@keyframes dz-pop {
+    0% { transform: scale(0.5); opacity: 0; }
+    70% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.dz-confetti-canvas {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 25;
+}
+
+.dz-map-actions {
+    display: flex;
+    justify-content: center;
+    padding: 8px 16px 16px;
+}
+.dz-map-actions button {
+    background: none;
+    border: none;
+    color: var(--dz-text-muted);
+    font-size: 0.75rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+.dz-map-actions button:hover { color: var(--dz-primary); }
+
+@media (max-width: 768px) {
+    .dz-mascot-row { flex-direction: column; align-items: center; }
+    .dz-speech-bubble::before { display: none; }
+    .dz-lesson-left, .dz-lesson-right { align-self: center; margin: 0; }
+    .dz-connector-left, .dz-connector-right { align-self: center; margin: 0; }
+}
+</style>

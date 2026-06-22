@@ -1,0 +1,53 @@
+<div class="dz-onboarding-root" id="dz-onboarding-root" data-user-id="{{ userId|default('guest') }}">
+    <script type="application/json" data-dz-quest-json>{{ questData|json_encode|raw }}</script>
+
+    <div class="dz-hud">
+        <div class="dz-hud-progress-wrap">
+            <div class="dz-hud-progress-bar">
+                <div class="dz-hud-progress-fill" data-dz-progress-fill style="width: 0%"></div>
+            </div>
+            <div class="dz-hud-progress-label">Уроки: <span data-dz-progress-text>0 / 0</span></div>
+        </div>
+        <div class="dz-hud-stat dz-stat-xp" title="Опыт">⚡ <span data-dz-xp>0</span> XP</div>
+        <div class="dz-hud-stat dz-stat-streak" title="Серия дней">🔥 <span data-dz-streak>1</span></div>
+        <div class="dz-hud-stat" data-dz-hearts title="Сердечки"></div>
+    </div>
+
+    <canvas class="dz-confetti-canvas" data-dz-confetti aria-hidden="true"></canvas>
+
+    <div data-dz-overlay class="dz-overlay d-none">
+        <div data-dz-overlay-content></div>
+    </div>
+
+    <div class="dz-lesson-top d-none" data-dz-lesson-bar>
+        <button type="button" class="btn btn-sm btn-link text-secondary p-0" data-dz-back-map title="На карту">✕</button>
+        <div class="dz-lesson-top-bar">
+            <div class="dz-lesson-top-fill" data-dz-lesson-progress style="width: 0%"></div>
+        </div>
+        <span class="dz-lesson-top-title" data-dz-lesson-title>Урок</span>
+    </div>
+
+    <div class="dz-mascot-row">
+        <div class="dz-mascot-wrap" data-dz-mascot>
+            {% include 'admin/partials/_zalka_mascot.html.twig' %}
+        </div>
+        <div class="dz-speech-bubble" data-dz-bubble>
+            <div class="dz-bubble-title" data-dz-bubble-title>{{ questData.mascot.name|default('Залька') }}</div>
+            <p class="dz-bubble-text" data-dz-bubble-text>Выбери урок на пути! Я помогу освоить CRM шаг за шагом.</p>
+        </div>
+    </div>
+
+    <div data-dz-view="map" class="dz-map-view">
+        <div data-dz-path class="dz-lesson-path"></div>
+        <div class="dz-map-actions">
+            <button type="button" data-dz-reset>Начать заново</button>
+        </div>
+    </div>
+
+    <div data-dz-view="lesson" class="d-none">
+        <div data-dz-quiz-options class="dz-quiz-options d-none"></div>
+        <div class="dz-lesson-footer">
+            <button type="button" class="dz-btn dz-btn-primary" data-dz-continue>Продолжить</button>
+        </div>
+    </div>
+</div>

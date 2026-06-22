@@ -3,14 +3,30 @@
 {% block title %}CRM Доброзал — Обучение{% endblock %}
 
 {% block body %}
+    {% include 'admin/partials/_dobrozal_onboarding_styles.html.twig' %}
+
     <div class="content-header crm-onboarding-hero">
         <div>
             <h1>Обучение по CRM</h1>
-            <p class="text-secondary mb-0">Полное руководство для сотрудников клуба «Доброзал». Здесь описаны все разделы системы — от первого входа до кассы и аналитики.</p>
+            <p class="text-secondary mb-0">Пройди квест с <strong>Залькой</strong> — как в Duolingo — или открой подробный справочник по всем разделам.</p>
         </div>
         <a href="{{ path('admin_section', {section: 'dashboard'}) }}" class="btn btn-sm btn-outline-secondary">На дашборд</a>
     </div>
 
+    <div class="dz-onboarding-tabs" role="tablist">
+        <button type="button" class="dz-onboarding-tab active" data-dz-page-tab="quest" role="tab" aria-selected="true">
+            🎮 Квест с Залькой
+        </button>
+        <button type="button" class="dz-onboarding-tab" data-dz-page-tab="guide" role="tab" aria-selected="false">
+            📖 Справочник
+        </button>
+    </div>
+
+    <div id="dz-panel-quest" class="mb-4" role="tabpanel">
+        {% include 'admin/partials/_onboarding_quest.html.twig' %}
+    </div>
+
+    <div id="dz-panel-guide" class="d-none" role="tabpanel">
     <div class="row g-4 crm-onboarding-layout">
         <div class="col-lg-3">
             <nav class="content-card crm-onboarding-toc sticky-top" style="top: 1rem;">
@@ -442,4 +458,20 @@
             </div>
         </div>
     </div>
+    </div>{# /dz-panel-guide #}
+
+    <script src="/js/dobrozal-onboarding.js?v=1"></script>
+    <script>
+        document.querySelectorAll('[data-dz-page-tab]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tab = btn.getAttribute('data-dz-page-tab');
+                document.querySelectorAll('[data-dz-page-tab]').forEach(function (b) {
+                    b.classList.toggle('active', b === btn);
+                    b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+                });
+                document.getElementById('dz-panel-quest').classList.toggle('d-none', tab !== 'quest');
+                document.getElementById('dz-panel-guide').classList.toggle('d-none', tab !== 'guide');
+            });
+        });
+    </script>
 {% endblock %}

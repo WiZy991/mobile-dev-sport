@@ -26,6 +26,7 @@ use App\Entity\StaffUser;
 use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
+use App\Service\Admin\OnboardingQuestCatalog;
 use App\Service\Admin\SubscriptionPlanCatalog;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
@@ -62,6 +63,7 @@ class AdminController extends AbstractController
         private readonly SubscriptionFreezeService $freezeService,
         private readonly SubscriptionPlanCatalog $planCatalog,
         private readonly LeadIngestionService $leadIngestion,
+        private readonly OnboardingQuestCatalog $onboardingQuestCatalog,
     ) {}
 
     private function buildMenu(): array
@@ -1902,9 +1904,14 @@ class AdminController extends AbstractController
         }
 
         if ($section === 'onboarding') {
+            $staff = $this->getUser();
+            $userId = $staff instanceof StaffUser ? (string) $staff->getId() : 'guest';
+
             return $this->render('admin/onboarding.html.twig', [
                 'menu' => $menu,
                 'current' => $section,
+                'questData' => $this->onboardingQuestCatalog->export(),
+                'userId' => $userId,
             ]);
         }
 

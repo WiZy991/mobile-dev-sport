@@ -1,0 +1,516 @@
+/**
+ * Dobrozal gamified onboarding — Duolingo-style quest engine.
+ * Reusable in CRM, client app, and staff app.
+ */
+(function (global) {
+    'use strict';
+
+    const STORAGE_PREFIX = 'dobrozal_onboarding_';
+
+    class DobrozalOnboarding {
+        /**
+         * @param {HTMLElement} root
+         * @param {{ userId: string, quest: object }} config
+         */
+        constructor(root, config) {
+            this.root = root;
+            this.userId = config.userId || 'guest';
+            this.quest = config.quest;
+            this.state = this.loadState();
+            this.view = 'map';
+            this.currentLesson = null;
+            this.currentStepIndex = 0;
+            this.heartsMax = this.quest.heartsMax || 5;
+            this.cacheDom();
+            this.bindEvents();
+            this.render();
+        }
+
+        cacheDom() {
+            this.el = {
+                map: this.root.querySelector('[data-dz-view="map"]'),
+                lesson: this.root.querySelector('[data-dz-view="lesson"]'),
+                progressFill: this.root.querySelector('[data-dz-progress-fill]'),
+                progressText: this.root.querySelector('[data-dz-progress-text]'),
+                xp: this.root.querySelector('[data-dz-xp]'),
+                streak: this.root.querySelector('[data-dz-streak]'),
+                hearts: this.root.querySelector('[data-dz-hearts]'),
+                path: this.root.querySelector('[data-dz-path]'),
+                mascot: this.root.querySelector('[data-dz-mascot]'),
+                bubble: this.root.querySelector('[data-dz-bubble]'),
+                bubbleTitle: this.root.querySelector('[data-dz-bubble-title]'),
+                bubbleText: this.root.querySelector('[data-dz-bubble-text]'),
+                stepCard: this.root.querySelector('[data-dz-step-card]'),
+                quizOptions: this.root.querySelector('[data-dz-quiz-options]'),
+                continueBtn: this.root.querySelector('[data-dz-continue]'),
+                backBtn: this.root.querySelector('[data-dz-back-map]'),
+                lessonTitle: this.root.querySelector('[data-dz-lesson-title]'),
+                lessonProgress: this.root.querySelector('[data-dz-lesson-progress]'),
+                overlay: this.root.querySelector('[data-dz-overlay]'),
+                overlayContent: this.root.querySelector('[data-dz-overlay-content]'),
+                confetti: this.root.querySelector('[data-dz-confetti]'),
+            };
+        }
+
+        defaultState() {
+            return {
+                xp: 0,
+                streak: 1,
+                hearts: this.heartsMax,
+                completedLessons: [],
+                lastVisit: new Date().toISOString().slice(0, 10),
+                currentLessonId: null,
+            };
+        }
+
+        loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_PREFIX + this.userId);
+                const base = raw ? JSON.parse(raw) : this.defaultState();
+                base.hearts = base.hearts ?? this.heartsMax;
+                base.completedLessons = base.completedLessons || [];
+                this.applyStreak(base);
+                return base;
+            } catch {
+                return this.defaultState();
+            }
+        }
+
+        applyStreak(state) {
+            const today = new Date().toISOString().slice(0, 10);
+            const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+            if (state.lastVisit === today) return;
+            if (state.lastVisit === yesterday) {
+                state.streak = (state.streak || 1) + 1;
+            } else {
+                state.streak = 1;
+            }
+            state.lastVisit = today;
+        }
+
+        saveState() {
+            localStorage.setItem(STORAGE_PREFIX + this.userId, JSON.stringify(this.state));
+        }
+
+        allLessons() {
+            const list = [];
+            (this.quest.units || []).forEach((unit) => {
+                (unit.lessons || []).forEach((lesson) => {
+                    list.push({ ...lesson, unitId: unit.id, unitTitle: unit.title, unitColor: unit.color });
+                });
+            });
+            return list;
+        }
+
+        lessonById(id) {
+            return this.allLessons().find((l) => l.id === id) || null;
+        }
+
+        nextLessonId(afterId) {
+            const lessons = this.allLessons();
+            const idx = lessons.findIndex((l) => l.id === afterId);
+            if (idx < 0 || idx >= lessons.length - 1) return null;
+            return lessons[idx + 1].id;
+        }
+
+        isLessonUnlocked(lessonId) {
+            const lessons = this.allLessons();
+            const idx = lessons.findIndex((l) => l.id === lessonId);
+            if (idx === 0) return true;
+            const prev = lessons[idx - 1];
+            return this.state.completedLessons.includes(prev.id);
+        }
+
+        isLessonCompleted(lessonId) {
+            return this.state.completedLessons.includes(lessonId);
+        }
+
+        progressPercent() {
+            const total = this.quest.totalLessons || this.allLessons().length;
+            if (!total) return 0;
+            return Math.round((this.state.completedLessons.length / total) * 100);
+        }
+
+        bindEvents() {
+            this.el.continueBtn?.addEventListener('click', () => this.onContinue());
+            this.el.backBtn?.addEventListener('click', () => this.showMap());
+            this.root.querySelector('[data-dz-reset]')?.addEventListener('click', () => {
+                if (confirm('Начать квест заново? XP и прогресс сбросятся.')) {
+                    this.state = this.defaultState();
+                    this.saveState();
+                    this.showMap();
+                }
+            });
+        }
+
+        setMood(mood) {
+            const moods = ['neutral', 'happy', 'excited', 'thinking', 'sad', 'celebrate'];
+            const m = moods.includes(mood) ? mood : 'neutral';
+            this.el.mascot?.querySelectorAll('.dz-mascot-mouth').forEach((g) => {
+                g.style.display = 'none';
+            });
+            const mouth = this.el.mascot?.querySelector('.dz-mouth-' + m);
+            if (mouth) mouth.style.display = '';
+            this.el.mascot?.classList.toggle('dz-mascot-bounce', m === 'celebrate' || m === 'excited');
+            this.el.mascot?.classList.toggle('dz-mascot-wiggle', m === 'sad');
+        }
+
+        renderHud() {
+            const pct = this.progressPercent();
+            if (this.el.progressFill) this.el.progressFill.style.width = pct + '%';
+            if (this.el.progressText) {
+                this.el.progressText.textContent =
+                    this.state.completedLessons.length + ' / ' + (this.quest.totalLessons || this.allLessons().length);
+            }
+            if (this.el.xp) this.el.xp.textContent = String(this.state.xp);
+            if (this.el.streak) this.el.streak.textContent = String(this.state.streak || 1);
+            if (this.el.hearts) {
+                this.el.hearts.innerHTML = '';
+                for (let i = 0; i < this.heartsMax; i++) {
+                    const span = document.createElement('span');
+                    span.className = 'dz-heart' + (i < this.state.hearts ? ' dz-heart-full' : ' dz-heart-empty');
+                    span.textContent = '♥';
+                    this.el.hearts.appendChild(span);
+                }
+            }
+        }
+
+        renderPath() {
+            if (!this.el.path) return;
+            this.el.path.innerHTML = '';
+            const lessons = this.allLessons();
+            let lessonNum = 0;
+
+            (this.quest.units || []).forEach((unit, ui) => {
+                const unitEl = document.createElement('div');
+                unitEl.className = 'dz-unit';
+                unitEl.innerHTML =
+                    '<div class="dz-unit-header" style="--unit-color:' +
+                    (unit.color || '#ff5b2e') +
+                    '">' +
+                    '<span class="dz-unit-badge">' +
+                    (ui + 1) +
+                    '</span>' +
+                    '<span class="dz-unit-title">' +
+                    this.escape(unit.title) +
+                    '</span></div>';
+
+                const track = document.createElement('div');
+                track.className = 'dz-lesson-track';
+
+                (unit.lessons || []).forEach((lesson, li) => {
+                    lessonNum++;
+                    const done = this.isLessonCompleted(lesson.id);
+                    const unlocked = this.isLessonUnlocked(lesson.id);
+                    const current = this.isCurrentLesson(lesson.id);
+
+                    const node = document.createElement('button');
+                    node.type = 'button';
+                    node.className = 'dz-lesson-node';
+                    if (done) node.classList.add('dz-lesson-done');
+                    else if (!unlocked) node.classList.add('dz-lesson-locked');
+                    else if (current) node.classList.add('dz-lesson-current');
+
+                    const side = li % 2 === 0 ? 'left' : 'right';
+                    node.classList.add('dz-lesson-' + side);
+
+                    node.innerHTML =
+                        '<span class="dz-lesson-icon">' +
+                        (done ? '✓' : unlocked ? lesson.icon || '●' : '🔒') +
+                        '</span>' +
+                        '<span class="dz-lesson-label">' +
+                        this.escape(lesson.title) +
+                        '</span>';
+
+                    if (unlocked) {
+                        node.addEventListener('click', () => this.startLesson(lesson.id));
+                    }
+                    track.appendChild(node);
+
+                    if (li < unit.lessons.length - 1) {
+                        const conn = document.createElement('div');
+                        conn.className = 'dz-lesson-connector dz-connector-' + side;
+                        track.appendChild(conn);
+                    }
+                });
+
+                unitEl.appendChild(track);
+                this.el.path.appendChild(unitEl);
+            });
+        }
+
+        showMap() {
+            this.view = 'map';
+            this.currentLesson = null;
+            this.el.map?.classList.remove('d-none');
+            this.el.lesson?.classList.add('d-none');
+            this.root.querySelector('[data-dz-lesson-bar]')?.classList.add('d-none');
+            this.el.continueBtn?.closest('.dz-lesson-footer')?.classList.add('d-none');
+            this.renderHud();
+            this.renderPath();
+            this.setMood('happy');
+            if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.quest.mascot?.name || 'Залька';
+            if (this.el.bubbleText) {
+                const left = (this.quest.totalLessons || 0) - this.state.completedLessons.length;
+                this.el.bubbleText.textContent =
+                    left > 0
+                        ? 'Выбери урок на пути! Осталось ' + left + ' — ты справишься 💪'
+                        : 'Все уроки пройдены! Ты чемпион клуба «Доброзал»! 🏆';
+            }
+        }
+
+        startLesson(lessonId) {
+            const lesson = this.lessonById(lessonId);
+            if (!lesson || !this.isLessonUnlocked(lessonId)) return;
+            this.currentLesson = lesson;
+            this.currentStepIndex = 0;
+            this.view = 'lesson';
+            this.el.map?.classList.add('d-none');
+            this.el.lesson?.classList.remove('d-none');
+            this.root.querySelector('[data-dz-lesson-bar]')?.classList.remove('d-none');
+            this.el.continueBtn?.closest('.dz-lesson-footer')?.classList.remove('d-none');
+            if (this.el.lessonTitle) this.el.lessonTitle.textContent = lesson.title;
+            this.renderStep();
+        }
+
+        isCurrentLesson(lessonId) {
+            const lessons = this.allLessons();
+            const next = lessons.find((l) => !this.isLessonCompleted(l.id) && this.isLessonUnlocked(l.id));
+            return next?.id === lessonId;
+        }
+
+        renderStep() {
+            if (!this.currentLesson) return;
+            const steps = this.currentLesson.steps || [];
+            const step = steps[this.currentStepIndex];
+            const total = steps.length;
+
+            if (this.el.lessonProgress) {
+                this.el.lessonProgress.style.width = ((this.currentStepIndex + 1) / total) * 100 + '%';
+            }
+
+            this.el.continueBtn?.classList.remove('d-none');
+            this.el.continueBtn.disabled = false;
+            this.el.quizOptions?.classList.add('d-none');
+            this.el.quizOptions.innerHTML = '';
+
+            if (!step) {
+                this.completeLesson();
+                return;
+            }
+
+            const mood = step.mood || 'neutral';
+            this.setMood(mood);
+
+            if (step.type === 'quiz') {
+                this.el.continueBtn.classList.add('d-none');
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Вопрос';
+                if (this.el.bubbleText) this.el.bubbleText.textContent = step.question;
+                this.renderQuiz(step);
+                return;
+            }
+
+            if (this.el.bubbleTitle) {
+                this.el.bubbleTitle.textContent = step.title || this.currentLesson.title;
+            }
+            if (this.el.bubbleText) {
+                this.el.bubbleText.textContent = step.text || '';
+            }
+
+            if (step.type === 'checkpoint') {
+                this.el.continueBtn.textContent = 'На карту пути';
+            } else {
+                this.el.continueBtn.textContent = 'Продолжить';
+            }
+        }
+
+        renderQuiz(step) {
+            this.el.quizOptions.classList.remove('d-none');
+            (step.options || []).forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'dz-quiz-option';
+                btn.textContent = opt;
+                btn.addEventListener('click', () => this.answerQuiz(step, i, btn));
+                this.el.quizOptions.appendChild(btn);
+            });
+        }
+
+        answerQuiz(step, index, btn) {
+            const correct = step.correct === index;
+            this.el.quizOptions.querySelectorAll('.dz-quiz-option').forEach((b) => {
+                b.disabled = true;
+            });
+
+            if (correct) {
+                btn.classList.add('dz-quiz-correct');
+                this.setMood('happy');
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Верно!';
+                if (this.el.bubbleText) this.el.bubbleText.textContent = step.explain || 'Отлично!';
+                this.playSound('correct');
+                setTimeout(() => {
+                    this.currentStepIndex++;
+                    this.renderStep();
+                }, 1200);
+            } else {
+                btn.classList.add('dz-quiz-wrong');
+                this.state.hearts = Math.max(0, this.state.hearts - 1);
+                this.saveState();
+                this.renderHud();
+                this.setMood('sad');
+                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = 'Не совсем…';
+                if (this.el.bubbleText) {
+                    this.el.bubbleText.textContent =
+                        (step.explain || 'Попробуй ещё раз.') +
+                        (this.state.hearts <= 0 ? ' Сердечки закончились — они восстановятся.' : '');
+                }
+                this.playSound('wrong');
+                if (this.state.hearts <= 0) {
+                    this.state.hearts = this.heartsMax;
+                    this.saveState();
+                }
+                setTimeout(() => {
+                    this.el.quizOptions.querySelectorAll('.dz-quiz-option').forEach((b) => {
+                        b.disabled = false;
+                        b.classList.remove('dz-quiz-wrong', 'dz-quiz-correct');
+                    });
+                    this.renderStep();
+                }, 1800);
+            }
+        }
+
+        onContinue() {
+            const steps = this.currentLesson?.steps || [];
+            const step = steps[this.currentStepIndex];
+            if (step?.type === 'checkpoint') {
+                this.showMap();
+                return;
+            }
+            this.currentStepIndex++;
+            if (this.currentStepIndex >= steps.length) {
+                this.completeLesson();
+            } else {
+                this.renderStep();
+            }
+        }
+
+        completeLesson() {
+            const id = this.currentLesson?.id;
+            if (id && !this.state.completedLessons.includes(id)) {
+                this.state.completedLessons.push(id);
+                const xpGain = this.quest.xpPerLesson || 15;
+                this.state.xp += xpGain;
+                this.state.hearts = Math.min(this.heartsMax, this.state.hearts + 1);
+                this.saveState();
+                this.showCelebration(xpGain);
+            } else {
+                this.showMap();
+            }
+        }
+
+        showCelebration(xpGain) {
+            this.setMood('celebrate');
+            if (this.el.confetti) this.el.confetti.classList.remove('d-none');
+            this.fireConfetti();
+            this.playSound('complete');
+            if (this.el.overlay && this.el.overlayContent) {
+                this.el.overlay.classList.remove('d-none');
+                this.el.overlayContent.innerHTML =
+                    '<div class="dz-celebration">' +
+                    '<div class="dz-celebration-xp">+' +
+                    xpGain +
+                    ' XP</div>' +
+                    '<div class="dz-celebration-title">Урок пройден!</div>' +
+                    '<p class="dz-celebration-text">' +
+                    (this.quest.mascot?.name || 'Залька') +
+                    ' гордится тобой!</p>' +
+                    '<button type="button" class="dz-btn dz-btn-primary" data-dz-celebration-close>Продолжить путь</button>' +
+                    '</div>';
+                this.el.overlayContent.querySelector('[data-dz-celebration-close]')?.addEventListener('click', () => {
+                    this.el.overlay.classList.add('d-none');
+                    this.el.confetti?.classList.add('d-none');
+                    const next = this.nextLessonId(this.currentLesson?.id);
+                    if (next && this.isLessonUnlocked(next)) {
+                        this.startLesson(next);
+                    } else {
+                        this.showMap();
+                    }
+                });
+            }
+        }
+
+        fireConfetti() {
+            const canvas = this.el.confetti;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = (canvas.width = this.root.offsetWidth);
+            const h = (canvas.height = this.root.offsetHeight);
+            const colors = ['#ff5b2e', '#ffcb45', '#14b88a', '#3b9eff', '#a855f7'];
+            const pieces = Array.from({ length: 80 }, () => ({
+                x: Math.random() * w,
+                y: -20 - Math.random() * h * 0.3,
+                r: 4 + Math.random() * 6,
+                c: colors[Math.floor(Math.random() * colors.length)],
+                vy: 2 + Math.random() * 4,
+                vx: -2 + Math.random() * 4,
+                rot: Math.random() * 360,
+                vr: -8 + Math.random() * 16,
+            }));
+            let frame = 0;
+            const draw = () => {
+                ctx.clearRect(0, 0, w, h);
+                pieces.forEach((p) => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.08;
+                    p.rot += p.vr;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rot * Math.PI) / 180);
+                    ctx.fillStyle = p.c;
+                    ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r);
+                    ctx.restore();
+                });
+                frame++;
+                if (frame < 90) requestAnimationFrame(draw);
+                else ctx.clearRect(0, 0, w, h);
+            };
+            draw();
+        }
+
+        playSound(type) {
+            /* Заглушка для будущих звуков в мобильных приложениях */
+            this.root.dispatchEvent(new CustomEvent('dz-onboarding-sound', { detail: { type } }));
+        }
+
+        escape(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        render() {
+            this.renderHud();
+            this.showMap();
+        }
+    }
+
+    global.DobrozalOnboarding = DobrozalOnboarding;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const root = document.getElementById('dz-onboarding-root');
+        if (!root) return;
+        const questEl = root.querySelector('[data-dz-quest-json]');
+        if (!questEl) return;
+        let quest;
+        try {
+            quest = JSON.parse(questEl.textContent || '{}');
+        } catch {
+            return;
+        }
+        new DobrozalOnboarding(root, {
+            userId: root.dataset.userId || 'guest',
+            quest,
+        });
+    });
+})(typeof window !== 'undefined' ? window : this);
