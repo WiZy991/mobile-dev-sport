@@ -1,0 +1,445 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM Доброзал — Обучение{% endblock %}
+
+{% block body %}
+    <div class="content-header crm-onboarding-hero">
+        <div>
+            <h1>Обучение по CRM</h1>
+            <p class="text-secondary mb-0">Полное руководство для сотрудников клуба «Доброзал». Здесь описаны все разделы системы — от первого входа до кассы и аналитики.</p>
+        </div>
+        <a href="{{ path('admin_section', {section: 'dashboard'}) }}" class="btn btn-sm btn-outline-secondary">На дашборд</a>
+    </div>
+
+    <div class="row g-4 crm-onboarding-layout">
+        <div class="col-lg-3">
+            <nav class="content-card crm-onboarding-toc sticky-top" style="top: 1rem;">
+                <div class="card-section-title mb-2">Содержание</div>
+                <ol class="crm-onboarding-toc-list small mb-0">
+                    <li><a href="#ob-start">С чего начать</a></li>
+                    <li><a href="#ob-dashboard">Дашборд</a></li>
+                    <li><a href="#ob-tasks">Задачи</a></li>
+                    <li><a href="#ob-clients">Клиенты</a></li>
+                    <li><a href="#ob-leads">Лиды и сделки</a></li>
+                    <li><a href="#ob-subscriptions">Абонементы</a></li>
+                    <li><a href="#ob-schedule">Расписание и записи</a></li>
+                    <li><a href="#ob-visits">Посещения</a></li>
+                    <li><a href="#ob-sales">Продажи, касса, склад</a></li>
+                    <li><a href="#ob-services">Услуги и магазин</a></li>
+                    <li><a href="#ob-analytics">Аналитика и финансы</a></li>
+                    <li><a href="#ob-comms">Обращения и связь</a></li>
+                    <li><a href="#ob-mobile">Мобильное приложение</a></li>
+                    <li><a href="#ob-trainers">Тренеры и персонал</a></li>
+                    <li><a href="#ob-marketing">Акции, промокоды, теги</a></li>
+                    <li><a href="#ob-docs">Документы</a></li>
+                    <li><a href="#ob-settings">Настройки клуба</a></li>
+                    <li><a href="#ob-roles">Роли и доступ</a></li>
+                </ol>
+            </nav>
+        </div>
+
+        <div class="col-lg-9">
+            <div class="accordion crm-onboarding-accordion" id="onboardingAccordion">
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-start">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-start" aria-expanded="true">
+                            <i class="bi bi-flag me-2 text-primary"></i> С чего начать
+                        </button>
+                    </h2>
+                    <div id="collapse-start" class="accordion-collapse collapse show" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p><strong>CRM «Доброзал»</strong> — рабочее место администратора, менеджера, кассира, тренера и поддержки. Через неё вы ведёте клиентов, продажи, расписание и обращения из мобильного приложения.</p>
+                            <h6 class="text-primary mt-3">Первые шаги</h6>
+                            <ol class="small">
+                                <li>Войдите под выданным логином и паролем. При утере пароля обратитесь к администратору CRM.</li>
+                                <li>Откройте <strong>Дашборд</strong> — там сводка на сегодня и быстрые действия.</li>
+                                <li>Изучите боковое меню слева: видны только те разделы, которые разрешены вашей роли.</li>
+                                <li>Для поиска клиента используйте поле поиска в шапке или раздел «Клиенты».</li>
+                            </ol>
+                            <div class="crm-onboarding-tip">
+                                <i class="bi bi-lightbulb"></i>
+                                <span>Этот раздел «Обучение» всегда доступен в меню. Возвращайтесь сюда, если забыли, где что находится.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-dashboard">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dashboard">
+                            <i class="bi bi-speedometer2 me-2 text-primary"></i> Дашборд
+                        </button>
+                    </h2>
+                    <div id="collapse-dashboard" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p>Главный экран при входе. Показывает ключевые цифры за день и ссылки на частые действия.</p>
+                            <ul class="small">
+                                <li><strong>Быстрые действия</strong> — новый клиент, лид, запись, продажа (набор кнопок зависит от роли).</li>
+                                <li><strong>Сводка</strong> — посещения, записи, новые лиды, обращения из приложения.</li>
+                                <li>Кнопка <strong>«Обучение по CRM»</strong> ведёт сюда.</li>
+                            </ul>
+                            <p class="small text-secondary mb-0">Рекомендуется открывать дашборд в начале смены, чтобы увидеть нагрузку на зал и непрочитанные обращения.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-tasks">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-tasks">
+                            <i class="bi bi-check2-square me-2 text-primary"></i> Задачи
+                        </button>
+                    </h2>
+                    <div id="collapse-tasks" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p>Внутренний список дел для сотрудников: перезвонить лиду, оформить абонемент, проверить оплату.</p>
+                            <ul class="small">
+                                <li>Создавайте задачу с текстом, сроком и привязкой к клиенту или лиду.</li>
+                                <li>Отмечайте выполненные задачи, чтобы коллеги видели актуальный статус.</li>
+                                <li>Фильтруйте по статусу: новые, в работе, выполненные.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-clients">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-clients">
+                            <i class="bi bi-people me-2 text-primary"></i> Клиенты
+                        </button>
+                    </h2>
+                    <div id="collapse-clients" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p>База всех посетителей клуба с абонементами, посещениями и историей.</p>
+                            <h6 class="text-primary">Список клиентов</h6>
+                            <ul class="small">
+                                <li>Поиск по имени, телефону, email.</li>
+                                <li>Фильтры по тегам и клубу (при нескольких филиалах).</li>
+                                <li>Кнопка <strong>«Новый клиент»</strong> — регистрация на ресепшене.</li>
+                                <li><strong>Импорт</strong> — загрузка базы из Excel/CSV (клиенты, абонементы, записи).</li>
+                                <li><strong>Скачать CSV</strong> — выгрузка для отчётов или правки в Excel.</li>
+                            </ul>
+                            <h6 class="text-primary mt-3">Карточка клиента</h6>
+                            <ul class="small">
+                                <li>Контакты, паспортные данные, бонусы.</li>
+                                <li>Активные и прошлые абонементы — выдача, продление, заморозка.</li>
+                                <li>Записи на тренировки, история посещений.</li>
+                                <li>Комментарии и заметки для коллег.</li>
+                                <li>Теги для сегментации (например, «VIP», «Долг»).</li>
+                            </ul>
+                            <div class="crm-onboarding-tip">
+                                <i class="bi bi-lightbulb"></i>
+                                <span>Перед выдачей абонемента убедитесь, что телефон клиента указан верно — по нему он входит в мобильное приложение.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-leads">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-leads">
+                            <i class="bi bi-funnel me-2 text-primary"></i> Лиды и сделки
+                        </button>
+                    </h2>
+                    <div id="collapse-leads" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Лиды</h6>
+                            <p class="small">Потенциальные клиенты, которые ещё не купили абонемент. Заявки попадают сюда автоматически:</p>
+                            <ul class="small">
+                                <li>Форма на сайте клуба</li>
+                                <li>Гостевой пропуск в приложении</li>
+                                <li>Реферальная программа</li>
+                                <li>Обращения в поддержку (при согласии оставить контакт)</li>
+                                <li>Ручное добавление администратором</li>
+                            </ul>
+                            <p class="small"><strong>Воронка</strong> показывает этапы: Новый → Пробное занятие → Пришёл → Стал клиентом. Переводите лида по этапам по мере работы.</p>
+                            <p class="small">Фильтр <strong>«По источникам»</strong> помогает понять, откуда приходят заявки (сайт, соцсети, звонок и т.д.).</p>
+                            <h6 class="text-primary mt-3">Сделки</h6>
+                            <p class="small mb-0">Крупные или отложенные продажи: корпоративные абонементы, пакеты услуг. Ведите сумму, этап и ответственного менеджера до закрытия сделки.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-subscriptions">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-subscriptions">
+                            <i class="bi bi-card-checklist me-2 text-primary"></i> Абонементы
+                        </button>
+                    </h2>
+                    <div id="collapse-subscriptions" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Тарифные планы</h6>
+                            <ul class="small">
+                                <li>Стандартные тарифы (1, 3, 6, 12 месяцев) добавляются из каталога — название и срок подставляются автоматически.</li>
+                                <li>Меняйте только <strong>цену</strong> и отметку «популярный» при необходимости.</li>
+                                <li>Кнопка «Добавить все стандартные» — быстрое заполнение прайса.</li>
+                            </ul>
+                            <h6 class="text-primary mt-3">Выдача и управление</h6>
+                            <ul class="small">
+                                <li>Выдача абонемента — из карточки клиента или списка абонементов.</li>
+                                <li>Фильтры: активные, замороженные, истёкшие.</li>
+                                <li><strong>Заморозка</strong> — клиент может заморозить в приложении; в CRM вы тоже можете заморозить/разморозить. Дни заморозки зависят от срока абонемента (1 мес — 0 дн., 3 мес — 14 дн., 6 мес — 20 дн., 12 мес — 30 дн.).</li>
+                                <li>При заморозке дата окончания абонемента сдвигается на срок заморозки.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-schedule">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-schedule">
+                            <i class="bi bi-calendar3 me-2 text-primary"></i> Расписание и записи
+                        </button>
+                    </h2>
+                    <div id="collapse-schedule" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Расписание</h6>
+                            <ul class="small">
+                                <li>Календарь занятий на выбранный день: сегодня, завтра или любая дата.</li>
+                                <li>Типы слотов: <strong>групповая</strong>, <strong>персональная</strong> (видна в приложении в разделе индивидуальных тренировок), <strong>доп. услуга</strong>.</li>
+                                <li>Укажите тренера, зал, время начала/окончания и число мест.</li>
+                                <li>Поле «Повторять» создаёт такое же занятие на несколько недель вперёд.</li>
+                            </ul>
+                            <h6 class="text-primary mt-3">Записи на тренировки</h6>
+                            <ul class="small mb-0">
+                                <li>Список всех записей клиентов на групповые и персональные занятия.</li>
+                                <li>Отмена записи — из списка или из карточки клиента.</li>
+                                <li>Клиенты также записываются и отменяют сами через мобильное приложение.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-visits">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-visits">
+                            <i class="bi bi-door-open me-2 text-primary"></i> Посещения и самообслуживание
+                        </button>
+                    </h2>
+                    <div id="collapse-visits" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Посещения</h6>
+                            <p class="small">Журнал визитов клиентов в клуб: дата, время, способ входа. Используйте для контроля загрузки зала и спорных ситуаций с абонементом.</p>
+                            <h6 class="text-primary mt-3">Самообслуживание</h6>
+                            <ul class="small mb-0">
+                                <li>Логи входа по QR-коду из мобильного приложения.</li>
+                                <li>Статус «Вход» или «Отклонён» — если абонемент неактивен или QR просрочен.</li>
+                                <li>Раздел «Мобильные приложения» дублирует последние входы для быстрого контроля.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-sales">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-sales">
+                            <i class="bi bi-cash-stack me-2 text-primary"></i> Продажи, касса, склад
+                        </button>
+                    </h2>
+                    <div id="collapse-sales" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Продажи</h6>
+                            <p class="small">Оформление покупок: абонементы, товары, услуги. Привязка к клиенту, способ оплаты, сумма.</p>
+                            <h6 class="text-primary mt-3">Касса</h6>
+                            <p class="small">Операции по кассе за смену: приход, расход, сверка с продажами.</p>
+                            <h6 class="text-primary mt-3">Склад</h6>
+                            <p class="small mb-0">Учёт товаров (напитки, аксессуары): остатки, приход, списание. Связан с продажами в разделе «Услуги».</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-services">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-services">
+                            <i class="bi bi-bag me-2 text-primary"></i> Услуги и магазин
+                        </button>
+                    </h2>
+                    <div id="collapse-services" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p class="small">Каталог дополнительных услуг и товаров, которые клиент может купить в приложении или на ресепшене: массаж, солярий, протеиновые батончики и т.д.</p>
+                            <ul class="small mb-0">
+                                <li>Название, цена, описание, фото.</li>
+                                <li>Включение/отключение позиции без удаления из истории продаж.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-analytics">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-analytics">
+                            <i class="bi bi-graph-up me-2 text-primary"></i> Аналитика и финансы
+                        </button>
+                    </h2>
+                    <div id="collapse-analytics" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Аналитика</h6>
+                            <ul class="small">
+                                <li>Посещаемость, новые клиенты, конверсия лидов.</li>
+                                <li>Выручка по периодам и категориям.</li>
+                                <li>Выберите период отчёта в фильтрах.</li>
+                            </ul>
+                            <h6 class="text-primary mt-3">Финансы</h6>
+                            <p class="small mb-0">Сводные финансовые показатели, движение денег, отчёты для руководства. Доступ обычно у роли «Финансы» и администраторов.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-comms">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-comms">
+                            <i class="bi bi-chat-dots me-2 text-primary"></i> Обращения и связь с клиентами
+                        </button>
+                    </h2>
+                    <div id="collapse-comms" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Обращения из приложения</h6>
+                            <p class="small">Клиенты пишут в поддержку из мобильного приложения. Отвечайте здесь, меняйте статус (новое, в работе, закрыто).</p>
+                            <h6 class="text-primary mt-3">Комментарии</h6>
+                            <p class="small">Внутренние заметки по клиентам и лидам — видны только сотрудникам.</p>
+                            <h6 class="text-primary mt-3">Звонки</h6>
+                            <p class="small">Быстрый переход к клиентам и лидам с телефонами. На телефоне нажмите на номер — откроется набор.</p>
+                            <h6 class="text-primary mt-3">Мессенджеры</h6>
+                            <p class="small mb-0">Настройка каналов связи с клиентами. Ссылка на чат поддержки задаётся в настройках клуба.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-mobile">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-mobile">
+                            <i class="bi bi-phone me-2 text-primary"></i> Мобильное приложение «Доброзал»
+                        </button>
+                    </h2>
+                    <div id="collapse-mobile" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p>Клиентское приложение для Android. Через CRM вы контролируете, что в нём отображается.</p>
+                            <h6 class="text-primary">Что видит клиент</h6>
+                            <ul class="small">
+                                <li>Расписание и запись на тренировки</li>
+                                <li>Свои абонементы (заморозка, срок действия)</li>
+                                <li>QR-код для входа в зал</li>
+                                <li>Профиль, тренеры, магазин услуг</li>
+                                <li>Акции и баннер на главном экране</li>
+                                <li>Чат поддержки</li>
+                            </ul>
+                            <h6 class="text-primary mt-3">Что проверить перед запуском</h6>
+                            <ul class="small mb-0">
+                                <li>Настройки клуба заполнены (название, адрес, режим работы)</li>
+                                <li>Есть тарифные планы и тренеры</li>
+                                <li>Расписание на ближайшие дни создано</li>
+                                <li>Баннер акции на главной (по желанию) — в настройках клуба</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-trainers">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trainers">
+                            <i class="bi bi-person-badge me-2 text-primary"></i> Тренеры и персонал CRM
+                        </button>
+                    </h2>
+                    <div id="collapse-trainers" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Тренеры</h6>
+                            <ul class="small">
+                                <li>Карточки тренеров: ФИО, фото, специализация, описание.</li>
+                                <li>Отображаются в приложении и привязываются к занятиям в расписании.</li>
+                                <li>Тренер с ролью в CRM видит расписание, записи и своих клиентов.</li>
+                            </ul>
+                            <h6 class="text-primary mt-3">Персонал CRM</h6>
+                            <p class="small">Учётные записи сотрудников: логин, роль, активность. Только для администраторов.</p>
+                            <h6 class="text-primary mt-3">Франшиза / шлюзы</h6>
+                            <p class="small mb-0">Несколько клубов в одной системе. Настройка филиалов — для администраторов сети.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-marketing">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-marketing">
+                            <i class="bi bi-megaphone me-2 text-primary"></i> Акции, промокоды, теги
+                        </button>
+                    </h2>
+                    <div id="collapse-marketing" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <h6 class="text-primary">Акции</h6>
+                            <p class="small">Рекламные кампании: скидки, спецпредложения. Баннер на главной приложения настраивается в «Настройках клуба».</p>
+                            <h6 class="text-primary mt-3">Промокоды</h6>
+                            <p class="small">Коды со скидкой при покупке абонемента в приложении или на ресепшене.</p>
+                            <h6 class="text-primary mt-3">Теги</h6>
+                            <p class="small mb-0">Метки для группировки клиентов (например, «Корпоратив», «День рождения»). Фильтр по тегам — в списке клиентов.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-docs">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-docs">
+                            <i class="bi bi-file-earmark-text me-2 text-primary"></i> Документы
+                        </button>
+                    </h2>
+                    <div id="collapse-docs" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p class="small mb-0">Хранение шаблонов и файлов клуба: договоры, правила посещения, согласия на обработку данных. Загружайте актуальные версии — сотрудники и клиенты получают единый источник документов.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-settings">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-settings">
+                            <i class="bi bi-gear me-2 text-primary"></i> Настройки клуба
+                        </button>
+                    </h2>
+                    <div id="collapse-settings" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p class="small">Основные данные клуба, которые видят клиенты в приложении и на сайте:</p>
+                            <ul class="small">
+                                <li>Название, адрес, телефон, email, режим работы</li>
+                                <li>Удобства зала (бассейн, сауна и т.д.)</li>
+                                <li>Координаты на карте</li>
+                                <li>Баннер акции на главном экране приложения</li>
+                            </ul>
+                            <p class="small">Раздел <strong>«СКУД / турникет»</strong> — настройка автоматического входа по QR. Обычно настраивает технический специалист клуба; после изменений нажмите «Проверить подключение».</p>
+                            <p class="small mb-0">Общий раздел «Настройки» в меню — ссылки на клуб, персонал и системные параметры.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item content-card border-0 mb-3" id="ob-roles">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roles">
+                            <i class="bi bi-shield-check me-2 text-primary"></i> Роли и доступ
+                        </button>
+                    </h2>
+                    <div id="collapse-roles" class="accordion-collapse collapse" data-bs-parent="#onboardingAccordion">
+                        <div class="accordion-body">
+                            <p class="small">Каждый сотрудник видит только те разделы, которые нужны для его работы:</p>
+                            <table class="table table-sm table-dark small">
+                                <thead><tr><th>Роль</th><th>Основные разделы</th></tr></thead>
+                                <tbody>
+                                    <tr><td>Администратор</td><td>Все разделы, персонал, франшиза</td></tr>
+                                    <tr><td>Менеджер</td><td>Клиенты, лиды, расписание, абонементы, обращения</td></tr>
+                                    <tr><td>Финансы</td><td>Касса, продажи, склад, аналитика, промокоды</td></tr>
+                                    <tr><td>Тренер</td><td>Расписание, записи, клиенты, своя карточка</td></tr>
+                                    <tr><td>Поддержка</td><td>Обращения из приложения, клиенты, комментарии</td></tr>
+                                    <tr><td>Наблюдатель</td><td>Только просмотр без изменений</td></tr>
+                                </tbody>
+                            </table>
+                            <p class="small text-secondary mb-0">Если не хватает доступа к разделу — обратитесь к администратору CRM для смены роли.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="content-card mt-4 text-center crm-onboarding-footer">
+                <div class="fw-bold mb-2">Готовы к работе?</div>
+                <p class="small text-secondary mb-3">Откройте дашборд и начните смену. При вопросах — этот раздел всегда в меню слева: <strong>Обучение</strong>.</p>
+                <a href="{{ path('admin_section', {section: 'dashboard'}) }}" class="btn btn-primary">Перейти на дашборд</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

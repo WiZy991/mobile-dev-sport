@@ -12,6 +12,7 @@ final class AdminMenuBuilder
 {
     /** @var array<string, string> ключ section => подпись */
     private const FULL_MENU = [
+        'onboarding' => 'Обучение',
         'dashboard' => 'Дашборд',
         'tasks' => 'Задачи',
         'clients' => 'Клиенты',
@@ -52,26 +53,26 @@ final class AdminMenuBuilder
         'ROLE_ADMIN' => null,
         /** Операционный блок: лиды, записи, документы, тренеры зала и т.д. */
         'ROLE_MANAGER' => [
-            'dashboard', 'tasks', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits',
+            'onboarding', 'dashboard', 'tasks', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits',
             'leads', 'deals', 'comments', 'services', 'mobileapps', 'app_support', 'documents', 'tags', 'settings', 'selfservice', 'promotions',
             'trainers', 'analytics',
         ],
         /** Касса, склад, отчёты по деньгам */
         'ROLE_FINANCE' => [
-            'dashboard', 'sales', 'cashdesk', 'warehouse', 'finance', 'analytics',
+            'onboarding', 'dashboard', 'sales', 'cashdesk', 'warehouse', 'finance', 'analytics',
             'subscriptions', 'clients', 'promocodes', 'promotions', 'visits', 'services', 'app_support',
         ],
         /** Тренер зала: расписание (создание/перенос/удаление), записи, абонементы, клиенты, своя карточка в «Тренеры». */
         'ROLE_TRAINER' => [
-            'dashboard', 'schedule', 'bookings', 'subscriptions', 'clients', 'visits', 'trainers',
+            'onboarding', 'dashboard', 'schedule', 'bookings', 'subscriptions', 'clients', 'visits', 'trainers',
         ],
         /** Широкий просмотр без изменений (POST блокируется подписчиком). */
         'ROLE_VIEWER' => [
-            'dashboard', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits', 'analytics', 'app_support',
+            'onboarding', 'dashboard', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits', 'analytics', 'app_support',
         ],
         /** Линия поддержки: обращения и клиенты. */
         'ROLE_SUPPORT' => [
-            'dashboard', 'app_support', 'clients', 'comments',
+            'onboarding', 'dashboard', 'app_support', 'clients', 'comments',
         ],
     ];
 

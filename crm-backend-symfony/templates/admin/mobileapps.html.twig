@@ -1,6 +1,6 @@
 {% extends 'admin/base.html.twig' %}
 
-{% block title %}CRM FitnessClub — Мобильное приложение{% endblock %}
+{% block title %}CRM Доброзал — Мобильное приложение{% endblock %}
 
 {% block body %}
     <div class="content-header">
@@ -8,7 +8,8 @@
     </div>
 
     <div class="content-card mb-3">
-        <div class="mb-2 text-primary small fw-semibold text-uppercase">Готовность к работе приложения</div>
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Готовность к работе</div>
+        <p class="small text-secondary mb-2">Перед открытием зала убедитесь, что всё настроено — клиенты увидят это в приложении «Доброзал».</p>
         <div class="row g-2 small">
             <div class="col-md-6">
                 <span class="{{ clubConfigured ? 'text-success' : 'text-warning' }}">{{ clubConfigured ? '✓' : '○' }}</span>
@@ -38,6 +39,7 @@
 
     <div class="content-card mb-3">
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Последние входы по QR</div>
+        <p class="small text-secondary mb-2">Клиент показывает QR в приложении — турникет проверяет абонемент и пропускает в зал.</p>
         <div class="table-responsive">
             <table class="table table-sm table-dark align-middle mb-0">
                 <thead><tr><th>Дата</th><th>Клиент</th><th>Результат</th></tr></thead>
@@ -58,35 +60,22 @@
     </div>
 
     <div class="content-card">
-        <div class="mb-3 text-primary small fw-semibold text-uppercase">FitnessClub</div>
+        <div class="mb-3 text-primary small fw-semibold text-uppercase">Приложение «Доброзал» для клиентов</div>
         <p class="text-secondary small mb-2">
-            Клиентское Android-приложение для бесконтактного доступа в зал.
+            Клиенты устанавливают приложение на Android и пользуются клубом без очереди на ресепшене.
         </p>
-        <ul class="small text-secondary mb-0">
-            <li>Расписание тренировок с фильтром по дате</li>
-            <li>Запись и отмена бронирований</li>
-            <li>Мои абонементы (заморозка/разморозка)</li>
+        <ul class="small text-secondary mb-3">
+            <li>Расписание тренировок и запись на занятия</li>
+            <li>Мои абонементы — срок, заморозка</li>
             <li>QR-код для входа в зал</li>
-            <li>Профиль и редактирование данных</li>
-            <li>Список тренеров</li>
+            <li>Профиль, тренеры, магазин услуг</li>
+            <li>Акции и обращения в поддержку</li>
         </ul>
-    </div>
-
-    <div class="content-card mt-3">
-        <div class="mb-2 text-primary small fw-semibold text-uppercase">Вход по QR</div>
-        <p class="text-secondary small mb-2">
-            Клиент открывает QR в приложении, турникет сканирует код и отправляет POST на <code>/api/v1/access/entry</code>.
-            Формат: <code>FITNESSCLUB:ENTRY:user-{id}:{timestamp}</code>. Код действителен 5 минут.
-        </p>
-    </div>
-
-    <div class="content-card mt-3">
-        <div class="mb-2 text-primary small fw-semibold text-uppercase">API и ссылки</div>
-        <div class="small">
-            <a href="{{ path('admin_section', {section: 'schedule'}) }}" class="btn btn-sm btn-outline-primary me-2">Расписание в CRM</a>
-            <a href="{{ path('admin_section', {section: 'subscriptions'}) }}" class="btn btn-sm btn-outline-primary me-2">Абонементы</a>
-            <a href="{{ path('admin_section', {section: 'trainers'}) }}" class="btn btn-sm btn-outline-primary me-2">Тренеры</a>
-            <a href="{{ path('admin_settings_club') }}" class="btn btn-sm btn-outline-primary me-2">Настройки клуба</a>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ path('admin_section', {section: 'schedule'}) }}" class="btn btn-sm btn-outline-primary">Расписание</a>
+            <a href="{{ path('admin_section', {section: 'subscriptions'}) }}" class="btn btn-sm btn-outline-primary">Абонементы</a>
+            <a href="{{ path('admin_section', {section: 'trainers'}) }}" class="btn btn-sm btn-outline-primary">Тренеры</a>
+            <a href="{{ path('admin_settings_club') }}" class="btn btn-sm btn-outline-primary">Настройки клуба</a>
         </div>
     </div>
 {% endblock %}

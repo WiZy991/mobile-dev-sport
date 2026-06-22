@@ -1901,6 +1901,13 @@ class AdminController extends AbstractController
             throw $this->createNotFoundException();
         }
 
+        if ($section === 'onboarding') {
+            return $this->render('admin/onboarding.html.twig', [
+                'menu' => $menu,
+                'current' => $section,
+            ]);
+        }
+
         // Специальная страница для клиентов с данными из БД
         if ($section === 'clients') {
             $search = trim((string) $request->query->get('q', ''));

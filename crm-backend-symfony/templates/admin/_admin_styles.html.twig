@@ -448,4 +448,41 @@ a.text-reset:hover .content-card {
     .sidebar { width: 100%; height: auto; position: relative; max-height: 50vh; }
     .content { padding: 16px; }
 }
+
+/* ——— Onboarding ——— */
+.crm-onboarding-hero h1 { font-size: 2rem !important; font-weight: 800; }
+.crm-onboarding-banner { border-left: 3px solid var(--primary); }
+.crm-onboarding-toc { padding: 1rem 1.1rem; }
+.crm-onboarding-toc-list { padding-left: 1.1rem; }
+.crm-onboarding-toc-list li { margin-bottom: 0.35rem; }
+.crm-onboarding-toc-list a { color: var(--muted); text-decoration: none; }
+.crm-onboarding-toc-list a:hover { color: var(--primary); }
+.crm-onboarding-accordion .accordion-item { background: transparent; }
+.crm-onboarding-accordion .accordion-button {
+    background: rgba(0, 0, 0, 0.15);
+    color: var(--text);
+    font-weight: 700;
+    font-size: 1rem;
+    box-shadow: none;
+    border-radius: 12px !important;
+}
+.crm-onboarding-accordion .accordion-button:not(.collapsed) {
+    background: rgba(255, 91, 46, 0.12);
+    color: #fff;
+}
+.crm-onboarding-accordion .accordion-button::after { filter: invert(1); }
+.crm-onboarding-accordion .accordion-body { padding-top: 0.5rem; }
+.crm-onboarding-tip {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    margin-top: 1rem;
+    border-radius: 10px;
+    background: rgba(255, 91, 46, 0.1);
+    border: 1px solid rgba(255, 91, 46, 0.25);
+    font-size: 0.875rem;
+}
+.crm-onboarding-tip i { color: var(--primary); font-size: 1.1rem; flex-shrink: 0; }
+.crm-onboarding-footer { padding: 1.5rem; }
 </style>

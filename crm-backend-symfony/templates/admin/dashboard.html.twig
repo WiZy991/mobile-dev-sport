@@ -8,6 +8,19 @@
             <h1>Дашборд</h1>
             <div class="text-secondary small">Сегодня {{ "now"|date("d.m.Y") }}</div>
         </div>
+        <a href="{{ path('admin_section', {section: 'onboarding'}) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-mortarboard me-1"></i> Обучение по CRM
+        </a>
+    </div>
+
+    <div class="content-card mb-3 crm-onboarding-banner">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="fw-bold mb-1">Новичок в CRM или нужно освежить память?</div>
+                <div class="text-secondary small">В разделе «Обучение» — пошаговые инструкции по всем разделам: клиенты, лиды, абонементы, расписание, касса и другое.</div>
+            </div>
+            <a href="{{ path('admin_section', {section: 'onboarding'}) }}" class="btn btn-primary btn-sm">Открыть обучение</a>
+        </div>
     </div>
 
     {% if admin_can_mutate() %}
