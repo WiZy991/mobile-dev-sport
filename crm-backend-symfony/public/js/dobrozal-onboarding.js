@@ -402,31 +402,65 @@
             hole.style.height = h + 'px';
         }
 
+        topbarInset() {
+            const bar = this.root?.querySelector('.dz-tour-topbar');
+            return bar ? bar.getBoundingClientRect().height + 12 : 68;
+        }
+
+        measureStage() {
+            const stage = this.el.stage;
+            if (!stage) return { w: 300, h: 280 };
+            const prev = stage.style.visibility;
+            stage.style.visibility = 'hidden';
+            stage.style.display = 'flex';
+            const w = stage.offsetWidth || 300;
+            const h = stage.offsetHeight || 280;
+            stage.style.visibility = prev || '';
+            return { w, h };
+        }
+
         positionStage(target) {
             const stage = this.el.stage;
             if (!stage) return;
             const margin = 16;
-            const stageW = 300;
-            const stageH = 280;
-            let top, left;
+            const bottomSafe = this.topbarInset();
+            const topSafe = 12;
+            const { w: stageW, h: stageH } = this.measureStage();
+            let top;
+            let left;
 
             if (target) {
                 const r = target.getBoundingClientRect();
-                const below = r.bottom + stageH + margin < window.innerHeight;
-                const above = r.top - stageH - margin > 60;
-                if (below) {
+                const spaceBelow = window.innerHeight - bottomSafe - r.bottom - margin;
+                const spaceAbove = r.top - topSafe - margin;
+                const nearTop = r.top < window.innerHeight * 0.35;
+
+                if (nearTop || spaceBelow >= stageH) {
                     top = r.bottom + margin;
-                } else if (above) {
+                } else if (spaceAbove >= stageH) {
                     top = r.top - stageH - margin;
                 } else {
-                    top = Math.max(60, window.innerHeight - stageH - margin);
+                    top = Math.max(topSafe, window.innerHeight - bottomSafe - stageH - margin);
                 }
-                left = Math.min(
-                    Math.max(margin, r.left + r.width / 2 - stageW / 2),
-                    window.innerWidth - stageW - margin,
-                );
+
+                top = Math.min(top, window.innerHeight - bottomSafe - stageH - 8);
+                top = Math.max(topSafe, top);
+
+                if (r.right > window.innerWidth * 0.55) {
+                    left = Math.max(margin, Math.min(r.left - stageW - margin, window.innerWidth - stageW - margin));
+                    if (left < margin) {
+                        left = margin;
+                    }
+                } else if (r.left < window.innerWidth * 0.35) {
+                    left = Math.min(r.right + margin, window.innerWidth - stageW - margin);
+                } else {
+                    left = Math.min(
+                        Math.max(margin, r.left + r.width / 2 - stageW / 2),
+                        window.innerWidth - stageW - margin,
+                    );
+                }
             } else {
-                top = window.innerHeight - stageH - margin - 20;
+                top = window.innerHeight - bottomSafe - stageH - margin;
                 left = window.innerWidth - stageW - margin - 20;
             }
 
