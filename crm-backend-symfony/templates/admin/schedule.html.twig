@@ -1,7 +1,7 @@
 {% extends 'admin/base.html.twig' %}
 
 {% block body %}
-<div class="content-header">
+<div class="content-header" data-dz-tour="schedule-main">
   <h1 class="h4 mb-0">Расписание</h1>
   <div class="d-flex align-items-center gap-2 flex-wrap">
     <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="btn btn-sm {{ (scheduleDate|default('')) == ("now"|date("Y-m-d")) ? 'btn-primary' : 'btn-outline-secondary' }}">Сегодня</a>

@@ -4,17 +4,17 @@
 
 {% block body %}
     {% set export_base = path('admin_clients_export') ~ '?q=' ~ (search|default('')|url_encode) ~ '&tag_id=' ~ (filterTagId|default('')) ~ '&club_id=' ~ (filterClubId|default('')) %}
-    <div class="content-header">
+    <div class="content-header" data-dz-tour="clients-header">
         <h1 class="h4 mb-0">Клиенты</h1>
         <div>
             <a href="{{ export_base ~ '&format=csv' }}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
             <a href="{{ export_base ~ '&format=xlsx' }}" class="btn btn-sm btn-success me-2">Скачать Excel</a>
             <a href="{{ path('admin_clients_import') }}" class="btn btn-sm btn-outline-primary me-2">Импорт CSV / Excel</a>
-            <a href="{{ path('admin_client_new') }}" class="btn btn-sm btn-primary">+ Новый клиент</a>
+            <a href="{{ path('admin_client_new') }}" class="btn btn-sm btn-primary" data-dz-tour="clients-new">+ Новый клиент</a>
         </div>
     </div>
 
-    <div class="content-card mb-3">
+    <div class="content-card mb-3" data-dz-tour="clients-search">
         <form method="get" action="{{ path('admin_section', {section: 'clients'}) }}" class="row g-2 align-items-end">
             <div class="col-md-3">
                 <label class="form-label small mb-0">Поиск</label>
@@ -44,7 +44,7 @@
         </form>
     </div>
 
-    <div class="content-card">
+    <div class="content-card" data-dz-tour="clients-table">
         <div class="table-responsive">
             <table class="table table-sm table-dark align-middle mb-0">
                 <thead>

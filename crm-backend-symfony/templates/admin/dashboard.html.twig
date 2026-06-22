@@ -3,7 +3,7 @@
 {% block title %}CRM Доброзал — Дашборд{% endblock %}
 
 {% block body %}
-    <div class="content-header">
+    <div class="content-header" data-dz-tour="dashboard-header">
         <div>
             <h1>Дашборд</h1>
             <div class="text-secondary small">Сегодня {{ "now"|date("d.m.Y") }}</div>
@@ -19,7 +19,7 @@
                 <div class="dz-dashboard-mascot" aria-hidden="true">🏋️</div>
                 <div>
                     <div class="fw-bold mb-1">Пройдите обучение по CRM</div>
-                    <div class="text-secondary small">16 уроков: клиенты, абонементы, расписание, приложение. Займёт 15–20 минут.</div>
+                    <div class="text-secondary small">Интерактивный тур по CRM: Залька подсвечивает реальные кнопки и разделы.</div>
                 </div>
             </div>
             <a href="{{ path('admin_section', {section: 'onboarding'}) }}" class="btn btn-primary btn-sm">Начать обучение</a>
@@ -68,7 +68,7 @@
     </div>
     {% endif %}
 
-    <div class="row g-3">
+    <div class="row g-3" data-dz-tour="dashboard-stats">
         <div class="col-6 col-md-2">
             {% if menu.clients is defined %}
             <a href="{{ path('admin_section', {section: 'clients'}) }}" class="text-decoration-none text-reset">

@@ -1,34 +1,8 @@
 <div class="dz-onboarding-root" id="dz-onboarding-root"
      data-user-id="{{ userId|default('guest') }}"
-     data-dz-lbl-continue="Продолжить"
-     data-dz-lbl-back-map="К списку уроков"
-     data-dz-lbl-question="Вопрос"
-     data-dz-lbl-correct="Верно!"
-     data-dz-lbl-excellent="Отлично!"
-     data-dz-lbl-wrong="Не совсем…"
-     data-dz-lbl-try-again="Попробуй ещё раз."
-     data-dz-lbl-hearts-out=" Сердечки закончились — скоро восстановятся."
-     data-dz-lbl-reset-confirm="Сбросить прогресс обучения?"
-     data-dz-lbl-map-left="Выберите урок в списке. Осталось: {n}."
-     data-dz-lbl-map-done="Все уроки пройдены!"
-     data-dz-lbl-proud="молодец!"
-     data-dz-lbl-continue-path="Следующий урок"
-     data-dz-lbl-mascot="{{ questData.mascot.name|default('Залька') }}"
-     data-dz-lbl-lesson-start="Открыть"
+     data-dz-lbl-lesson-start="Начать"
      data-dz-lbl-lesson-done-mark="✓"
-     data-dz-lbl-lesson-of="Урок {n} из {total}"
-     data-dz-lbl-step-of="шаг {s} из {st}">
-
-    <script type="application/json" id="dz-quest-json" data-dz-quest-json>{{ questDataJson|default('{}')|raw }}</script>
-
-    <template data-dz-celebration-template>
-        <div class="dz-celebration">
-            <div class="dz-celebration-xp" data-dz-celebration-xp>+15 XP</div>
-            <div class="dz-celebration-title">Урок пройден</div>
-            <p class="dz-celebration-text" data-dz-celebration-text></p>
-            <button type="button" class="dz-btn dz-btn-primary" data-dz-celebration-close>Следующий урок</button>
-        </div>
-    </template>
+     data-dz-lbl-reset-confirm="Сбросить прогресс обучения?">
 
     <div class="dz-hud">
         <div class="dz-hud-progress-wrap">
@@ -42,19 +16,11 @@
         <div class="dz-hud-stat dz-stat-hearts" data-dz-hearts title="Попытки при ошибке"></div>
     </div>
 
-    <canvas class="dz-confetti-canvas d-none" data-dz-confetti aria-hidden="true"></canvas>
-
-    <div data-dz-overlay class="dz-overlay d-none">
-        <div data-dz-overlay-content></div>
-    </div>
-
-    {# ——— Список уроков ——— #}
     <div data-dz-view="map" class="dz-map-view">
         <p class="dz-map-lead">
-            <strong>16 уроков</strong> по работе в CRM: нажмите урок — Залька объяснит раздел и задаст 1–2 вопроса.
-            Полные тексты — во вкладке «Справочник».
+            <strong>Интерактивный тур.</strong> Залька откроет раздел CRM, подсветит кнопку или поле — нажмите его или «Далее».
         </p>
-        <div data-dz-path class="dz-lesson-path">
+        <div data-dz-tour="lesson-map" data-dz-path class="dz-lesson-path">
             {% set globalLesson = 0 %}
             {% for unit in questData.units|default([]) %}
                 <section class="dz-unit">
@@ -76,7 +42,7 @@
                                     <span class="dz-lesson-row-title">{{ lesson.title }}</span>
                                     <span class="dz-lesson-row-meta">{{ lesson.summary|default('') }}</span>
                                 </span>
-                                <span class="dz-lesson-row-action">{% if isFirst %}Открыть{% else %}🔒{% endif %}</span>
+                                <span class="dz-lesson-row-action">{% if isFirst %}Начать{% else %}🔒{% endif %}</span>
                             </button>
                         {% endfor %}
                     </div>
@@ -85,30 +51,6 @@
         </div>
         <div class="dz-map-actions">
             <button type="button" data-dz-reset>Сбросить прогресс</button>
-        </div>
-    </div>
-
-    {# ——— Прохождение урока ——— #}
-    <div data-dz-view="lesson" class="dz-lesson-screen d-none">
-        <div class="dz-lesson-context" data-dz-lesson-context></div>
-        <div class="dz-lesson-top" data-dz-lesson-bar>
-            <button type="button" class="dz-back-link" data-dz-back-map>← К списку уроков</button>
-            <div class="dz-lesson-top-bar">
-                <div class="dz-lesson-top-fill" data-dz-lesson-progress style="width: 0%"></div>
-            </div>
-        </div>
-        <div class="dz-mascot-row dz-mascot-row-lesson">
-            <div class="dz-mascot-wrap" data-dz-mascot>
-                {% include 'admin/partials/_zalka_mascot.html.twig' %}
-            </div>
-            <div class="dz-speech-bubble">
-                <div class="dz-bubble-title" data-dz-bubble-title>Урок</div>
-                <p class="dz-bubble-text" data-dz-bubble-text></p>
-            </div>
-        </div>
-        <div data-dz-quiz-options class="dz-quiz-options d-none"></div>
-        <div class="dz-lesson-footer">
-            <button type="button" class="dz-btn dz-btn-primary" data-dz-continue>Продолжить</button>
         </div>
     </div>
 </div>

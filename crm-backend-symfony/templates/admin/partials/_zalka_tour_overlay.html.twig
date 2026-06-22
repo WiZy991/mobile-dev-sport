@@ -1,0 +1,62 @@
+{% if app.user %}
+<div id="dz-tour-root" class="dz-tour-root d-none" aria-live="polite"
+     data-user-id="{{ dz_onboarding_user_id() }}"
+     data-dz-lbl-continue="Далее"
+     data-dz-lbl-tap="Нажми подсвеченное"
+     data-dz-lbl-question="Вопрос"
+     data-dz-lbl-correct="Верно!"
+     data-dz-lbl-excellent="Отлично!"
+     data-dz-lbl-wrong="Не совсем…"
+     data-dz-lbl-try-again="Попробуй ещё раз."
+     data-dz-lbl-hearts-out=" Сердечки закончились — скоро восстановятся."
+     data-dz-lbl-proud="молодец!"
+     data-dz-lbl-continue-path="Следующий урок"
+     data-dz-lbl-mascot="Залька"
+     data-dz-lbl-lesson-done="Урок пройден!"
+     data-dz-lbl-exit-tour="Выйти из обучения">
+
+    <script type="application/json" id="dz-quest-json-global">{{ dz_onboarding_quest_json() }}</script>
+
+    <div class="dz-tour-backdrop" data-dz-tour-backdrop></div>
+    <div class="dz-tour-hole" data-dz-tour-hole></div>
+
+    <div class="dz-tour-stage" data-dz-tour-stage>
+        <div class="dz-comic-bubble" data-dz-tour-bubble>
+            <div class="dz-comic-bubble-inner">
+                <p class="dz-comic-text" data-dz-tour-text></p>
+                <div data-dz-tour-quiz class="dz-tour-quiz d-none"></div>
+                <button type="button" class="dz-tour-next dz-btn dz-btn-primary" data-dz-tour-next>Далее</button>
+            </div>
+            <div class="dz-comic-tail" aria-hidden="true"></div>
+        </div>
+        <div class="dz-tour-mascot-wrap" data-dz-tour-mascot>
+            {% include 'admin/partials/_zalka_mascot.html.twig' %}
+        </div>
+    </div>
+
+    <div class="dz-tour-topbar">
+        <button type="button" class="dz-tour-exit" data-dz-tour-exit title="Выйти">✕</button>
+        <div class="dz-tour-topbar-progress">
+            <div class="dz-tour-topbar-fill" data-dz-tour-step-progress></div>
+        </div>
+        <div class="dz-tour-topbar-stats">
+            <span class="dz-tour-stat-xp" data-dz-tour-xp>0 XP</span>
+            <span data-dz-tour-hearts class="dz-tour-hearts"></span>
+        </div>
+    </div>
+
+    <template data-dz-celebration-template>
+        <div class="dz-celebration">
+            <div class="dz-celebration-xp" data-dz-celebration-xp>+15 XP</div>
+            <div class="dz-celebration-title">Урок пройден</div>
+            <p class="dz-celebration-text" data-dz-celebration-text></p>
+            <button type="button" class="dz-btn dz-btn-primary" data-dz-celebration-close>Следующий урок</button>
+        </div>
+    </template>
+
+    <div data-dz-tour-overlay class="dz-overlay d-none">
+        <div data-dz-tour-overlay-content></div>
+    </div>
+    <canvas class="dz-confetti-canvas d-none" data-dz-tour-confetti aria-hidden="true"></canvas>
+</div>
+{% endif %}

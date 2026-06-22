@@ -3,7 +3,7 @@
 {% block title %}CRM Доброзал — Лиды{% endblock %}
 
 {% block body %}
-    <div class="content-header">
+    <div class="content-header" data-dz-tour="leads-header">
         <div>
             <h1>Лиды</h1>
             <div class="text-secondary small mt-1">Заявки с сайта, приложения, соцсетей и гостевых пропусков</div>
@@ -11,8 +11,7 @@
     </div>
 
     {% if funnel is defined %}
-    <div class="content-card mb-3">
-        <div class="card-section-title">Воронка</div>
+    <div class="content-card mb-3" data-dz-tour="leads-funnel">
         <div class="crm-funnel">
             <a href="{{ path('admin_section', {section: 'leads', status: 'new'}) }}" class="crm-funnel-step {{ statusFilter == 'new' ? 'active' : '' }}">
                 <div class="label">Новый</div>

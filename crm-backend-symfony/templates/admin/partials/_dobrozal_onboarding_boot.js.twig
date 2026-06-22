@@ -1,76 +1,101 @@
 {% verbatim %}
 /**
- * Dobrozal gamified onboarding engine (ASCII-only; UI strings from HTML data-* attrs).
+ * Dobrozal CRM tour — spotlight on real UI + Zalka comic bubble (ASCII-only strings from data-*).
  */
 (function (global) {
     'use strict';
 
     const STORAGE_PREFIX = 'dobrozal_onboarding_';
 
-    function readLabels(root) {
-        const d = root.dataset;
+    function readLabels(el) {
+        const d = el.dataset;
         return {
-            continue: d.dzLblContinue || 'Continue',
-            backMap: d.dzLblBackMap || 'Back',
+            continue: d.dzLblContinue || 'Next',
+            tap: d.dzLblTap || 'Tap highlighted',
             question: d.dzLblQuestion || 'Question',
             correct: d.dzLblCorrect || 'OK',
             excellent: d.dzLblExcellent || 'OK',
             wrong: d.dzLblWrong || 'Wrong',
             tryAgain: d.dzLblTryAgain || 'Try again',
             heartsOut: d.dzLblHeartsOut || '',
-            resetConfirm: d.dzLblResetConfirm || 'Reset progress?',
-            mapLeft: d.dzLblMapLeft || 'Pick a lesson. {n} left.',
-            mapDone: d.dzLblMapDone || 'All lessons done!',
-            lessonDone: d.dzLblLessonDone || 'Lesson complete!',
-            proud: d.dzLblProud || 'is proud of you!',
-            continuePath: d.dzLblContinuePath || 'Continue',
-            pathError: d.dzLblPathError || 'Lessons failed to load.',
+            proud: d.dzLblProud || 'is proud!',
+            continuePath: d.dzLblContinuePath || 'Next lesson',
             mascot: d.dzLblMascot || 'Zalka',
+            lessonDone: d.dzLblLessonDone || 'Done!',
+            exitTour: d.dzLblExitTour || 'Exit training?',
             lessonStart: d.dzLblLessonStart || 'Start',
-            lessonDoneMark: d.dzLblLessonDoneMark || 'OK',
-            lessonOf: d.dzLblLessonOf || 'Lesson {n} of {total}',
-            stepOf: d.dzLblStepOf || 'step {s} of {st}',
+            lessonDoneMark: '\u2713',
+            resetConfirm: 'Reset?',
         };
     }
 
-    class DobrozalOnboarding {
-        constructor(root, config) {
+    function currentSection() {
+        return document.body.dataset.dzSection || '';
+    }
+
+    function sectionUrl(section) {
+        const nav = document.querySelector('[data-dz-nav="' + section + '"]');
+        if (nav && nav.href) return nav.href;
+        if (section === 'dashboard') return '/admin';
+        return '/admin/' + section;
+    }
+
+    function parseQuest() {
+        const el = document.getElementById('dz-quest-json-global')
+            || document.getElementById('dz-quest-json')
+            || document.querySelector('[data-dz-quest-json]');
+        if (!el) return null;
+        try {
+            return JSON.parse((el.textContent || '').trim() || '{}');
+        } catch (e) {
+            console.error('Dobrozal tour: JSON error', e);
+            return null;
+        }
+    }
+
+    class DobrozalTour {
+        constructor(root, quest, userId) {
             this.root = root;
-            this.userId = config.userId || 'guest';
-            this.quest = config.quest;
+            this.quest = quest;
+            this.userId = userId;
             this.labels = readLabels(root);
+            this.heartsMax = quest.heartsMax || 5;
             this.state = this.loadState();
-            this.view = 'map';
             this.currentLesson = null;
             this.currentStepIndex = 0;
-            this.heartsMax = this.quest.heartsMax || 5;
+            this.clickHandler = null;
+            this.resizeHandler = null;
             this.cacheDom();
             this.bindEvents();
-            this.render();
+            if (this.state.activeLesson) {
+                const lesson = this.lessonById(this.state.activeLesson);
+                if (lesson) {
+                    this.currentLesson = lesson;
+                    this.currentStepIndex = this.state.activeStep || 0;
+                    this.runStep();
+                } else {
+                    this.clearActive();
+                }
+            }
         }
 
         cacheDom() {
-            const lessonRoot = this.root.querySelector('[data-dz-view="lesson"]');
             this.el = {
-                map: this.root.querySelector('[data-dz-view="map"]'),
-                lesson: lessonRoot,
-                progressFill: this.root.querySelector('[data-dz-progress-fill]'),
-                progressText: this.root.querySelector('[data-dz-progress-text]'),
-                xp: this.root.querySelector('[data-dz-xp]'),
-                streak: this.root.querySelector('[data-dz-streak]'),
-                hearts: this.root.querySelector('[data-dz-hearts]'),
-                path: this.root.querySelector('[data-dz-path]'),
-                lessonContext: this.root.querySelector('[data-dz-lesson-context]'),
-                mascot: lessonRoot?.querySelector('[data-dz-mascot]'),
-                bubbleTitle: lessonRoot?.querySelector('[data-dz-bubble-title]'),
-                bubbleText: lessonRoot?.querySelector('[data-dz-bubble-text]'),
-                quizOptions: lessonRoot?.querySelector('[data-dz-quiz-options]'),
-                continueBtn: lessonRoot?.querySelector('[data-dz-continue]'),
-                backBtn: lessonRoot?.querySelector('[data-dz-back-map]'),
-                lessonProgress: lessonRoot?.querySelector('[data-dz-lesson-progress]'),
-                overlay: this.root.querySelector('[data-dz-overlay]'),
-                overlayContent: this.root.querySelector('[data-dz-overlay-content]'),
-                confetti: this.root.querySelector('[data-dz-confetti]'),
+                backdrop: this.root.querySelector('[data-dz-tour-backdrop]'),
+                hole: this.root.querySelector('[data-dz-tour-hole]'),
+                stage: this.root.querySelector('[data-dz-tour-stage]'),
+                bubble: this.root.querySelector('[data-dz-tour-bubble]'),
+                text: this.root.querySelector('[data-dz-tour-text]'),
+                quiz: this.root.querySelector('[data-dz-tour-quiz]'),
+                next: this.root.querySelector('[data-dz-tour-next]'),
+                mascot: this.root.querySelector('[data-dz-tour-mascot]'),
+                stepProgress: this.root.querySelector('[data-dz-tour-step-progress]'),
+                xp: this.root.querySelector('[data-dz-tour-xp]'),
+                hearts: this.root.querySelector('[data-dz-tour-hearts]'),
+                exit: this.root.querySelector('[data-dz-tour-exit]'),
+                overlay: this.root.querySelector('[data-dz-tour-overlay]'),
+                overlayContent: this.root.querySelector('[data-dz-tour-overlay-content]'),
+                confetti: this.root.querySelector('[data-dz-tour-confetti]'),
                 celebrationTpl: this.root.querySelector('[data-dz-celebration-template]'),
             };
         }
@@ -82,6 +107,8 @@
                 hearts: this.heartsMax,
                 completedLessons: [],
                 lastVisit: new Date().toISOString().slice(0, 10),
+                activeLesson: null,
+                activeStep: 0,
             };
         }
 
@@ -91,30 +118,28 @@
                 const base = raw ? JSON.parse(raw) : this.defaultState();
                 base.hearts = base.hearts ?? this.heartsMax;
                 base.completedLessons = base.completedLessons || [];
-                this.applyStreak(base);
                 return base;
             } catch {
                 return this.defaultState();
             }
         }
 
-        applyStreak(state) {
-            const today = new Date().toISOString().slice(0, 10);
-            const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-            if (state.lastVisit === today) return;
-            state.streak = state.lastVisit === yesterday ? (state.streak || 1) + 1 : 1;
-            state.lastVisit = today;
-        }
-
         saveState() {
             localStorage.setItem(STORAGE_PREFIX + this.userId, JSON.stringify(this.state));
+            global.dispatchEvent(new CustomEvent('dz-onboarding-state', { detail: this.state }));
+        }
+
+        clearActive() {
+            this.state.activeLesson = null;
+            this.state.activeStep = 0;
+            this.saveState();
         }
 
         allLessons() {
             const list = [];
             (this.quest.units || []).forEach((unit) => {
                 (unit.lessons || []).forEach((lesson) => {
-                    list.push({ ...lesson, unitId: unit.id, unitTitle: unit.title, unitColor: unit.color });
+                    list.push(lesson);
                 });
             });
             return list;
@@ -122,11 +147,6 @@
 
         lessonById(id) {
             return this.allLessons().find((l) => l.id === id) || null;
-        }
-
-        firstLessonId() {
-            const lessons = this.allLessons();
-            return lessons.length ? lessons[0].id : null;
         }
 
         nextLessonId(afterId) {
@@ -147,53 +167,410 @@
             return this.state.completedLessons.includes(lessonId);
         }
 
-        isCurrentLesson(lessonId) {
-            const next = this.allLessons().find((l) => !this.isLessonCompleted(l.id) && this.isLessonUnlocked(l.id));
-            return next?.id === lessonId;
-        }
-
-        progressPercent() {
-            const total = this.quest.totalLessons || this.allLessons().length;
-            return total ? Math.round((this.state.completedLessons.length / total) * 100) : 0;
-        }
-
-        lessonIndex(lessonId) {
-            const idx = this.allLessons().findIndex((l) => l.id === lessonId);
-            return idx >= 0 ? idx + 1 : 0;
-        }
-
-        updateLessonContext() {
-            if (!this.el.lessonContext || !this.currentLesson) return;
-            const total = this.quest.totalLessons || this.allLessons().length;
-            const n = this.lessonIndex(this.currentLesson.id);
-            const steps = this.currentLesson.steps || [];
-            const line =
-                this.labels.lessonOf.replace('{n}', String(n)).replace('{total}', String(total)) +
-                ' · ' +
-                this.currentLesson.title +
-                ' · ' +
-                this.labels.stepOf
-                    .replace('{s}', String(this.currentStepIndex + 1))
-                    .replace('{st}', String(steps.length));
-            this.el.lessonContext.textContent = line;
-        }
-
         bindEvents() {
-            this.el.continueBtn?.addEventListener('click', () => this.onContinue());
-            this.el.backBtn?.addEventListener('click', () => this.showMap());
-            this.el.path?.addEventListener('click', (e) => {
-                const node = e.target.closest('[data-lesson-id]');
-                if (!node || node.classList.contains('dz-lesson-locked')) return;
-                const id = node.getAttribute('data-lesson-id');
-                if (id) this.startLesson(id);
-            });
-            this.root.querySelector('[data-dz-reset]')?.addEventListener('click', () => {
-                if (confirm(this.labels.resetConfirm)) {
-                    this.state = this.defaultState();
-                    this.saveState();
-                    this.showMap();
+            this.el.next?.addEventListener('click', () => this.onNext());
+            this.el.exit?.addEventListener('click', () => {
+                if (confirm(this.labels.exitTour)) {
+                    this.endTour();
                 }
             });
+            this.el.backdrop?.addEventListener('click', (e) => {
+                if (e.target === this.el.backdrop) e.preventDefault();
+            });
+        }
+
+        startLesson(lessonId) {
+            const lesson = this.lessonById(lessonId);
+            if (!lesson || !this.isLessonUnlocked(lessonId)) return;
+            this.currentLesson = lesson;
+            this.currentStepIndex = 0;
+            this.state.activeLesson = lessonId;
+            this.state.activeStep = 0;
+            this.saveState();
+            this.runStep();
+        }
+
+        endTour() {
+            this.clearActive();
+            this.currentLesson = null;
+            this.hideTour();
+            this.unhighlight();
+        }
+
+        showTour() {
+            this.root.classList.remove('d-none');
+            this.root.classList.add('dz-tour-active');
+            this.renderHud();
+        }
+
+        hideTour() {
+            this.root.classList.add('d-none');
+            this.root.classList.remove('dz-tour-active');
+            this.cleanupClick();
+            if (this.resizeHandler) {
+                window.removeEventListener('resize', this.resizeHandler);
+                window.removeEventListener('scroll', this.resizeHandler, true);
+                this.resizeHandler = null;
+            }
+        }
+
+        cleanupClick() {
+            if (this.clickHandler) {
+                const t = this.clickHandler.target;
+                t?.removeEventListener('click', this.clickHandler.fn, true);
+                this.clickHandler = null;
+            }
+        }
+
+        unhighlight() {
+            document.querySelectorAll('[data-dz-tour-highlight]').forEach((n) => {
+                n.removeAttribute('data-dz-tour-highlight');
+            });
+        }
+
+        runStep() {
+            const steps = this.currentLesson?.steps || [];
+            const step = steps[this.currentStepIndex];
+            if (!step) {
+                this.completeLesson();
+                return;
+            }
+
+            const needSection = step.section || currentSection();
+            if (needSection && needSection !== currentSection()) {
+                this.state.activeStep = this.currentStepIndex;
+                this.saveState();
+                window.location.assign(sectionUrl(needSection));
+                return;
+            }
+
+            this.showTour();
+            requestAnimationFrame(() => this.renderStep(step));
+        }
+
+        renderStep(step) {
+            const steps = this.currentLesson?.steps || [];
+            if (this.el.stepProgress) {
+                this.el.stepProgress.style.width = ((this.currentStepIndex + 1) / steps.length) * 100 + '%';
+            }
+
+            this.cleanupClick();
+            this.unhighlight();
+            this.el.quiz?.classList.add('d-none');
+            if (this.el.quiz) this.el.quiz.innerHTML = '';
+
+            const mood = step.mood || 'neutral';
+            this.setMood(mood);
+
+            const target = this.resolveTarget(step);
+            if (target) {
+                target.setAttribute('data-dz-tour-highlight', '1');
+                this.positionSpotlight(target);
+            } else {
+                this.centerSpotlight();
+            }
+
+            const isQuiz = step.type === 'quiz';
+            const isClick = step.type === 'tour_click';
+
+            if (isQuiz) {
+                if (this.el.text) this.el.text.textContent = step.question || '';
+                this.el.next?.classList.add('d-none');
+                this.renderQuiz(step);
+            } else {
+                if (this.el.text) {
+                    this.el.text.textContent = step.text || step.title || '';
+                }
+                if (isClick) {
+                    this.el.next?.classList.add('d-none');
+                    this.el.hole?.classList.add('dz-tour-hole-click');
+                    this.setupClickAdvance(target);
+                } else if (step.type === 'checkpoint') {
+                    if (this.el.next) this.el.next.textContent = this.labels.continuePath;
+                    this.el.next?.classList.remove('d-none');
+                } else {
+                    if (this.el.next) this.el.next.textContent = this.labels.continue;
+                    this.el.next?.classList.remove('d-none');
+                }
+            }
+
+            this.positionStage(target);
+            this.renderHud();
+
+            if (!this.resizeHandler) {
+                this.resizeHandler = () => {
+                    const s = this.currentLesson?.steps?.[this.currentStepIndex];
+                    if (!s) return;
+                    const t = this.resolveTarget(s);
+                    if (t) {
+                        this.positionSpotlight(t);
+                        this.positionStage(t);
+                    }
+                };
+                window.addEventListener('resize', this.resizeHandler);
+                window.addEventListener('scroll', this.resizeHandler, true);
+            }
+        }
+
+        resolveTarget(step) {
+            const sel = step.target;
+            if (!sel) return null;
+            try {
+                return document.querySelector(sel);
+            } catch {
+                return null;
+            }
+        }
+
+        positionSpotlight(el) {
+            const pad = 8;
+            const r = el.getBoundingClientRect();
+            const hole = this.el.hole;
+            if (!hole) return;
+            hole.style.top = (r.top - pad) + 'px';
+            hole.style.left = (r.left - pad) + 'px';
+            hole.style.width = (r.width + pad * 2) + 'px';
+            hole.style.height = (r.height + pad * 2) + 'px';
+            hole.classList.remove('dz-tour-hole-click');
+        }
+
+        centerSpotlight() {
+            const hole = this.el.hole;
+            if (!hole) return;
+            const w = Math.min(400, window.innerWidth * 0.8);
+            const h = 120;
+            hole.style.top = (window.innerHeight / 2 - h / 2) + 'px';
+            hole.style.left = (window.innerWidth / 2 - w / 2) + 'px';
+            hole.style.width = w + 'px';
+            hole.style.height = h + 'px';
+        }
+
+        positionStage(target) {
+            const stage = this.el.stage;
+            if (!stage) return;
+            const margin = 16;
+            const stageW = 300;
+            const stageH = 280;
+            let top, left;
+
+            if (target) {
+                const r = target.getBoundingClientRect();
+                const below = r.bottom + stageH + margin < window.innerHeight;
+                const above = r.top - stageH - margin > 60;
+                if (below) {
+                    top = r.bottom + margin;
+                } else if (above) {
+                    top = r.top - stageH - margin;
+                } else {
+                    top = Math.max(60, window.innerHeight - stageH - margin);
+                }
+                left = Math.min(
+                    Math.max(margin, r.left + r.width / 2 - stageW / 2),
+                    window.innerWidth - stageW - margin,
+                );
+            } else {
+                top = window.innerHeight - stageH - margin - 20;
+                left = window.innerWidth - stageW - margin - 20;
+            }
+
+            stage.style.top = top + 'px';
+            stage.style.left = left + 'px';
+            stage.style.width = stageW + 'px';
+        }
+
+        setupClickAdvance(target) {
+            if (!target) return;
+            const fn = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.cleanupClick();
+                const steps = this.currentLesson?.steps || [];
+                const isLastStep = this.currentStepIndex >= steps.length - 1;
+
+                if (isLastStep) {
+                    const lessonId = this.currentLesson?.id;
+                    if (lessonId && !this.state.completedLessons.includes(lessonId)) {
+                        this.state.completedLessons.push(lessonId);
+                        this.state.xp += this.quest.xpPerLesson || 15;
+                        this.state.hearts = Math.min(this.heartsMax, this.state.hearts + 1);
+                    }
+                    const nextId = this.nextLessonId(lessonId);
+                    if (nextId) {
+                        this.state.activeLesson = nextId;
+                        this.state.activeStep = 0;
+                        this.currentLesson = this.lessonById(nextId);
+                        this.currentStepIndex = 0;
+                    } else {
+                        this.clearActive();
+                    }
+                } else {
+                    this.currentStepIndex++;
+                    this.state.activeStep = this.currentStepIndex;
+                }
+                this.saveState();
+                if (target.tagName === 'A' && target.href) {
+                    window.location.assign(target.href);
+                } else {
+                    this.runStep();
+                }
+            };
+            target.addEventListener('click', fn, true);
+            this.clickHandler = { target, fn };
+        }
+
+        renderQuiz(step) {
+            if (!this.el.quiz) return;
+            this.el.quiz.classList.remove('d-none');
+            (step.options || []).forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'dz-quiz-option';
+                btn.textContent = opt;
+                btn.addEventListener('click', () => this.answerQuiz(step, i, btn));
+                this.el.quiz.appendChild(btn);
+            });
+        }
+
+        answerQuiz(step, index, btn) {
+            const correct = step.correct === index;
+            this.el.quiz?.querySelectorAll('.dz-quiz-option').forEach((b) => {
+                b.disabled = true;
+            });
+            if (correct) {
+                btn.classList.add('dz-quiz-correct');
+                this.setMood('happy');
+                if (this.el.text) this.el.text.textContent = step.explain || this.labels.excellent;
+                setTimeout(() => this.advance(), 1100);
+            } else {
+                btn.classList.add('dz-quiz-wrong');
+                this.state.hearts = Math.max(0, this.state.hearts - 1);
+                this.saveState();
+                this.setMood('sad');
+                if (this.el.text) {
+                    let msg = step.explain || this.labels.tryAgain;
+                    if (this.state.hearts <= 0) msg += this.labels.heartsOut;
+                    this.el.text.textContent = msg;
+                }
+                if (this.state.hearts <= 0) {
+                    this.state.hearts = this.heartsMax;
+                    this.saveState();
+                }
+                setTimeout(() => {
+                    this.el.quiz?.querySelectorAll('.dz-quiz-option').forEach((b) => {
+                        b.disabled = false;
+                        b.classList.remove('dz-quiz-wrong', 'dz-quiz-correct');
+                    });
+                    const s = this.currentLesson?.steps?.[this.currentStepIndex];
+                    if (s) this.renderStep(s);
+                }, 1600);
+            }
+            this.renderHud();
+        }
+
+        onNext() {
+            const step = this.currentLesson?.steps?.[this.currentStepIndex];
+            if (step?.type === 'checkpoint') {
+                this.endTour();
+                const onboarding = sectionUrl('onboarding');
+                if (currentSection() !== 'onboarding') {
+                    window.location.assign(onboarding);
+                }
+                return;
+            }
+            this.advance();
+        }
+
+        advance() {
+            this.currentStepIndex++;
+            this.state.activeStep = this.currentStepIndex;
+            this.saveState();
+            const steps = this.currentLesson?.steps || [];
+            if (this.currentStepIndex >= steps.length) {
+                this.completeLesson();
+            } else {
+                this.runStep();
+            }
+        }
+
+        completeLesson() {
+            const id = this.currentLesson?.id;
+            if (id && !this.state.completedLessons.includes(id)) {
+                this.state.completedLessons.push(id);
+                const xpGain = this.quest.xpPerLesson || 15;
+                this.state.xp += xpGain;
+                this.state.hearts = Math.min(this.heartsMax, this.state.hearts + 1);
+            }
+            this.clearActive();
+            this.showCelebration(this.quest.xpPerLesson || 15);
+        }
+
+        showCelebration(xpGain) {
+            this.setMood('celebrate');
+            this.el.confetti?.classList.remove('d-none');
+            this.fireConfetti();
+            if (!this.el.overlay || !this.el.overlayContent) return;
+            const tpl = this.el.celebrationTpl;
+            if (tpl) {
+                const clone = tpl.content.cloneNode(true);
+                const xpEl = clone.querySelector('[data-dz-celebration-xp]');
+                const textEl = clone.querySelector('[data-dz-celebration-text]');
+                if (xpEl) xpEl.textContent = '+' + xpGain + ' XP';
+                if (textEl) {
+                    textEl.textContent = (this.quest.mascot?.name || this.labels.mascot) + ' ' + this.labels.proud;
+                }
+                this.el.overlayContent.innerHTML = '';
+                this.el.overlayContent.appendChild(clone);
+            }
+            this.el.overlay.classList.remove('d-none');
+            this.el.overlayContent.querySelector('[data-dz-celebration-close]')?.addEventListener('click', () => {
+                this.el.overlay.classList.add('d-none');
+                this.el.confetti?.classList.add('d-none');
+                const next = this.nextLessonId(this.currentLesson?.id);
+                this.hideTour();
+                if (next && this.isLessonUnlocked(next)) {
+                    this.startLesson(next);
+                } else {
+                    this.endTour();
+                }
+            });
+        }
+
+        fireConfetti() {
+            const canvas = this.el.confetti;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const colors = ['#ff5b2e', '#ffcb45', '#14b88a', '#3b9eff'];
+            const pieces = Array.from({ length: 70 }, () => ({
+                x: Math.random() * canvas.width,
+                y: -20,
+                r: 4 + Math.random() * 5,
+                c: colors[Math.floor(Math.random() * colors.length)],
+                vy: 2 + Math.random() * 4,
+                vx: -2 + Math.random() * 4,
+                rot: Math.random() * 360,
+                vr: -6 + Math.random() * 12,
+            }));
+            let frame = 0;
+            const draw = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                pieces.forEach((p) => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.1;
+                    p.rot += p.vr;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rot * Math.PI) / 180);
+                    ctx.fillStyle = p.c;
+                    ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r);
+                    ctx.restore();
+                });
+                if (++frame < 80) requestAnimationFrame(draw);
+                else ctx.clearRect(0, 0, canvas.width, canvas.height);
+            };
+            draw();
         }
 
         setMood(mood) {
@@ -205,305 +582,126 @@
             const mouth = this.el.mascot?.querySelector('.dz-mouth-' + m);
             if (mouth) mouth.style.display = '';
             this.el.mascot?.classList.toggle('dz-mascot-bounce', m === 'celebrate' || m === 'excited');
-            this.el.mascot?.classList.toggle('dz-mascot-wiggle', m === 'sad');
         }
 
         renderHud() {
-            const total = this.quest.totalLessons || this.allLessons().length;
-            if (this.el.progressFill) this.el.progressFill.style.width = this.progressPercent() + '%';
-            if (this.el.progressText) {
-                this.el.progressText.textContent = this.state.completedLessons.length + ' / ' + total;
-            }
-            if (this.el.xp) this.el.xp.textContent = String(this.state.xp);
-            if (this.el.streak) this.el.streak.textContent = String(this.state.streak || 1);
+            if (this.el.xp) this.el.xp.textContent = (this.state.xp || 0) + ' XP';
             if (this.el.hearts) {
                 this.el.hearts.innerHTML = '';
                 for (let i = 0; i < this.heartsMax; i++) {
                     const span = document.createElement('span');
                     span.className = 'dz-heart ' + (i < this.state.hearts ? 'dz-heart-full' : 'dz-heart-empty');
-                    span.setAttribute('aria-hidden', 'true');
                     this.el.hearts.appendChild(span);
                 }
             }
         }
+    }
 
-        updatePathNodes() {
-            if (!this.el.path) return;
-            this.el.path.querySelectorAll('[data-lesson-id]').forEach((node) => {
-                const id = node.getAttribute('data-lesson-id');
-                const lesson = this.lessonById(id);
-                if (!lesson) return;
-                const done = this.isLessonCompleted(id);
-                const unlocked = this.isLessonUnlocked(id);
-                const current = this.isCurrentLesson(id);
-                node.classList.toggle('dz-lesson-done', done);
-                node.classList.toggle('dz-lesson-locked', !unlocked && !done);
-                node.classList.toggle('dz-lesson-current', current && !done);
-                node.disabled = !unlocked;
-                const num = node.querySelector('.dz-lesson-row-num');
-                if (num && done) num.textContent = '\u2713';
-                const action = node.querySelector('.dz-lesson-row-action');
-                if (action) {
-                    action.textContent = done ? this.labels.lessonDoneMark : unlocked ? this.labels.lessonStart : '\uD83D\uDD12';
-                }
-            });
-        }
-
-        showMap() {
-            this.view = 'map';
-            this.currentLesson = null;
-            this.el.map?.classList.remove('d-none');
-            this.el.lesson?.classList.add('d-none');
-            this.renderHud();
-            this.updatePathNodes();
-        }
-
-        startLesson(lessonId) {
-            const lesson = this.lessonById(lessonId);
-            if (!lesson || !this.isLessonUnlocked(lessonId)) return;
-            this.currentLesson = lesson;
-            this.currentStepIndex = 0;
-            this.view = 'lesson';
-            this.el.map?.classList.add('d-none');
-            this.el.lesson?.classList.remove('d-none');
-            this.renderStep();
-        }
-
-        setContinueLabel(mode) {
-            if (!this.el.continueBtn) return;
-            this.el.continueBtn.textContent = mode === 'back' ? this.labels.backMap : this.labels.continue;
-        }
-
-        renderStep() {
-            if (!this.currentLesson) return;
-            const steps = this.currentLesson.steps || [];
-            const step = steps[this.currentStepIndex];
-            const total = steps.length;
-
-            if (this.el.lessonProgress) {
-                this.el.lessonProgress.style.width = ((this.currentStepIndex + 1) / total) * 100 + '%';
-            }
-
-            this.el.continueBtn?.classList.remove('d-none');
-            if (this.el.continueBtn) this.el.continueBtn.disabled = false;
-            this.el.quizOptions?.classList.add('d-none');
-            if (this.el.quizOptions) this.el.quizOptions.innerHTML = '';
-
-            if (!step) {
-                this.completeLesson();
-                return;
-            }
-
-            this.setMood(step.mood || 'neutral');
-            this.updateLessonContext();
-
-            if (step.type === 'quiz') {
-                this.el.continueBtn?.classList.add('d-none');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.labels.question;
-                if (this.el.bubbleText) this.el.bubbleText.textContent = step.question || '';
-                this.renderQuiz(step);
-                return;
-            }
-
-            if (this.el.bubbleTitle) {
-                this.el.bubbleTitle.textContent = step.title || this.currentLesson.title;
-            }
-            if (this.el.bubbleText) {
-                this.el.bubbleText.textContent = step.text || '';
-            }
-
-            this.setContinueLabel(step.type === 'checkpoint' ? 'back' : 'continue');
-        }
-
-        renderQuiz(step) {
-            if (!this.el.quizOptions) return;
-            this.el.quizOptions.classList.remove('d-none');
-            (step.options || []).forEach((opt, i) => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'dz-quiz-option';
-                btn.textContent = opt;
-                btn.addEventListener('click', () => this.answerQuiz(step, i, btn));
-                this.el.quizOptions.appendChild(btn);
-            });
-        }
-
-        answerQuiz(step, index, btn) {
-            const correct = step.correct === index;
-            this.el.quizOptions?.querySelectorAll('.dz-quiz-option').forEach((b) => {
-                b.disabled = true;
-            });
-
-            if (correct) {
-                btn.classList.add('dz-quiz-correct');
-                this.setMood('happy');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.labels.correct;
-                if (this.el.bubbleText) this.el.bubbleText.textContent = step.explain || this.labels.excellent;
-                setTimeout(() => {
-                    this.currentStepIndex++;
-                    this.renderStep();
-                }, 1200);
-            } else {
-                btn.classList.add('dz-quiz-wrong');
-                this.state.hearts = Math.max(0, this.state.hearts - 1);
-                this.saveState();
-                this.renderHud();
-                this.setMood('sad');
-                if (this.el.bubbleTitle) this.el.bubbleTitle.textContent = this.labels.wrong;
-                if (this.el.bubbleText) {
-                    let msg = step.explain || this.labels.tryAgain;
-                    if (this.state.hearts <= 0) msg += this.labels.heartsOut;
-                    this.el.bubbleText.textContent = msg;
-                }
-                if (this.state.hearts <= 0) {
-                    this.state.hearts = this.heartsMax;
-                    this.saveState();
-                }
-                setTimeout(() => {
-                    this.el.quizOptions?.querySelectorAll('.dz-quiz-option').forEach((b) => {
-                        b.disabled = false;
-                        b.classList.remove('dz-quiz-wrong', 'dz-quiz-correct');
-                    });
-                    this.renderStep();
-                }, 1800);
-            }
-        }
-
-        onContinue() {
-            const steps = this.currentLesson?.steps || [];
-            const step = steps[this.currentStepIndex];
-            if (step?.type === 'checkpoint') {
-                this.showMap();
-                return;
-            }
-            this.currentStepIndex++;
-            if (this.currentStepIndex >= steps.length) {
-                this.completeLesson();
-            } else {
-                this.renderStep();
-            }
-        }
-
-        completeLesson() {
-            const id = this.currentLesson?.id;
-            if (id && !this.state.completedLessons.includes(id)) {
-                this.state.completedLessons.push(id);
-                const xpGain = this.quest.xpPerLesson || 15;
-                this.state.xp += xpGain;
-                this.state.hearts = Math.min(this.heartsMax, this.state.hearts + 1);
-                this.saveState();
-                this.showCelebration(xpGain);
-            } else {
-                this.showMap();
-            }
-        }
-
-        showCelebration(xpGain) {
-            this.setMood('celebrate');
-            this.el.confetti?.classList.remove('d-none');
-            this.fireConfetti();
-            if (!this.el.overlay || !this.el.overlayContent) return;
-
-            const tpl = this.el.celebrationTpl;
-            if (tpl) {
-                const clone = tpl.content.cloneNode(true);
-                const xpEl = clone.querySelector('[data-dz-celebration-xp]');
-                const textEl = clone.querySelector('[data-dz-celebration-text]');
-                if (xpEl) xpEl.textContent = '+' + xpGain + ' XP';
-                if (textEl) {
-                    textEl.textContent =
-                        (this.quest.mascot?.name || this.labels.mascot) + ' ' + this.labels.proud;
-                }
-                this.el.overlayContent.innerHTML = '';
-                this.el.overlayContent.appendChild(clone);
-            }
-
-            this.el.overlay.classList.remove('d-none');
-            this.el.overlayContent.querySelector('[data-dz-celebration-close]')?.addEventListener('click', () => {
-                this.el.overlay.classList.add('d-none');
-                this.el.confetti?.classList.add('d-none');
-                const next = this.nextLessonId(this.currentLesson?.id);
-                if (next && this.isLessonUnlocked(next)) {
-                    this.startLesson(next);
-                } else {
-                    this.showMap();
-                }
-            });
-        }
-
-        fireConfetti() {
-            const canvas = this.el.confetti;
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            const w = (canvas.width = this.root.offsetWidth);
-            const h = (canvas.height = this.root.offsetHeight);
-            const colors = ['#ff5b2e', '#ffcb45', '#14b88a', '#3b9eff', '#a855f7'];
-            const pieces = Array.from({ length: 80 }, () => ({
-                x: Math.random() * w,
-                y: -20 - Math.random() * h * 0.3,
-                r: 4 + Math.random() * 6,
-                c: colors[Math.floor(Math.random() * colors.length)],
-                vy: 2 + Math.random() * 4,
-                vx: -2 + Math.random() * 4,
-                rot: Math.random() * 360,
-                vr: -8 + Math.random() * 16,
-            }));
-            let frame = 0;
-            const draw = () => {
-                ctx.clearRect(0, 0, w, h);
-                pieces.forEach((p) => {
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    p.vy += 0.08;
-                    p.rot += p.vr;
-                    ctx.save();
-                    ctx.translate(p.x, p.y);
-                    ctx.rotate((p.rot * Math.PI) / 180);
-                    ctx.fillStyle = p.c;
-                    ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r);
-                    ctx.restore();
-                });
-                frame++;
-                if (frame < 90) requestAnimationFrame(draw);
-                else ctx.clearRect(0, 0, w, h);
+    class DobrozalMap {
+        constructor(root, quest, tour) {
+            this.root = root;
+            this.quest = quest;
+            this.tour = tour;
+            this.userId = root.dataset.userId || 'guest';
+            this.labels = readLabels(root);
+            this.state = tour.state;
+            this.el = {
+                progressFill: root.querySelector('[data-dz-progress-fill]'),
+                progressText: root.querySelector('[data-dz-progress-text]'),
+                xp: root.querySelector('[data-dz-xp]'),
+                streak: root.querySelector('[data-dz-streak]'),
+                hearts: root.querySelector('[data-dz-hearts]'),
+                path: root.querySelector('[data-dz-path]'),
             };
-            draw();
+            this.bindEvents();
+            this.render();
+            global.addEventListener('dz-onboarding-state', () => {
+                this.state = tour.state;
+                this.render();
+            });
+        }
+
+        allLessons() {
+            return this.tour.allLessons();
+        }
+
+        bindEvents() {
+            this.el.path?.addEventListener('click', (e) => {
+                const row = e.target.closest('[data-lesson-id]');
+                if (!row || row.classList.contains('dz-lesson-locked')) return;
+                const id = row.getAttribute('data-lesson-id');
+                if (id) this.tour.startLesson(id);
+            });
+            this.root.querySelector('[data-dz-reset]')?.addEventListener('click', () => {
+                if (confirm(this.labels.resetConfirm)) {
+                    this.tour.state = this.tour.defaultState();
+                    this.tour.saveState();
+                    this.render();
+                }
+            });
         }
 
         render() {
-            this.renderHud();
-            this.showMap();
+            const total = this.quest.totalLessons || this.allLessons().length;
+            const done = this.state.completedLessons.length;
+            if (this.el.progressFill) {
+                this.el.progressFill.style.width = (total ? Math.round((done / total) * 100) : 0) + '%';
+            }
+            if (this.el.progressText) this.el.progressText.textContent = done + ' / ' + total;
+            if (this.el.xp) this.el.xp.textContent = String(this.state.xp || 0);
+            if (this.el.streak) this.el.streak.textContent = String(this.state.streak || 1);
+            if (this.el.hearts) {
+                this.el.hearts.innerHTML = '';
+                const max = this.quest.heartsMax || 5;
+                for (let i = 0; i < max; i++) {
+                    const span = document.createElement('span');
+                    span.className = 'dz-heart ' + (i < (this.state.hearts ?? max) ? 'dz-heart-full' : 'dz-heart-empty');
+                    this.el.hearts.appendChild(span);
+                }
+            }
+            this.el.path?.querySelectorAll('[data-lesson-id]').forEach((node) => {
+                const id = node.getAttribute('data-lesson-id');
+                const doneL = this.state.completedLessons.includes(id);
+                const unlocked = this.tour.isLessonUnlocked(id);
+                const lessons = this.allLessons();
+                const next = lessons.find((l) => !this.state.completedLessons.includes(l.id) && this.tour.isLessonUnlocked(l.id));
+                const current = next?.id === id;
+                node.classList.toggle('dz-lesson-done', doneL);
+                node.classList.toggle('dz-lesson-locked', !unlocked && !doneL);
+                node.classList.toggle('dz-lesson-current', current && !doneL);
+                node.disabled = !unlocked;
+                const num = node.querySelector('.dz-lesson-row-num');
+                if (num && doneL) num.textContent = '\u2713';
+                const action = node.querySelector('.dz-lesson-row-action');
+                if (action) {
+                    action.textContent = doneL ? this.labels.lessonDoneMark : unlocked ? this.labels.lessonStart : '\uD83D\uDD12';
+                }
+            });
         }
     }
 
-    global.DobrozalOnboarding = DobrozalOnboarding;
+    function boot() {
+        const quest = parseQuest();
+        if (!quest?.units?.length) return;
 
-    function bootDobrozalOnboarding() {
-        const root = document.getElementById('dz-onboarding-root');
-        if (!root) return;
-        const questEl = document.getElementById('dz-quest-json') || root.querySelector('[data-dz-quest-json]');
-        if (!questEl) return;
-        let quest;
-        try {
-            quest = JSON.parse((questEl.textContent || '').trim() || '{}');
-        } catch (e) {
-            console.error('Dobrozal onboarding: JSON parse error', e);
-            return;
+        const tourRoot = document.getElementById('dz-tour-root');
+        const userId = tourRoot?.dataset.userId || 'guest';
+        let tour = null;
+        if (tourRoot) {
+            tour = new DobrozalTour(tourRoot, quest, userId);
+            global.dobrozalTour = tour;
         }
-        if (!quest.units || !quest.units.length) {
-            console.error('Dobrozal onboarding: empty quest data');
-            return;
+
+        const mapRoot = document.getElementById('dz-onboarding-root');
+        if (mapRoot && tour) {
+            new DobrozalMap(mapRoot, quest, tour);
         }
-        new DobrozalOnboarding(root, {
-            userId: root.dataset.userId || 'guest',
-            quest,
-        });
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', bootDobrozalOnboarding);
+        document.addEventListener('DOMContentLoaded', boot);
     } else {
-        bootDobrozalOnboarding();
+        boot();
     }
 })(typeof window !== 'undefined' ? window : this);
 

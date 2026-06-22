@@ -12,7 +12,7 @@
     <link href="/css/admin.css?v=3" rel="stylesheet">
     {% include 'admin/_admin_styles.html.twig' %}
 </head>
-<body>
+<body data-dz-section="{{ current|default('') }}">
 <div class="crm-bg-layer" aria-hidden="true"></div>
 <div class="crm-bg-glow" aria-hidden="true"></div>
 
@@ -75,7 +75,8 @@
             } %}
             {% for key, label in menu %}
                 <a href="{% if key == 'dashboard' %}{{ path('admin_dashboard') }}{% elseif key == 'crm_staff' %}{{ path('admin_crm_staff_index') }}{% elseif key == 'franchise' %}{{ path('admin_franchise_list') }}{% else %}{{ path('admin_section', {section: key}) }}{% endif %}"
-                   class="menu-item {{ current == key ? 'active' : '' }}">
+                   class="menu-item {{ current == key ? 'active' : '' }}"
+                   data-dz-nav="{{ key }}">
                     <i class="bi {{ icons[key]|default('bi-circle') }}"></i>
                     <span>{{ label }}</span>
                 </a>
@@ -94,6 +95,9 @@
         {% block body %}{% endblock %}
     </main>
 </div>
+{% include 'admin/partials/_zalka_tour_styles.html.twig' %}
+{% include 'admin/partials/_zalka_tour_overlay.html.twig' %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script charset="UTF-8">{% include 'admin/partials/_dobrozal_onboarding_boot.js.twig' %}</script>
 </body>
 </html>

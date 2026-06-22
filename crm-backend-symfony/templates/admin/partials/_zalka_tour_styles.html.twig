@@ -1,0 +1,231 @@
+{# Глобальный тур по CRM — подсветка + комиксное облако Зальки #}
+<style>
+.dz-tour-root {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    pointer-events: none;
+}
+.dz-tour-root.dz-tour-active { pointer-events: auto; }
+
+.dz-tour-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 10, 16, 0.55);
+    pointer-events: auto;
+}
+
+.dz-tour-hole {
+    position: fixed;
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(8, 10, 16, 0.72);
+    border: 3px solid #ff5b2e;
+    pointer-events: none;
+    transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
+    z-index: 10051;
+}
+.dz-tour-hole.dz-tour-hole-click {
+    pointer-events: auto;
+    cursor: pointer;
+    animation: dz-hole-pulse 1.4s ease-in-out infinite;
+}
+@keyframes dz-hole-pulse {
+    0%, 100% { box-shadow: 0 0 0 9999px rgba(8, 10, 16, 0.72), 0 0 0 0 rgba(255, 91, 46, 0.5); }
+    50% { box-shadow: 0 0 0 9999px rgba(8, 10, 16, 0.72), 0 0 0 8px rgba(255, 91, 46, 0.35); }
+}
+
+.dz-tour-stage {
+    position: fixed;
+    z-index: 10052;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: min(320px, calc(100vw - 24px));
+    pointer-events: auto;
+    transition: top 0.25s ease, left 0.25s ease;
+}
+
+/* Комиксное облако НАД головой */
+.dz-comic-bubble {
+    position: relative;
+    width: 100%;
+    margin-bottom: 4px;
+    order: 1;
+}
+.dz-comic-bubble-inner {
+    background: #fffef8;
+    color: #1a1f2e;
+    border: 3px solid #1a1f2e;
+    border-radius: 18px;
+    padding: 14px 16px 12px;
+    box-shadow: 4px 4px 0 #1a1f2e;
+}
+.dz-comic-text {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+.dz-comic-tail {
+    width: 0;
+    height: 0;
+    margin: 0 auto;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 16px solid #1a1f2e;
+    position: relative;
+    top: -1px;
+}
+.dz-comic-tail::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: -18px;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 12px solid #fffef8;
+}
+
+.dz-tour-mascot-wrap {
+    order: 2;
+    width: 110px;
+    flex-shrink: 0;
+}
+.dz-tour-mascot-wrap .dz-mascot-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,0.35));
+}
+.dz-mascot-bounce { animation: dz-mascot-bounce 0.6s ease infinite alternate; }
+@keyframes dz-mascot-bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-6px); }
+}
+
+.dz-tour-next {
+    width: 100%;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 800;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 12px;
+    background: #58cc02;
+    color: #fff;
+    box-shadow: 0 4px 0 #46a302;
+    cursor: pointer;
+}
+.dz-tour-next:hover { background: #61d802; }
+.dz-tour-next:active { transform: translateY(2px); box-shadow: 0 2px 0 #46a302; }
+.dz-tour-next.d-none { display: none !important; }
+
+.dz-tour-quiz { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.dz-tour-quiz .dz-quiz-option {
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 2px solid #d0d5de;
+    background: #f4f6fa;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: #1a1f2e;
+}
+.dz-tour-quiz .dz-quiz-option:hover:not(:disabled) { border-color: #ff5b2e; background: #fff; }
+.dz-tour-quiz .dz-quiz-correct { border-color: #14b88a !important; background: #d4f5eb !important; }
+.dz-tour-quiz .dz-quiz-wrong { border-color: #ff4d6d !important; background: #ffe0e6 !important; }
+
+.dz-tour-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10053;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: rgba(21, 24, 31, 0.92);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    pointer-events: auto;
+}
+.dz-tour-exit {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.3);
+    color: #b8c0d0;
+    font-size: 1rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.dz-tour-exit:hover { color: #fff; border-color: #ff5b2e; }
+.dz-tour-topbar-progress {
+    flex: 1;
+    height: 10px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.1);
+}
+.dz-tour-topbar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #14b88a, #2dd4a8);
+    transition: width 0.3s;
+}
+.dz-tour-topbar-stats {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 0.8rem;
+    color: #ffcb45;
+    flex-shrink: 0;
+}
+.dz-tour-hearts { display: flex; gap: 3px; }
+.dz-tour-hearts .dz-heart {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.dz-tour-hearts .dz-heart-full { background: #ff4d6d; }
+.dz-tour-hearts .dz-heart-empty { background: #4a5060; opacity: 0.6; }
+
+[data-dz-tour-highlight] {
+    position: relative;
+    z-index: 10049 !important;
+}
+
+.dz-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    pointer-events: auto;
+}
+.dz-celebration {
+    background: #2a3140;
+    border-radius: 20px;
+    padding: 28px 32px;
+    text-align: center;
+    border: 2px solid #ffcb45;
+    max-width: 360px;
+}
+.dz-celebration-xp { font-size: 2rem; font-weight: 800; color: #ffcb45; }
+.dz-celebration-title { font-size: 1.25rem; font-weight: 800; color: #f7f6f1; margin: 8px 0; }
+.dz-celebration-text { color: #b8c0d0; margin-bottom: 16px; }
+.dz-confetti-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 10061;
+    pointer-events: none;
+}
+</style>
