@@ -62,7 +62,7 @@
             this.state = this.loadState();
             this.currentLesson = null;
             this.currentStepIndex = 0;
-            this.clickHandler = null;
+            this.clickHandlers = [];
             this.resizeHandler = null;
             this.cacheDom();
             this.bindEvents();
@@ -214,17 +214,75 @@
         }
 
         cleanupClick() {
-            if (this.clickHandler) {
-                const t = this.clickHandler.target;
-                t?.removeEventListener('click', this.clickHandler.fn, true);
-                this.clickHandler = null;
-            }
+            (this.clickHandlers || []).forEach(({ el, fn, capture }) => {
+                el?.removeEventListener('click', fn, capture);
+            });
+            this.clickHandlers = [];
+            this.root?.classList.remove('dz-tour-click-mode');
+            this.el.hole?.classList.remove('dz-tour-hole-click');
         }
 
         unhighlight() {
             document.querySelectorAll('[data-dz-tour-highlight]').forEach((n) => {
                 n.removeAttribute('data-dz-tour-highlight');
+                n.classList.remove('dz-tour-click-target');
             });
+        }
+
+        handleClickAdvance(target) {
+            const steps = this.currentLesson?.steps || [];
+            const isLastStep = this.currentStepIndex >= steps.length - 1;
+
+            if (isLastStep) {
+                const lessonId = this.currentLesson?.id;
+                if (lessonId && !this.state.completedLessons.includes(lessonId)) {
+                    this.state.completedLessons.push(lessonId);
+                    this.state.xp += this.quest.xpPerLesson || 15;
+                    this.state.hearts = Math.min(this.heartsMax, this.state.hearts + 1);
+                }
+                const nextId = this.nextLessonId(lessonId);
+                if (nextId) {
+                    this.state.activeLesson = nextId;
+                    this.state.activeStep = 0;
+                    this.currentLesson = this.lessonById(nextId);
+                    this.currentStepIndex = 0;
+                } else {
+                    this.clearActive();
+                }
+            } else {
+                this.currentStepIndex++;
+                this.state.activeStep = this.currentStepIndex;
+            }
+            this.saveState();
+            const href = target?.href || (target?.tagName === 'A' ? target.getAttribute('href') : null);
+            if (target?.tagName === 'A' && href) {
+                window.location.assign(href);
+            } else {
+                this.runStep();
+            }
+        }
+
+        bindClickAdvance(el, target) {
+            if (!el) return;
+            const fn = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.cleanupClick();
+                this.handleClickAdvance(target || el);
+            };
+            el.addEventListener('click', fn, true);
+            this.clickHandlers.push({ el, fn, capture: true });
+        }
+
+        setupClickAdvance(target) {
+            if (!target) return;
+            this.root?.classList.add('dz-tour-click-mode');
+            target.classList.add('dz-tour-click-target');
+            this.bindClickAdvance(target, target);
+            if (this.el.hole) {
+                this.el.hole.classList.add('dz-tour-hole-click');
+                this.bindClickAdvance(this.el.hole, target);
+            }
         }
 
         runStep() {
@@ -375,46 +433,6 @@
             stage.style.top = top + 'px';
             stage.style.left = left + 'px';
             stage.style.width = stageW + 'px';
-        }
-
-        setupClickAdvance(target) {
-            if (!target) return;
-            const fn = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.cleanupClick();
-                const steps = this.currentLesson?.steps || [];
-                const isLastStep = this.currentStepIndex >= steps.length - 1;
-
-                if (isLastStep) {
-                    const lessonId = this.currentLesson?.id;
-                    if (lessonId && !this.state.completedLessons.includes(lessonId)) {
-                        this.state.completedLessons.push(lessonId);
-                        this.state.xp += this.quest.xpPerLesson || 15;
-                        this.state.hearts = Math.min(this.heartsMax, this.state.hearts + 1);
-                    }
-                    const nextId = this.nextLessonId(lessonId);
-                    if (nextId) {
-                        this.state.activeLesson = nextId;
-                        this.state.activeStep = 0;
-                        this.currentLesson = this.lessonById(nextId);
-                        this.currentStepIndex = 0;
-                    } else {
-                        this.clearActive();
-                    }
-                } else {
-                    this.currentStepIndex++;
-                    this.state.activeStep = this.currentStepIndex;
-                }
-                this.saveState();
-                if (target.tagName === 'A' && target.href) {
-                    window.location.assign(target.href);
-                } else {
-                    this.runStep();
-                }
-            };
-            target.addEventListener('click', fn, true);
-            this.clickHandler = { target, fn };
         }
 
         renderQuiz(step) {

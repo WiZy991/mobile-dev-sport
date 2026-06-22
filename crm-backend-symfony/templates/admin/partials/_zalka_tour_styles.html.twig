@@ -14,6 +14,14 @@
     background: rgba(8, 10, 16, 0.55);
     pointer-events: auto;
 }
+/* Режим «нажми подсвеченное» — не блокируем клики по странице */
+.dz-tour-root.dz-tour-click-mode .dz-tour-backdrop {
+    pointer-events: none;
+    background: transparent;
+}
+.dz-tour-root.dz-tour-click-mode .dz-tour-stage {
+    pointer-events: none;
+}
 
 .dz-tour-hole {
     position: fixed;
@@ -24,9 +32,12 @@
     transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
     z-index: 10051;
 }
-.dz-tour-hole.dz-tour-hole-click {
+.dz-tour-root.dz-tour-click-mode .dz-tour-hole {
     pointer-events: auto;
     cursor: pointer;
+    animation: dz-hole-pulse 1.4s ease-in-out infinite;
+}
+.dz-tour-hole.dz-tour-hole-click {
     animation: dz-hole-pulse 1.4s ease-in-out infinite;
 }
 @keyframes dz-hole-pulse {
@@ -198,6 +209,12 @@
 [data-dz-tour-highlight] {
     position: relative;
     z-index: 10049 !important;
+}
+.dz-tour-click-target {
+    z-index: 10054 !important;
+    position: relative;
+    cursor: pointer !important;
+    box-shadow: 0 0 0 3px #ff5b2e, 0 0 20px rgba(255, 91, 46, 0.45) !important;
 }
 
 .dz-overlay {
