@@ -1432,7 +1432,13 @@
                     <p>Менеджер свяжется в течение часа, настроит демо и поможет с первыми шагами. Вы получите рабочий аккаунт CRM и тестовое мобильное приложение.</p>
                 </div>
                 <div class="cta-side form-card">
-                    <form action="#" method="post" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Спасибо! Мы свяжемся с вами'; this.querySelector('button').disabled=true;">
+                    {% for type, messages in app.flashes %}
+                        {% for message in messages %}
+                            <div style="margin-bottom:1rem;padding:0.75rem 1rem;border-radius:8px;font-size:0.9rem;{{ type == 'success' ? 'background:#e8f5e9;color:#1b5e20' : 'background:#ffebee;color:#b71c1c' }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endfor %}
+                    <form action="{{ path('landing_lead_submit') }}" method="post">
+                        <input type="text" name="website" value="" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
                         <div class="form-grid">
                             <div class="field">
                                 <label>Имя</label>

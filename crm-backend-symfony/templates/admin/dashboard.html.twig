@@ -294,6 +294,14 @@
                                 <label class="form-label small text-secondary">E-mail</label>
                                 <input type="email" name="email" class="form-control form-control-sm">
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-secondary">Источник</label>
+                                <select name="source" class="form-select form-select-sm">
+                                    {% for key, label in lead_sources() %}
+                                        <option value="{{ key }}" {{ key == 'call' ? 'selected' : '' }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                             <div class="col-12">
                                 <label class="form-label small text-secondary">Комментарий</label>
                                 <textarea name="comment" class="form-control form-control-sm" rows="2"></textarea>

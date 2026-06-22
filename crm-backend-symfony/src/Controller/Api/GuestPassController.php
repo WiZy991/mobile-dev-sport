@@ -5,6 +5,8 @@ namespace App\Controller\Api;
 use App\Entity\GuestPass;
 use App\Entity\Subscription;
 use App\Service\CurrentUserResolver;
+use App\Service\Lead\LeadIngestionService;
+use App\Service\Lead\LeadSource;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,6 +19,7 @@ class GuestPassController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
+        private readonly LeadIngestionService $leadIngestion,
     ) {}
 
     #[Route('', name: 'api_guest_passes_list', methods: ['GET'])]
@@ -49,6 +52,7 @@ class GuestPassController extends AbstractController
 
         $data = json_decode($request->getContent(), true) ?? [];
         $guestName = trim((string) ($data['guest_name'] ?? $data['guestName'] ?? ''));
+        $guestPhone = trim((string) ($data['guest_phone'] ?? $data['guestPhone'] ?? ''));
 
         $pass = (new GuestPass())
             ->setOwner($user)
@@ -56,6 +60,25 @@ class GuestPassController extends AbstractController
 
         $this->em->persist($pass);
         $this->em->flush();
+
+        $contactPhone = $guestPhone !== '' ? $guestPhone : $user->getPhone();
+        $leadName = $guestName !== '' ? $guestName : 'Гость';
+        try {
+            $this->leadIngestion->ingest(
+                $leadName,
+                $contactPhone,
+                null,
+                LeadSource::GUEST_PASS,
+                sprintf(
+                    'Гостевой пропуск #%d. Пригласил: %s (%s)',
+                    $pass->getId(),
+                    $user->getName(),
+                    $user->getPhone(),
+                ),
+            );
+            $this->em->flush();
+        } catch (\InvalidArgumentException) {
+        }
 
         return $this->json(self::serialize($pass), 201);
     }

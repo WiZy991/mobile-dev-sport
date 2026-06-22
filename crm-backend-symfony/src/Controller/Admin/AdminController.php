@@ -27,7 +27,8 @@ use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
 use App\Service\Admin\SubscriptionPlanCatalog;
-use App\Service\Api\SubscriptionFreezePolicy;
+use App\Service\Lead\LeadIngestionService;
+use App\Service\Lead\LeadSource;
 use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
@@ -59,6 +60,7 @@ class AdminController extends AbstractController
         private readonly SubscriptionFreezePolicy $freezePolicy,
         private readonly SubscriptionFreezeService $freezeService,
         private readonly SubscriptionPlanCatalog $planCatalog,
+        private readonly LeadIngestionService $leadIngestion,
     ) {}
 
     private function buildMenu(): array
@@ -618,17 +620,18 @@ class AdminController extends AbstractController
         $phone = (string) $request->request->get('phone');
         $email = $request->request->get('email') ?: null;
         $comment = $request->request->get('comment') ?: null;
-        $source = $request->request->get('source') ?: null;
+        $source = (string) $request->request->get('source', '');
+        if (!LeadSource::isValid($source)) {
+            $source = LeadSource::CALL;
+        }
 
-        $lead = (new Lead())
-            ->setName($name)
-            ->setPhone($phone)
-            ->setEmail($email)
-            ->setComment($comment)
-            ->setSource($source);
-
-        $this->em->persist($lead);
-        $this->em->flush();
+        try {
+            $this->leadIngestion->ingest($name, $phone, $email, $source, $comment);
+            $this->em->flush();
+            $this->addFlash('success', 'Лид добавлен.');
+        } catch (\InvalidArgumentException $e) {
+            $this->addFlash('danger', $e->getMessage());
+        }
 
         return $this->redirectToRoute('admin_section', ['section' => 'leads']);
     }
@@ -2037,10 +2040,15 @@ class AdminController extends AbstractController
             if ($statusFilter !== '' && in_array($statusFilter, ['new', 'trial_scheduled', 'trial_visited', 'converted', 'inactive'], true)) {
                 $qb->andWhere('l.status = :status')->setParameter('status', $statusFilter);
             }
-            if ($sourceFilter !== '' && in_array($sourceFilter, ['site', 'instagram', 'referral', 'call', 'other'], true)) {
+            if ($sourceFilter !== '' && LeadSource::isValid($sourceFilter)) {
                 $qb->andWhere('l.source = :source')->setParameter('source', $sourceFilter);
             }
             $leads = $qb->getQuery()->getResult();
+
+            $sourceStats = [];
+            foreach (LeadSource::keys() as $srcKey) {
+                $sourceStats[$srcKey] = (int) $this->em->getRepository(Lead::class)->count(['source' => $srcKey]);
+            }
 
             $funnel = [
                 'new' => $this->em->getRepository(Lead::class)->count(['status' => 'new']),
@@ -2057,6 +2065,7 @@ class AdminController extends AbstractController
                 'statusFilter' => $statusFilter,
                 'sourceFilter' => $sourceFilter,
                 'funnel' => $funnel,
+                'sourceStats' => $sourceStats,
             ]);
         }
 

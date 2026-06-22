@@ -4,6 +4,8 @@ namespace App\Controller\Api;
 
 use App\Entity\SupportTicket;
 use App\Service\CurrentUserResolver;
+use App\Service\Lead\LeadIngestionService;
+use App\Service\Lead\LeadSource;
 use App\Service\Support\SupportTicketStaffNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,6 +20,7 @@ class SupportTicketController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
         private readonly SupportTicketStaffNotifier $staffNotifier,
+        private readonly LeadIngestionService $leadIngestion,
     ) {}
 
     #[Route('/tickets', name: 'api_support_ticket_create', methods: ['POST'])]
@@ -30,6 +33,8 @@ class SupportTicketController extends AbstractController
         $message = trim((string) ($data['message'] ?? ''));
         $category = (string) ($data['category'] ?? SupportTicket::CATEGORY_OTHER);
         $contactEmail = trim((string) ($data['contact_email'] ?? ''));
+        $contactName = trim((string) ($data['contact_name'] ?? $data['name'] ?? ''));
+        $contactPhone = trim((string) ($data['contact_phone'] ?? $data['phone'] ?? ''));
 
         if ($subject === '') {
             return $this->json(['error' => 'subject is required'], 400);
@@ -66,6 +71,20 @@ class SupportTicketController extends AbstractController
 
         $this->em->persist($ticket);
         $this->em->flush();
+
+        if ($user === null && $contactPhone !== '') {
+            try {
+                $this->leadIngestion->ingest(
+                    $contactName !== '' ? $contactName : 'Обращение в поддержку',
+                    $contactPhone,
+                    $contactEmail !== '' ? $contactEmail : null,
+                    LeadSource::SUPPORT,
+                    'Тикет #' . $ticket->getId() . ': ' . $subject . ($message !== '' ? "\n" . mb_substr($message, 0, 500) : ''),
+                );
+                $this->em->flush();
+            } catch (\InvalidArgumentException) {
+            }
+        }
 
         $this->staffNotifier->notifyNewTicket($ticket);
 

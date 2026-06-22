@@ -1,46 +1,64 @@
 {% extends 'admin/base.html.twig' %}
 
-{% block title %}CRM FitnessClub — Лиды{% endblock %}
+{% block title %}CRM Доброзал — Лиды{% endblock %}
 
 {% block body %}
     <div class="content-header">
-        <h1 class="h4 mb-0">Лиды</h1>
+        <div>
+            <h1>Лиды</h1>
+            <div class="text-secondary small mt-1">Заявки с сайта, приложения, соцсетей и гостевых пропусков</div>
+        </div>
     </div>
 
     {% if funnel is defined %}
     <div class="content-card mb-3">
-        <div class="mb-2 text-primary small fw-semibold text-uppercase">Воронка лидов</div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <a href="{{ path('admin_section', {section: 'leads', status: 'new'}) }}" class=" rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'new' ? 'bg-secondary' : '' }}" style="background: #262b34; min-width: 100px; text-align: center;">
-                <div class="small text-secondary">Новый</div>
-                <div class="h5 mb-0">{{ funnel.new|default(0) }}</div>
+        <div class="card-section-title">Воронка</div>
+        <div class="crm-funnel">
+            <a href="{{ path('admin_section', {section: 'leads', status: 'new'}) }}" class="crm-funnel-step {{ statusFilter == 'new' ? 'active' : '' }}">
+                <div class="label">Новый</div>
+                <div class="value">{{ funnel.new|default(0) }}</div>
             </a>
-            <span class="text-secondary">→</span>
-            <a href="{{ path('admin_section', {section: 'leads', status: 'trial_scheduled'}) }}" class="rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'trial_scheduled' ? 'bg-info' : '' }}" style="background: #262b34; min-width: 100px; text-align: center;">
-                <div class="small text-secondary">Пробное</div>
-                <div class="h5 mb-0">{{ funnel.trial_scheduled|default(0) }}</div>
+            <span class="crm-funnel-arrow">→</span>
+            <a href="{{ path('admin_section', {section: 'leads', status: 'trial_scheduled'}) }}" class="crm-funnel-step {{ statusFilter == 'trial_scheduled' ? 'active' : '' }}">
+                <div class="label">Пробное</div>
+                <div class="value">{{ funnel.trial_scheduled|default(0) }}</div>
             </a>
-            <span class="text-secondary">→</span>
-            <a href="{{ path('admin_section', {section: 'leads', status: 'trial_visited'}) }}" class="rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'trial_visited' ? 'bg-primary' : '' }}" style="background: #262b34; min-width: 100px; text-align: center;">
-                <div class="small text-secondary">Пришёл</div>
-                <div class="h5 mb-0">{{ funnel.trial_visited|default(0) }}</div>
+            <span class="crm-funnel-arrow">→</span>
+            <a href="{{ path('admin_section', {section: 'leads', status: 'trial_visited'}) }}" class="crm-funnel-step {{ statusFilter == 'trial_visited' ? 'active' : '' }}">
+                <div class="label">Пришёл</div>
+                <div class="value">{{ funnel.trial_visited|default(0) }}</div>
             </a>
-            <span class="text-secondary">→</span>
-            <a href="{{ path('admin_section', {section: 'leads', status: 'converted'}) }}" class="rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'converted' ? 'bg-success' : '' }}" style="background: #262b34; min-width: 100px; text-align: center;">
-                <div class="small text-secondary">Клиент</div>
-                <div class="h5 mb-0 text-success">{{ funnel.converted|default(0) }}</div>
+            <span class="crm-funnel-arrow">→</span>
+            <a href="{{ path('admin_section', {section: 'leads', status: 'converted'}) }}" class="crm-funnel-step {{ statusFilter == 'converted' ? 'active' : '' }}">
+                <div class="label">Клиент</div>
+                <div class="value text-success">{{ funnel.converted|default(0) }}</div>
             </a>
-            <a href="{{ path('admin_section', {section: 'leads', status: 'inactive'}) }}" class="rounded-2 px-3 py-2 text-decoration-none {{ statusFilter == 'inactive' ? 'bg-dark' : '' }}" style="background: #262b34; min-width: 80px; text-align: center;">
-                <div class="small text-secondary">Неактивен</div>
-                <div class="h5 mb-0">{{ funnel.inactive|default(0) }}</div>
+            <a href="{{ path('admin_section', {section: 'leads', status: 'inactive'}) }}" class="crm-funnel-step {{ statusFilter == 'inactive' ? 'active' : '' }}">
+                <div class="label">Неактивен</div>
+                <div class="value">{{ funnel.inactive|default(0) }}</div>
             </a>
         </div>
     </div>
     {% endif %}
 
+    {% if sourceStats is defined %}
     <div class="content-card mb-3">
-        <form method="get" action="{{ path('admin_section', {section: 'leads'}) }}" class="row g-2 align-items-end mb-0">
-            <div class="col-auto">
+        <div class="card-section-title">По источникам</div>
+        <div class="crm-source-chips mb-3">
+            <a href="{{ path('admin_section', {section: 'leads', status: statusFilter}) }}" class="crm-source-chip {{ sourceFilter == '' ? 'active' : '' }}">
+                Все
+            </a>
+            {% for key, label in lead_sources() %}
+                {% if sourceStats[key]|default(0) > 0 or sourceFilter == key %}
+                    <a href="{{ path('admin_section', {section: 'leads', status: statusFilter, source: key}) }}" class="crm-source-chip {{ sourceFilter == key ? 'active' : '' }}">
+                        {{ label }} <strong>{{ sourceStats[key]|default(0) }}</strong>
+                    </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+        <form method="get" action="{{ path('admin_section', {section: 'leads'}) }}" class="row g-2 align-items-end">
+            {% if statusFilter %}<input type="hidden" name="status" value="{{ statusFilter }}">{% endif %}
+            <div class="col-md-3">
                 <label class="form-label small text-secondary mb-0">Статус</label>
                 <select name="status" class="form-select form-select-sm">
                     <option value="">Все</option>
@@ -51,15 +69,13 @@
                     <option value="inactive" {{ statusFilter == 'inactive' ? 'selected' : '' }}>Неактивен</option>
                 </select>
             </div>
-            <div class="col-auto">
+            <div class="col-md-3">
                 <label class="form-label small text-secondary mb-0">Источник</label>
                 <select name="source" class="form-select form-select-sm">
                     <option value="">Все</option>
-                    <option value="site" {{ sourceFilter == 'site' ? 'selected' : '' }}>Сайт</option>
-                    <option value="instagram" {{ sourceFilter == 'instagram' ? 'selected' : '' }}>Instagram</option>
-                    <option value="referral" {{ sourceFilter == 'referral' ? 'selected' : '' }}>Рекомендация</option>
-                    <option value="call" {{ sourceFilter == 'call' ? 'selected' : '' }}>Звонок</option>
-                    <option value="other" {{ sourceFilter == 'other' ? 'selected' : '' }}>Другое</option>
+                    {% for key, label in lead_sources() %}
+                        <option value="{{ key }}" {{ sourceFilter == key ? 'selected' : '' }}>{{ label }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <div class="col-auto">
@@ -67,14 +83,10 @@
             </div>
         </form>
     </div>
+    {% endif %}
 
     <div class="content-card mb-3">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="text-primary small fw-semibold text-uppercase">Новый лид</span>
-            <span class="text-secondary small">
-                Воронка: Новый → Пробное назначено → Пробное прошло → Клиент / Неактивен
-            </span>
-        </div>
+        <div class="card-section-title">Добавить вручную</div>
         <form method="post" action="{{ path('admin_lead_new') }}">
             <div class="row g-2 align-items-end">
                 <div class="col-md-2">
@@ -91,13 +103,10 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small text-secondary">Источник</label>
-                    <select name="source" class="form-select form-select-sm">
-                        <option value="">—</option>
-                        <option value="site">Сайт</option>
-                        <option value="instagram">Instagram</option>
-                        <option value="referral">Рекомендация</option>
-                        <option value="call">Звонок</option>
-                        <option value="other">Другое</option>
+                    <select name="source" class="form-select form-select-sm" required>
+                        {% for key, label in lead_sources() %}
+                            <option value="{{ key }}" {{ key == 'call' ? 'selected' : '' }}>{{ label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -109,11 +118,15 @@
                 </div>
             </div>
         </form>
+        <p class="small text-secondary mt-2 mb-0">
+            Автоматически: заявки с сайта, гостевые пропуска, обращения в поддержку, регистрация по рекомендации.
+        </p>
     </div>
 
     <div class="content-card">
+        <div class="card-section-title">Список лидов</div>
         <div class="table-responsive">
-            <table class="table table-sm table-dark align-middle mb-0">
+            <table class="table table-sm table-dark table-hover align-middle mb-0">
                 <thead>
                 <tr>
                     <th>ID</th>
@@ -130,22 +143,28 @@
                 </thead>
                 <tbody>
                 {% for lead in leads %}
+                    {% set normalized = {
+                        'new':'new',
+                        'in_progress':'trial_scheduled',
+                        'won':'converted',
+                        'lost':'inactive'
+                    }[lead.status] ?? lead.status %}
                     <tr>
-                        <td>{{ lead.id }}</td>
+                        <td class="text-secondary">#{{ lead.id }}</td>
                         <td>
                             {% if lead.convertedUser %}
-                                <a href="{{ path('admin_client_show', {id: lead.convertedUser.id}) }}" class="link-light text-decoration-none">{{ lead.name }}</a>
-                                <span class="badge bg-success ms-1">→ клиент</span>
+                                <a href="{{ path('admin_client_show', {id: lead.convertedUser.id}) }}" class="link-light text-decoration-none fw-medium">{{ lead.name }}</a>
+                                <span class="badge bg-success ms-1">клиент</span>
                             {% else %}
-                                {{ lead.name }}
+                                <span class="fw-medium">{{ lead.name }}</span>
                             {% endif %}
                         </td>
                         <td><a href="tel:{{ (lead.phone ?? '')|replace({' ': '', '-': '', '(': '', ')': ''}) }}" class="link-light text-decoration-none">{{ lead.phone }}</a></td>
-                        <td>{{ lead.email ?? '—' }}</td>
-                        <td>{{ {'site':'Сайт','instagram':'Instagram','referral':'Рекомендация','call':'Звонок','other':'Другое'}[lead.source] ?? (lead.source ?: '—') }}</td>
+                        <td class="text-secondary">{{ lead.email ?? '—' }}</td>
+                        <td>{% include 'admin/_lead_source_badge.html.twig' with {lead: lead} %}</td>
                         <td>
                             <form method="post" action="{{ path('admin_lead_comment', {id: lead.id}) }}" class="d-inline-flex align-items-center gap-1">
-                                <input type="text" name="comment" class="form-control form-control-sm" style="width: 100px" value="{{ lead.comment ?? '' }}" placeholder="—">
+                                <input type="text" name="comment" class="form-control form-control-sm" style="min-width: 120px" value="{{ lead.comment ?? '' }}" placeholder="—">
                                 <button type="submit" class="btn btn-sm btn-outline-secondary py-0">✓</button>
                             </form>
                         </td>
@@ -157,28 +176,19 @@
                                 <form method="post" action="{{ path('admin_lead_note_new', {id: lead.id}) }}" class="d-inline-flex">
                                     <input type="hidden" name="status_filter" value="{{ statusFilter }}">
                                     <input type="hidden" name="source_filter" value="{{ sourceFilter }}">
-                                    <input type="text" name="text" class="form-control form-control-sm" style="width: 80px" placeholder="+ заметка">
+                                    <input type="text" name="text" class="form-control form-control-sm" style="width: 90px" placeholder="+ заметка">
                                     <button type="submit" class="btn btn-sm btn-outline-secondary py-0 ms-1">+</button>
                                 </form>
                             </div>
                         </td>
                         <td>
-                            {# Нормализуем старые статусы (in_progress / won / lost) в новую воронку #}
-                            {% set normalized = {
-                                'new':'new',
-                                'in_progress':'trial_scheduled',
-                                'won':'converted',
-                                'lost':'inactive'
-                            }[lead.status] ?? lead.status %}
-
                             {% set label = {
                                 'new':'Новый',
-                                'trial_scheduled':'Пробное назначено',
-                                'trial_visited':'Пробное прошло',
+                                'trial_scheduled':'Пробное',
+                                'trial_visited':'Пришёл',
                                 'converted':'Клиент',
                                 'inactive':'Неактивен'
                             }[normalized] ?? normalized %}
-
                             {% set badgeClass = {
                                 'new':'bg-secondary',
                                 'trial_scheduled':'bg-info',
@@ -186,54 +196,37 @@
                                 'converted':'bg-success',
                                 'inactive':'bg-dark'
                             }[normalized] ?? 'bg-secondary' %}
-
                             <span class="badge {{ badgeClass }}">{{ label }}</span>
                         </td>
-                        <td>{{ lead.createdAt|date('d.m.Y H:i') }}</td>
-                        <td class="text-end">
-                            <div class="btn-group btn-group-sm" role="group">
-                                {% if normalized == 'new' %}
-                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}">
-                                        <input type="hidden" name="status" value="trial_scheduled">
-                                        <button type="submit" class="btn btn-outline-info btn-sm">Назначить пробное</button>
-                                    </form>
-                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="ms-1">
-                                        <input type="hidden" name="status" value="inactive">
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Неактуально</button>
-                                    </form>
-                                {% elseif normalized == 'trial_scheduled' %}
-                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}">
-                                        <input type="hidden" name="status" value="trial_visited">
-                                        <button type="submit" class="btn btn-outline-primary btn-sm">Пришёл</button>
-                                    </form>
-                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="ms-1">
-                                        <input type="hidden" name="status" value="inactive">
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Не пришёл</button>
-                                    </form>
-                                {% elseif normalized == 'trial_visited' %}
-                                    <form method="post" action="{{ path('admin_lead_convert', {id: lead.id}) }}">
-                                        <button type="submit" class="btn btn-success btn-sm">Оформить абонемент</button>
-                                    </form>
-                                    <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="ms-1">
-                                        <input type="hidden" name="status" value="inactive">
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Не купил</button>
-                                    </form>
-                                {% elseif normalized == 'converted' %}
-                                    {% if lead.convertedUser %}
-                                        <a href="{{ path('admin_client_show', {id: lead.convertedUser.id}) }}" class="btn btn-outline-success btn-sm">→ Клиент #{{ lead.convertedUser.id }}</a>
-                                    {% else %}
-                                        <span class="badge bg-success">Клиент</span>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="text-secondary small">Нет активных действий</span>
-                                {% endif %}
-                            </div>
+                        <td class="text-secondary small">{{ lead.createdAt|date('d.m.Y H:i') }}</td>
+                        <td class="text-end text-nowrap">
+                            {% if normalized == 'new' %}
+                                <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="d-inline">
+                                    <input type="hidden" name="status" value="trial_scheduled">
+                                    <button type="submit" class="btn btn-outline-info btn-sm">Пробное</button>
+                                </form>
+                                <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="d-inline ms-1">
+                                    <input type="hidden" name="status" value="inactive">
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm">×</button>
+                                </form>
+                            {% elseif normalized == 'trial_scheduled' %}
+                                <form method="post" action="{{ path('admin_lead_status', {id: lead.id}) }}" class="d-inline">
+                                    <input type="hidden" name="status" value="trial_visited">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Пришёл</button>
+                                </form>
+                            {% elseif normalized == 'trial_visited' %}
+                                <form method="post" action="{{ path('admin_lead_convert', {id: lead.id}) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-success btn-sm">В клиента</button>
+                                </form>
+                            {% elseif normalized == 'converted' and lead.convertedUser %}
+                                <a href="{{ path('admin_client_show', {id: lead.convertedUser.id}) }}" class="btn btn-outline-success btn-sm">Карточка</a>
+                            {% endif %}
                         </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="10" class="text-center text-secondary">
-                            Пока нет ни одного лида.
+                        <td colspan="10" class="text-center text-secondary py-4">
+                            Лидов пока нет. Они появятся при заявках с сайта, из приложения и других каналов.
                         </td>
                     </tr>
                 {% endfor %}
@@ -242,4 +235,3 @@
         </div>
     </div>
 {% endblock %}
-

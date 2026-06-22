@@ -35,7 +35,7 @@ class Lead
     private ?string $comment = null;
 
     #[ORM\Column(type: 'string', length: 50, nullable: true)]
-    private ?string $source = null; // site, instagram, referral, call, other
+    private ?string $source = null; // site, instagram, vk, telegram, referral, guest_pass, support, call, walk_in, other
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
