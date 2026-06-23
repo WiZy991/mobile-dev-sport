@@ -265,6 +265,7 @@
             this.root.classList.remove('d-none');
             this.root.classList.add('dz-tour-active');
             this.mountStagePortal();
+            this.bindStageResizeObserver();
             this.renderHud();
         }
 
@@ -273,6 +274,10 @@
             this.root.classList.remove('dz-tour-active');
             this.unmountStagePortal();
             this.cleanupClick();
+            if (this._stageResizeObs) {
+                this._stageResizeObs.disconnect();
+                this._stageResizeObs = null;
+            }
             if (this.resizeHandler) {
                 window.removeEventListener('resize', this.resizeHandler);
                 window.removeEventListener('scroll', this.resizeHandler, true);
@@ -449,8 +454,13 @@
                 }
             }
 
-            this.positionStage(target);
+            if (!isQuiz) {
+                this.positionStage(target);
+            }
             this.scheduleStageLayout(target);
+            if (isQuiz) {
+                setTimeout(() => this.scheduleStageLayout(target), 0);
+            }
             this.renderHud();
 
             if (!this.resizeHandler) {
@@ -475,9 +485,9 @@
             if (img && !img.dataset.dzBound) {
                 img.dataset.dzBound = '1';
                 img.addEventListener('load', () => {
-                    const t = this.resolveTarget(step);
-                    this.positionStage(t);
-                    this.scheduleStageLayout(t);
+                    const s = this.currentLesson?.steps?.[this.currentStepIndex];
+                    if (!s) return;
+                    this.scheduleStageLayout(this.resolveTarget(s));
                 });
             }
         }
@@ -564,6 +574,53 @@
             return this.clamp(preferredTop, topSafe, Math.max(topSafe, maxTop));
         }
 
+        ensureMascotVisible() {
+            const stage = this.el.stage;
+            const mascot = this.el.mascot;
+            if (!stage || !mascot) return;
+            const bottomSafe = this.topbarInset();
+            const topSafe = 12;
+            const maxBottom = window.innerHeight - bottomSafe - 8;
+            const mr = mascot.getBoundingClientRect();
+            if (mr.height < 4 && mr.width < 4) return;
+            let top = parseFloat(stage.style.top);
+            if (Number.isNaN(top)) top = stage.getBoundingClientRect().top;
+            let changed = false;
+            if (mr.bottom > maxBottom) {
+                top -= mr.bottom - maxBottom;
+                changed = true;
+            }
+            const check = changed ? mascot.getBoundingClientRect() : mr;
+            if (check.top < topSafe) {
+                top += topSafe - check.top;
+                changed = true;
+            }
+            if (changed) {
+                stage.style.top = Math.max(topSafe, top) + 'px';
+            }
+        }
+
+        bindStageResizeObserver() {
+            const stage = this.el.stage;
+            if (!stage || this._stageResizeObs || typeof ResizeObserver === 'undefined') return;
+            let raf = 0;
+            this._stageResizeObs = new ResizeObserver(() => {
+                cancelAnimationFrame(raf);
+                raf = requestAnimationFrame(() => {
+                    if (this.root.classList.contains('d-none')) return;
+                    const s = this.currentLesson?.steps?.[this.currentStepIndex];
+                    if (!s) return;
+                    const top = parseFloat(stage.style.top);
+                    if (!Number.isNaN(top)) {
+                        stage.style.top = this.fitStageInViewport(top) + 'px';
+                    }
+                    this.ensureMascotVisible();
+                    this.alignBubbleTail(this.resolveTarget(s), this._lastTailPlacement);
+                });
+            });
+            this._stageResizeObs.observe(stage);
+        }
+
         measureBubbleTailY() {
             const stage = this.el.stage;
             const bubble = this.el.bubble;
@@ -599,6 +656,7 @@
                         stage.style.top = this.fitStageInViewport(top) + 'px';
                     }
                 }
+                this.ensureMascotVisible();
             };
             requestAnimationFrame(() => {
                 run();
@@ -640,7 +698,9 @@
             const margin = 16;
             const bottomSafe = this.topbarInset();
             const topSafe = 12;
-            const { w: stageW, h: stageH } = this.measureStage();
+            const stageW = Math.min(340, stage.offsetWidth || stage.getBoundingClientRect().width || 320);
+            stage.style.width = stageW + 'px';
+            const stageH = stage.offsetHeight || 380;
             let top;
             let left;
             let tailPlacement = 'left';
@@ -662,7 +722,14 @@
                 } else {
                     const liveH = stage.offsetHeight || stageH;
                     const spaceBelow = window.innerHeight - bottomSafe - r.bottom - margin;
+                    const spaceAbove = r.top - margin - topSafe;
                     if (spaceBelow >= liveH) {
+                        top = r.bottom + margin;
+                        tailPlacement = 'top';
+                    } else if (spaceAbove >= liveH) {
+                        top = r.top - liveH - margin;
+                        tailPlacement = 'bottom';
+                    } else if (spaceBelow >= spaceAbove) {
                         top = r.bottom + margin;
                         tailPlacement = 'top';
                     } else {
@@ -681,16 +748,17 @@
                 top = this.fitStageInViewport(top);
             }
 
-            stage.style.width = stageW + 'px';
             stage.style.top = top + 'px';
             stage.style.left = left + 'px';
             stage.style.right = 'auto';
             stage.style.bottom = 'auto';
             stage.style.transform = 'none';
             this._lastTailPlacement = tailPlacement;
+            this.ensureMascotVisible();
             requestAnimationFrame(() => {
                 this.refineStageVerticalAlign(target, tailPlacement);
                 this.alignBubbleTail(target, tailPlacement);
+                this.ensureMascotVisible();
             });
         }
 
@@ -705,12 +773,8 @@
                 btn.addEventListener('click', () => this.answerQuiz(step, i, btn));
                 this.el.quiz.appendChild(btn);
             });
-            requestAnimationFrame(() => {
-                const t = this.resolveTarget(step);
-                this.positionStage(t);
-                this.scheduleStageLayout(t);
-                requestAnimationFrame(() => this.scheduleStageLayout(t));
-            });
+            const t = this.resolveTarget(step);
+            requestAnimationFrame(() => this.scheduleStageLayout(t));
         }
 
         answerQuiz(step, index, btn) {
