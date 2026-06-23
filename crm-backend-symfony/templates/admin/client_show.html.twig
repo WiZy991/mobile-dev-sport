@@ -272,7 +272,7 @@
                             <th>Период</th>
                             <th>Посещений</th>
                             <th>Заморозка</th>
-                            <th></th>
+                            <th class="sub-mgmt-cell">Действия</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -316,7 +316,7 @@
                                 <td>
                                     {% include 'admin/_subscription_freeze_info.html.twig' with {sub: sub} %}
                                 </td>
-                                <td>
+                                <td class="sub-mgmt-cell">
                                     {% include 'admin/_subscription_manage_actions.html.twig' with {sub: sub} %}
                                 </td>
                             </tr>

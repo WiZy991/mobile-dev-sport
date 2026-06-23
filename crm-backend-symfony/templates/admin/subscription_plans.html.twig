@@ -220,7 +220,7 @@
                     <th>Продажа</th>
                     <th>Посещений</th>
                     <th>Заморозка</th>
-                    <th></th>
+                    <th class="sub-mgmt-cell">Действия</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -233,7 +233,17 @@
                         </td>
                         <td>{{ sub.plan.name }}</td>
                         <td>{% if sub.club %}{{ sub.club.name }}{% else %}<span class="text-secondary">Все клубы</span>{% endif %}</td>
-                        <td>{{ sub.status }}</td>
+                        <td class="text-nowrap">
+                            {% if sub.status == 'active' %}
+                                <span class="badge bg-success">Активен</span>
+                            {% elseif sub.status == 'frozen' %}
+                                <span class="badge bg-warning text-dark">Заморожен</span>
+                            {% elseif sub.status == 'cancelled' %}
+                                <span class="badge bg-danger">Отменён</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Истёк</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {{ sub.startDate|date('d.m.Y') }}
                             {% if sub.endDate %}
@@ -258,7 +268,7 @@
                         <td>
                             {% include 'admin/_subscription_freeze_info.html.twig' with {sub: sub} %}
                         </td>
-                        <td>
+                        <td class="sub-mgmt-cell">
                             {% include 'admin/_subscription_manage_actions.html.twig' with {sub: sub, return_to: 'subscriptions', return_status: statusFilter} %}
                         </td>
                     </tr>
