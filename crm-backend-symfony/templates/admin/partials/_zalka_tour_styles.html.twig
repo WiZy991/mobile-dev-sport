@@ -44,6 +44,21 @@
 .dz-tour-hole.dz-tour-hole-click {
     animation: dz-hole-pulse 1.4s ease-in-out infinite;
 }
+.dz-tour-tap-paw {
+    position: fixed;
+    z-index: 10057;
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.45));
+    animation: dz-paw-tap 1s ease-in-out infinite;
+}
+@keyframes dz-paw-tap {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
+    50% { transform: translate(-50%, -50%) scale(0.88); opacity: 1; }
+}
 @keyframes dz-hole-pulse {
     0%, 100% { box-shadow: 0 0 0 9999px rgba(8, 10, 16, 0.72), 0 0 0 0 rgba(255, 91, 46, 0.5); }
     50% { box-shadow: 0 0 0 9999px rgba(8, 10, 16, 0.72), 0 0 0 8px rgba(255, 91, 46, 0.35); }

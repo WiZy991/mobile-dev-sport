@@ -92,14 +92,53 @@
 
         loadMascotFaces() {
             const parsed = parseMascotFaces();
-            if (parsed && parsed.neutral) return parsed;
+            const fallback = {
+                neutral: [
+                    '/img/mascot/heads/zalka-head-01.png',
+                    '/img/mascot/heads/zalka-head-05.png',
+                    '/img/mascot/heads/zalka-head-09.png',
+                    '/img/mascot/heads/zalka-head-13.png',
+                ],
+                happy: [
+                    '/img/mascot/heads/zalka-head-02.png',
+                    '/img/mascot/heads/zalka-head-06.png',
+                    '/img/mascot/heads/zalka-head-10.png',
+                    '/img/mascot/heads/zalka-head-14.png',
+                ],
+                excited: [
+                    '/img/mascot/heads/zalka-head-03.png',
+                    '/img/mascot/heads/zalka-head-07.png',
+                    '/img/mascot/heads/zalka-head-11.png',
+                    '/img/mascot/heads/zalka-head-15.png',
+                ],
+                thinking: [
+                    '/img/mascot/heads/zalka-head-04.png',
+                    '/img/mascot/heads/zalka-head-08.png',
+                    '/img/mascot/heads/zalka-head-12.png',
+                    '/img/mascot/heads/zalka-head-16.png',
+                ],
+                sad: [
+                    '/img/mascot/heads/zalka-head-13.png',
+                    '/img/mascot/heads/zalka-head-14.png',
+                    '/img/mascot/heads/zalka-head-15.png',
+                    '/img/mascot/heads/zalka-head-16.png',
+                ],
+                celebrate: [
+                    '/img/mascot/heads/zalka-head-03.png',
+                    '/img/mascot/heads/zalka-head-07.png',
+                    '/img/mascot/heads/zalka-head-11.png',
+                    '/img/mascot/heads/zalka-head-15.png',
+                ],
+            };
+            if (parsed && Array.isArray(parsed.neutral)) {
+                Object.keys(fallback).forEach((k) => {
+                    if (!parsed[k]) parsed[k] = fallback[k];
+                    if (!Array.isArray(parsed[k])) parsed[k] = [parsed[k]];
+                });
+                return parsed;
+            }
             return {
-                neutral: '/admin/mascot/neutral.png',
-                happy: '/admin/mascot/happy.png',
-                excited: '/admin/mascot/excited.png',
-                thinking: '/admin/mascot/thinking.png',
-                sad: '/admin/mascot/sad.png',
-                celebrate: '/admin/mascot/celebrate.png',
+                ...fallback,
             };
         }
 
@@ -114,6 +153,7 @@
                 quiz: this.root.querySelector('[data-dz-tour-quiz]'),
                 next: this.root.querySelector('[data-dz-tour-next]'),
                 mascot: this.root.querySelector('[data-dz-tour-mascot]'),
+                tapPaw: this.root.querySelector('[data-dz-tour-tap-paw]'),
                 stepProgress: this.root.querySelector('[data-dz-tour-step-progress]'),
                 xp: this.root.querySelector('[data-dz-tour-xp]'),
                 hearts: this.root.querySelector('[data-dz-tour-hearts]'),
@@ -270,6 +310,7 @@
             this.root?.classList.remove('dz-tour-click-mode');
             this.el.stage?.classList.remove('dz-tour-stage-click-mode');
             this.el.hole?.classList.remove('dz-tour-hole-click');
+            this.hideTapPaw();
         }
 
         unhighlight() {
@@ -334,6 +375,7 @@
                 this.el.hole.classList.add('dz-tour-hole-click');
                 this.bindClickAdvance(this.el.hole, target);
             }
+            this.showTapPaw(target);
         }
 
         runStep() {
@@ -394,9 +436,11 @@
                     this.el.hole?.classList.add('dz-tour-hole-click');
                     this.setupClickAdvance(target);
                 } else if (step.type === 'checkpoint') {
+                    this.hideTapPaw();
                     if (this.el.next) this.el.next.textContent = this.labels.continuePath;
                     this.el.next?.classList.remove('d-none');
                 } else {
+                    this.hideTapPaw();
                     if (this.el.next) this.el.next.textContent = this.labels.continue;
                     this.el.next?.classList.remove('d-none');
                 }
@@ -413,6 +457,9 @@
                     const t = this.resolveTarget(s);
                     if (t) {
                         this.positionSpotlight(t);
+                    }
+                    if (s.type === 'tour_click' && t) {
+                        this.showTapPaw(t);
                     }
                     this.positionStage(t || null);
                 };
@@ -803,12 +850,39 @@
             }[m] || 'neutral';
             const img = this.el.mascot?.querySelector('[data-dz-mascot-img]');
             if (img) {
-                const base = this.mascotFaces[faceKey] || this.mascotFaces.neutral || '';
+                const variants = Array.isArray(this.mascotFaces[faceKey]) ? this.mascotFaces[faceKey] : [this.mascotFaces[faceKey]];
+                const neutralVariants = Array.isArray(this.mascotFaces.neutral) ? this.mascotFaces.neutral : [this.mascotFaces.neutral];
+                const pool = variants.filter(Boolean).length ? variants.filter(Boolean) : neutralVariants.filter(Boolean);
+                if (!this._moodCursor) this._moodCursor = {};
+                const i = this._moodCursor[faceKey] || 0;
+                const base = pool[i % pool.length] || '';
+                this._moodCursor[faceKey] = i + 1;
                 const sep = base.includes('?') ? '&' : '?';
-                img.src = base + sep + 'm=' + faceKey;
+                img.src = base + sep + 'm=' + faceKey + '-' + i;
             }
             this.el.mascot?.querySelector('.dz-mascot-wrap')?.classList.toggle('dz-mascot-bounce', m === 'celebrate' || m === 'excited');
             this.el.mascot?.querySelector('.dz-mascot-wrap')?.classList.toggle('dz-mascot-wiggle', m === 'sad');
+        }
+
+        showTapPaw(target) {
+            const paw = this.el.tapPaw;
+            if (!paw || !target) return;
+            const r = this.anchorRect(target);
+            if (!r) return;
+            const placeRight = r.left < window.innerWidth * 0.5;
+            paw.src = placeRight ? '/img/mascot/zalka-paw-right.png' : '/img/mascot/zalka-paw-left.png';
+            const x = r.left + r.width / 2;
+            const y = r.top + r.height / 2;
+            paw.style.left = x + 'px';
+            paw.style.top = y + 'px';
+            paw.classList.remove('d-none');
+        }
+
+        hideTapPaw() {
+            const paw = this.el.tapPaw;
+            if (!paw) return;
+            paw.classList.add('d-none');
+            paw.removeAttribute('src');
         }
 
         renderHud() {
