@@ -114,6 +114,27 @@
     display: block;
     background: transparent;
 }
+/* Quiz: Зайка слева от облака — не уезжает за низ экрана */
+.dz-tour-stage.dz-tour-stage-quiz {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 10px;
+    max-width: min(520px, calc(100vw - 32px));
+}
+.dz-tour-stage.dz-tour-stage-quiz .dz-comic-bubble {
+    flex: 1;
+    min-width: 0;
+}
+.dz-tour-stage.dz-tour-stage-quiz .dz-tour-mascot-wrap {
+    order: -1;
+    width: 96px;
+    margin-top: 0;
+    flex-shrink: 0;
+}
+.dz-tour-stage.dz-tour-stage-quiz .dz-tour-mascot-wrap .dz-mascot-img {
+    height: 96px;
+    max-width: 96px;
+}
 .dz-comic-bubble-inner {
     background: #fffef8;
     color: #1a1f2e;
