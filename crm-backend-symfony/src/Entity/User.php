@@ -63,6 +63,10 @@ class User
     #[ORM\Column(type: 'boolean')]
     private bool $isBlocked = false;
 
+    /** Хеш пароля для входа в мобильное приложение (email + password). */
+    #[ORM\Column(name: 'password_hash', type: 'string', length: 255, nullable: true)]
+    private ?string $passwordHash = null;
+
     /** Одноразовый refresh для мобильного клиента (Bearer в POST /auth/refresh). */
     #[ORM\Column(name: 'api_refresh_token', type: 'string', length: 64, nullable: true)]
     private ?string $apiRefreshToken = null;
@@ -338,6 +342,18 @@ class User
     public function setIsBlocked(bool $isBlocked): self
     {
         $this->isBlocked = $isBlocked;
+        return $this;
+    }
+
+    public function getPasswordHash(): ?string
+    {
+        return $this->passwordHash;
+    }
+
+    public function setPasswordHash(?string $passwordHash): self
+    {
+        $this->passwordHash = $passwordHash;
+
         return $this;
     }
 

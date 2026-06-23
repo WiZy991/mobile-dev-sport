@@ -27,26 +27,26 @@ class AuthController extends AbstractController
     public function login(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true) ?? [];
-        $email = trim((string) ($data['email'] ?? ''));
-        $password = $data['password'] ?? ''; // пока не проверяем
+        $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
+        $password = (string) ($data['password'] ?? '');
+
+        if ($email === '' || $password === '') {
+            return $this->json(['error' => 'Укажите email и password', 'code' => 'missing_credentials'], 400);
+        }
 
         $user = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
 
-        // Если пользователя нет, но это первый вход — создаём (для быстрого старта)
-        if (!$user && $email !== '') {
-            $count = $this->em->getRepository(User::class)->count([]);
-            if ($count === 0) {
-                $user = (new User())
-                    ->setEmail($email)
-                    ->setName((string) ($data['name'] ?? 'Пользователь'))
-                    ->setPhone((string) ($data['phone'] ?? '+7 900 000-00-00'))
-                    ->setBonusPoints(0);
-                $this->em->persist($user);
-                $this->em->flush();
-            }
-        }
-
         if (!$user) {
+            return $this->json(['error' => 'User not found', 'code' => 'invalid_credentials'], 401);
+        }
+        $hash = $user->getPasswordHash();
+        if ($hash === null || $hash === '') {
+            return $this->json([
+                'error' => 'Для этого аккаунта вход по паролю не настроен',
+                'code' => 'password_not_set',
+            ], 401);
+        }
+        if (!password_verify($password, $hash)) {
             return $this->json(['error' => 'User not found', 'code' => 'invalid_credentials'], 401);
         }
 
@@ -61,12 +61,19 @@ class AuthController extends AbstractController
     public function register(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true) ?? [];
-        $email = trim((string) ($data['email'] ?? ''));
+        $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         $name = trim((string) ($data['name'] ?? 'Новый пользователь'));
         $phone = trim((string) ($data['phone'] ?? '+7 900 000-00-00'));
+        $password = (string) ($data['password'] ?? '');
 
         if ($email === '') {
             return $this->json(['error' => 'Укажите email'], 400);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->json(['error' => 'Некорректный email', 'code' => 'invalid_email'], 400);
+        }
+        if (mb_strlen($password) < 6) {
+            return $this->json(['error' => 'Пароль должен быть не менее 6 символов', 'code' => 'weak_password'], 400);
         }
 
         $existing = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
@@ -82,7 +89,8 @@ class AuthController extends AbstractController
             ->setName($name)
             ->setPhone($phone)
             ->setBonusPoints(0)
-            ->setIsBlocked(false);
+            ->setIsBlocked(false)
+            ->setPasswordHash(password_hash($password, PASSWORD_BCRYPT));
 
         $this->mobileClientPayloadApplier->applyRegistrationPayload($user, $data);
 
