@@ -65,6 +65,7 @@
     position: relative;
     width: 100%;
     flex-shrink: 0;
+    overflow: visible;
 }
 .dz-tour-mascot-wrap {
     width: 180px;
@@ -120,6 +121,34 @@
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
     border-top: 12px solid #fffef8;
+}
+/* Хвостик облака указывает на подсвеченный элемент CRM */
+.dz-comic-bubble[data-dz-tail="top"] .dz-comic-tail {
+    position: absolute;
+    top: -14px;
+    left: 0;
+    margin: 0;
+    transform: rotate(180deg);
+}
+.dz-comic-bubble[data-dz-tail="bottom"] .dz-comic-tail {
+    position: relative;
+    margin: 0 auto;
+    top: -1px;
+}
+.dz-comic-bubble[data-dz-tail="left"] .dz-comic-tail {
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    margin: 0;
+    transform: translateY(-50%) rotate(-90deg);
+}
+.dz-comic-bubble[data-dz-tail="right"] .dz-comic-tail {
+    position: absolute;
+    right: -20px;
+    left: auto;
+    top: 50%;
+    margin: 0;
+    transform: translateY(-50%) rotate(90deg);
 }
 
 .dz-mascot-bounce { animation: dz-mascot-bounce 0.6s ease infinite alternate; }

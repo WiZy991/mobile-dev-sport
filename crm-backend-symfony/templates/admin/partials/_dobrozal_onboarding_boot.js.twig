@@ -438,41 +438,109 @@
             return bar ? bar.getBoundingClientRect().height + 12 : 68;
         }
 
+        measureStage() {
+            const stage = this.el.stage;
+            if (!stage) return { w: 320, h: 380 };
+            const prevVis = stage.style.visibility;
+            stage.style.visibility = 'hidden';
+            stage.style.display = 'flex';
+            const w = stage.offsetWidth || 300;
+            const h = stage.offsetHeight || 380;
+            stage.style.visibility = prevVis || '';
+            return { w, h };
+        }
+
+        alignBubbleTail(target, placement) {
+            const bubble = this.el.bubble;
+            const tail = bubble?.querySelector('.dz-comic-tail');
+            if (!bubble || !tail) return;
+
+            const tailSide = placement || 'top';
+            bubble.dataset.dzTail = tailSide;
+            tail.style.marginLeft = '';
+            tail.style.marginTop = '';
+            tail.style.top = '';
+            tail.style.left = '';
+
+            if (!target) return;
+
+            const r = target.getBoundingClientRect();
+            const b = bubble.getBoundingClientRect();
+
+            if (tailSide === 'top' || tailSide === 'bottom') {
+                const targetCx = r.left + r.width / 2;
+                const offset = targetCx - (b.left + b.width / 2);
+                const clamped = Math.max(-b.width / 2 + 28, Math.min(b.width / 2 - 28, offset));
+                tail.style.marginLeft = (b.width / 2 + clamped) + 'px';
+            } else if (tailSide === 'left' || tailSide === 'right') {
+                const targetCy = r.top + r.height / 2;
+                const offset = targetCy - (b.top + b.height / 2);
+                const clamped = Math.max(-b.height / 2 + 24, Math.min(b.height / 2 - 24, offset));
+                tail.style.top = (b.height / 2 + clamped) + 'px';
+            }
+        }
+
         positionStage(target) {
             const stage = this.el.stage;
             if (!stage) return;
             const margin = 16;
             const bottomSafe = this.topbarInset();
             const topSafe = 12;
-            const maxW = Math.min(340, window.innerWidth - margin * 2);
-            stage.style.width = maxW + 'px';
-
-            const h = stage.offsetHeight || 320;
+            const { w: stageW, h: stageH } = this.measureStage();
             let top;
             let left;
+            let tailPlacement = 'top';
 
             if (target) {
                 const r = target.getBoundingClientRect();
                 const spaceBelow = window.innerHeight - bottomSafe - r.bottom - margin;
-                if (spaceBelow >= h) {
+                const spaceAbove = r.top - topSafe - margin;
+                const nearTop = r.top < window.innerHeight * 0.35;
+
+                if (r.right > window.innerWidth * 0.55) {
+                    left = Math.max(margin, Math.min(r.left - stageW - margin, window.innerWidth - stageW - margin));
+                    top = r.top + r.height / 2 - stageH / 2;
+                    tailPlacement = 'right';
+                } else if (r.left < window.innerWidth * 0.35) {
+                    left = Math.min(r.right + margin, window.innerWidth - stageW - margin);
+                    top = r.top + r.height / 2 - stageH / 2;
+                    tailPlacement = 'left';
+                } else if (nearTop || spaceBelow >= stageH) {
                     top = r.bottom + margin;
-                } else if (r.top - margin - h >= topSafe) {
-                    top = r.top - h - margin;
+                    left = Math.min(
+                        Math.max(margin, r.left + r.width / 2 - stageW / 2),
+                        window.innerWidth - stageW - margin,
+                    );
+                    tailPlacement = 'top';
+                } else if (spaceAbove >= stageH) {
+                    top = r.top - stageH - margin;
+                    left = Math.min(
+                        Math.max(margin, r.left + r.width / 2 - stageW / 2),
+                        window.innerWidth - stageW - margin,
+                    );
+                    tailPlacement = 'bottom';
                 } else {
-                    top = window.innerHeight - bottomSafe - h - margin;
+                    top = Math.max(topSafe, window.innerHeight - bottomSafe - stageH - margin);
+                    left = Math.min(
+                        Math.max(margin, r.left + r.width / 2 - stageW / 2),
+                        window.innerWidth - stageW - margin,
+                    );
+                    tailPlacement = 'top';
                 }
-                top = Math.max(topSafe, Math.min(top, window.innerHeight - bottomSafe - h - 8));
-                left = Math.max(
-                    margin,
-                    Math.min(r.left + r.width / 2 - maxW / 2, window.innerWidth - maxW - margin),
-                );
+
+                top = Math.min(top, window.innerHeight - bottomSafe - stageH - 8);
+                top = Math.max(topSafe, top);
+                left = Math.max(margin, Math.min(left, window.innerWidth - stageW - margin));
             } else {
-                top = window.innerHeight - bottomSafe - h - margin;
-                left = margin;
+                top = window.innerHeight - bottomSafe - stageH - margin;
+                left = window.innerWidth - stageW - margin - 20;
+                tailPlacement = 'top';
             }
 
+            stage.style.width = stageW + 'px';
             stage.style.top = top + 'px';
             stage.style.left = left + 'px';
+            requestAnimationFrame(() => this.alignBubbleTail(target, tailPlacement));
         }
 
         renderQuiz(step) {
@@ -636,9 +704,17 @@
         setMood(mood) {
             const moods = ['neutral', 'happy', 'excited', 'thinking', 'sad', 'celebrate'];
             const m = moods.includes(mood) ? mood : 'neutral';
+            const faceKey = {
+                neutral: 'neutral',
+                happy: 'happy',
+                excited: 'excited',
+                thinking: 'thinking',
+                sad: 'sad',
+                celebrate: 'celebrate',
+            }[m] || 'neutral';
             const img = this.el.mascot?.querySelector('[data-dz-mascot-img]');
             if (img) {
-                img.src = this.mascotFaces[m] || this.mascotFaces.neutral || '';
+                img.src = this.mascotFaces[faceKey] || this.mascotFaces.neutral || '';
             }
             this.el.mascot?.querySelector('.dz-mascot-wrap')?.classList.toggle('dz-mascot-bounce', m === 'celebrate' || m === 'excited');
             this.el.mascot?.querySelector('.dz-mascot-wrap')?.classList.toggle('dz-mascot-wiggle', m === 'sad');
