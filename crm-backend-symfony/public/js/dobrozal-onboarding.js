@@ -82,7 +82,7 @@
             this.el = {
                 backdrop: this.root.querySelector('[data-dz-tour-backdrop]'),
                 hole: this.root.querySelector('[data-dz-tour-hole]'),
-                stage: this.root.querySelector('[data-dz-tour-stage]'),
+                bubbleFloat: this.root.querySelector('[data-dz-tour-bubble-float]'),
                 bubble: this.root.querySelector('[data-dz-tour-bubble]'),
                 text: this.root.querySelector('[data-dz-tour-text]'),
                 quiz: this.root.querySelector('[data-dz-tour-quiz]'),
@@ -351,7 +351,7 @@
                 }
             }
 
-            this.positionStage(target);
+            this.positionBubble(target);
             this.renderHud();
 
             if (!this.resizeHandler) {
@@ -361,11 +361,16 @@
                     const t = this.resolveTarget(s);
                     if (t) {
                         this.positionSpotlight(t);
-                        this.positionStage(t);
                     }
+                    this.positionBubble(t || null);
                 };
                 window.addEventListener('resize', this.resizeHandler);
                 window.addEventListener('scroll', this.resizeHandler, true);
+            }
+            const img = this.el.mascot?.querySelector('[data-dz-mascot-img]');
+            if (img && !img.dataset.dzBound) {
+                img.dataset.dzBound = '1';
+                img.addEventListener('load', () => this.positionBubble(this.resolveTarget(step)));
             }
         }
 
@@ -407,66 +412,41 @@
             return bar ? bar.getBoundingClientRect().height + 12 : 68;
         }
 
-        measureStage() {
-            const stage = this.el.stage;
-            if (!stage) return { w: 320, h: 380 };
-            const prev = stage.style.visibility;
-            stage.style.visibility = 'hidden';
-            stage.style.display = 'flex';
-            const w = stage.offsetWidth || 300;
-            const h = stage.offsetHeight || 380;
-            stage.style.visibility = prev || '';
-            return { w, h };
-        }
-
-        positionStage(target) {
-            const stage = this.el.stage;
-            if (!stage) return;
+        positionBubble(target) {
+            const box = this.el.bubbleFloat;
+            if (!box) return;
             const margin = 16;
             const bottomSafe = this.topbarInset();
+            const mascotReserve = 196;
             const topSafe = 12;
-            const { w: stageW, h: stageH } = this.measureStage();
+            const maxW = Math.min(340, window.innerWidth - mascotReserve - margin * 2);
+            box.style.width = maxW + 'px';
+
+            const h = box.offsetHeight || 180;
             let top;
             let left;
 
             if (target) {
                 const r = target.getBoundingClientRect();
                 const spaceBelow = window.innerHeight - bottomSafe - r.bottom - margin;
-                const spaceAbove = r.top - topSafe - margin;
-                const nearTop = r.top < window.innerHeight * 0.35;
-
-                if (nearTop || spaceBelow >= stageH) {
+                if (spaceBelow >= h || r.top < window.innerHeight * 0.4) {
                     top = r.bottom + margin;
-                } else if (spaceAbove >= stageH) {
-                    top = r.top - stageH - margin;
                 } else {
-                    top = Math.max(topSafe, window.innerHeight - bottomSafe - stageH - margin);
+                    top = Math.max(topSafe, r.top - h - margin);
                 }
-
-                top = Math.min(top, window.innerHeight - bottomSafe - stageH - 8);
+                top = Math.min(top, window.innerHeight - bottomSafe - h - 8);
                 top = Math.max(topSafe, top);
-
-                if (r.right > window.innerWidth * 0.55) {
-                    left = Math.max(margin, Math.min(r.left - stageW - margin, window.innerWidth - stageW - margin));
-                    if (left < margin) {
-                        left = margin;
-                    }
-                } else if (r.left < window.innerWidth * 0.35) {
-                    left = Math.min(r.right + margin, window.innerWidth - stageW - margin);
-                } else {
-                    left = Math.min(
-                        Math.max(margin, r.left + r.width / 2 - stageW / 2),
-                        window.innerWidth - stageW - margin,
-                    );
-                }
+                left = Math.max(
+                    mascotReserve,
+                    Math.min(r.left + r.width / 2 - maxW / 2, window.innerWidth - maxW - margin),
+                );
             } else {
-                top = window.innerHeight - bottomSafe - stageH - margin;
-                left = window.innerWidth - stageW - margin - 20;
+                top = topSafe + 48;
+                left = mascotReserve;
             }
 
-            stage.style.top = top + 'px';
-            stage.style.left = left + 'px';
-            stage.style.width = stageW + 'px';
+            box.style.top = top + 'px';
+            box.style.left = left + 'px';
         }
 
         renderQuiz(step) {
@@ -479,6 +459,9 @@
                 btn.textContent = opt;
                 btn.addEventListener('click', () => this.answerQuiz(step, i, btn));
                 this.el.quiz.appendChild(btn);
+            });
+            requestAnimationFrame(() => {
+                this.positionBubble(this.resolveTarget(step));
             });
         }
 

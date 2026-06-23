@@ -19,8 +19,12 @@
     pointer-events: none;
     background: transparent;
 }
-.dz-tour-root.dz-tour-click-mode .dz-tour-stage {
+.dz-tour-root.dz-tour-click-mode .dz-tour-bubble-float {
     pointer-events: none;
+}
+.dz-tour-root.dz-tour-click-mode .dz-tour-bubble-float .dz-comic-bubble-inner,
+.dz-tour-root.dz-tour-click-mode .dz-tour-bubble-float .dz-tour-next {
+    pointer-events: auto;
 }
 
 .dz-tour-hole {
@@ -45,23 +49,30 @@
     50% { box-shadow: 0 0 0 9999px rgba(8, 10, 16, 0.72), 0 0 0 8px rgba(255, 91, 46, 0.35); }
 }
 
-.dz-tour-stage {
+.dz-tour-bubble-float {
     position: fixed;
     z-index: 10052;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    max-width: min(340px, calc(100vw - 24px));
+    max-width: min(340px, calc(100vw - 220px));
     pointer-events: auto;
     transition: top 0.25s ease, left 0.25s ease;
 }
 
-/* Комиксное облако НАД головой */
+.dz-tour-mascot-dock {
+    position: fixed;
+    left: 16px;
+    bottom: 64px;
+    width: 180px;
+    z-index: 10052;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+/* Комиксное облако (хвостик вниз к Зайке) */
 .dz-comic-bubble {
     position: relative;
     width: 100%;
-    margin-bottom: 4px;
-    order: 1;
 }
 .dz-comic-bubble-inner {
     background: #fffef8;
@@ -97,28 +108,18 @@
     border-top: 12px solid #fffef8;
 }
 
-.dz-tour-mascot-wrap {
-    order: 2;
-    width: 180px;
-    flex-shrink: 0;
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    background: transparent;
-}
-.dz-tour-mascot-wrap .dz-mascot-wrap {
-    width: 100%;
-    background: transparent;
-}
-.dz-tour-mascot-wrap .dz-mascot-img,
-.dz-tour-mascot-wrap .dz-mascot-svg {
+.dz-tour-mascot-dock .dz-mascot-wrap,
+.dz-tour-mascot-dock .dz-mascot-img {
     width: 100%;
     height: auto;
     max-height: 200px;
+    min-height: 140px;
     object-fit: contain;
     display: block;
-    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.4));
     background: transparent;
+}
+.dz-tour-mascot-dock .dz-mascot-img {
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.45));
 }
 .dz-mascot-bounce { animation: dz-mascot-bounce 0.6s ease infinite alternate; }
 @keyframes dz-mascot-bounce {
