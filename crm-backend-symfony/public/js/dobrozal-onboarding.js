@@ -502,8 +502,41 @@
             };
         }
 
+        measureBubbleTailY() {
+            const stage = this.el.stage;
+            const bubble = this.el.bubble;
+            if (!stage || !bubble) return 65;
+            const stageRect = stage.getBoundingClientRect();
+            const bubbleRect = bubble.getBoundingClientRect();
+            if (stageRect.height > 0 && bubbleRect.height > 0) {
+                return (bubbleRect.top - stageRect.top) + bubbleRect.height / 2;
+            }
+            return (bubble.offsetHeight || 130) / 2;
+        }
+
+        refineStageVerticalAlign(target, tailPlacement) {
+            if (!target || !this.el.stage) return;
+            if (tailPlacement !== 'left' && tailPlacement !== 'right') return;
+            const r = this.anchorRect(target);
+            if (!r) return;
+            const stage = this.el.stage;
+            const tailY = this.measureBubbleTailY();
+            const targetCy = r.top + r.height / 2;
+            const bottomSafe = this.topbarInset();
+            const stageH = stage.getBoundingClientRect().height || this.measureStage().h;
+            const top = this.clamp(
+                targetCy - tailY,
+                12,
+                window.innerHeight - bottomSafe - stageH - 8,
+            );
+            stage.style.top = top + 'px';
+        }
+
         scheduleStageLayout(target) {
-            const run = () => this.positionStage(target);
+            const run = () => {
+                this.positionStage(target);
+                this.refineStageVerticalAlign(target, this._lastTailPlacement);
+            };
             requestAnimationFrame(() => {
                 run();
                 requestAnimationFrame(run);
@@ -533,11 +566,6 @@
                 const offset = targetCx - (b.left + b.width / 2);
                 const clamped = Math.max(-b.width / 2 + 28, Math.min(b.width / 2 - 28, offset));
                 tail.style.marginLeft = (b.width / 2 + clamped) + 'px';
-            } else if (tailSide === 'left' || tailSide === 'right') {
-                const targetCy = r.top + r.height / 2;
-                const offset = targetCy - (b.top + b.height / 2);
-                const clamped = Math.max(-b.height / 2 + 24, Math.min(b.height / 2 - 24, offset));
-                tail.style.top = (b.height / 2 + clamped) + 'px';
             }
         }
 
@@ -562,11 +590,11 @@
 
                 if (inSidebar) {
                     left = r.right + margin;
-                    top = r.top + r.height / 2 - stageH / 2;
+                    top = r.top + r.height / 2 - this.measureBubbleTailY();
                     tailPlacement = 'left';
                 } else if (onRight) {
                     left = r.left - stageW - margin;
-                    top = r.top + r.height / 2 - stageH / 2;
+                    top = r.top + r.height / 2 - this.measureBubbleTailY();
                     tailPlacement = 'right';
                 } else {
                     const spaceBelow = window.innerHeight - bottomSafe - r.bottom - margin;
@@ -594,7 +622,11 @@
             stage.style.right = 'auto';
             stage.style.bottom = 'auto';
             stage.style.transform = 'none';
-            requestAnimationFrame(() => this.alignBubbleTail(target, tailPlacement));
+            this._lastTailPlacement = tailPlacement;
+            requestAnimationFrame(() => {
+                this.refineStageVerticalAlign(target, tailPlacement);
+                this.alignBubbleTail(target, tailPlacement);
+            });
         }
 
         renderQuiz(step) {
