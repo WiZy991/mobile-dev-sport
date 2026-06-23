@@ -224,17 +224,40 @@
         showTour() {
             this.root.classList.remove('d-none');
             this.root.classList.add('dz-tour-active');
+            this.mountStagePortal();
             this.renderHud();
         }
 
         hideTour() {
             this.root.classList.add('d-none');
             this.root.classList.remove('dz-tour-active');
+            this.unmountStagePortal();
             this.cleanupClick();
             if (this.resizeHandler) {
                 window.removeEventListener('resize', this.resizeHandler);
                 window.removeEventListener('scroll', this.resizeHandler, true);
                 this.resizeHandler = null;
+            }
+        }
+
+        mountStagePortal() {
+            const stage = this.el.stage;
+            if (!stage) return;
+            if (!this.stageHome) {
+                this.stageHome = stage.parentNode;
+            }
+            if (stage.parentNode !== document.body) {
+                document.body.appendChild(stage);
+            }
+            stage.classList.add('dz-tour-stage-portal');
+        }
+
+        unmountStagePortal() {
+            const stage = this.el.stage;
+            if (!stage || !this.stageHome) return;
+            stage.classList.remove('dz-tour-stage-portal', 'dz-tour-stage-click-mode');
+            if (stage.parentNode !== this.stageHome) {
+                this.stageHome.appendChild(stage);
             }
         }
 
@@ -244,6 +267,7 @@
             });
             this.clickHandlers = [];
             this.root?.classList.remove('dz-tour-click-mode');
+            this.el.stage?.classList.remove('dz-tour-stage-click-mode');
             this.el.hole?.classList.remove('dz-tour-hole-click');
         }
 
@@ -302,6 +326,7 @@
         setupClickAdvance(target) {
             if (!target) return;
             this.root?.classList.add('dz-tour-click-mode');
+            this.el.stage?.classList.add('dz-tour-stage-click-mode');
             target.classList.add('dz-tour-click-target');
             this.bindClickAdvance(target, target);
             if (this.el.hole) {
@@ -377,6 +402,7 @@
             }
 
             this.positionStage(target);
+            this.scheduleStageLayout(target);
             this.renderHud();
 
             if (!this.resizeHandler) {
@@ -395,7 +421,11 @@
             const img = this.el.mascot?.querySelector('[data-dz-mascot-img]');
             if (img && !img.dataset.dzBound) {
                 img.dataset.dzBound = '1';
-                img.addEventListener('load', () => this.positionStage(this.resolveTarget(step)));
+                img.addEventListener('load', () => {
+                    const t = this.resolveTarget(step);
+                    this.positionStage(t);
+                    this.scheduleStageLayout(t);
+                });
             }
         }
 
@@ -437,16 +467,47 @@
             return bar ? bar.getBoundingClientRect().height + 12 : 68;
         }
 
+        anchorRect(target) {
+            const hole = this.el.hole;
+            if (hole) {
+                const hr = hole.getBoundingClientRect();
+                if (hr.width > 0 && hr.height > 0) {
+                    return hr;
+                }
+            }
+            return target ? target.getBoundingClientRect() : null;
+        }
+
+        sidebarRightEdge() {
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) {
+                return sidebar.getBoundingClientRect().right;
+            }
+            return Math.min(280, window.innerWidth * 0.22);
+        }
+
+        clamp(n, min, max) {
+            return Math.max(min, Math.min(max, n));
+        }
+
         measureStage() {
             const stage = this.el.stage;
             if (!stage) return { w: 320, h: 380 };
-            const prevVis = stage.style.visibility;
-            stage.style.visibility = 'hidden';
-            stage.style.display = 'flex';
-            const w = stage.offsetWidth || 300;
-            const h = stage.offsetHeight || 380;
-            stage.style.visibility = prevVis || '';
-            return { w, h };
+            const rect = stage.getBoundingClientRect();
+            const w = rect.width > 0 ? rect.width : (stage.offsetWidth || 320);
+            const h = rect.height > 0 ? rect.height : (stage.offsetHeight || 380);
+            return {
+                w: Math.min(340, w || 320),
+                h: h || 380,
+            };
+        }
+
+        scheduleStageLayout(target) {
+            const run = () => this.positionStage(target);
+            requestAnimationFrame(() => {
+                run();
+                requestAnimationFrame(run);
+            });
         }
 
         alignBubbleTail(target, placement) {
@@ -463,7 +524,8 @@
 
             if (!target) return;
 
-            const r = target.getBoundingClientRect();
+            const r = this.anchorRect(target);
+            if (!r) return;
             const b = bubble.getBoundingClientRect();
 
             if (tailSide === 'top' || tailSide === 'bottom') {
@@ -482,54 +544,44 @@
         positionStage(target) {
             const stage = this.el.stage;
             if (!stage) return;
+            this.mountStagePortal();
+
             const margin = 16;
             const bottomSafe = this.topbarInset();
             const topSafe = 12;
             const { w: stageW, h: stageH } = this.measureStage();
             let top;
             let left;
-            let tailPlacement = 'top';
+            let tailPlacement = 'left';
 
-            if (target) {
-                const r = target.getBoundingClientRect();
-                const spaceBelow = window.innerHeight - bottomSafe - r.bottom - margin;
-                const spaceAbove = r.top - topSafe - margin;
-                const nearTop = r.top < window.innerHeight * 0.35;
+            const r = this.anchorRect(target);
+            if (r) {
+                const sidebarEdge = this.sidebarRightEdge();
+                const inSidebar = r.right <= sidebarEdge + 4;
+                const onRight = r.left >= window.innerWidth * 0.62;
 
-                if (r.right > window.innerWidth * 0.55) {
-                    left = Math.max(margin, Math.min(r.left - stageW - margin, window.innerWidth - stageW - margin));
-                    top = r.top + r.height / 2 - stageH / 2;
-                    tailPlacement = 'right';
-                } else if (r.left < window.innerWidth * 0.35) {
-                    left = Math.min(r.right + margin, window.innerWidth - stageW - margin);
+                if (inSidebar) {
+                    left = r.right + margin;
                     top = r.top + r.height / 2 - stageH / 2;
                     tailPlacement = 'left';
-                } else if (nearTop || spaceBelow >= stageH) {
-                    top = r.bottom + margin;
-                    left = Math.min(
-                        Math.max(margin, r.left + r.width / 2 - stageW / 2),
-                        window.innerWidth - stageW - margin,
-                    );
-                    tailPlacement = 'top';
-                } else if (spaceAbove >= stageH) {
-                    top = r.top - stageH - margin;
-                    left = Math.min(
-                        Math.max(margin, r.left + r.width / 2 - stageW / 2),
-                        window.innerWidth - stageW - margin,
-                    );
-                    tailPlacement = 'bottom';
+                } else if (onRight) {
+                    left = r.left - stageW - margin;
+                    top = r.top + r.height / 2 - stageH / 2;
+                    tailPlacement = 'right';
                 } else {
-                    top = Math.max(topSafe, window.innerHeight - bottomSafe - stageH - margin);
-                    left = Math.min(
-                        Math.max(margin, r.left + r.width / 2 - stageW / 2),
-                        window.innerWidth - stageW - margin,
-                    );
-                    tailPlacement = 'top';
+                    const spaceBelow = window.innerHeight - bottomSafe - r.bottom - margin;
+                    if (spaceBelow >= stageH * 0.55) {
+                        top = r.bottom + margin;
+                        tailPlacement = 'top';
+                    } else {
+                        top = r.top - stageH - margin;
+                        tailPlacement = 'bottom';
+                    }
+                    left = r.left + r.width / 2 - stageW / 2;
                 }
 
-                top = Math.min(top, window.innerHeight - bottomSafe - stageH - 8);
-                top = Math.max(topSafe, top);
-                left = Math.max(margin, Math.min(left, window.innerWidth - stageW - margin));
+                top = this.clamp(top, topSafe, window.innerHeight - bottomSafe - stageH - 8);
+                left = this.clamp(left, margin, window.innerWidth - stageW - margin);
             } else {
                 top = window.innerHeight - bottomSafe - stageH - margin;
                 left = window.innerWidth - stageW - margin - 20;
@@ -539,6 +591,9 @@
             stage.style.width = stageW + 'px';
             stage.style.top = top + 'px';
             stage.style.left = left + 'px';
+            stage.style.right = 'auto';
+            stage.style.bottom = 'auto';
+            stage.style.transform = 'none';
             requestAnimationFrame(() => this.alignBubbleTail(target, tailPlacement));
         }
 
@@ -554,7 +609,9 @@
                 this.el.quiz.appendChild(btn);
             });
             requestAnimationFrame(() => {
-                this.positionStage(this.resolveTarget(step));
+                const t = this.resolveTarget(step);
+                this.positionStage(t);
+                this.scheduleStageLayout(t);
             });
         }
 
@@ -713,7 +770,9 @@
             }[m] || 'neutral';
             const img = this.el.mascot?.querySelector('[data-dz-mascot-img]');
             if (img) {
-                img.src = this.mascotFaces[faceKey] || this.mascotFaces.neutral || '';
+                const base = this.mascotFaces[faceKey] || this.mascotFaces.neutral || '';
+                const sep = base.includes('?') ? '&' : '?';
+                img.src = base + sep + 'm=' + faceKey;
             }
             this.el.mascot?.querySelector('.dz-mascot-wrap')?.classList.toggle('dz-mascot-bounce', m === 'celebrate' || m === 'excited');
             this.el.mascot?.querySelector('.dz-mascot-wrap')?.classList.toggle('dz-mascot-wiggle', m === 'sad');

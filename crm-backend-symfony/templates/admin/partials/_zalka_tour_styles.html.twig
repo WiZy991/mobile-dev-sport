@@ -51,13 +51,23 @@
 
 .dz-tour-stage {
     position: fixed;
-    z-index: 10052;
+    z-index: 10055;
     display: flex;
     flex-direction: column;
     align-items: center;
     max-width: min(340px, calc(100vw - 32px));
     pointer-events: auto;
     transition: top 0.25s ease, left 0.25s ease;
+}
+.dz-tour-stage-portal {
+    z-index: 10056;
+}
+.dz-tour-stage.dz-tour-stage-click-mode {
+    pointer-events: none;
+}
+.dz-tour-stage.dz-tour-stage-click-mode .dz-comic-bubble-inner,
+.dz-tour-stage.dz-tour-stage-click-mode .dz-tour-next {
+    pointer-events: auto;
 }
 
 /* Облако сверху, Зайка сразу под хвостиком */
