@@ -421,7 +421,6 @@
 
             const isQuiz = step.type === 'quiz';
             const isClick = step.type === 'tour_click';
-            this.el.stage?.classList.toggle('dz-tour-stage-quiz', isQuiz);
 
             if (isQuiz) {
                 if (this.el.text) this.el.text.textContent = step.question || '';

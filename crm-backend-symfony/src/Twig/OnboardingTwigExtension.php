@@ -13,46 +13,6 @@ final class OnboardingTwigExtension extends AbstractExtension
 {
     private const MASCOT_FACES = ['neutral', 'happy', 'excited', 'thinking', 'celebrate', 'sad'];
 
-    /** @var array<string, list<string>> */
-    private const MASCOT_HEAD_POOLS = [
-        'neutral' => [
-            '/img/mascot/heads/zalka-head-01.png',
-            '/img/mascot/heads/zalka-head-05.png',
-            '/img/mascot/heads/zalka-head-09.png',
-            '/img/mascot/heads/zalka-head-13.png',
-        ],
-        'happy' => [
-            '/img/mascot/heads/zalka-head-02.png',
-            '/img/mascot/heads/zalka-head-06.png',
-            '/img/mascot/heads/zalka-head-10.png',
-            '/img/mascot/heads/zalka-head-14.png',
-        ],
-        'excited' => [
-            '/img/mascot/heads/zalka-head-03.png',
-            '/img/mascot/heads/zalka-head-07.png',
-            '/img/mascot/heads/zalka-head-11.png',
-            '/img/mascot/heads/zalka-head-15.png',
-        ],
-        'thinking' => [
-            '/img/mascot/heads/zalka-head-04.png',
-            '/img/mascot/heads/zalka-head-08.png',
-            '/img/mascot/heads/zalka-head-12.png',
-            '/img/mascot/heads/zalka-head-16.png',
-        ],
-        'sad' => [
-            '/img/mascot/heads/zalka-head-13.png',
-            '/img/mascot/heads/zalka-head-14.png',
-            '/img/mascot/heads/zalka-head-15.png',
-            '/img/mascot/heads/zalka-head-16.png',
-        ],
-        'celebrate' => [
-            '/img/mascot/heads/zalka-head-03.png',
-            '/img/mascot/heads/zalka-head-07.png',
-            '/img/mascot/heads/zalka-head-11.png',
-            '/img/mascot/heads/zalka-head-15.png',
-        ],
-    ];
-
     public function __construct(
         private readonly OnboardingQuestCatalog $catalog,
         private readonly Security $security,
@@ -76,14 +36,17 @@ final class OnboardingTwigExtension extends AbstractExtension
             $face = 'neutral';
         }
 
-        $pool = self::MASCOT_HEAD_POOLS[$face] ?? self::MASCOT_HEAD_POOLS['neutral'];
-
-        return $pool[0];
+        return $this->urlGenerator->generate('admin_mascot_face', ['face' => $face]);
     }
 
     private function mascotFacesJson(): string
     {
-        return json_encode(self::MASCOT_HEAD_POOLS, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+        $map = [];
+        foreach (self::MASCOT_FACES as $face) {
+            $map[$face] = $this->mascotFaceUrl($face);
+        }
+
+        return json_encode($map, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     }
 
     private function questJson(): string
