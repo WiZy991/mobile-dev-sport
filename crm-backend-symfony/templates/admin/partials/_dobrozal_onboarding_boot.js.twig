@@ -880,7 +880,8 @@
                 return;
             }
             const placeRight = r.left < window.innerWidth * 0.5;
-            paw.src = placeRight ? '/img/mascot/zalka-paw-right.png' : '/img/mascot/zalka-paw-left.png';
+            const pawBase = placeRight ? '/img/mascot/zalka-paw-right.png' : '/img/mascot/zalka-paw-left.png';
+            paw.src = pawBase + '?v=2';
             const x = r.left + r.width * 0.82;
             const y = r.top + r.height * 0.5;
             paw.style.left = x + 'px';
