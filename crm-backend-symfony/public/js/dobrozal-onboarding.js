@@ -39,6 +39,16 @@
         return '/admin/' + section;
     }
 
+    function parseMascotFaces() {
+        const el = document.getElementById('dz-mascot-faces-json');
+        if (!el) return null;
+        try {
+            return JSON.parse((el.textContent || '').trim() || '{}');
+        } catch {
+            return null;
+        }
+    }
+
     function parseQuest() {
         const el = document.getElementById('dz-quest-json-global')
             || document.getElementById('dz-quest-json')
@@ -59,6 +69,7 @@
             this.userId = userId;
             this.labels = readLabels(root);
             this.heartsMax = quest.heartsMax || 5;
+            this.mascotFaces = this.loadMascotFaces();
             this.state = this.loadState();
             this.currentLesson = null;
             this.currentStepIndex = 0;
@@ -76,6 +87,19 @@
                     this.clearActive();
                 }
             }
+        }
+
+        loadMascotFaces() {
+            const parsed = parseMascotFaces();
+            if (parsed && parsed.neutral) return parsed;
+            return {
+                neutral: '/admin/mascot/neutral.png',
+                happy: '/admin/mascot/happy.png',
+                excited: '/admin/mascot/excited.png',
+                thinking: '/admin/mascot/thinking.png',
+                sad: '/admin/mascot/sad.png',
+                celebrate: '/admin/mascot/celebrate.png',
+            };
         }
 
         cacheDom() {
@@ -610,17 +634,9 @@
         setMood(mood) {
             const moods = ['neutral', 'happy', 'excited', 'thinking', 'sad', 'celebrate'];
             const m = moods.includes(mood) ? mood : 'neutral';
-            const faces = {
-                neutral: '/img/mascot/zalka-neutral.png?v=2',
-                happy: '/img/mascot/zalka-happy.png?v=2',
-                excited: '/img/mascot/zalka-excited.png?v=2',
-                thinking: '/img/mascot/zalka-thinking.png?v=2',
-                sad: '/img/mascot/zalka-neutral.png?v=2',
-                celebrate: '/img/mascot/zalka-celebrate.png?v=2',
-            };
             const img = this.el.mascot?.querySelector('[data-dz-mascot-img]');
             if (img) {
-                img.src = faces[m] || faces.neutral;
+                img.src = this.mascotFaces[m] || this.mascotFaces.neutral || '';
             }
             this.el.mascot?.classList.toggle('dz-mascot-bounce', m === 'celebrate' || m === 'excited');
             this.el.mascot?.classList.toggle('dz-mascot-wiggle', m === 'sad');
