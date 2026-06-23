@@ -409,12 +409,12 @@
 
         measureStage() {
             const stage = this.el.stage;
-            if (!stage) return { w: 300, h: 280 };
+            if (!stage) return { w: 320, h: 380 };
             const prev = stage.style.visibility;
             stage.style.visibility = 'hidden';
             stage.style.display = 'flex';
             const w = stage.offsetWidth || 300;
-            const h = stage.offsetHeight || 280;
+            const h = stage.offsetHeight || 380;
             stage.style.visibility = prev || '';
             return { w, h };
         }
@@ -628,12 +628,12 @@
             const moods = ['neutral', 'happy', 'excited', 'thinking', 'sad', 'celebrate'];
             const m = moods.includes(mood) ? mood : 'neutral';
             const faces = {
-                neutral: '/img/mascot/zalka-neutral.png',
-                happy: '/img/mascot/zalka-happy.png',
-                excited: '/img/mascot/zalka-excited.png',
-                thinking: '/img/mascot/zalka-thinking.png',
-                sad: '/img/mascot/zalka-neutral.png',
-                celebrate: '/img/mascot/zalka-celebrate.png',
+                neutral: '/img/mascot/zalka-neutral.png?v=2',
+                happy: '/img/mascot/zalka-happy.png?v=2',
+                excited: '/img/mascot/zalka-excited.png?v=2',
+                thinking: '/img/mascot/zalka-thinking.png?v=2',
+                sad: '/img/mascot/zalka-neutral.png?v=2',
+                celebrate: '/img/mascot/zalka-celebrate.png?v=2',
             };
             const img = this.el.mascot?.querySelector('[data-dz-mascot-img]');
             if (img) {

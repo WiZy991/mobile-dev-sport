@@ -317,9 +317,11 @@
 }
 .dz-mascot-wrap {
     flex-shrink: 0;
-    width: 120px;
+    width: 180px;
+    background: transparent;
 }
-.dz-mascot-svg { width: 100%; height: auto; display: block; }
+.dz-mascot-img,
+.dz-mascot-svg { width: 100%; height: auto; max-height: 200px; object-fit: contain; display: block; background: transparent; }
 .dz-mascot-bounce { animation: dz-bounce 0.6s ease infinite; }
 .dz-mascot-wiggle { animation: dz-wiggle 0.4s ease; }
 @keyframes dz-bounce {
