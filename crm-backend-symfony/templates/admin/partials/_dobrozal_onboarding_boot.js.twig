@@ -434,7 +434,11 @@
                 if (isClick) {
                     this.el.next?.classList.add('d-none');
                     this.el.hole?.classList.add('dz-tour-hole-click');
-                    this.setupClickAdvance(target);
+                    if (target) {
+                        this.setupClickAdvance(target);
+                    } else {
+                        this.hideTapPaw();
+                    }
                 } else if (step.type === 'checkpoint') {
                     this.hideTapPaw();
                     if (this.el.next) this.el.next.textContent = this.labels.continuePath;
@@ -460,6 +464,8 @@
                     }
                     if (s.type === 'tour_click' && t) {
                         this.showTapPaw(t);
+                    } else if (s.type === 'tour_click') {
+                        this.hideTapPaw();
                     }
                     this.positionStage(t || null);
                 };
@@ -867,12 +873,16 @@
         showTapPaw(target) {
             const paw = this.el.tapPaw;
             if (!paw || !target) return;
-            const r = this.anchorRect(target);
+            const r = target.getBoundingClientRect();
             if (!r) return;
+            if (r.width <= 0 || r.height <= 0) {
+                this.hideTapPaw();
+                return;
+            }
             const placeRight = r.left < window.innerWidth * 0.5;
             paw.src = placeRight ? '/img/mascot/zalka-paw-right.png' : '/img/mascot/zalka-paw-left.png';
-            const x = r.left + r.width / 2;
-            const y = r.top + r.height / 2;
+            const x = r.left + r.width * 0.82;
+            const y = r.top + r.height * 0.5;
             paw.style.left = x + 'px';
             paw.style.top = y + 'px';
             paw.classList.remove('d-none');
