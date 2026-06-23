@@ -266,7 +266,7 @@ body {
     right: 0;
     top: calc(100% + 4px);
     z-index: 1040;
-    max-height: 240px;
+    max-height: 260px;
     overflow-y: auto;
     margin: 0;
     padding: 0.35rem;
@@ -276,12 +276,16 @@ body {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
-.crm-select--drop-up .crm-select__menu {
+.crm-select__menu--portal {
+    display: block;
+}
+
+.crm-select--drop-up .crm-select__menu:not(.crm-select__menu--portal) {
     top: auto;
     bottom: calc(100% + 4px);
 }
 
-.crm-select.is-open .crm-select__menu {
+.crm-select.is-open .crm-select__menu:not(.crm-select__menu--portal) {
     display: block;
 }
 

@@ -412,9 +412,10 @@ a.text-reset:hover .content-card {
 .crm-select__label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crm-select__chevron { position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: var(--muted); pointer-events: none; }
 .crm-select.is-open .crm-select__chevron { transform: translateY(-50%) rotate(180deg); color: var(--primary); }
-.crm-select__menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 1040; max-height: 240px; overflow-y: auto; padding: 0.35rem; background: #1c2029; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,0.45); }
-.crm-select--drop-up .crm-select__menu { top: auto; bottom: calc(100% + 4px); }
-.crm-select.is-open .crm-select__menu { display: block; }
+.crm-select__menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 1040; max-height: 260px; overflow-y: auto; padding: 0.35rem; background: #1c2029; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,0.45); }
+.crm-select--drop-up .crm-select__menu:not(.crm-select__menu--portal) { top: auto; bottom: calc(100% + 4px); }
+.crm-select.is-open .crm-select__menu:not(.crm-select__menu--portal) { display: block; }
+.crm-select__menu--portal { display: block; position: fixed; }
 .crm-select__option { display: block; width: 100%; padding: 0.45rem 0.65rem; border: none; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer; }
 .crm-select__option:hover:not(:disabled):not(.is-selected) { background: rgba(255,255,255,0.06); }
 .crm-select__option.is-selected { background: rgba(255,91,46,0.18); color: #fff; font-weight: 600; }
