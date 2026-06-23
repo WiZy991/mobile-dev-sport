@@ -32,6 +32,8 @@ use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
 use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
+use App\Service\Api\SubscriptionLifecycleService;
+use App\Service\Admin\ClubModuleRegistry;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
@@ -61,6 +63,8 @@ class AdminController extends AbstractController
         private readonly PassportAccessPolicy $passportAccess,
         private readonly SubscriptionFreezePolicy $freezePolicy,
         private readonly SubscriptionFreezeService $freezeService,
+        private readonly SubscriptionLifecycleService $lifecycleService,
+        private readonly ClubModuleRegistry $clubModules,
         private readonly SubscriptionPlanCatalog $planCatalog,
         private readonly LeadIngestionService $leadIngestion,
         private readonly OnboardingQuestCatalog $onboardingQuestCatalog,
@@ -792,6 +796,49 @@ class AdminController extends AbstractController
         return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
     }
 
+    #[Route('/subscriptions/{id}/extend', name: 'admin_subscription_extend', methods: ['POST'])]
+    public function extendSubscription(int $id, Request $request): Response
+    {
+        $subscription = $this->em->getRepository(Subscription::class)->find($id);
+        if (!$subscription) {
+            $this->addFlash('danger', 'Абонемент не найден');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
+        $days = (int) $request->request->get('days', 0);
+        $error = $this->lifecycleService->extend($subscription, $days);
+        if ($error !== null) {
+            $this->addFlash('danger', $error);
+        } else {
+            $this->em->flush();
+            $this->addFlash('success', 'Абонемент продлён на ' . $days . ' дн.');
+        }
+
+        return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
+    }
+
+    #[Route('/subscriptions/{id}/cancel', name: 'admin_subscription_cancel', methods: ['POST'])]
+    public function cancelSubscription(int $id, Request $request): Response
+    {
+        $subscription = $this->em->getRepository(Subscription::class)->find($id);
+        if (!$subscription) {
+            $this->addFlash('danger', 'Абонемент не найден');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
+        $error = $this->lifecycleService->cancel($subscription);
+        if ($error !== null) {
+            $this->addFlash('danger', $error);
+        } else {
+            $this->em->flush();
+            $this->addFlash('success', 'Абонемент отменён.');
+        }
+
+        return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
+    }
+
     private function redirectAfterSubscriptionFreezeAction(Subscription $subscription, Request $request): Response
     {
         if ($request->request->get('return_to') === 'subscriptions') {
@@ -1413,8 +1460,15 @@ class AdminController extends AbstractController
                 $this->em->persist($setting);
             }
 
-            $percoEnabled = $request->request->get('perco_enabled') === '1' ? '1' : '0';
-            $this->persistSetting('perco_enabled', $percoEnabled);
+            $enabledModules = $request->request->all('enabled_modules');
+            $moduleKeys = \is_array($enabledModules) ? array_map('strval', $enabledModules) : [];
+            if ($request->request->get('perco_enabled') === '1' && !\in_array('access', $moduleKeys, true)) {
+                $moduleKeys[] = 'access';
+            } elseif ($request->request->get('perco_enabled') !== '1') {
+                $moduleKeys = array_values(array_filter($moduleKeys, static fn (string $k) => $k !== 'access'));
+            }
+            $this->clubModules->saveEnabledKeys($moduleKeys);
+
             $this->persistSetting('perco_base_url', trim((string) $request->request->get('perco_base_url', '')) ?: null);
             $this->persistSetting('perco_login', trim((string) $request->request->get('perco_login', '')) ?: null);
             $percoPass = (string) $request->request->get('perco_password', '');
@@ -1438,6 +1492,8 @@ class AdminController extends AbstractController
         return $this->render('admin/settings_club.html.twig', [
             'menu' => $menu,
             'current' => 'settings',
+            'club_modules' => ClubModuleRegistry::OPTIONAL,
+            'enabled_modules' => $this->clubModules->enabledKeys(),
             'club' => [
                 'name' => $getSetting('name', 'FitnessClub'),
                 'address' => $getSetting('address', 'г. Москва, ул. Примерная, д. 1'),
@@ -1990,7 +2046,7 @@ class AdminController extends AbstractController
             $users = $this->em->getRepository(User::class)->findBy([], ['id' => 'ASC']);
             $statusFilter = $request->query->get('status', '');
             $subsQb = $this->em->createQueryBuilder()->select('s')->from(Subscription::class, 's')->orderBy('s.id', 'DESC');
-            if ($statusFilter === 'active' || $statusFilter === 'frozen') {
+            if ($statusFilter === 'active' || $statusFilter === 'frozen' || $statusFilter === 'cancelled') {
                 $subsQb->andWhere('s.status = :status')->setParameter('status', $statusFilter);
             } elseif ($statusFilter === 'expired') {
                 $today = new \DateTimeImmutable('today');

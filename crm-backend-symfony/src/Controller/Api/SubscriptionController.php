@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Service\Api\SberMobileAuthService;
 use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
+use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\CurrentUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,6 +28,7 @@ class SubscriptionController extends AbstractController
         private readonly SberMobileAuthService $sberMobileAuth,
         private readonly SubscriptionFreezePolicy $freezePolicy,
         private readonly SubscriptionFreezeService $freezeService,
+        private readonly SubscriptionLifecycleService $lifecycleService,
         private readonly bool $requireSberVerificationBeforePurchase = false,
     ) {}
 
@@ -261,6 +263,60 @@ class SubscriptionController extends AbstractController
         }
 
         $error = $this->freezeService->unfreeze($sub);
+        if ($error !== null) {
+            return $this->json(['error' => $error], 400);
+        }
+
+        $this->em->flush();
+
+        return $this->json($this->serializeSubscription($sub));
+    }
+
+    #[Route('/{id}/extend', name: 'api_subscriptions_extend', methods: ['POST'])]
+    public function extend(string $id, Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $sub = $this->findSubscriptionByApiId($id);
+        if (!$sub) {
+            return $this->json(['error' => 'Subscription not found'], 404);
+        }
+        if ($sub->getUser()->getId() !== $user->getId()) {
+            return $this->json(['error' => 'Forbidden'], 403);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $days = (int) ($data['days'] ?? $request->query->get('days', 0));
+        $error = $this->lifecycleService->extend($sub, $days);
+        if ($error !== null) {
+            return $this->json(['error' => $error], 400);
+        }
+
+        $this->em->flush();
+
+        return $this->json($this->serializeSubscription($sub));
+    }
+
+    #[Route('/{id}/cancel', name: 'api_subscriptions_cancel', methods: ['POST'])]
+    public function cancel(string $id, Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $sub = $this->findSubscriptionByApiId($id);
+        if (!$sub) {
+            return $this->json(['error' => 'Subscription not found'], 404);
+        }
+        if ($sub->getUser()->getId() !== $user->getId()) {
+            return $this->json(['error' => 'Forbidden'], 403);
+        }
+
+        $error = $this->lifecycleService->cancel($sub);
         if ($error !== null) {
             return $this->json(['error' => $error], 400);
         }

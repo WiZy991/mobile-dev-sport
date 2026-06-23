@@ -44,6 +44,7 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
     var freezeTarget by remember { mutableStateOf<Subscription?>(null) }
+    var cancelTarget by remember { mutableStateOf<Subscription?>(null) }
     
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -139,7 +140,8 @@ fun ProfileScreen(
                         SubscriptionCard(
                             subscription = subscription,
                             onFreezeClick = { freezeTarget = subscription },
-                            onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) }
+                            onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
+                            onCancelClick = { cancelTarget = subscription },
                         )
                     }
                 }
@@ -201,6 +203,42 @@ fun ProfileScreen(
             onConfirm = { days ->
                 viewModel.freezeSubscription(subscription.id, days)
                 freezeTarget = null
+            }
+        )
+    }
+
+    cancelTarget?.let { subscription ->
+        AlertDialog(
+            onDismissRequest = { cancelTarget = null },
+            title = { Text("Отменить абонемент?") },
+            text = { Text("Доступ в клуб по этому абонементу будет закрыт. Отменить можно только активный или замороженный абонемент.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.cancelSubscription(subscription.id)
+                        cancelTarget = null
+                    }
+                ) {
+                    Text("Отменить", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { cancelTarget = null }) {
+                    Text("Назад")
+                }
+            }
+        )
+    }
+
+    uiState.error?.let { err ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            title = { Text("Ошибка") },
+            text = { Text(err) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearError() }) {
+                    Text("OK")
+                }
             }
         )
     }
@@ -456,7 +494,8 @@ private fun UserInfoCard(
 private fun SubscriptionCard(
     subscription: Subscription,
     onFreezeClick: () -> Unit,
-    onUnfreezeClick: () -> Unit
+    onUnfreezeClick: () -> Unit,
+    onCancelClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -580,6 +619,16 @@ private fun SubscriptionCard(
                     Text("Разморозить")
                 }
             }
+
+            if (subscription.status == SubscriptionStatus.ACTIVE || subscription.status == SubscriptionStatus.FROZEN) {
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = onCancelClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Отменить абонемент", color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
 }
@@ -606,6 +655,11 @@ private fun SubscriptionStatusChip(status: SubscriptionStatus) {
             Warning.copy(alpha = 0.1f),
             Warning,
             "Ожидание"
+        )
+        SubscriptionStatus.CANCELLED -> Triple(
+            Error.copy(alpha = 0.1f),
+            Error,
+            "Отменён"
         )
     }
     

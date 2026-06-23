@@ -294,6 +294,8 @@
                                         <span class="badge bg-warning text-dark" title="В БД статус active, но текущая дата вне периода — турникет не пустит">По датам не действует</span>
                                     {% elseif sub.status == 'frozen' %}
                                         <span class="badge bg-warning text-dark">Заморожен</span>
+                                    {% elseif sub.status == 'cancelled' %}
+                                        <span class="badge bg-danger">Отменён</span>
                                     {% else %}
                                         <span class="badge bg-secondary">Истёк</span>
                                     {% endif %}
@@ -315,7 +317,7 @@
                                     {% include 'admin/_subscription_freeze_info.html.twig' with {sub: sub} %}
                                 </td>
                                 <td>
-                                    {% include 'admin/_subscription_freeze_actions.html.twig' with {sub: sub} %}
+                                    {% include 'admin/_subscription_manage_actions.html.twig' with {sub: sub} %}
                                 </td>
                             </tr>
                         {% else %}

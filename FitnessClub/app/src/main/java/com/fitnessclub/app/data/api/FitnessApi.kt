@@ -80,6 +80,9 @@ interface FitnessApi {
     
     @POST("subscriptions/{id}/unfreeze")
     suspend fun unfreezeSubscription(@Path("id") subscriptionId: String): Response<Subscription>
+
+    @POST("subscriptions/{id}/cancel")
+    suspend fun cancelSubscription(@Path("id") subscriptionId: String): Response<Subscription>
     
     // Trainers
     @GET("trainers")
@@ -131,6 +134,9 @@ interface FitnessApi {
     suspend fun submitFeedback(@Body request: FeedbackRequest): Response<FeedbackResponse>
 
     /** Обращение в поддержку клуба (попадает в CRM). */
+    @GET("support/tickets")
+    suspend fun getSupportTickets(): Response<SupportTicketListResponse>
+
     @POST("support/tickets")
     suspend fun createSupportTicket(@Body request: SupportTicketRequest): Response<SupportTicketCreateResponse>
     
@@ -318,6 +324,22 @@ data class SupportTicketRequest(
 
 data class SupportTicketCreateResponse(
     val success: Boolean = true,
+    @com.google.gson.annotations.SerializedName("id")
+    val id: String? = null,
+)
+
+data class SupportTicketListResponse(
+    val tickets: List<SupportTicketItem> = emptyList(),
+)
+
+data class SupportTicketItem(
+    val id: String,
+    val subject: String,
+    val message: String,
+    val category: String,
+    val status: String,
+    @com.google.gson.annotations.SerializedName("created_at")
+    val createdAt: String,
 )
 
 data class ApiNotification(

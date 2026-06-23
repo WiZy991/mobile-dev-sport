@@ -10,6 +10,11 @@ use Symfony\Component\Security\Core\User\UserInterface;
  */
 final class AdminMenuBuilder
 {
+    public function __construct(
+        private readonly ClubModuleRegistry $clubModules,
+    ) {
+    }
+
     /** @var array<string, string> ключ section => подпись */
     private const FULL_MENU = [
         'onboarding' => 'Обучение',
@@ -154,6 +159,9 @@ final class AdminMenuBuilder
         $menu = [];
         foreach (self::FULL_MENU as $key => $label) {
             if (!in_array($key, $allowed, true)) {
+                continue;
+            }
+            if (!$this->clubModules->isSectionEnabled($key)) {
                 continue;
             }
             if ($key === 'crm_staff' && !array_intersect($user->getRoles(), ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {

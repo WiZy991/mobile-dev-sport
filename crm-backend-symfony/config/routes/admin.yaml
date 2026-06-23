@@ -87,6 +87,16 @@ admin_subscription_unfreeze:
   controller: App\Controller\Admin\AdminController::unfreezeSubscription
   methods: [POST]
 
+admin_subscription_extend:
+  path: /admin/subscriptions/{id}/extend
+  controller: App\Controller\Admin\AdminController::extendSubscription
+  methods: [POST]
+
+admin_subscription_cancel:
+  path: /admin/subscriptions/{id}/cancel
+  controller: App\Controller\Admin\AdminController::cancelSubscription
+  methods: [POST]
+
 admin_lead_new:
   path: /admin/leads/new
   controller: App\Controller\Admin\AdminController::createLead

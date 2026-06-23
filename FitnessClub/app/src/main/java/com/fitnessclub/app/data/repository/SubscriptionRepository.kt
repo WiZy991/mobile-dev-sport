@@ -127,6 +127,20 @@ class SubscriptionRepository @Inject constructor(
             emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
         }
     }
+
+    fun cancelSubscription(subscriptionId: String): Flow<ApiResult<Subscription>> = flow {
+        emit(ApiResult.Loading)
+        try {
+            val response = api.cancelSubscription(subscriptionId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(ApiResult.Success(response.body()!!))
+            } else {
+                emit(ApiResult.Error(response.message() ?: "Ошибка отмены абонемента", response.code()))
+            }
+        } catch (e: Exception) {
+            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+        }
+    }
 }
 
 private data class SubscriptionPurchaseErrorBody(

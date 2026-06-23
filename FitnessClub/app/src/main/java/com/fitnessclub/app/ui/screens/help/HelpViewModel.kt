@@ -3,6 +3,7 @@ package com.fitnessclub.app.ui.screens.help
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.api.SupportTicketItem
 import com.fitnessclub.app.data.api.SupportTicketRequest
 import com.fitnessclub.app.data.local.TokenManager
 import com.google.gson.Gson
@@ -35,10 +36,22 @@ object SupportCategories {
         options.find { it.first == api }?.second ?: "Другое"
 }
 
+object SupportTicketStatuses {
+    fun label(api: String): String = when (api) {
+        "new" -> "Новое"
+        "in_progress" -> "В работе"
+        "done" -> "Закрыто"
+        else -> api
+    }
+}
+
 data class HelpUiState(
     val contactEmail: String = "",
     /** Есть сохранённый профиль — сервер примет обращение без email в теле. */
     val hasUserProfile: Boolean = false,
+    val tickets: List<SupportTicketItem> = emptyList(),
+    val isLoadingTickets: Boolean = false,
+    val ticketsError: String? = null,
     val subject: String = "",
     val message: String = "",
     val categoryApi: String = SupportCategories.defaultApi,
@@ -66,6 +79,40 @@ class HelpViewModel @Inject constructor(
                     contactEmail = user?.email?.trim().orEmpty(),
                     hasUserProfile = user != null,
                 )
+            }
+            if (user != null) {
+                loadTickets()
+            }
+        }
+    }
+
+    fun loadTickets() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingTickets = true, ticketsError = null) }
+            try {
+                val res = api.getSupportTickets()
+                if (res.isSuccessful) {
+                    _uiState.update {
+                        it.copy(
+                            isLoadingTickets = false,
+                            tickets = res.body()?.tickets.orEmpty(),
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoadingTickets = false,
+                            ticketsError = "Не удалось загрузить историю (${res.code()})",
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingTickets = false,
+                        ticketsError = e.message ?: "Ошибка сети",
+                    )
+                }
             }
         }
     }
@@ -144,6 +191,7 @@ class HelpViewModel @Inject constructor(
                             successMessage = "Обращение отправлено. Ответ придёт на указанный email.",
                         )
                     }
+                    loadTickets()
                 } else {
                     val raw = res.errorBody()?.string().orEmpty()
                     val parsed = runCatching { gson.fromJson(raw, ApiErrorJson::class.java) }.getOrNull()

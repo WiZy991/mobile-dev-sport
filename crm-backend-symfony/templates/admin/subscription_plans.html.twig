@@ -10,6 +10,7 @@
             <a href="{{ path('admin_section', {section: 'subscriptions'}) }}?status=active" class="btn {{ statusFilter == 'active' ? 'btn-success' : 'btn-outline-secondary' }}">Активные</a>
             <a href="{{ path('admin_section', {section: 'subscriptions'}) }}?status=frozen" class="btn {{ statusFilter == 'frozen' ? 'btn-warning' : 'btn-outline-secondary' }}">Замороженные</a>
             <a href="{{ path('admin_section', {section: 'subscriptions'}) }}?status=expired" class="btn {{ statusFilter == 'expired' ? 'btn-secondary' : 'btn-outline-secondary' }}">Истёкшие</a>
+            <a href="{{ path('admin_section', {section: 'subscriptions'}) }}?status=cancelled" class="btn {{ statusFilter == 'cancelled' ? 'btn-danger' : 'btn-outline-secondary' }}">Отменённые</a>
         </div>
     </div>
 
@@ -258,7 +259,7 @@
                             {% include 'admin/_subscription_freeze_info.html.twig' with {sub: sub} %}
                         </td>
                         <td>
-                            {% include 'admin/_subscription_freeze_actions.html.twig' with {sub: sub, return_to: 'subscriptions', return_status: statusFilter} %}
+                            {% include 'admin/_subscription_manage_actions.html.twig' with {sub: sub, return_to: 'subscriptions', return_status: statusFilter} %}
                         </td>
                     </tr>
                 {% else %}

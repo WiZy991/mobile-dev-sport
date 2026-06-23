@@ -74,7 +74,10 @@ enum class SubscriptionStatus {
     EXPIRED,
     
     @SerializedName("pending")
-    PENDING
+    PENDING,
+
+    @SerializedName("cancelled")
+    CANCELLED
 }
 
 data class SubscriptionPlan(

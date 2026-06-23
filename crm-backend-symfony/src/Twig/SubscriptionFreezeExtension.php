@@ -7,6 +7,7 @@ namespace App\Twig;
 use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
 use App\Service\Api\SubscriptionFreezeService;
+use App\Service\Api\SubscriptionLifecycleService;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
@@ -14,6 +15,7 @@ final class SubscriptionFreezeExtension extends AbstractExtension
 {
     public function __construct(
         private readonly SubscriptionFreezeService $freezeService,
+        private readonly SubscriptionLifecycleService $lifecycleService,
     ) {
     }
 
@@ -23,6 +25,8 @@ final class SubscriptionFreezeExtension extends AbstractExtension
             new TwigFunction('subscription_freeze_days_for_plan', $this->freezeDaysForPlan(...)),
             new TwigFunction('subscription_freeze_days_left', $this->freezeDaysLeft(...)),
             new TwigFunction('subscription_can_freeze', $this->canFreeze(...)),
+            new TwigFunction('subscription_can_extend', $this->canExtend(...)),
+            new TwigFunction('subscription_can_cancel', $this->canCancel(...)),
         ];
     }
 
@@ -39,5 +43,15 @@ final class SubscriptionFreezeExtension extends AbstractExtension
     public function canFreeze(Subscription $subscription): bool
     {
         return $this->freezeService->canFreeze($subscription);
+    }
+
+    public function canExtend(Subscription $subscription): bool
+    {
+        return $this->lifecycleService->canExtend($subscription);
+    }
+
+    public function canCancel(Subscription $subscription): bool
+    {
+        return $this->lifecycleService->canCancel($subscription);
     }
 }

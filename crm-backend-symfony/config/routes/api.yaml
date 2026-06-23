@@ -128,6 +128,26 @@ api_subscriptions_unfreeze:
   controller: App\Controller\Api\SubscriptionController::unfreeze
   methods: [POST]
 
+api_subscriptions_extend:
+  path: /api/v1/subscriptions/{id}/extend
+  controller: App\Controller\Api\SubscriptionController::extend
+  methods: [POST]
+
+api_subscriptions_cancel:
+  path: /api/v1/subscriptions/{id}/cancel
+  controller: App\Controller\Api\SubscriptionController::cancel
+  methods: [POST]
+
+api_support_tickets_list:
+  path: /api/v1/support/tickets
+  controller: App\Controller\Api\SupportTicketController::list
+  methods: [GET]
+
+api_support_ticket_create:
+  path: /api/v1/support/tickets
+  controller: App\Controller\Api\SupportTicketController::create
+  methods: [POST]
+
 api_trainers_list:
   path: /api/v1/trainers
   controller: App\Controller\Api\TrainerController::list
@@ -242,11 +262,6 @@ api_notifications_mark_read:
 api_feedback_submit:
   path: /api/v1/feedback
   controller: App\Controller\Api\FeedbackController::submit
-  methods: [POST]
-
-api_support_ticket_create:
-  path: /api/v1/support/tickets
-  controller: App\Controller\Api\SupportTicketController::create
   methods: [POST]
 
 api_guest_passes_list:

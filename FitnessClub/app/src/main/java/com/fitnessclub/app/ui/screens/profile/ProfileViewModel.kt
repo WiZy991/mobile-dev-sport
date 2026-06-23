@@ -102,6 +102,26 @@ class ProfileViewModel @Inject constructor(
             }
         }
     }
+
+    fun cancelSubscription(subscriptionId: String) {
+        viewModelScope.launch {
+            subscriptionRepository.cancelSubscription(subscriptionId).collect { result ->
+                when (result) {
+                    is ApiResult.Success -> {
+                        loadSubscriptions()
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(error = result.message)
+                    }
+                    is ApiResult.Loading -> {}
+                }
+            }
+        }
+    }
+    
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
     
     fun logout() {
         viewModelScope.launch {

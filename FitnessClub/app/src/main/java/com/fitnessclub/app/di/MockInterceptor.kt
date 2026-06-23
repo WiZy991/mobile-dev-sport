@@ -52,6 +52,7 @@ class MockInterceptor : Interceptor {
             path.endsWith("/bookings") && method == "GET" -> mockBookingsResponse()
             
             // Subscriptions endpoints
+            path.contains("/subscriptions") && path.contains("/cancel") && method == "POST" -> mockCancelSubscriptionResponse()
             path.endsWith("/subscriptions/purchase") && method == "POST" -> mockPurchaseResponse()
             path.contains("/subscriptions") && path.contains("/freeze") && method == "POST" -> mockFreezeResponse()
             path.contains("/subscriptions") && path.contains("/unfreeze") && method == "POST" -> mockUnfreezeResponse()
@@ -75,7 +76,8 @@ class MockInterceptor : Interceptor {
             // Feedback
             path.endsWith("/feedback") && method == "POST" -> """{"success": true, "id": "feedback-1"}"""
 
-            path.endsWith("/support/tickets") && method == "POST" -> """{"success": true, "id": 1}"""
+            path.endsWith("/support/tickets") && method == "GET" -> mockSupportTicketsListResponse()
+            path.endsWith("/support/tickets") && method == "POST" -> """{"success": true, "id": "1"}"""
             
             // Guest passes
             path.endsWith("/guest-passes") && method == "POST" -> mockGuestPassCreateResponse()
@@ -516,6 +518,39 @@ class MockInterceptor : Interceptor {
         "freeze_days_used": 7,
         "is_frozen": false,
         "price": 5000.0
+    }
+    """.trimIndent()
+
+    private fun mockCancelSubscriptionResponse(): String = """
+    {
+        "id": "sub-1",
+        "name": "Безлимит",
+        "description": "Неограниченное посещение всех групповых занятий",
+        "type": "unlimited",
+        "start_date": "2026-01-01",
+        "end_date": "2026-03-01",
+        "status": "cancelled",
+        "visits_total": null,
+        "visits_used": 0,
+        "freeze_days_total": 14,
+        "freeze_days_used": 0,
+        "is_frozen": false,
+        "price": 5000.0
+    }
+    """.trimIndent()
+
+    private fun mockSupportTicketsListResponse(): String = """
+    {
+        "tickets": [
+            {
+                "id": "1",
+                "subject": "Не открывается QR",
+                "message": "При сканировании турникет не реагирует",
+                "category": "technical",
+                "status": "in_progress",
+                "created_at": "2026-06-01T10:00:00+03:00"
+            }
+        ]
     }
     """.trimIndent()
     
