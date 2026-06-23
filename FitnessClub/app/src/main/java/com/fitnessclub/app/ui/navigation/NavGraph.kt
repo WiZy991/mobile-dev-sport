@@ -15,6 +15,8 @@ import androidx.navigation.navArgument
 import com.fitnessclub.app.ui.screens.auth.LoginScreen
 import com.fitnessclub.app.ui.screens.auth.LoginViewModel
 import com.fitnessclub.app.ui.screens.auth.RegisterClubPickScreen
+import com.fitnessclub.app.ui.screens.auth.RegisterPassportScreen
+import com.fitnessclub.app.ui.screens.auth.RegisterScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterViewModel
 import com.fitnessclub.app.ui.screens.club.ClubInfoScreen
 import com.fitnessclub.app.ui.screens.clubs.ClubsScreen
@@ -95,11 +97,47 @@ fun NavGraph(
                     onPicked = { club ->
                         viewModel.onClubSelected(club)
                     },
+                    onContinueToRegister = {
+                        navController.navigate(RegisterRoutes.FORM)
+                    },
                     onRequestSberRegistration = {
                         navController.navigate(Screen.Login.createRoute(startSber = true)) {
                             popUpTo(Screen.Register.route) { inclusive = true }
                         }
                     },
+                )
+            }
+            composable(RegisterRoutes.FORM) {
+                val parentEntry = remember {
+                    navController.getBackStackEntry(Screen.Register.route)
+                }
+                val viewModel: RegisterViewModel = hiltViewModel(parentEntry)
+                RegisterScreen(
+                    viewModel = viewModel,
+                    onNavigateToLogin = {
+                        navController.popBackStack(Screen.Login.route, inclusive = false)
+                    },
+                    onNavigateToPassport = {
+                        navController.navigate(RegisterRoutes.PASSPORT)
+                    },
+                    onRegisterSuccess = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    },
+                    onChangeClub = {
+                        navController.popBackStack(RegisterRoutes.CLUB_PICK, inclusive = false)
+                    },
+                )
+            }
+            composable(RegisterRoutes.PASSPORT) {
+                val parentEntry = remember {
+                    navController.getBackStackEntry(Screen.Register.route)
+                }
+                val viewModel: RegisterViewModel = hiltViewModel(parentEntry)
+                RegisterPassportScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
                 )
             }
         }

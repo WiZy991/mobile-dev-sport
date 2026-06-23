@@ -68,6 +68,7 @@ fun RegisterClubPickScreen(
     selectedClubId: String?,
     onBack: () -> Unit,
     onPicked: (ClubItem) -> Unit,
+    onContinueToRegister: () -> Unit = {},
     onRequestSberRegistration: (String) -> Unit = {},
 ) {
     val scroll = rememberScrollState()
@@ -238,14 +239,23 @@ fun RegisterClubPickScreen(
 
             Spacer(Modifier.height(6.dp))
             Button(
+                onClick = onContinueToRegister,
+                enabled = selectedClubId != null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Text("Продолжить регистрацию")
+            }
+            TextButton(
                 onClick = { showSberDialog = true },
                 enabled = selectedClubId != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 28.dp),
-                shape = RoundedCornerShape(14.dp),
             ) {
-                Text("Выбрать зал")
+                Text("Или зарегистрироваться через Сбер ID", color = Color.White)
             }
         }
 

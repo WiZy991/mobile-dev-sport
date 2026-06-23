@@ -48,7 +48,7 @@ class LoginViewModel @Inject constructor(
     fun onBiometricLoginClick(activity: FragmentActivity) {
         if (!biometricLoginStore.hasStoredCredential()) {
             _uiState.value = _uiState.value.copy(
-                error = "Сначала войдите в приложение (номер телефона и пароль). Затем в Настройки → Безопасность включите «Биометрию».",
+                error = "Сначала войдите по email и паролю. Затем в Настройки → Безопасность включите «Биометрию».",
             )
             return
         }

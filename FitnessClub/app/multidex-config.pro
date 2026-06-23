@@ -1,0 +1,3 @@
+-keep class com.fitnessclub.app.FitnessClubApp
+-keep class com.fitnessclub.app.Hilt_FitnessClubApp
+-keep class com.fitnessclub.app.FitnessClubApp_* { *; }
