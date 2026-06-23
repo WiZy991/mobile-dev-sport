@@ -627,12 +627,20 @@
         setMood(mood) {
             const moods = ['neutral', 'happy', 'excited', 'thinking', 'sad', 'celebrate'];
             const m = moods.includes(mood) ? mood : 'neutral';
-            this.el.mascot?.querySelectorAll('.dz-mascot-mouth').forEach((g) => {
-                g.style.display = 'none';
-            });
-            const mouth = this.el.mascot?.querySelector('.dz-mouth-' + m);
-            if (mouth) mouth.style.display = '';
+            const faces = {
+                neutral: '/img/mascot/zalka-neutral.png',
+                happy: '/img/mascot/zalka-happy.png',
+                excited: '/img/mascot/zalka-excited.png',
+                thinking: '/img/mascot/zalka-thinking.png',
+                sad: '/img/mascot/zalka-neutral.png',
+                celebrate: '/img/mascot/zalka-celebrate.png',
+            };
+            const img = this.el.mascot?.querySelector('[data-dz-mascot-img]');
+            if (img) {
+                img.src = faces[m] || faces.neutral;
+            }
             this.el.mascot?.classList.toggle('dz-mascot-bounce', m === 'celebrate' || m === 'excited');
+            this.el.mascot?.classList.toggle('dz-mascot-wiggle', m === 'sad');
         }
 
         renderHud() {
