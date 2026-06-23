@@ -3,16 +3,16 @@
 namespace App\Service\Admin;
 
 /**
- * Каталог игрового онбординга «Зайка» — единый источник уроков для CRM и будущих мобильных приложений.
+ * Каталог игрового онбординга — единый источник уроков для CRM и будущих мобильных приложений.
  */
 final class OnboardingQuestCatalog
 {
     public function mascot(): array
     {
         return [
-            'name' => 'Зайка',
+            'name' => 'Тренер',
             'tagline' => 'Твой гид по CRM',
-            'description' => 'Зайка в наушниках — проводит по CRM и подсказывает на каждом шаге.',
+            'description' => 'Тренер проводит по CRM и подсказывает на каждом шаге.',
         ];
     }
 
@@ -105,7 +105,7 @@ final class OnboardingQuestCatalog
                         $this->tour(
                             'onboarding',
                             '[data-dz-tour="lesson-map"]',
-                            'Привет! Я Зайка. Сейчас пойдём по настоящим разделам CRM — я подсвечу кнопки и поля.',
+                            'Привет! Я Тренер. Сейчас пойдём по настоящим разделам CRM — подсвечу кнопки и поля.',
                             'happy',
                         ),
                         $this->tourClick(

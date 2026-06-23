@@ -547,13 +547,22 @@
         measureStage() {
             const stage = this.el.stage;
             if (!stage) return { w: 320, h: 380 };
-            const rect = stage.getBoundingClientRect();
-            const w = rect.width > 0 ? rect.width : (stage.offsetWidth || 320);
-            const h = rect.height > 0 ? rect.height : (stage.offsetHeight || 380);
+            const w = stage.offsetWidth || stage.getBoundingClientRect().width || 320;
+            const h = stage.offsetHeight || stage.getBoundingClientRect().height || 380;
             return {
                 w: Math.min(340, w || 320),
                 h: h || 380,
             };
+        }
+
+        fitStageInViewport(preferredTop) {
+            const stage = this.el.stage;
+            if (!stage) return preferredTop;
+            const bottomSafe = this.topbarInset();
+            const topSafe = 12;
+            const stageH = stage.offsetHeight || this.measureStage().h;
+            const maxTop = window.innerHeight - bottomSafe - stageH - 8;
+            return this.clamp(preferredTop, topSafe, Math.max(topSafe, maxTop));
         }
 
         measureBubbleTailY() {
@@ -576,13 +585,7 @@
             const stage = this.el.stage;
             const tailY = this.measureBubbleTailY();
             const targetCy = r.top + r.height / 2;
-            const bottomSafe = this.topbarInset();
-            const stageH = stage.getBoundingClientRect().height || this.measureStage().h;
-            const top = this.clamp(
-                targetCy - tailY,
-                12,
-                window.innerHeight - bottomSafe - stageH - 8,
-            );
+            const top = this.fitStageInViewport(targetCy - tailY);
             stage.style.top = top + 'px';
         }
 
@@ -590,6 +593,13 @@
             const run = () => {
                 this.positionStage(target);
                 this.refineStageVerticalAlign(target, this._lastTailPlacement);
+                const stage = this.el.stage;
+                if (stage) {
+                    const top = parseFloat(stage.style.top);
+                    if (!Number.isNaN(top)) {
+                        stage.style.top = this.fitStageInViewport(top) + 'px';
+                    }
+                }
             };
             requestAnimationFrame(() => {
                 run();
@@ -651,23 +661,25 @@
                     top = r.top + r.height / 2 - this.measureBubbleTailY();
                     tailPlacement = 'right';
                 } else {
+                    const liveH = stage.offsetHeight || stageH;
                     const spaceBelow = window.innerHeight - bottomSafe - r.bottom - margin;
-                    if (spaceBelow >= stageH * 0.55) {
+                    if (spaceBelow >= liveH) {
                         top = r.bottom + margin;
                         tailPlacement = 'top';
                     } else {
-                        top = r.top - stageH - margin;
+                        top = r.top - liveH - margin;
                         tailPlacement = 'bottom';
                     }
                     left = r.left + r.width / 2 - stageW / 2;
                 }
 
-                top = this.clamp(top, topSafe, window.innerHeight - bottomSafe - stageH - 8);
+                top = this.fitStageInViewport(top);
                 left = this.clamp(left, margin, window.innerWidth - stageW - margin);
             } else {
                 top = window.innerHeight - bottomSafe - stageH - margin;
                 left = window.innerWidth - stageW - margin - 20;
                 tailPlacement = 'top';
+                top = this.fitStageInViewport(top);
             }
 
             stage.style.width = stageW + 'px';
@@ -698,6 +710,7 @@
                 const t = this.resolveTarget(step);
                 this.positionStage(t);
                 this.scheduleStageLayout(t);
+                requestAnimationFrame(() => this.scheduleStageLayout(t));
             });
         }
 
@@ -710,6 +723,7 @@
                 btn.classList.add('dz-quiz-correct');
                 this.setMood('happy');
                 if (this.el.text) this.el.text.textContent = step.explain || this.labels.excellent;
+                this.scheduleStageLayout(this.resolveTarget(step));
                 setTimeout(() => this.advance(), 1100);
             } else {
                 btn.classList.add('dz-quiz-wrong');
@@ -721,6 +735,7 @@
                     if (this.state.hearts <= 0) msg += this.labels.heartsOut;
                     this.el.text.textContent = msg;
                 }
+                this.scheduleStageLayout(this.resolveTarget(step));
                 if (this.state.hearts <= 0) {
                     this.state.hearts = this.heartsMax;
                     this.saveState();
@@ -880,8 +895,9 @@
                 return;
             }
             const placeRight = r.left < window.innerWidth * 0.5;
-            const pawBase = placeRight ? '/img/mascot/zalka-paw-right.png' : '/img/mascot/zalka-paw-left.png';
-            paw.src = pawBase + '?v=2';
+            const pawBase = '/img/mascot/trainer-paw.png';
+            paw.src = pawBase + '?v=3';
+            paw.classList.toggle('dz-tour-tap-paw-flip', !placeRight);
             const x = r.left + r.width * 0.82;
             const y = r.top + r.height * 0.5;
             paw.style.left = x + 'px';
