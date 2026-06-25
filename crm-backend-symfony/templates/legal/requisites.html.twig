@@ -1,0 +1,192 @@
+{% extends 'legal/base.html.twig' %}
+
+{% block title %}Реквизиты продавца{% endblock %}
+
+{% block body %}
+    <style>
+        .req-intro {
+            color: var(--muted);
+            margin-bottom: 1.75rem;
+            max-width: 52rem;
+        }
+
+        .req-section {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .req-section h2 {
+            margin: 0 0 1rem;
+            font-size: 1.15rem;
+        }
+
+        .req-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .req-table th,
+        .req-table td {
+            text-align: left;
+            vertical-align: top;
+            padding: 0.55rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .req-table tr:last-child th,
+        .req-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .req-table th {
+            width: 38%;
+            color: var(--muted);
+            font-weight: 600;
+            padding-right: 1rem;
+        }
+
+        .req-note {
+            margin-top: 1rem;
+            font-size: 0.92rem;
+            color: var(--muted);
+        }
+
+        @media (max-width: 640px) {
+            .req-table th,
+            .req-table td {
+                display: block;
+                width: 100%;
+                padding: 0.25rem 0;
+            }
+
+            .req-table th {
+                padding-top: 0.75rem;
+            }
+
+            .req-table tr {
+                display: block;
+                padding-bottom: 0.5rem;
+            }
+        }
+    </style>
+
+    <h1>Реквизиты продавца</h1>
+    <p class="req-intro">
+        Реквизиты организации, осуществляющей продажу абонементов и услуг через мобильное приложение
+        <strong>WorldCashFit</strong> (<code>ru.worldcashfit.app</code>).
+    </p>
+
+    <section class="req-section" id="gymroom">
+        <h2>ИП Мацкова Александра Сергеевна (GymRoom)</h2>
+        <table class="req-table">
+            <tr>
+                <th>Полное наименование</th>
+                <td>Индивидуальный предприниматель Мацкова Александра Сергеевна</td>
+            </tr>
+            <tr>
+                <th>Торговое наименование</th>
+                <td>GymRoom</td>
+            </tr>
+            <tr>
+                <th>ИНН</th>
+                <td>254009880989</td>
+            </tr>
+            <tr>
+                <th>ОГРНИП</th>
+                <td>323253600018625</td>
+            </tr>
+            <tr>
+                <th>Юридический адрес</th>
+                <td>692768, Приморский край, Надеждинский район, п. Зима южная, ул. Терентьева, д. 1/2</td>
+            </tr>
+            <tr>
+                <th>Почтовый адрес</th>
+                <td>690014, г. Владивосток, Приморский край, ул. Толстого, д. 32а, офис 308</td>
+            </tr>
+            <tr>
+                <th>Банк</th>
+                <td>АО «Альфа-Банк», г. Москва</td>
+            </tr>
+            <tr>
+                <th>Расчётный счёт</th>
+                <td>40802810520020005616</td>
+            </tr>
+            <tr>
+                <th>Корреспондентский счёт</th>
+                <td>30101810900000000770</td>
+            </tr>
+            <tr>
+                <th>БИК</th>
+                <td>040813770</td>
+            </tr>
+            <tr>
+                <th>Телефон</th>
+                <td><a href="tel:+79532041084">+7 (953) 204-10-84</a></td>
+            </tr>
+            <tr>
+                <th>Электронная почта</th>
+                <td><a href="mailto:info@gymroom.ru">info@gymroom.ru</a></td>
+            </tr>
+        </table>
+        <p class="req-note">
+            Онлайн-оплата абонементов и услуг в приложении осуществляется в пользу указанного продавца.
+        </p>
+    </section>
+
+    <section class="req-section" id="worldcashfit">
+        <h2>ООО «Ворлдкэшбокс» (WorldCashFit)</h2>
+        <table class="req-table">
+            <tr>
+                <th>Полное наименование</th>
+                <td>Общество с ограниченной ответственностью «Ворлдкэшбокс»</td>
+            </tr>
+            <tr>
+                <th>ИНН / КПП</th>
+                <td>2543082240 / 253601001</td>
+            </tr>
+            <tr>
+                <th>ОГРН</th>
+                <td>1152543020629</td>
+            </tr>
+            <tr>
+                <th>Юридический адрес</th>
+                <td>690014, Приморский край, г. Владивосток, ул. Толстого, д. 32 А, офис 308</td>
+            </tr>
+            <tr>
+                <th>Банк</th>
+                <td>Филиал «ЦЕНТРАЛЬНЫЙ» Банка ВТБ (ПАО), г. Москва</td>
+            </tr>
+            <tr>
+                <th>Расчётный счёт</th>
+                <td>40702810711020000799</td>
+            </tr>
+            <tr>
+                <th>БИК</th>
+                <td>044525411</td>
+            </tr>
+            <tr>
+                <th>Корреспондентский счёт</th>
+                <td>30101810145250000411</td>
+            </tr>
+            <tr>
+                <th>Телефон</th>
+                <td><a href="tel:+79940107272">8 (994) 010-72-72</a></td>
+            </tr>
+            <tr>
+                <th>Электронная почта</th>
+                <td><a href="mailto:vl@worldcashbox.ru">vl@worldcashbox.ru</a></td>
+            </tr>
+        </table>
+        <p class="req-note">
+            Правообладатель программного обеспечения WorldCashFit. Реквизиты для оплаты лицензии на платформу.
+        </p>
+    </section>
+
+    <p style="color: var(--muted); font-size: 0.92rem;">
+        См. также: <a href="{{ path('legal_client_agreement') }}">Договор с клиентом</a>,
+        <a href="{{ path('legal_license_agreement') }}">Договор-оферта</a>.
+    </p>
+{% endblock %}

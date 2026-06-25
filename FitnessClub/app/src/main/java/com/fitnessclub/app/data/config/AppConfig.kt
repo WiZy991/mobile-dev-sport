@@ -33,6 +33,9 @@ object AppConfig {
 
     /** Все правовые документы */
     const val LEGAL_INDEX_URL = "${SITE_URL}/legal"
+
+    /** Реквизиты продавца (для онлайн-оплаты в приложении) */
+    const val REQUISITES_URL = "${SITE_URL}/requisites"
     
     /** Ссылка на страницу приложения в Google Play */
     const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.fitnessclub.app"

@@ -77,6 +77,12 @@ class LegalController extends AbstractController
         return $this->renderDocument('personal-data-consent');
     }
 
+    #[Route('/requisites', name: 'legal_requisites', methods: ['GET'])]
+    public function requisites(): Response
+    {
+        return $this->render('legal/requisites.html.twig');
+    }
+
     #[Route('/legal/{slug}/download', name: 'legal_download', methods: ['GET'])]
     public function download(string $slug): Response
     {
@@ -137,6 +143,12 @@ class LegalController extends AbstractController
                 'url' => $this->generateUrl($route),
             ];
         }
+
+        $documents[] = [
+            'slug' => 'requisites',
+            'title' => 'Реквизиты продавца',
+            'url' => $this->generateUrl('legal_requisites'),
+        ];
 
         return $documents;
     }

@@ -227,6 +227,13 @@ fun SettingsScreen(
             // Legal section
             SettingsSection(title = "Правовая информация") {
                 ClickableSettingItem(
+                    icon = Icons.Default.AccountBalance,
+                    title = "Реквизиты продавца",
+                    subtitle = "ИП Мацкова А.С. (GymRoom)",
+                    onClick = { uriHandler.openUri(AppConfig.REQUISITES_URL) }
+                )
+
+                ClickableSettingItem(
                     icon = Icons.Default.Description,
                     title = "Договор-оферта",
                     onClick = { uriHandler.openUri(AppConfig.TERMS_URL) }
