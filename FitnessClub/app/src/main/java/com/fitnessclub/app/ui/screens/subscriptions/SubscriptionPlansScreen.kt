@@ -155,7 +155,7 @@ fun SubscriptionPlansScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     "• Оплата онлайн или в клубе\n" +
-                                    "• Продавец: ИП Мацкова А.С. (GymRoom) — реквизиты на сайте\n" +
+                                    "• ИП Мацкова Александра Сергеевна — реквизиты на сайте\n" +
                                     "• Если клуб включил проверку — подтверждение через Сбер ID перед оплатой\n" +
                                     "• Заморозка: 1 мес — нет; 3 мес — 14 дн.; 6 мес — 20 дн.; 12 мес — 30 дн.\n" +
                                     "• Возврат в течение 14 дней",
@@ -167,7 +167,7 @@ fun SubscriptionPlansScreen(
                                     onClick = { uriHandler.openUri(AppConfig.REQUISITES_URL) },
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    Text("Реквизиты продавца")
+                                    Text("Реквизиты")
                                 }
                             }
                         }
@@ -536,7 +536,7 @@ private fun PurchaseConfirmDialog(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Продавец: ИП Мацкова Александра Сергеевна (GymRoom), ИНН 254009880989",
+                    text = "ИП Мацкова Александра Сергеевна, ИНН 254009880989",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -545,7 +545,7 @@ private fun PurchaseConfirmDialog(
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(
-                        text = "Реквизиты продавца",
+                        text = "Реквизиты",
                         style = MaterialTheme.typography.bodySmall,
                         textDecoration = TextDecoration.Underline
                     )

@@ -146,7 +146,7 @@ class LegalController extends AbstractController
 
         $documents[] = [
             'slug' => 'requisites',
-            'title' => 'Реквизиты продавца',
+            'title' => 'Реквизиты',
             'url' => $this->generateUrl('legal_requisites'),
         ];
 

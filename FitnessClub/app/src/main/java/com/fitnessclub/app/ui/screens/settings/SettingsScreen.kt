@@ -228,8 +228,8 @@ fun SettingsScreen(
             SettingsSection(title = "Правовая информация") {
                 ClickableSettingItem(
                     icon = Icons.Default.AccountBalance,
-                    title = "Реквизиты продавца",
-                    subtitle = "ИП Мацкова А.С. (GymRoom)",
+                    title = "Реквизиты",
+                    subtitle = "ИП Мацкова Александра Сергеевна",
                     onClick = { uriHandler.openUri(AppConfig.REQUISITES_URL) }
                 )
 
