@@ -1,5 +1,7 @@
 package com.fitnessclub.app.ui.navigation
 
+import com.fitnessclub.app.data.config.LegalDocumentType
+
 sealed class Screen(val route: String) {
     // Auth
     data object Login : Screen("login") {
@@ -33,6 +35,10 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object Help : Screen("help")
     data object About : Screen("about")
+
+    data object LegalDocument : Screen("legal/{legalDoc}") {
+        fun createRoute(type: LegalDocumentType) = "legal/${type.name}"
+    }
     
     // Club & Trainers
     data object ClubInfo : Screen("club_info")
@@ -58,4 +64,5 @@ object NavArgs {
     const val TRAINING_ID = "trainingId"
     const val CLUB_ID = "clubId"
     const val TRAINER_ID = "trainerId"
+    const val LEGAL_DOC = "legalDoc"
 }

@@ -17,7 +17,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -26,7 +25,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.fitnessclub.app.data.config.AppConfig
+import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.ui.theme.AccentOrange
 import com.fitnessclub.app.ui.theme.AppShapes
@@ -40,6 +39,7 @@ fun SubscriptionPlansScreen(
     onNavigateBack: () -> Unit,
     onPromoCode: () -> Unit,
     onPurchaseSuccess: () -> Unit = {},
+    onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
     viewModel: SubscriptionPlansViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -155,16 +155,15 @@ fun SubscriptionPlansScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     "• Оплата онлайн или в клубе\n" +
-                                    "• ИП Мацкова Александра Сергеевна — реквизиты на сайте\n" +
+                                    "• ИП Мацкова Александра Сергеевна — реквизиты в приложении\n" +
                                     "• Если клуб включил проверку — подтверждение через Сбер ID перед оплатой\n" +
                                     "• Заморозка: 1 мес — нет; 3 мес — 14 дн.; 6 мес — 20 дн.; 12 мес — 30 дн.\n" +
                                     "• Возврат в течение 14 дней",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                val uriHandler = LocalUriHandler.current
                                 TextButton(
-                                    onClick = { uriHandler.openUri(AppConfig.REQUISITES_URL) },
+                                    onClick = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Text("Реквизиты")
@@ -198,6 +197,7 @@ fun SubscriptionPlansScreen(
             isLoading = uiState.isLoading,
             error = purchaseError,
             onDismiss = { showPurchaseDialog = null; purchaseError = null },
+            onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
             onConfirm = {
                 purchaseError = null
                 viewModel.purchasePlan(
@@ -488,9 +488,9 @@ private fun PurchaseConfirmDialog(
     isLoading: Boolean = false,
     error: String? = null,
     onDismiss: () -> Unit,
+    onOpenRequisites: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    val uriHandler = LocalUriHandler.current
     val finalPrice = if (discount > 0) {
         (plan.price * (100 - discount) / 100).toInt()
     } else {
@@ -541,7 +541,7 @@ private fun PurchaseConfirmDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(
-                    onClick = { uriHandler.openUri(AppConfig.REQUISITES_URL) },
+                    onClick = onOpenRequisites,
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(

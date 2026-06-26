@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.ui.components.GeneralFeedbackDialog
 import com.fitnessclub.app.ui.theme.Primary
@@ -37,6 +38,7 @@ fun SettingsScreen(
     onNavigateToSecuritySettings: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
+    onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uriHandler = LocalUriHandler.current
@@ -230,37 +232,37 @@ fun SettingsScreen(
                     icon = Icons.Default.AccountBalance,
                     title = "Реквизиты",
                     subtitle = "ИП Мацкова Александра Сергеевна",
-                    onClick = { uriHandler.openUri(AppConfig.REQUISITES_URL) }
+                    onClick = { onOpenLegalDocument(LegalDocumentType.REQUISITES) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Description,
                     title = "Договор-оферта",
-                    onClick = { uriHandler.openUri(AppConfig.TERMS_URL) }
+                    onClick = { onOpenLegalDocument(LegalDocumentType.TERMS) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.PrivacyTip,
                     title = "Политика конфиденциальности",
-                    onClick = { uriHandler.openUri(AppConfig.PRIVACY_URL) }
+                    onClick = { onOpenLegalDocument(LegalDocumentType.PRIVACY) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Article,
                     title = "Договор с клиентом",
-                    onClick = { uriHandler.openUri(AppConfig.CLIENT_AGREEMENT_URL) }
+                    onClick = { onOpenLegalDocument(LegalDocumentType.CLIENT_AGREEMENT) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Article,
                     title = "Договор с тренером",
-                    onClick = { uriHandler.openUri(AppConfig.TRAINER_AGREEMENT_URL) }
+                    onClick = { onOpenLegalDocument(LegalDocumentType.TRAINER_AGREEMENT) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Assignment,
                     title = "Согласие на обработку персональных данных",
-                    onClick = { uriHandler.openUri(AppConfig.PERSONAL_DATA_CONSENT_URL) }
+                    onClick = { onOpenLegalDocument(LegalDocumentType.PERSONAL_DATA_CONSENT) }
                 )
             }
             

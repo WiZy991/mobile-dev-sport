@@ -35,6 +35,8 @@ import com.fitnessclub.app.ui.screens.lockers.LockerScreen
 import com.fitnessclub.app.ui.screens.settings.SettingsScreen
 import com.fitnessclub.app.ui.screens.help.HelpScreen
 import com.fitnessclub.app.ui.screens.about.AboutScreen
+import com.fitnessclub.app.ui.screens.legal.LegalDocumentScreen
+import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.ui.screens.shop.ShopScreen
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPlansScreen
 import com.fitnessclub.app.ui.screens.trainers.TrainerDetailsScreen
@@ -208,7 +210,10 @@ fun NavGraph(
             SubscriptionPlansScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onPromoCode = { /* Handled in screen */ },
-                onPurchaseSuccess = { navController.popBackStack() }
+                onPurchaseSuccess = { navController.popBackStack() },
+                onOpenLegalDocument = { type ->
+                    navController.navigate(Screen.LegalDocument.createRoute(type))
+                },
             )
         }
         
@@ -245,8 +250,28 @@ fun NavGraph(
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHelp = { navController.navigate(Screen.Help.route) },
-                onNavigateToAbout = { navController.navigate(Screen.About.route) }
+                onNavigateToAbout = { navController.navigate(Screen.About.route) },
+                onOpenLegalDocument = { type ->
+                    navController.navigate(Screen.LegalDocument.createRoute(type))
+                },
             )
+        }
+
+        composable(
+            route = Screen.LegalDocument.route,
+            arguments = listOf(
+                navArgument(NavArgs.LEGAL_DOC) { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val docType = backStackEntry.arguments
+                ?.getString(NavArgs.LEGAL_DOC)
+                ?.let { LegalDocumentType.fromRouteArg(it) }
+            if (docType != null) {
+                LegalDocumentScreen(
+                    document = docType,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
         }
         
         // Help & About
