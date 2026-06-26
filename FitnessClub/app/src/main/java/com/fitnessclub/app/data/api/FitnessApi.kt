@@ -178,6 +178,10 @@ interface FitnessApi {
     @Streaming
     @GET("documents/{id}/download")
     suspend fun downloadDocument(@Path("id") id: String): Response<okhttp3.ResponseBody>
+
+    // Legal (правовая информация для приложения)
+    @GET("legal/{slug}")
+    suspend fun getLegalDocument(@Path("slug") slug: String): Response<LegalDocumentResponse>
 }
 
 data class PurchaseSubscriptionRequest(

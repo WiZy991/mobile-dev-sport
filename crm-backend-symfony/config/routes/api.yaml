@@ -384,3 +384,8 @@ api_staff_push_token:
   controller: App\Controller\Api\StaffPushController::register
   methods: [POST]
 
+api_legal_document:
+  path: /api/v1/legal/{slug}
+  controller: App\Controller\Api\LegalApiController::document
+  methods: [GET]
+
