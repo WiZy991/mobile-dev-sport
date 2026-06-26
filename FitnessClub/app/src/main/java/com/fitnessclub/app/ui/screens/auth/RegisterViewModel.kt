@@ -105,7 +105,7 @@ object ReferralSourceOptions {
 
     val items: List<Pair<String, String>> = listOf(
         "friends_family" to "От друзей/родственников",
-        "friends_in_gymroom" to "Друзья/родственники уже ходят в ДжимРум",
+        "friends_in_gymroom" to "Друзья/родственники уже ходят в Доброзал",
         "social" to "Из социальных сетей",
         "2gis" to "2ГИС",
         "yandex" to "Яндекс",
