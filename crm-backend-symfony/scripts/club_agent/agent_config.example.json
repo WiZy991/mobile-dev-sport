@@ -26,5 +26,24 @@
       "notes": ""
     }
   ],
+  "camera": {
+    "enabled": false,
+    "host": "192.168.1.108",
+    "username": "admin",
+    "password": "",
+    "channel": 1,
+    "https": false,
+    "verify_ssl": false,
+    "event_codes": "CrossLineDetection",
+    "inbound_direction": "",
+    "require_human": true,
+    "tailgating_window_ms": 6000,
+    "pre_roll_ms": 1000,
+    "min_people": 2,
+    "standalone_enabled": false,
+    "standalone_window_ms": 4000,
+    "standalone_min_people": 2,
+    "standalone_cooldown_ms": 30000
+  },
   "only_fitnessclub_qr": true
 }

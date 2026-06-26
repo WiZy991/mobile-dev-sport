@@ -213,6 +213,24 @@
                 <div class="mb-1"><strong>Пол:</strong> {% set gl = client.gender ? client.gender|lower : '' %}{{ gl in ['m', 'male'] ? 'М' : (gl in ['f', 'female'] ? 'Ж' : (client.gender ?: '—')) }}</div>
                 <div class="mb-1"><strong>Бонусы:</strong> {{ client.bonusPoints }}</div>
                 <div class="mb-1"><strong>Создан:</strong> {{ client.createdAt|date('d.m.Y H:i') }}</div>
+                {% if client.referralSource %}
+                    {% set referralLabels = {
+                        'friends_family': 'От друзей/родственников',
+                        'friends_in_gymroom': 'Друзья/родственники уже ходят в ДжимРум',
+                        'social': 'Из социальных сетей',
+                        '2gis': '2ГИС',
+                        'yandex': 'Яндекс',
+                        'internet_ads': 'Из рекламы в интернете',
+                        'mall': 'Увидел в торговом центре',
+                        'event': 'Посещал мероприятие',
+                        'other': 'Другое'
+                    } %}
+                    <div class="mb-1">
+                        <strong>Откуда узнал(а) о нас:</strong>
+                        {{ referralLabels[client.referralSource] ?? client.referralSource }}
+                        {% if client.referralSourceOther %}<span class="text-secondary">— {{ client.referralSourceOther }}</span>{% endif %}
+                    </div>
+                {% endif %}
             </div>
             <div class="content-card mb-3">
                 <div class="text-primary small fw-semibold mb-2 text-uppercase">В приложении</div>

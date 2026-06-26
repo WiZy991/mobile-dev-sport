@@ -65,6 +65,7 @@ class NotificationsViewModel @Inject constructor(
             "promo" -> NotificationType.PROMO
             "subscription" -> NotificationType.SUBSCRIPTION
             "bonus" -> NotificationType.BONUS
+            "access_alarm" -> NotificationType.ACCESS_ALARM
             else -> NotificationType.SYSTEM
         }
         return NotificationItem(

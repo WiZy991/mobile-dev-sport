@@ -4,7 +4,9 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 import urllib.error
+from datetime import datetime
 from typing import Any, Callable, Optional, Union
 
 from c01_client import C01Outbound
@@ -12,6 +14,7 @@ from c01_protocol import access_deny, control_cross_reference, control_output, e
 from c01_server import C01Server
 from config import AgentConfig
 from crm_client import CrmClient
+from dahua_camera import DahuaCameraListener
 from equipment import EquipmentItem
 
 LOG = logging.getLogger("agent")
@@ -82,6 +85,13 @@ class ClubAgent:
         self._c01_connected: dict[str, bool] = {}
         self._crm_ok = False
         self._selected_equipment_id: Optional[str] = None
+        self._camera: Optional[DahuaCameraListener] = None
+        self._camera_last_alarm: str = ""
+        # Дедупликация: момент последнего успешного прохода по QR (monotonic) — чтобы контроль
+        # входа без QR не дублировал tailgating, и момент последней тревоги «вход без QR» (cooldown).
+        self._last_qr_entry_mono: float = 0.0
+        self._last_standalone_alarm_mono: float = 0.0
+        self._standalone_thread: Optional[threading.Thread] = None
 
     def _emit(self, level: str, msg: str) -> None:
         self.on_log(level, msg)
@@ -239,11 +249,144 @@ class ClubAgent:
                         control_output(out_n, False),
                         f"реле/выход №{out_n} (выкл)",
                     )
+            if passage == "entry":
+                self._arm_tailgating_window(qr)
         else:
             cmd = access_deny(number, direction)
             self._log_c01_command(equipment, cmd, "запрет прохода")
 
         return granted
+
+    def _arm_tailgating_window(self, qr: str) -> None:
+        """После открытия двери по одному QR посчитать пересечения линии входа камерой.
+
+        Если за окно прошло >= min_people человек — это проход вдвоём (tailgating): шлём тревогу в CRM.
+        """
+        # Фиксируем момент прохода по QR даже без камеры — для дедупликации контроля входа без QR.
+        self._last_qr_entry_mono = time.monotonic()
+        cam = self._camera
+        if cam is None or not self.cfg.camera.enabled:
+            return
+        cam_cfg = self.cfg.camera
+        window_ms = max(500, int(cam_cfg.tailgating_window_ms))
+        pre_roll_ms = max(0, int(cam_cfg.pre_roll_ms))
+        min_people = max(2, int(cam_cfg.min_people))
+        t0 = time.monotonic()
+        self._emit(
+            "info",
+            f"камера: окно подсчёта прохода {window_ms} мс (контроль прохода вдвоём, порог {min_people})",
+        )
+
+        def worker() -> None:
+            end = t0 + window_ms / 1000.0
+            while not self._stop.is_set():
+                now = time.monotonic()
+                if now >= end:
+                    break
+                self._stop.wait(min(0.2, end - now))
+            crossings = cam.crossings_between(t0 - pre_roll_ms / 1000.0, time.monotonic())
+            count = len(crossings)
+            if count >= min_people:
+                self._emit(
+                    "warning",
+                    f"камера: по одному QR прошло {count} чел. — тревога «проход вдвоём» (tailgating)",
+                )
+                self._camera_last_alarm = f"{datetime.now():%H:%M:%S} — {count} чел."
+                self._send_tailgating_alarm(qr, count, crossings, window_ms)
+            else:
+                self._emit("info", f"камера: прошло {count} чел. — норма")
+
+        threading.Thread(target=worker, name="tailgating-window", daemon=True).start()
+
+    def _send_tailgating_alarm(
+        self, qr: str, people_count: int, crossings: list[dict], window_ms: int
+    ) -> None:
+        try:
+            code, body = self._crm_client().submit_alarm(
+                qr=qr,
+                alarm_type="tailgating",
+                people_count=people_count,
+                details={"window_ms": window_ms, "crossings": crossings},
+            )
+        except Exception as e:  # noqa: BLE001 — сеть; тревогу не теряем в логе
+            self._emit("error", f"CRM: ошибка отправки тревоги: {e}")
+            return
+        if code == 200 and isinstance(body, dict) and body.get("ok"):
+            self._emit("info", "CRM: тревога «проход вдвоём» принята (уведомления отправлены)")
+        else:
+            self._emit(
+                "warning",
+                f"CRM: тревога не принята — HTTP {code}, тело {json.dumps(body, ensure_ascii=False)}",
+            )
+
+    def _start_standalone_watcher(self) -> None:
+        """Непрерывный контроль входа без QR: тревога, если за окно прошло >= порога человек.
+
+        Работает независимо от прохода по QR. Дедупликация: пропускаем интервалы, перекрывающиеся
+        с окном tailgating после успешного прохода по QR (там уже своя тревога), и держим cooldown,
+        чтобы одна группа не порождала много тревог.
+        """
+        cam = self._camera
+        cam_cfg = self.cfg.camera
+        if cam is None or not cam_cfg.standalone_enabled:
+            return
+        window_ms = max(500, int(cam_cfg.standalone_window_ms))
+        min_people = max(2, int(cam_cfg.standalone_min_people))
+        cooldown_ms = max(0, int(cam_cfg.standalone_cooldown_ms))
+        tg_window_ms = max(0, int(cam_cfg.tailgating_window_ms))
+        poll_sec = max(0.3, min(1.0, window_ms / 2000.0))
+        self._emit(
+            "info",
+            f"камера: контроль входа без QR включён (окно {window_ms} мс, порог {min_people})",
+        )
+
+        def worker() -> None:
+            while not self._stop.is_set():
+                if self._stop.wait(poll_sec):
+                    break
+                now = time.monotonic()
+                # cooldown между тревогами
+                if (now - self._last_standalone_alarm_mono) * 1000.0 < cooldown_ms:
+                    continue
+                # дедуп против tailgating: проход по QR «объясняет» проходы в своём окне
+                if (now - self._last_qr_entry_mono) * 1000.0 < (tg_window_ms + window_ms):
+                    continue
+                crossings = cam.crossings_between(now - window_ms / 1000.0, now)
+                count = len(crossings)
+                if count >= min_people:
+                    self._emit(
+                        "warning",
+                        f"камера: вход группой без прохода по QR — {count} чел. (тревога group_entry)",
+                    )
+                    self._camera_last_alarm = f"{datetime.now():%H:%M:%S} — {count} чел. (без QR)"
+                    self._last_standalone_alarm_mono = now
+                    self._send_group_entry_alarm(count, crossings, window_ms)
+
+        self._standalone_thread = threading.Thread(
+            target=worker, name="standalone-entry-watcher", daemon=True
+        )
+        self._standalone_thread.start()
+
+    def _send_group_entry_alarm(
+        self, people_count: int, crossings: list[dict], window_ms: int
+    ) -> None:
+        try:
+            code, body = self._crm_client().submit_alarm(
+                qr="",
+                alarm_type="group_entry",
+                people_count=people_count,
+                details={"window_ms": window_ms, "crossings": crossings, "no_qr": True},
+            )
+        except Exception as e:  # noqa: BLE001 — сеть; тревогу не теряем в логе
+            self._emit("error", f"CRM: ошибка отправки тревоги (вход без QR): {e}")
+            return
+        if code == 200 and isinstance(body, dict) and body.get("ok"):
+            self._emit("info", "CRM: тревога «вход группой без QR» принята (уведомления отправлены)")
+        else:
+            self._emit(
+                "warning",
+                f"CRM: тревога не принята — HTTP {code}, тело {json.dumps(body, ensure_ascii=False)}",
+            )
 
     def _crm_loop(self) -> None:
         while not self._stop.is_set():
@@ -331,7 +474,28 @@ class ClubAgent:
             ep.start_background()
         self._crm_thread = threading.Thread(target=self._crm_loop, daemon=True)
         self._crm_thread.start()
+        self._start_camera()
         self._emit("info", "Агент запущен")
+
+    def _start_camera(self) -> None:
+        cam_cfg = self.cfg.camera
+        if not cam_cfg.enabled or not cam_cfg.host.strip():
+            return
+        self._camera = DahuaCameraListener(
+            host=cam_cfg.host,
+            username=cam_cfg.username,
+            password=cam_cfg.password,
+            channel=cam_cfg.channel,
+            event_codes=cam_cfg.event_codes,
+            inbound_direction=cam_cfg.inbound_direction,
+            require_human=cam_cfg.require_human,
+            https=cam_cfg.https,
+            verify_ssl=cam_cfg.verify_ssl,
+            on_log=self.on_log,
+        )
+        self._camera.start()
+        self._emit("info", f"Камера: запуск слежения за линией входа ({cam_cfg.host})")
+        self._start_standalone_watcher()
 
     def stop(self) -> None:
         self._stop.set()
@@ -339,6 +503,10 @@ class ClubAgent:
             ep.stop()
         self._endpoints.clear()
         self._c01_connected.clear()
+        if self._camera is not None:
+            self._camera.stop()
+            self._camera = None
+        self._standalone_thread = None
         self._crm_ok = False
         self._notify_status()
 
@@ -440,3 +608,19 @@ class ClubAgent:
     @property
     def c01_online(self) -> bool:
         return any(self._c01_connected.values())
+
+    @property
+    def camera_enabled(self) -> bool:
+        return bool(self.cfg.camera.enabled and self.cfg.camera.host.strip())
+
+    @property
+    def camera_online(self) -> bool:
+        return self._camera is not None and self._camera.connected
+
+    @property
+    def camera_total_crossings(self) -> int:
+        return self._camera.total_crossings if self._camera is not None else 0
+
+    @property
+    def camera_last_alarm(self) -> str:
+        return self._camera_last_alarm

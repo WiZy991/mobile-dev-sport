@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     // AGP 9+ включает Kotlin; compose-compiler — отдельный плагин с версией.
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 val keystorePropertiesFile = rootProject.file("staffapp/keystore.properties")
@@ -84,6 +85,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+
+    // Firebase Cloud Messaging (push-уведомления)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

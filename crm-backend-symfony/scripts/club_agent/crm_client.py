@@ -79,6 +79,27 @@ class CrmClient:
             json_body={"qr": qr, "device_id": self.cfg.device_id},
         )
 
+    def submit_alarm(
+        self,
+        *,
+        qr: str,
+        alarm_type: str = "tailgating",
+        people_count: int,
+        details: Optional[dict] = None,
+    ) -> tuple[int, dict]:
+        """Тревога доступа (например, проход вдвоём по одному QR) → CRM."""
+        return self._request(
+            "POST",
+            "/api/v1/gateway/access/alarm",
+            json_body={
+                "type": alarm_type,
+                "qr": qr,
+                "device_id": self.cfg.device_id,
+                "people_count": int(people_count),
+                "details": details or {},
+            },
+        )
+
     def heartbeat(self, payload: Optional[dict] = None, *, log: bool = False) -> tuple[int, dict]:
         return self._request(
             "POST",

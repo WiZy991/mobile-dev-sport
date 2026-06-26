@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 class StaffNotification
 {
     public const TYPE_SUPPORT_TICKET = 'support_ticket';
+    public const TYPE_ACCESS_ALARM = 'access_alarm';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

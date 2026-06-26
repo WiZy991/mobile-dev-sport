@@ -55,6 +55,48 @@ def config_file_path() -> Path:
 
 
 @dataclass
+class CameraConfig:
+    """Камера Dahua (IVS tripwire) для контроля прохода вдвоём по одному QR.
+
+    Линия (tripwire) настраивается в веб-интерфейсе камеры на линию входа, тип цели — Human,
+    направление — внутрь. Агент считает пересечения в окне после открытия двери.
+    """
+
+    enabled: bool = False
+    host: str = ""
+    username: str = "admin"
+    password: str = ""
+    channel: int = 1
+    https: bool = False
+    verify_ssl: bool = False
+    event_codes: str = "CrossLineDetection"
+    inbound_direction: str = ""  # "", "LeftToRight" или "RightToLeft"
+    require_human: bool = True
+    tailgating_window_ms: int = 6000
+    pre_roll_ms: int = 1000
+    min_people: int = 2
+
+    # Контроль входа без QR: непрерывно следим за линией входа и шлём тревогу, если за окно
+    # прошло >= standalone_min_people человек, а прохода по QR не было (дверь подперта/взлом).
+    standalone_enabled: bool = False
+    standalone_window_ms: int = 4000
+    standalone_min_people: int = 2
+    standalone_cooldown_ms: int = 30000
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CameraConfig":
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        filtered = {k: v for k, v in (data or {}).items() if k in known}
+        return cls(**filtered)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    def ready(self) -> bool:
+        return bool(self.enabled and self.host.strip())
+
+
+@dataclass
 class AgentConfig:
     crm_base_url: str = "https://crm.worldcashfit.ru"
     gateway_token: str = ""
@@ -62,6 +104,7 @@ class AgentConfig:
     crm_verify_ssl: bool = True
 
     equipment: list[EquipmentItem] = field(default_factory=list)
+    camera: CameraConfig = field(default_factory=CameraConfig)
 
     # Устаревшие поля — синхронизируются с первым оборудованием при сохранении
     c01_listen_host: str = "0.0.0.0"
@@ -135,10 +178,15 @@ class AgentConfig:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AgentConfig":
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
-        filtered = {k: v for k, v in data.items() if k in known and k != "equipment"}
+        filtered = {
+            k: v for k, v in data.items() if k in known and k not in ("equipment", "camera")
+        }
         raw_eq = data.get("equipment")
         if isinstance(raw_eq, list) and raw_eq:
             filtered["equipment"] = [EquipmentItem.from_dict(x) for x in raw_eq if isinstance(x, dict)]
+        raw_cam = data.get("camera")
+        if isinstance(raw_cam, dict):
+            filtered["camera"] = CameraConfig.from_dict(raw_cam)
         cfg = cls(**filtered)
         cfg.ensure_default_equipment()
         cfg.sync_legacy_c01_fields()

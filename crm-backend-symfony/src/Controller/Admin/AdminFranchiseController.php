@@ -2,6 +2,7 @@
 
 namespace App\Controller\Admin;
 
+use App\Entity\AccessAlarm;
 use App\Entity\Club;
 use App\Entity\GatewayCommand;
 use App\Service\Admin\AdminMenuBuilder;
@@ -68,12 +69,22 @@ class AdminFranchiseController extends AbstractController
             ->getQuery()
             ->getResult();
 
+        $recentAlarms = $this->em->getRepository(AccessAlarm::class)
+            ->createQueryBuilder('a')
+            ->andWhere('a.club = :club')
+            ->setParameter('club', $club)
+            ->orderBy('a.id', 'DESC')
+            ->setMaxResults(20)
+            ->getQuery()
+            ->getResult();
+
         return $this->render('admin/franchise/edit.html.twig', [
             'menu' => $this->adminMenuBuilder->buildFor($this->getUser()),
             'current' => 'franchise',
             'club' => $club,
             'online' => $this->isOnline($club, new \DateTimeImmutable()),
             'recent_commands' => $recentCommands,
+            'recent_alarms' => $recentAlarms,
             'inside' => $this->occupancy->countCurrentlyInside($club),
             'inside_list' => $this->occupancy->listCurrentlyInside($club, 100),
         ]);

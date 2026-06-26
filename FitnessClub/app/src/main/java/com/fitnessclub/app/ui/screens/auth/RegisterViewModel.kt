@@ -67,6 +67,11 @@ data class RegisterUiState(
     val newsletter: Boolean = true,
     val password: String = "",
     val confirmPassword: String = "",
+    /** Опросник «Откуда узнали о нас»: выбранный ключ варианта (см. ReferralSourceOptions). */
+    val referralSource: String? = null,
+    /** Свой вариант, если выбрано «Другое». */
+    val referralSourceOther: String = "",
+    val referralError: String? = null,
     val lastNameError: String? = null,
     val firstNameError: String? = null,
     val birthDateError: String? = null,
@@ -92,6 +97,23 @@ data class RegisterUiState(
 
 sealed class RegisterEvent {
     data class Success(val user: User) : RegisterEvent()
+}
+
+/** Варианты опросника «Откуда вы о нас узнали»: стабильный ключ + подпись. */
+object ReferralSourceOptions {
+    const val OTHER_KEY = "other"
+
+    val items: List<Pair<String, String>> = listOf(
+        "friends_family" to "От друзей/родственников",
+        "friends_in_gymroom" to "Друзья/родственники уже ходят в ДжимРум",
+        "social" to "Из социальных сетей",
+        "2gis" to "2ГИС",
+        "yandex" to "Яндекс",
+        "internet_ads" to "Из рекламы в интернете",
+        "mall" to "Увидел в торговом центре",
+        "event" to "Посещал мероприятие",
+        OTHER_KEY to "Другое (свой вариант)",
+    )
 }
 
 @HiltViewModel
@@ -211,6 +233,14 @@ class RegisterViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(confirmPassword = v, confirmPasswordError = null)
     }
 
+    fun onReferralSourceSelected(key: String) {
+        _uiState.value = _uiState.value.copy(referralSource = key, referralError = null)
+    }
+
+    fun onReferralSourceOtherChange(v: String) {
+        _uiState.value = _uiState.value.copy(referralSourceOther = v.take(255), referralError = null)
+    }
+
     fun onPassportSeriesChange(v: String) {
         _uiState.value = _uiState.value.copy(
             passport = _uiState.value.passport.copy(series = v.take(5)),
@@ -285,7 +315,50 @@ class RegisterViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(passportError = null)
     }
     
+    /**
+     * Опросник «Откуда вы о нас узнали» — первый шаг регистрации.
+     * Проверяет выбор перед переходом к выбору клуба. В CRM ничего не отправляет:
+     * выбор сохраняется и уходит вместе с регистрацией (см. register()).
+     */
+    fun submitSurvey(): Boolean {
+        val state = _uiState.value
+        if (state.referralSource.isNullOrBlank()) {
+            _uiState.value = state.copy(referralError = "Выберите вариант")
+            return false
+        }
+        if (state.referralSource == ReferralSourceOptions.OTHER_KEY && state.referralSourceOther.isBlank()) {
+            _uiState.value = state.copy(referralError = "Опишите ваш вариант")
+            return false
+        }
+        return true
+    }
+
+    /** Завершение регистрации: данные опросника уходят в CRM вместе с остальными полями. */
     fun register() {
+        val request = validateAndBuild() ?: return
+        viewModelScope.launch {
+            authRepository.register(request).collect { result ->
+                when (result) {
+                    is ApiResult.Loading -> {
+                        _uiState.value = _uiState.value.copy(isLoading = true)
+                    }
+                    is ApiResult.Success -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        _events.emit(RegisterEvent.Success(result.data))
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** Валидация полей формы. Возвращает готовый запрос (с данными опросника) или null при ошибке. */
+    private fun validateAndBuild(): RegisterRequest? {
         _uiState.value = _uiState.value.copy(submitAttempted = true)
         val state = _uiState.value
         var lastNameError: String? = null
@@ -367,7 +440,7 @@ class RegisterViewModel @Inject constructor(
                 confirmPasswordError = confirmPasswordError,
                 clubError = clubError
             )
-            return
+            return null
         }
 
         val fullName = listOf(state.lastName, state.firstName, state.middleName)
@@ -381,7 +454,7 @@ class RegisterViewModel @Inject constructor(
         ).filter { it.isNotBlank() }
             .joinToString(", ")
 
-        val request = RegisterRequest(
+        return RegisterRequest(
             email = state.email,
             password = state.password,
             phone = phoneApi,
@@ -396,28 +469,10 @@ class RegisterViewModel @Inject constructor(
             registrationAddress = address,
             promoCode = state.promoCode.takeIf { it.isNotBlank() },
             newsletter = state.newsletter,
-            clubId = state.selectedClub?.id
+            clubId = state.selectedClub?.id,
+            referralSource = state.referralSource,
+            referralSourceOther = state.referralSourceOther.takeIf { it.isNotBlank() }
         )
-        
-        viewModelScope.launch {
-            authRepository.register(request).collect { result ->
-                when (result) {
-                    is ApiResult.Loading -> {
-                        _uiState.value = _uiState.value.copy(isLoading = true)
-                    }
-                    is ApiResult.Success -> {
-                        _uiState.value = _uiState.value.copy(isLoading = false)
-                        _events.emit(RegisterEvent.Success(result.data))
-                    }
-                    is ApiResult.Error -> {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            error = result.message
-                        )
-                    }
-                }
-            }
-        }
     }
     
     fun clearError() {

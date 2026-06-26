@@ -17,6 +17,7 @@ import com.fitnessclub.app.ui.screens.auth.LoginViewModel
 import com.fitnessclub.app.ui.screens.auth.RegisterClubPickScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterPassportScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterScreen
+import com.fitnessclub.app.ui.screens.auth.RegisterSurveyScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterViewModel
 import com.fitnessclub.app.ui.screens.club.ClubInfoScreen
 import com.fitnessclub.app.ui.screens.clubs.ClubsScreen
@@ -81,8 +82,23 @@ fun NavGraph(
         
         navigation(
             route = Screen.Register.route,
-            startDestination = RegisterRoutes.CLUB_PICK
+            startDestination = RegisterRoutes.SURVEY
         ) {
+            composable(RegisterRoutes.SURVEY) {
+                val parentEntry = remember {
+                    navController.getBackStackEntry(Screen.Register.route)
+                }
+                val viewModel: RegisterViewModel = hiltViewModel(parentEntry)
+                RegisterSurveyScreen(
+                    viewModel = viewModel,
+                    onBack = {
+                        navController.popBackStack(Screen.Login.route, inclusive = false)
+                    },
+                    onSubmit = {
+                        navController.navigate(RegisterRoutes.CLUB_PICK)
+                    },
+                )
+            }
             composable(RegisterRoutes.CLUB_PICK) {
                 val parentEntry = remember {
                     navController.getBackStackEntry(Screen.Register.route)

@@ -20,6 +20,8 @@ parameters:
     mobile_api_access_ttl_default: 3600
     sber_userinfo_log_default: false
     fcm_server_key_default: ''
+    fcm_credentials_default: ''
+    fcm_project_id_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -95,6 +97,8 @@ services:
     App\Service\Push\FcmPushSender:
         arguments:
             $serverKey: '%env(default:fcm_server_key_default:FCM_SERVER_KEY)%'
+            $credentials: '%env(default:fcm_credentials_default:FCM_CREDENTIALS_JSON)%'
+            $projectId: '%env(default:fcm_project_id_default:FCM_PROJECT_ID)%'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

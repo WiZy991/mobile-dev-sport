@@ -38,6 +38,7 @@ enum class NotificationType {
     PROMO,
     SUBSCRIPTION,
     BONUS,
+    ACCESS_ALARM,
     SYSTEM
 }
 
@@ -221,6 +222,7 @@ private fun getNotificationIconAndColor(type: NotificationType): Pair<ImageVecto
         NotificationType.PROMO -> Icons.Default.LocalOffer to Primary
         NotificationType.SUBSCRIPTION -> Icons.Default.CardMembership to AccentBlue
         NotificationType.BONUS -> Icons.Default.Stars to AccentOrange
+        NotificationType.ACCESS_ALARM -> Icons.Default.Warning to Error
         NotificationType.SYSTEM -> Icons.Default.Info to Gray600
     }
 }

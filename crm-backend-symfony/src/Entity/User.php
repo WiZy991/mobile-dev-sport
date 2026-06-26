@@ -48,6 +48,14 @@ class User
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $registrationAddress = null;
 
+    /** Опросник при регистрации в приложении: ключ варианта «Откуда узнали о нас». */
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    private ?string $referralSource = null;
+
+    /** Свой вариант, если выбрано «Другое». */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $referralSourceOther = null;
+
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $emergencyContact = null;
 
@@ -280,6 +288,28 @@ class User
     public function setRegistrationAddress(?string $registrationAddress): self
     {
         $this->registrationAddress = $registrationAddress;
+        return $this;
+    }
+
+    public function getReferralSource(): ?string
+    {
+        return $this->referralSource;
+    }
+
+    public function setReferralSource(?string $referralSource): self
+    {
+        $this->referralSource = $referralSource;
+        return $this;
+    }
+
+    public function getReferralSourceOther(): ?string
+    {
+        return $this->referralSourceOther;
+    }
+
+    public function setReferralSourceOther(?string $referralSourceOther): self
+    {
+        $this->referralSourceOther = $referralSourceOther;
         return $this;
     }
 

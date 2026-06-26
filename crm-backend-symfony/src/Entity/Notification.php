@@ -17,6 +17,7 @@ class Notification
     public const TYPE_SUBSCRIPTION = 'subscription';
     public const TYPE_BONUS = 'bonus';
     public const TYPE_SYSTEM = 'system';
+    public const TYPE_ACCESS_ALARM = 'access_alarm';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

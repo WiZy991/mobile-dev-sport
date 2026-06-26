@@ -95,5 +95,13 @@ data class RegisterRequest(
     val newsletter: Boolean? = null,
 
     @SerializedName("club_id")
-    val clubId: String? = null
+    val clubId: String? = null,
+
+    /** Опросник «Откуда вы о нас узнали»: ключ варианта (см. RegisterSurveyScreen). */
+    @SerializedName("referral_source")
+    val referralSource: String? = null,
+
+    /** Свой вариант ответа, если выбрано «Другое». */
+    @SerializedName("referral_source_other")
+    val referralSourceOther: String? = null
 )

@@ -35,6 +35,13 @@ final class MobileClientPayloadApplier
 
         $this->hydratePassportFromRegistration($user, $data);
 
+        $referralSource = trim((string) ($data['referral_source'] ?? ''));
+        if ($referralSource !== '') {
+            $user->setReferralSource(substr($referralSource, 0, 50));
+            $referralOther = trim((string) ($data['referral_source_other'] ?? ''));
+            $user->setReferralSourceOther($referralOther === '' ? null : substr($referralOther, 0, 255));
+        }
+
         $clubRaw = $data['club_id'] ?? null;
         if ($clubRaw !== null && $clubRaw !== '') {
             $cid = (int) $clubRaw;

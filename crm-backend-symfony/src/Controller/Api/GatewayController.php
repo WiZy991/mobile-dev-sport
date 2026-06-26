@@ -2,6 +2,7 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\AccessAlarm;
 use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\GatewayCommand;
@@ -9,6 +10,7 @@ use App\Entity\GuestPass;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\SubscriptionGateResolver;
+use App\Service\Security\AccessAlarmNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -43,6 +45,7 @@ class GatewayController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SubscriptionGateResolver $subscriptionGateResolver,
+        private readonly AccessAlarmNotifier $accessAlarmNotifier,
     ) {
     }
 
@@ -198,6 +201,85 @@ class GatewayController extends AbstractController
         }
 
         return $this->json($this->grantedPayload($club, $payload));
+    }
+
+    /**
+     * Тревога доступа от шлюза клуба: камера зафиксировала проход вдвоём по одному QR (tailgating).
+     *
+     * Дверь уже открыта СКУД по одному QR; событие — только уведомление (не блокирует проход).
+     * Тело: { type, qr, user_id?, device_id?, people_count, details? }.
+     */
+    #[Route('/access/alarm', name: 'api_gateway_access_alarm', methods: ['POST'])]
+    public function alarm(Request $request): JsonResponse
+    {
+        $club = $this->authenticateClub($request);
+        if ($club instanceof JsonResponse) {
+            return $club;
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $qr = (string) ($data['qr'] ?? '');
+        $type = (string) ($data['type'] ?? AccessAlarm::TYPE_TAILGATING);
+        $deviceId = isset($data['device_id']) ? (string) $data['device_id'] : ('club-' . $club->getId());
+        $peopleCount = max(2, (int) ($data['people_count'] ?? 2));
+        $details = is_array($data['details'] ?? null) ? $data['details'] : [];
+
+        $user = $this->resolveUserFromQr($qr, $data['user_id'] ?? null);
+
+        $alarm = (new AccessAlarm())
+            ->setClub($club)
+            ->setUser($user)
+            ->setType($type === '' ? AccessAlarm::TYPE_TAILGATING : $type)
+            ->setDeviceId($deviceId)
+            ->setPeopleCount($peopleCount)
+            ->setRawData($qr !== '' ? mb_substr($qr, 0, 255) : null)
+            ->setDetails($details !== [] ? $details : null)
+            ->setAccessLog($this->findRecentEntryLog($club, $user));
+
+        $this->em->persist($alarm);
+        $this->em->flush();
+
+        try {
+            $this->accessAlarmNotifier->notifyTailgating($alarm);
+        } catch (\Throwable) {
+            // Уведомления не должны ронять приём тревоги: событие уже сохранено.
+        }
+
+        return $this->json([
+            'ok' => true,
+            'alarm_id' => $alarm->getId(),
+            'people_count' => $peopleCount,
+        ]);
+    }
+
+    private function resolveUserFromQr(string $qr, mixed $userIdInput): ?User
+    {
+        $userId = 0;
+        $parts = explode(':', $qr);
+        if (count($parts) >= 3 && $parts[0] === 'FITNESSCLUB' && $parts[1] === 'ENTRY') {
+            $ext = $parts[2];
+            $userId = str_starts_with($ext, 'user-') ? (int) substr($ext, 5) : (int) $ext;
+        }
+        if ($userId <= 0 && $userIdInput !== null) {
+            $userId = (int) $userIdInput;
+        }
+        if ($userId <= 0) {
+            return null;
+        }
+
+        return $this->em->getRepository(User::class)->find($userId);
+    }
+
+    private function findRecentEntryLog(Club $club, ?User $user): ?AccessLog
+    {
+        if (!$user instanceof User) {
+            return null;
+        }
+
+        return $this->em->getRepository(AccessLog::class)->findOneBy(
+            ['club' => $club, 'user' => $user, 'eventType' => 'entry', 'result' => 'granted'],
+            ['createdAt' => 'DESC']
+        );
     }
 
     #[Route('/heartbeat', name: 'api_gateway_heartbeat', methods: ['POST'])]

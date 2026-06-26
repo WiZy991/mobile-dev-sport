@@ -60,14 +60,6 @@ class StaffSessionStore(context: Context) {
         prefs.edit().putInt("unread_notifications", count).apply()
     }
 
-    fun getOrCreatePushToken(): String {
-        val existing = prefs.getString("push_token", null)
-        if (!existing.isNullOrBlank()) return existing
-        val token = "staff-local-${java.util.UUID.randomUUID()}"
-        prefs.edit().putString("push_token", token).apply()
-        return token
-    }
-
     private fun parseCsv(raw: String?): List<String> {
         return raw.orEmpty().split(",").map { it.trim() }.filter { it.isNotBlank() }
     }

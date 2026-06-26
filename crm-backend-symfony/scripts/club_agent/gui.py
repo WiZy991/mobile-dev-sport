@@ -71,6 +71,8 @@ class AgentApp(tk.Tk):
         self.lbl_crm.pack(side=tk.LEFT, padx=(0, 16))
         self.lbl_c01 = ttk.Label(top, text="C01: —")
         self.lbl_c01.pack(side=tk.LEFT, padx=(0, 16))
+        self.lbl_cam = ttk.Label(top, text="Камера: выкл")
+        self.lbl_cam.pack(side=tk.LEFT, padx=(0, 16))
         self.lbl_lan = ttk.Label(top, text=f"IP ПК для C01: {get_lan_ip()}", foreground="#0066aa")
         self.lbl_lan.pack(side=tk.LEFT)
 
@@ -106,6 +108,10 @@ class AgentApp(tk.Tk):
         tab_eq = ttk.Frame(nb, padding=8)
         nb.add(tab_eq, text="Оборудование")
         build_equipment_tab(self, tab_eq)
+
+        tab_cam = ttk.Frame(nb, padding=8)
+        nb.add(tab_cam, text="Камера")
+        self._build_camera_tab(tab_cam)
 
         install_edit_bindings(self)
 
@@ -150,6 +156,147 @@ class AgentApp(tk.Tk):
             font=("", 8),
         ).grid(row=5, column=1, sticky=tk.W, pady=(0, 4))
 
+    def _build_camera_tab(self, parent: ttk.Frame) -> None:
+        ttk.Label(
+            parent,
+            text="Камера Dahua (IVS «Tripwire») для контроля прохода вдвоём по одному QR.\n"
+            "В веб-интерфейсе камеры включите Smart Plan → IVS → Tripwire на линии входа, "
+            "тип цели Human, направление — внутрь.",
+            foreground="gray",
+            wraplength=600,
+        ).pack(anchor=tk.W, pady=(0, 8))
+
+        grid = ttk.Frame(parent)
+        grid.pack(fill=tk.X)
+        grid.columnconfigure(1, weight=1)
+
+        self.var_cam_enabled = tk.BooleanVar()
+        self.var_cam_host = tk.StringVar()
+        self.var_cam_user = tk.StringVar()
+        self.var_cam_pass = tk.StringVar()
+        self.var_cam_channel = tk.StringVar()
+        self.var_cam_https = tk.BooleanVar()
+        self.var_cam_verify_ssl = tk.BooleanVar()
+        self.var_cam_codes = tk.StringVar()
+        self.var_cam_direction = tk.StringVar()
+        self.var_cam_human = tk.BooleanVar()
+        self.var_cam_window = tk.StringVar()
+        self.var_cam_preroll = tk.StringVar()
+        self.var_cam_min = tk.StringVar()
+        self.var_cam_standalone = tk.BooleanVar()
+        self.var_cam_standalone_window = tk.StringVar()
+        self.var_cam_standalone_min = tk.StringVar()
+        self.var_cam_standalone_cooldown = tk.StringVar()
+
+        ttk.Checkbutton(
+            grid, text="Включить контроль прохода вдвоём (камера)", variable=self.var_cam_enabled
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=4)
+
+        rows = [
+            ("IP/host камеры", ttk.Entry(grid, textvariable=self.var_cam_host, width=40)),
+            ("Логин", ttk.Entry(grid, textvariable=self.var_cam_user, width=30)),
+            ("Пароль", ttk.Entry(grid, textvariable=self.var_cam_pass, width=30, show="*")),
+            ("Канал", ttk.Entry(grid, textvariable=self.var_cam_channel, width=8)),
+            ("Коды событий", ttk.Entry(grid, textvariable=self.var_cam_codes, width=30)),
+            (
+                "Направление входа",
+                ttk.Combobox(
+                    grid,
+                    textvariable=self.var_cam_direction,
+                    width=18,
+                    values=["", "LeftToRight", "RightToLeft"],
+                    state="readonly",
+                ),
+            ),
+            ("Окно подсчёта, мс", ttk.Entry(grid, textvariable=self.var_cam_window, width=10)),
+            ("Преролл, мс", ttk.Entry(grid, textvariable=self.var_cam_preroll, width=10)),
+            ("Порог людей (тревога ≥)", ttk.Entry(grid, textvariable=self.var_cam_min, width=10)),
+        ]
+        for i, (label, w) in enumerate(rows, start=1):
+            ttk.Label(grid, text=label).grid(row=i, column=0, sticky=tk.W, pady=4, padx=(0, 8))
+            w.grid(row=i, column=1, sticky=tk.W, pady=4)
+
+        opts = ttk.Frame(parent)
+        opts.pack(fill=tk.X, pady=(4, 0))
+        ttk.Checkbutton(opts, text="HTTPS", variable=self.var_cam_https).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Checkbutton(opts, text="Проверять SSL", variable=self.var_cam_verify_ssl).pack(
+            side=tk.LEFT, padx=(0, 12)
+        )
+        ttk.Checkbutton(opts, text="Только цель Human", variable=self.var_cam_human).pack(side=tk.LEFT)
+
+        ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(12, 6))
+        ttk.Label(
+            parent,
+            text="Контроль входа БЕЗ прохода по QR (дверь подперта / вход группой). "
+            "Тревога, если за окно линию входа пересекли ≥ порога человек, а прохода по QR не было.",
+            foreground="gray",
+            wraplength=600,
+        ).pack(anchor=tk.W)
+
+        sa = ttk.Frame(parent)
+        sa.pack(fill=tk.X, pady=(4, 0))
+        sa.columnconfigure(1, weight=1)
+        ttk.Checkbutton(
+            sa, text="Включить контроль входа без QR", variable=self.var_cam_standalone
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=4)
+        sa_rows = [
+            ("Окно подсчёта, мс", ttk.Entry(sa, textvariable=self.var_cam_standalone_window, width=10)),
+            ("Порог людей (тревога ≥)", ttk.Entry(sa, textvariable=self.var_cam_standalone_min, width=10)),
+            ("Пауза между тревогами, мс", ttk.Entry(sa, textvariable=self.var_cam_standalone_cooldown, width=10)),
+        ]
+        for i, (label, w) in enumerate(sa_rows, start=1):
+            ttk.Label(sa, text=label).grid(row=i, column=0, sticky=tk.W, pady=4, padx=(0, 8))
+            w.grid(row=i, column=1, sticky=tk.W, pady=4)
+
+        self.lbl_cam_stat = ttk.Label(parent, text="Статус камеры: —", foreground="gray")
+        self.lbl_cam_stat.pack(anchor=tk.W, pady=(10, 0))
+
+    def _load_camera_fields(self) -> None:
+        cam = self.cfg.camera
+        self.var_cam_enabled.set(cam.enabled)
+        self.var_cam_host.set(cam.host)
+        self.var_cam_user.set(cam.username)
+        self.var_cam_pass.set(cam.password)
+        self.var_cam_channel.set(str(cam.channel))
+        self.var_cam_https.set(cam.https)
+        self.var_cam_verify_ssl.set(cam.verify_ssl)
+        self.var_cam_codes.set(cam.event_codes)
+        self.var_cam_direction.set(cam.inbound_direction)
+        self.var_cam_human.set(cam.require_human)
+        self.var_cam_window.set(str(cam.tailgating_window_ms))
+        self.var_cam_preroll.set(str(cam.pre_roll_ms))
+        self.var_cam_min.set(str(cam.min_people))
+        self.var_cam_standalone.set(cam.standalone_enabled)
+        self.var_cam_standalone_window.set(str(cam.standalone_window_ms))
+        self.var_cam_standalone_min.set(str(cam.standalone_min_people))
+        self.var_cam_standalone_cooldown.set(str(cam.standalone_cooldown_ms))
+
+    def _camera_from_fields(self) -> None:
+        def _int(var: tk.StringVar, default: int) -> int:
+            try:
+                return int(str(var.get()).strip())
+            except (TypeError, ValueError):
+                return default
+
+        cam = self.cfg.camera
+        cam.enabled = bool(self.var_cam_enabled.get())
+        cam.host = self.var_cam_host.get().strip()
+        cam.username = self.var_cam_user.get().strip() or "admin"
+        cam.password = self.var_cam_pass.get()
+        cam.channel = _int(self.var_cam_channel, 1) or 1
+        cam.https = bool(self.var_cam_https.get())
+        cam.verify_ssl = bool(self.var_cam_verify_ssl.get())
+        cam.event_codes = self.var_cam_codes.get().strip() or "CrossLineDetection"
+        cam.inbound_direction = self.var_cam_direction.get().strip()
+        cam.require_human = bool(self.var_cam_human.get())
+        cam.tailgating_window_ms = max(500, _int(self.var_cam_window, 6000))
+        cam.pre_roll_ms = max(0, _int(self.var_cam_preroll, 1000))
+        cam.min_people = max(2, _int(self.var_cam_min, 2))
+        cam.standalone_enabled = bool(self.var_cam_standalone.get())
+        cam.standalone_window_ms = max(500, _int(self.var_cam_standalone_window, 4000))
+        cam.standalone_min_people = max(2, _int(self.var_cam_standalone_min, 2))
+        cam.standalone_cooldown_ms = max(0, _int(self.var_cam_standalone_cooldown, 30000))
+
     def _load_crm_fields(self) -> None:
         c = self.cfg
         self.var_crm_url.set(c.crm_base_url)
@@ -157,6 +304,7 @@ class AgentApp(tk.Tk):
         self.var_device_id.set(c.device_id)
         self.var_ssl.set(c.crm_verify_ssl)
         self.var_only_fc.set(c.only_fitnessclub_qr)
+        self._load_camera_fields()
 
     def _crm_from_fields(self) -> None:
         raw_url = self.var_crm_url.get().strip()
@@ -465,6 +613,7 @@ class AgentApp(tk.Tk):
         except Exception:
             pass
         self._crm_from_fields()
+        self._camera_from_fields()
         try:
             self.cfg.save()
             if self.agent:
@@ -486,6 +635,7 @@ class AgentApp(tk.Tk):
             self._refresh_equipment_list()
             return
         self._crm_from_fields()
+        self._camera_from_fields()
         try:
             self._apply_equipment_form()
         except Exception:
@@ -522,7 +672,27 @@ class AgentApp(tk.Tk):
         if self.agent and self._running:
             self._refresh_status_labels(self.agent.crm_online, self.agent.equipment_connected())
             self._refresh_equipment_list()
+            self._refresh_camera_status()
         self.after(1000, self._refresh_status)
+
+    def _refresh_camera_status(self) -> None:
+        if not (self.agent and self._running) or not self.agent.camera_enabled:
+            self.lbl_cam.configure(text="Камера: выкл")
+            if hasattr(self, "lbl_cam_stat"):
+                self.lbl_cam_stat.configure(text="Статус камеры: выключена", foreground="gray")
+            return
+        online = self.agent.camera_online
+        crossings = self.agent.camera_total_crossings
+        self.lbl_cam.configure(text=f"Камера: {'онлайн' if online else 'офлайн'}")
+        last_alarm = self.agent.camera_last_alarm or "—"
+        if hasattr(self, "lbl_cam_stat"):
+            self.lbl_cam_stat.configure(
+                text=(
+                    f"Статус камеры: {'онлайн' if online else 'офлайн'} · "
+                    f"пересечений с запуска: {crossings} · последняя тревога: {last_alarm}"
+                ),
+                foreground="#0a7a0a" if online else "#a30",
+            )
 
     def _toggle_simulator(self) -> None:
         eq = self._get_selected_equipment()
