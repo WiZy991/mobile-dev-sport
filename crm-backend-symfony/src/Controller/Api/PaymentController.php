@@ -24,12 +24,28 @@ class PaymentController extends AbstractController
         private readonly PaymentStatusSyncService $statusSyncService,
     ) {}
 
+    private function requireUser(Request $request): JsonResponse|array
+    {
+        $auth = $this->userResolver->resolveAuthState($request);
+        if ($auth['user'] === null) {
+            $status = ($auth['code'] ?? '') === 'user_blocked' ? 403 : 401;
+
+            return $this->json([
+                'error' => ($auth['code'] ?? '') === 'user_blocked' ? 'Access denied' : 'Unauthorized',
+                'code' => $auth['code'] ?? 'unauthorized',
+                'message' => $auth['message'] ?? 'Войдите в приложение, чтобы продолжить.',
+            ], $status);
+        }
+
+        return $auth;
+    }
+
     #[Route('/promo/validate', name: 'api_payments_promo_validate', methods: ['POST'])]
     public function validatePromo(Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve($request);
-        if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+        $auth = $this->requireUser($request);
+        if ($auth instanceof JsonResponse) {
+            return $auth;
         }
 
         $data = json_decode($request->getContent(), true) ?? [];
@@ -61,9 +77,9 @@ class PaymentController extends AbstractController
     #[Route('/subscription/quote', name: 'api_payments_subscription_quote', methods: ['POST'])]
     public function quote(Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve($request);
-        if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+        $auth = $this->requireUser($request);
+        if ($auth instanceof JsonResponse) {
+            return $auth;
         }
 
         $data = json_decode($request->getContent(), true) ?? [];
@@ -96,10 +112,11 @@ class PaymentController extends AbstractController
     #[Route('/subscription/init', name: 'api_payments_subscription_init', methods: ['POST'])]
     public function initSubscriptionPayment(Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve($request);
-        if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+        $auth = $this->requireUser($request);
+        if ($auth instanceof JsonResponse) {
+            return $auth;
         }
+        $user = $auth['user'];
 
         $data = json_decode($request->getContent(), true) ?? [];
         $planIdRaw = (string) ($data['plan_id'] ?? $data['planId'] ?? '');
@@ -124,10 +141,11 @@ class PaymentController extends AbstractController
     #[Route('/{id}/status', name: 'api_payments_status', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function status(int $id, Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve($request);
-        if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+        $auth = $this->requireUser($request);
+        if ($auth instanceof JsonResponse) {
+            return $auth;
         }
+        $user = $auth['user'];
 
         $payment = $this->em->getRepository(Payment::class)->find($id);
         if (!$payment) {

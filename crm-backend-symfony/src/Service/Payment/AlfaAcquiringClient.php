@@ -11,6 +11,8 @@ class AlfaAcquiringClient
         private readonly string $apiUrl,
         private readonly string $username,
         private readonly string $password,
+        /** ISO 4217 numeric: 810 на alfa.rbsuat.com (тест), 643 на payment.alfabank.ru (прод) */
+        private readonly int $currency = 643,
     ) {}
 
     public function registerOrder(AlfaRegisterOrderRequest $request): AlfaRegisterOrderResponse
@@ -20,7 +22,7 @@ class AlfaAcquiringClient
             'password' => $this->password,
             'orderNumber' => $request->orderNumber,
             'amount' => (string) $request->amountKopecks,
-            'currency' => '643',
+            'currency' => (string) $this->currency,
             'returnUrl' => $request->returnUrl,
             'failUrl' => $request->failUrl,
             'description' => $request->description,

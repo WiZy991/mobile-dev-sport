@@ -6,7 +6,6 @@ import com.fitnessclub.app.data.api.PromoCodeRequest
 import com.fitnessclub.app.data.api.PromoValidationResponse
 import com.fitnessclub.app.data.api.SubscriptionPaymentInitResponse
 import com.fitnessclub.app.data.api.SubscriptionPaymentQuoteResponse
-import com.fitnessclub.app.data.catalog.LocalSubscriptionCatalog
 import com.fitnessclub.app.data.model.Subscription
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.google.gson.annotations.SerializedName
@@ -46,28 +45,32 @@ class SubscriptionRepository @Inject constructor(
     
     fun getSubscriptionPlans(): Flow<ApiResult<List<SubscriptionPlan>>> = flow {
         emit(ApiResult.Loading)
-        try {
-            val response = api.getSubscriptionPlans()
-            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                emit(ApiResult.Success(response.body()!!))
-            } else {
-                emit(ApiResult.Success(LocalSubscriptionCatalog.PLANS))
-            }
-        } catch (e: Exception) {
-            emit(ApiResult.Success(LocalSubscriptionCatalog.PLANS))
-        }
+        emit(loadSubscriptionPlansFromApi())
     }
     
     suspend fun getSubscriptionPlansSuspend(): ApiResult<List<SubscriptionPlan>> {
+        return loadSubscriptionPlansFromApi()
+    }
+
+    private suspend fun loadSubscriptionPlansFromApi(): ApiResult<List<SubscriptionPlan>> {
         return try {
             val response = api.getSubscriptionPlans()
-            if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                ApiResult.Success(response.body()!!)
-            } else {
-                ApiResult.Success(LocalSubscriptionCatalog.PLANS)
+            when {
+                response.isSuccessful && !response.body().isNullOrEmpty() -> {
+                    ApiResult.Success(response.body()!!)
+                }
+                response.isSuccessful && response.body().isNullOrEmpty() -> {
+                    ApiResult.Error("Тарифы не настроены на сервере")
+                }
+                else -> {
+                    ApiResult.Error(
+                        message = "Не удалось загрузить тарифы (${response.code()})",
+                        code = response.code(),
+                    )
+                }
             }
         } catch (e: Exception) {
-            ApiResult.Success(LocalSubscriptionCatalog.PLANS)
+            ApiResult.Error(e.message ?: "Не удалось загрузить тарифы")
         }
     }
 
@@ -154,6 +157,7 @@ class SubscriptionRepository @Inject constructor(
                         val msg = humanizeApiError(
                             httpCode = response.code(),
                             raw = raw,
+                            parsedCode = parsed?.code,
                             parsedMessage = parsed?.message,
                             parsedError = parsed?.error,
                             fallback = response.message() ?: "Ошибка инициализации оплаты",
@@ -233,12 +237,24 @@ private data class SubscriptionPurchaseErrorBody(
 private fun humanizeApiError(
     httpCode: Int?,
     raw: String,
+    parsedCode: String?,
     parsedMessage: String?,
     parsedError: String?,
     fallback: String,
 ): String {
     parsedMessage?.takeIf { it.isNotBlank() }?.let { return it }
-    parsedError?.takeIf { it.isNotBlank() }?.let { return it }
+
+    when (parsedCode) {
+        "user_blocked" -> return "Аккаунт заблокирован. Обратитесь в клуб."
+        "token_expired", "invalid_token" -> return "Сессия истекла. Выйдите и войдите в приложение снова."
+        "missing_token" -> return "Войдите в приложение, чтобы оплатить абонемент."
+    }
+
+    when (parsedError?.trim()) {
+        "Access denied" -> return "Аккаунт заблокирован. Обратитесь в клуб."
+        "Unauthorized" -> return "Сессия истекла. Выйдите и войдите в приложение снова."
+        "Forbidden" -> return "Нет доступа к оплате. Войдите снова или обратитесь в клуб."
+    }
 
     if (raw.contains("<!DOCTYPE", ignoreCase = true) || raw.contains("<html", ignoreCase = true)) {
         return when (httpCode) {
@@ -248,5 +264,5 @@ private fun humanizeApiError(
         }
     }
 
-    return raw.takeIf { it.isNotBlank() } ?: fallback
+    return parsedError?.takeIf { it.isNotBlank() } ?: raw.takeIf { it.isNotBlank() } ?: fallback
 }

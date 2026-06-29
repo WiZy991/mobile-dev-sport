@@ -19,22 +19,52 @@ class CurrentUserResolver
 
     public function resolve(Request $request): ?User
     {
+        $auth = $this->resolveAuthState($request);
+
+        return $auth['user'];
+    }
+
+    /**
+     * @return array{user: ?User, code: ?string, message: ?string}
+     */
+    public function resolveAuthState(Request $request): array
+    {
         $token = $this->extractBearerToken($request);
         if ($token === null || $token === '') {
-            return null;
+            return [
+                'user' => null,
+                'code' => 'missing_token',
+                'message' => 'Войдите в приложение, чтобы продолжить.',
+            ];
         }
 
         $user = $this->em->getRepository(User::class)->findOneBy(['apiAccessToken' => $token]);
-        if ($user === null || $user->isBlocked()) {
-            return null;
+        if ($user === null) {
+            return [
+                'user' => null,
+                'code' => 'invalid_token',
+                'message' => 'Сессия недействительна. Войдите в приложение снова.',
+            ];
+        }
+
+        if ($user->isBlocked()) {
+            return [
+                'user' => null,
+                'code' => 'user_blocked',
+                'message' => 'Аккаунт заблокирован. Обратитесь в клуб.',
+            ];
         }
 
         $expires = $user->getApiAccessTokenExpiresAt();
         if ($expires !== null && $expires < new \DateTimeImmutable()) {
-            return null;
+            return [
+                'user' => null,
+                'code' => 'token_expired',
+                'message' => 'Сессия истекла. Войдите в приложение снова.',
+            ];
         }
 
-        return $user;
+        return ['user' => $user, 'code' => null, 'message' => null];
     }
 
     private function extractBearerToken(Request $request): ?string

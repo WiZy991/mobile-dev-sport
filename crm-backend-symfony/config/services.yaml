@@ -28,6 +28,7 @@ parameters:
     alfa_acquiring_tax_type_default: 0
     alfa_acquiring_username_default: ''
     alfa_acquiring_password_default: ''
+    alfa_acquiring_currency_default: 643
 
 services:
     # default configuration for services in *this* file
@@ -101,6 +102,7 @@ services:
             $apiUrl: '%env(ALFA_ACQUIRING_API_URL)%'
             $username: '%env(default:alfa_acquiring_username_default:ALFA_ACQUIRING_USERNAME)%'
             $password: '%env(default:alfa_acquiring_password_default:ALFA_ACQUIRING_PASSWORD)%'
+            $currency: '%env(int:default:alfa_acquiring_currency_default:ALFA_ACQUIRING_CURRENCY)%'
 
     App\Service\Payment\SubscriptionPaymentInitService:
         arguments:
