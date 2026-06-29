@@ -1,0 +1,9 @@
+payment_success_redirect:
+  path: /payment/success
+  controller: App\Controller\PaymentRedirectController::success
+  methods: [GET]
+
+payment_fail_redirect:
+  path: /payment/fail
+  controller: App\Controller\PaymentRedirectController::fail
+  methods: [GET]

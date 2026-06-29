@@ -18,3 +18,7 @@ admin_yaml:
 api_yaml:
     resource: 'routes/api.yaml'
     type: yaml
+
+payment_yaml:
+    resource: 'routes/payment.yaml'
+    type: yaml

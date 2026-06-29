@@ -53,6 +53,9 @@ class MockInterceptor : Interceptor {
             
             // Subscriptions endpoints
             path.contains("/subscriptions") && path.contains("/cancel") && method == "POST" -> mockCancelSubscriptionResponse()
+            path.endsWith("/payments/subscription/init") && method == "POST" -> mockPaymentInitResponse()
+            path.matches(Regex(".*/payments/\\d+/status$")) && method == "GET" -> mockPaymentStatusResponse()
+            path.endsWith("/payments/promo/validate") && method == "POST" -> mockPromoValidateResponse()
             path.endsWith("/subscriptions/purchase") && method == "POST" -> mockPurchaseResponse()
             path.contains("/subscriptions") && path.contains("/freeze") && method == "POST" -> mockFreezeResponse()
             path.contains("/subscriptions") && path.contains("/unfreeze") && method == "POST" -> mockUnfreezeResponse()
@@ -648,6 +651,41 @@ class MockInterceptor : Interceptor {
         "freeze_days_used": 0,
         "is_frozen": false,
         "price": 5000.0
+    }
+    """.trimIndent()
+
+    private fun mockPaymentInitResponse(): String = """
+    {
+        "payment_id": 1,
+        "status": "pending",
+        "payment_url": "https://alfa.rbsuat.com/payment/merchants/ecom2/payment_ru.html?mdOrder=mock-order",
+        "amount": 5000.0,
+        "final_price": 5000.0,
+        "discount_amount": 0.0,
+        "original_price": 5000.0,
+        "expires_at": "2026-06-29T12:30:00+00:00"
+    }
+    """.trimIndent()
+
+    private fun mockPaymentStatusResponse(): String = """
+    {
+        "payment_id": 1,
+        "status": "paid",
+        "amount": 5000.0,
+        "final_price": 5000.0,
+        "subscription": {
+            "id": "sub-new",
+            "name": "На 1 месяц",
+            "status": "active"
+        }
+    }
+    """.trimIndent()
+
+    private fun mockPromoValidateResponse(): String = """
+    {
+        "promo_valid": true,
+        "promo_code": "WELCOME10",
+        "discount_percent": 10.0
     }
     """.trimIndent()
     

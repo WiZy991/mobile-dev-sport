@@ -2,6 +2,7 @@ package com.fitnessclub.app
 
 import android.content.Intent
 import android.os.Bundle
+import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
 import com.fitnessclub.app.data.auth.SberAuthDeepLinkBus
 import androidx.activity.compose.setContent
 import androidx.fragment.app.FragmentActivity
@@ -58,6 +59,9 @@ class MainActivity : FragmentActivity() {
         val data = intent?.data ?: return
         if (data.scheme == "worldfitness" && data.host == "auth" && data.path == "/callback") {
             SberAuthDeepLinkBus.publish(data)
+        }
+        if (data.scheme == "worldfitness" && data.host == "payment" && data.path == "/callback") {
+            PaymentDeepLinkBus.publish(data)
         }
     }
 }

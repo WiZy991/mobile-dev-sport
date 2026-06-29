@@ -138,6 +138,33 @@ api_subscriptions_cancel:
   controller: App\Controller\Api\SubscriptionController::cancel
   methods: [POST]
 
+api_payments_promo_validate:
+  path: /api/v1/payments/promo/validate
+  controller: App\Controller\Api\PaymentController::validatePromo
+  methods: [POST]
+
+api_payments_subscription_quote:
+  path: /api/v1/payments/subscription/quote
+  controller: App\Controller\Api\PaymentController::quote
+  methods: [POST]
+
+api_payments_subscription_init:
+  path: /api/v1/payments/subscription/init
+  controller: App\Controller\Api\PaymentController::initSubscriptionPayment
+  methods: [POST]
+
+api_payments_status:
+  path: /api/v1/payments/{id}/status
+  controller: App\Controller\Api\PaymentController::status
+  methods: [GET]
+  requirements:
+    id: '\d+'
+
+api_payments_alfa_callback:
+  path: /api/v1/payments/alfa/callback
+  controller: App\Controller\Api\PaymentCallbackController::callback
+  methods: [GET, POST]
+
 api_support_tickets_list:
   path: /api/v1/support/tickets
   controller: App\Controller\Api\SupportTicketController::list

@@ -71,6 +71,18 @@ interface FitnessApi {
     
     @POST("subscriptions/purchase")
     suspend fun purchaseSubscription(@Body request: PurchaseSubscriptionRequest): Response<Subscription>
+
+    @POST("payments/promo/validate")
+    suspend fun validatePromoCode(@Body request: PromoCodeRequest): Response<PromoValidationResponse>
+
+    @POST("payments/subscription/quote")
+    suspend fun quoteSubscriptionPayment(@Body request: PurchaseSubscriptionRequest): Response<SubscriptionPaymentQuoteResponse>
+
+    @POST("payments/subscription/init")
+    suspend fun initSubscriptionPayment(@Body request: PurchaseSubscriptionRequest): Response<SubscriptionPaymentInitResponse>
+
+    @GET("payments/{id}/status")
+    suspend fun getPaymentStatus(@Path("id") paymentId: Int): Response<SubscriptionPaymentInitResponse>
     
     @POST("subscriptions/{id}/freeze")
     suspend fun freezeSubscription(
@@ -189,6 +201,71 @@ data class PurchaseSubscriptionRequest(
     val planId: String,
     @com.google.gson.annotations.SerializedName("promo_code")
     val promoCode: String? = null
+)
+
+data class PromoCodeRequest(
+    @com.google.gson.annotations.SerializedName("promo_code")
+    val promoCode: String,
+)
+
+data class PromoValidationResponse(
+    @com.google.gson.annotations.SerializedName("promo_valid")
+    val promoValid: Boolean = false,
+    @com.google.gson.annotations.SerializedName("promo_code")
+    val promoCode: String? = null,
+    @com.google.gson.annotations.SerializedName("promo_error")
+    val promoError: String? = null,
+    @com.google.gson.annotations.SerializedName("discount_percent")
+    val discountPercent: Double? = null,
+    @com.google.gson.annotations.SerializedName("discount_amount")
+    val discountAmount: Double? = null,
+)
+
+data class SubscriptionPaymentQuoteResponse(
+    @com.google.gson.annotations.SerializedName("plan_id")
+    val planId: String? = null,
+    @com.google.gson.annotations.SerializedName("original_price")
+    val originalPrice: Double = 0.0,
+    @com.google.gson.annotations.SerializedName("final_price")
+    val finalPrice: Double = 0.0,
+    @com.google.gson.annotations.SerializedName("discount_amount")
+    val discountAmount: Double = 0.0,
+    @com.google.gson.annotations.SerializedName("promo_valid")
+    val promoValid: Boolean = false,
+    @com.google.gson.annotations.SerializedName("promo_error")
+    val promoError: String? = null,
+)
+
+data class SubscriptionPaymentInitResponse(
+    @com.google.gson.annotations.SerializedName("payment_id")
+    val paymentId: Int = 0,
+    @com.google.gson.annotations.SerializedName("status")
+    val status: String = "pending",
+    @com.google.gson.annotations.SerializedName("payment_url")
+    val paymentUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("amount")
+    val amount: Double = 0.0,
+    @com.google.gson.annotations.SerializedName("final_price")
+    val finalPrice: Double = 0.0,
+    @com.google.gson.annotations.SerializedName("discount_amount")
+    val discountAmount: Double = 0.0,
+    @com.google.gson.annotations.SerializedName("original_price")
+    val originalPrice: Double = 0.0,
+    @com.google.gson.annotations.SerializedName("expires_at")
+    val expiresAt: String? = null,
+    @com.google.gson.annotations.SerializedName("failure_reason")
+    val failureReason: String? = null,
+    @com.google.gson.annotations.SerializedName("subscription")
+    val subscription: PaymentSubscriptionSummary? = null,
+)
+
+data class PaymentSubscriptionSummary(
+    @com.google.gson.annotations.SerializedName("id")
+    val id: String,
+    @com.google.gson.annotations.SerializedName("name")
+    val name: String,
+    @com.google.gson.annotations.SerializedName("status")
+    val status: String,
 )
 
 data class PurchaseItem(

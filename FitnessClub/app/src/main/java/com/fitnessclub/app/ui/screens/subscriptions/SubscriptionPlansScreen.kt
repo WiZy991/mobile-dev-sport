@@ -38,6 +38,7 @@ import com.fitnessclub.app.ui.theme.Success
 fun SubscriptionPlansScreen(
     onNavigateBack: () -> Unit,
     onPromoCode: () -> Unit,
+    onNavigateToPayment: (paymentId: Int) -> Unit = {},
     onPurchaseSuccess: () -> Unit = {},
     onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
     viewModel: SubscriptionPlansViewModel = hiltViewModel()
@@ -112,7 +113,8 @@ fun SubscriptionPlansScreen(
                         item {
                             PromoCodeAppliedCard(
                                 code = uiState.appliedPromoCode!!,
-                                discount = uiState.promoDiscount,
+                                discountPercent = uiState.promoDiscountPercent,
+                                discountAmount = uiState.promoDiscountAmount,
                                 onRemove = { viewModel.removePromoCode() }
                             )
                         }
@@ -123,9 +125,11 @@ fun SubscriptionPlansScreen(
                         items = uiState.plans,
                         key = { it.safeId }
                     ) { plan ->
+                        val discountedPrice = viewModel.discountedPrice(plan)
+                        val hasDiscount = uiState.appliedPromoCode != null && discountedPrice < plan.price
                         SubscriptionPlanCard(
                             plan = plan,
-                            discount = if (uiState.appliedPromoCode != null) uiState.promoDiscount else 0,
+                            finalPrice = if (hasDiscount) discountedPrice else null,
                             onPurchase = { showPurchaseDialog = plan }
                         )
                     }
@@ -191,9 +195,11 @@ fun SubscriptionPlansScreen(
     // Purchase dialog
     var purchaseError by remember { mutableStateOf<String?>(null) }
     showPurchaseDialog?.let { plan ->
+        val discountedPrice = viewModel.discountedPrice(plan)
         PurchaseConfirmDialog(
             plan = plan,
-            discount = if (uiState.appliedPromoCode != null) uiState.promoDiscount else 0,
+            finalPrice = discountedPrice,
+            hasDiscount = uiState.appliedPromoCode != null && discountedPrice < plan.price,
             isLoading = uiState.isLoading,
             error = purchaseError,
             onDismiss = { showPurchaseDialog = null; purchaseError = null },
@@ -202,16 +208,17 @@ fun SubscriptionPlansScreen(
                 purchaseError = null
                 viewModel.purchasePlan(
                     plan = plan,
-                    onSuccess = {
+                    onPaymentRequired = { paymentId, paymentUrl ->
                         showPurchaseDialog = null
-                        onPurchaseSuccess()
+                        openPaymentUrl(context, paymentUrl)
+                        onNavigateToPayment(paymentId)
                     },
                     onVerificationRequired = { url, message ->
                         showPurchaseDialog = null
                         scope.launch {
                             snackbarHostState.showSnackbar(message)
                         }
-                        openSberVerification(context, url)
+                        openExternalUrl(context, url)
                     },
                     onError = { msg ->
                         purchaseError = msg
@@ -222,13 +229,19 @@ fun SubscriptionPlansScreen(
     }
 }
 
-private fun openSberVerification(context: Context, url: String) {
+private fun openPaymentUrl(context: Context, url: String) {
+    openExternalUrl(context, url)
+}
+
+private fun openExternalUrl(context: Context, url: String) {
     val activity = context.findActivity() ?: return
     CustomTabsIntent.Builder()
         .setShowTitle(true)
         .build()
         .launchUrl(activity, Uri.parse(url))
 }
+
+private fun openSberVerification(context: Context, url: String) = openExternalUrl(context, url)
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
@@ -239,7 +252,8 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 @Composable
 private fun PromoCodeAppliedCard(
     code: String,
-    discount: Int,
+    discountPercent: Double?,
+    discountAmount: Double?,
     onRemove: () -> Unit
 ) {
     Card(
@@ -269,7 +283,11 @@ private fun PromoCodeAppliedCard(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "$code — скидка $discount%",
+                        when {
+                            discountPercent != null -> "$code — скидка ${discountPercent.toInt()}%"
+                            discountAmount != null -> "$code — скидка ${discountAmount.toInt()} ₽"
+                            else -> code
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = Success
                     )
@@ -285,7 +303,7 @@ private fun PromoCodeAppliedCard(
 @Composable
 private fun SubscriptionPlanCard(
     plan: SubscriptionPlan,
-    discount: Int,
+    finalPrice: Double?,
     onPurchase: () -> Unit
 ) {
     val isPopular = plan.isPopular
@@ -401,7 +419,7 @@ private fun SubscriptionPlanCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        if (discount > 0) {
+                        if (finalPrice != null) {
                             Text(
                                 text = "${plan.price.toInt()} ₽",
                                 style = MaterialTheme.typography.bodyLarge,
@@ -409,7 +427,7 @@ private fun SubscriptionPlanCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "${(plan.price * (100 - discount) / 100).toInt()} ₽",
+                                text = "${finalPrice.toInt()} ₽",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = Success
@@ -484,19 +502,14 @@ private fun PromoCodeDialog(
 @Composable
 private fun PurchaseConfirmDialog(
     plan: SubscriptionPlan,
-    discount: Int,
+    finalPrice: Double,
+    hasDiscount: Boolean,
     isLoading: Boolean = false,
     error: String? = null,
     onDismiss: () -> Unit,
     onOpenRequisites: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    val finalPrice = if (discount > 0) {
-        (plan.price * (100 - discount) / 100).toInt()
-    } else {
-        plan.price.toInt()
-    }
-    
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Подтверждение покупки") },
@@ -529,8 +542,16 @@ private fun PurchaseConfirmDialog(
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+                if (hasDiscount) {
+                    Text(
+                        text = "Было: ${plan.price.toInt()} ₽",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textDecoration = TextDecoration.LineThrough,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Text(
-                    text = "К оплате: $finalPrice ₽",
+                    text = "К оплате: ${finalPrice.toInt()} ₽",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )

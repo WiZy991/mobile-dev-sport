@@ -5,6 +5,12 @@ import com.fitnessclub.app.data.model.Subscription
 sealed class PurchaseSubscriptionOutcome {
     data class Success(val subscription: Subscription) : PurchaseSubscriptionOutcome()
 
+    data class PaymentRequired(
+        val paymentId: Int,
+        val paymentUrl: String,
+        val amount: Double,
+    ) : PurchaseSubscriptionOutcome()
+
     /** Сервер вернул 403 — нужно пройти Сбер ID, затем повторить покупку. */
     data class VerificationRequired(val authorizeUrl: String, val message: String) : PurchaseSubscriptionOutcome()
 

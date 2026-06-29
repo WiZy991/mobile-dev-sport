@@ -25,6 +25,9 @@ sealed class Screen(val route: String) {
     // Subscriptions & Shop
     data object Subscriptions : Screen("subscriptions")
     data object SubscriptionPlans : Screen("subscription_plans")
+    data object PaymentPending : Screen("payment_pending/{paymentId}") {
+        fun createRoute(paymentId: Int) = "payment_pending/$paymentId"
+    }
     data object Shop : Screen("shop")
     
     // Profile related

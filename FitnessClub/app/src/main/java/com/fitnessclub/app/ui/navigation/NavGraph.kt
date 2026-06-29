@@ -1,5 +1,6 @@
 package com.fitnessclub.app.ui.navigation
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -12,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navigation
 import com.fitnessclub.app.ui.navigation.NavArgs
 import androidx.navigation.navArgument
+import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
 import com.fitnessclub.app.ui.screens.auth.LoginScreen
 import com.fitnessclub.app.ui.screens.auth.LoginViewModel
 import com.fitnessclub.app.ui.screens.auth.RegisterClubPickScreen
@@ -38,6 +40,7 @@ import com.fitnessclub.app.ui.screens.about.AboutScreen
 import com.fitnessclub.app.ui.screens.legal.LegalDocumentScreen
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.ui.screens.shop.ShopScreen
+import com.fitnessclub.app.ui.screens.subscriptions.PaymentPendingScreen
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPlansScreen
 import com.fitnessclub.app.ui.screens.trainers.TrainerDetailsScreen
 import com.fitnessclub.app.ui.screens.trainers.TrainersScreen
@@ -50,6 +53,18 @@ fun NavGraph(
     isLoggedIn: Boolean
 ) {
     val startDestination = if (isLoggedIn) Screen.Home.route else Screen.Login.route
+
+    LaunchedEffect(isLoggedIn) {
+        if (!isLoggedIn) return@LaunchedEffect
+        PaymentDeepLinkBus.events.collect { uri ->
+            val paymentId = uri.getQueryParameter("payment_id")?.toIntOrNull()
+            if (paymentId != null && paymentId > 0) {
+                navController.navigate(Screen.PaymentPending.createRoute(paymentId)) {
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
     
     NavHost(
         navController = navController,
@@ -210,9 +225,30 @@ fun NavGraph(
             SubscriptionPlansScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onPromoCode = { /* Handled in screen */ },
+                onNavigateToPayment = { paymentId ->
+                    navController.navigate(Screen.PaymentPending.createRoute(paymentId))
+                },
                 onPurchaseSuccess = { navController.popBackStack() },
                 onOpenLegalDocument = { type ->
                     navController.navigate(Screen.LegalDocument.createRoute(type))
+                },
+            )
+        }
+
+        composable(
+            route = Screen.PaymentPending.route,
+            arguments = listOf(
+                navArgument("paymentId") { type = NavType.IntType },
+            ),
+        ) { backStackEntry ->
+            val paymentId = backStackEntry.arguments?.getInt("paymentId") ?: 0
+            PaymentPendingScreen(
+                paymentId = paymentId,
+                onPaymentSuccess = {
+                    navController.popBackStack(Screen.SubscriptionPlans.route, inclusive = true)
+                },
+                onPaymentFailed = { _ ->
+                    navController.popBackStack()
                 },
             )
         }

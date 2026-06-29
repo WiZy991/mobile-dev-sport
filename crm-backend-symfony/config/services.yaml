@@ -22,6 +22,12 @@ parameters:
     fcm_server_key_default: ''
     fcm_credentials_default: ''
     fcm_project_id_default: ''
+    alfa_acquiring_app_bridge_default: 'worldfitness://payment/callback'
+    alfa_acquiring_session_timeout_default: 1200
+    alfa_acquiring_fiscalization_default: false
+    alfa_acquiring_tax_type_default: 0
+    alfa_acquiring_username_default: ''
+    alfa_acquiring_password_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -84,6 +90,27 @@ services:
     App\Controller\Api\SubscriptionController:
         bind:
             $requireSberVerificationBeforePurchase: '%env(bool:SUBSCRIPTION_REQUIRE_SBER)%'
+            $alfaAcquiringEnabled: '%env(bool:ALFA_ACQUIRING_ENABLED)%'
+
+    App\Service\Payment\AlfaAcquiringClient:
+        arguments:
+            $apiUrl: '%env(ALFA_ACQUIRING_API_URL)%'
+            $username: '%env(default:alfa_acquiring_username_default:ALFA_ACQUIRING_USERNAME)%'
+            $password: '%env(default:alfa_acquiring_password_default:ALFA_ACQUIRING_PASSWORD)%'
+
+    App\Service\Payment\SubscriptionPaymentInitService:
+        arguments:
+            $requireSberVerificationBeforePurchase: '%env(bool:SUBSCRIPTION_REQUIRE_SBER)%'
+            $returnUrlBase: '%env(ALFA_ACQUIRING_RETURN_URL)%'
+            $failUrlBase: '%env(ALFA_ACQUIRING_FAIL_URL)%'
+            $callbackUrl: '%env(ALFA_ACQUIRING_CALLBACK_URL)%'
+            $sessionTimeoutSecs: '%env(int:default:alfa_acquiring_session_timeout_default:ALFA_ACQUIRING_SESSION_TIMEOUT)%'
+            $fiscalizationEnabled: '%env(bool:default:alfa_acquiring_fiscalization_default:ALFA_ACQUIRING_FISCALIZATION)%'
+            $taxType: '%env(int:default:alfa_acquiring_tax_type_default:ALFA_ACQUIRING_TAX_TYPE)%'
+
+    App\Controller\PaymentRedirectController:
+        arguments:
+            $appBridgeUri: '%env(default:alfa_acquiring_app_bridge_default:ALFA_ACQUIRING_APP_BRIDGE_URI)%'
 
     App\Controller\Api\AccessController:
         bind:
