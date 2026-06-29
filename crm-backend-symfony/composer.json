@@ -51,9 +51,6 @@
             "App\\Tests\\": "tests/"
         }
     },
-    "require-dev": {
-        "phpunit/phpunit": "^11.5"
-    },
     "replace": {
         "symfony/polyfill-ctype": "*",
         "symfony/polyfill-iconv": "*",
