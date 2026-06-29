@@ -40,7 +40,8 @@ class PaymentStatusSyncService
         $status = $this->alfaClient->getOrderStatusExtended($payment->getAlfaOrderId());
 
         if ($status->isDeposited()) {
-            if ($status->amountKopecks !== null && $status->amountKopecks !== $payment->getAmountKopecks()) {
+            $paidAmount = $status->amountKopecks;
+            if ($paidAmount !== null && $paidAmount > 0 && $paidAmount !== $payment->getAmountKopecks()) {
                 $payment->setStatus(Payment::STATUS_FAILED)
                     ->setFailureReason('Amount mismatch: expected ' . $payment->getAmountKopecks() . ', got ' . $status->amountKopecks);
                 $this->em->flush();

@@ -156,8 +156,12 @@ class PaymentController extends AbstractController
         }
 
         if ($payment->isPending() && $payment->getAlfaOrderId() !== null) {
-            $this->statusSyncService->syncFromGateway($payment);
-            $this->em->refresh($payment);
+            try {
+                $this->statusSyncService->syncFromGateway($payment);
+                $this->em->refresh($payment);
+            } catch (\Throwable) {
+                // Возвращаем текущий статус из БД, чтобы polling в приложении не зависал на 500.
+            }
         }
 
         return $this->json($this->serializePayment($payment, includeSubscription: true));

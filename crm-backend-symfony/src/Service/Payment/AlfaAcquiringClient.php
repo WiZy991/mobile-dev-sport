@@ -70,15 +70,12 @@ class AlfaAcquiringClient
         $orderStatus = isset($data['orderStatus']) ? (int) $data['orderStatus'] : 0;
         $paymentState = null;
         $paymentWay = null;
-        $amount = isset($data['amount']) ? (int) $data['amount'] : null;
+        $amount = $this->resolvePaidAmountKopecks($data);
 
         if (isset($data['paymentAmountInfo']) && is_array($data['paymentAmountInfo'])) {
             $paymentState = isset($data['paymentAmountInfo']['paymentState'])
                 ? (string) $data['paymentAmountInfo']['paymentState']
                 : null;
-            if (isset($data['paymentAmountInfo']['approvedAmount'])) {
-                $amount = (int) $data['paymentAmountInfo']['approvedAmount'];
-            }
         }
 
         if (isset($data['cardAuthInfo']['paymentWay'])) {
@@ -117,5 +114,26 @@ class AlfaAcquiringClient
         }
 
         return $decoded;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function resolvePaidAmountKopecks(array $data): ?int
+    {
+        if (isset($data['paymentAmountInfo']) && is_array($data['paymentAmountInfo'])) {
+            $info = $data['paymentAmountInfo'];
+            foreach (['depositedAmount', 'approvedAmount', 'totalAmount'] as $key) {
+                if (isset($info[$key]) && (int) $info[$key] > 0) {
+                    return (int) $info[$key];
+                }
+            }
+        }
+
+        if (isset($data['amount']) && (int) $data['amount'] > 0) {
+            return (int) $data['amount'];
+        }
+
+        return null;
     }
 }

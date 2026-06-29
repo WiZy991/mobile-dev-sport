@@ -16,11 +16,20 @@ final class AlfaOrderStatus
 
     public function isDeposited(): bool
     {
-        if ($this->paymentState === 'DEPOSITED') {
+        if (in_array($this->paymentState, ['DEPOSITED', 'APPROVED'], true)) {
             return true;
         }
 
-        return $this->orderStatus === 2;
+        if ($this->orderStatus === 2) {
+            return true;
+        }
+
+        $deposited = (int) ($this->raw['paymentAmountInfo']['depositedAmount'] ?? 0);
+        if ($deposited > 0 && !in_array($this->orderStatus, [3, 4, 6], true)) {
+            return true;
+        }
+
+        return false;
     }
 
     public function isDeclined(): bool

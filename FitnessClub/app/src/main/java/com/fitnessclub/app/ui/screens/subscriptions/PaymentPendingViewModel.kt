@@ -47,7 +47,16 @@ class PaymentPendingViewModel @Inject constructor(
                             }
                         }
                     }
-                    is ApiResult.Error -> Unit
+                    is ApiResult.Error -> {
+                        if (attempt >= 3 && (result.code == 401 || result.code == 403)) {
+                            _events.emit(
+                                PaymentPendingEvent.Failed(
+                                    "Сессия истекла. Вернитесь в приложение и проверьте абонемент в профиле."
+                                )
+                            )
+                            return@launch
+                        }
+                    }
                     is ApiResult.Loading -> Unit
                 }
                 delay(3000)
