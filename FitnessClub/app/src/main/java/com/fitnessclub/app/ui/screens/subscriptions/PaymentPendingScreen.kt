@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,10 +27,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
 import com.fitnessclub.app.ui.theme.Error
 import com.fitnessclub.app.ui.theme.Primary
 import kotlinx.coroutines.flow.collectLatest
@@ -45,8 +50,29 @@ fun PaymentPendingScreen(
     var statusMessage by remember { mutableStateOf("Ожидаем подтверждение оплаты…") }
     var isFailed by remember { mutableStateOf(false) }
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     LaunchedEffect(paymentId) {
         viewModel.pollPaymentStatus(paymentId)
+    }
+
+    LaunchedEffect(paymentId) {
+        PaymentDeepLinkBus.events.collect { uri ->
+            val returnedId = uri.getQueryParameter("payment_id")?.toIntOrNull()
+            if (returnedId == paymentId) {
+                viewModel.refreshPaymentStatus(paymentId)
+            }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, paymentId) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshPaymentStatus(paymentId)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(Unit) {

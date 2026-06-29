@@ -16,7 +16,7 @@ data class Subscription(
     val startDate: String,
     
     @SerializedName("end_date")
-    val endDate: String,
+    val endDate: String? = null,
     
     @SerializedName("status")
     val status: SubscriptionStatus,

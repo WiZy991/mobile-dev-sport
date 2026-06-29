@@ -535,7 +535,7 @@ private fun SubscriptionCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = subscription.startDate.substring(0, 10),
+                        text = subscription.startDate.take(10),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -547,7 +547,7 @@ private fun SubscriptionCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = subscription.endDate.substring(0, 10),
+                        text = subscription.endDate?.take(10) ?: "Без срока",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
