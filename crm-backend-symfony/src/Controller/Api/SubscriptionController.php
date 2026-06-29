@@ -167,7 +167,8 @@ class SubscriptionController extends AbstractController
     {
         $plans = $this->em->getRepository(SubscriptionPlan::class)->findAll();
 
-        $data = array_map(static function (SubscriptionPlan $p) {
+        $freezePolicy = $this->freezePolicy;
+        $data = array_map(static function (SubscriptionPlan $p) use ($freezePolicy) {
             return [
                 'id' => 'plan-' . $p->getId(),
                 'name' => $p->getName(),
@@ -178,7 +179,7 @@ class SubscriptionController extends AbstractController
                 'type' => $p->getType(),
                 'features' => [], // можно заполнить позже
                 'is_popular' => $p->isPopular(),
-                'freeze_days_total' => $this->freezePolicy->freezeDaysTotalForPlan($p),
+                'freeze_days_total' => $freezePolicy->freezeDaysTotalForPlan($p),
             ];
         }, $plans);
 
