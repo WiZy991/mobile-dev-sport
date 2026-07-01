@@ -1,5 +1,10 @@
 package com.fitnessclub.app.ui.screens.shop
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,11 +16,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.config.LegalDocumentType
+import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPurchaseConfirmDialog
 import com.fitnessclub.app.ui.theme.*
+import kotlinx.coroutines.launch
 
 enum class ShopCategory(val title: String) {
     SERVICES("Услуги"),
@@ -40,12 +50,17 @@ data class ShopItem(
 fun ShopScreen(
     onNavigateBack: () -> Unit,
     onOpenPurchaseHistory: () -> Unit = {},
-    onNavigateToSubscriptionPlans: () -> Unit = {},
-    viewModel: ShopViewModel = hiltViewModel()
+    onNavigateToPayment: (paymentId: Int) -> Unit = {},
+    onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
+    viewModel: ShopViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedCategory by remember { mutableStateOf(ShopCategory.SERVICES) }
+    var showPurchasePlan by remember { mutableStateOf<SubscriptionPlan?>(null) }
+    var purchaseError by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     
     LaunchedEffect(uiState.purchaseMessage, uiState.error) {
         uiState.purchaseMessage?.let { msg ->
@@ -137,14 +152,14 @@ fun ShopScreen(
                         ShopItemCard(
                             item = item,
                             onBuy = {
-                                if (item.category == ShopCategory.SUBSCRIPTIONS ||
-                                    item.id.startsWith("sub-")
-                                ) {
-                                    onNavigateToSubscriptionPlans()
+                                val plan = viewModel.planForItem(item.id)
+                                if (plan != null) {
+                                    purchaseError = null
+                                    showPurchasePlan = plan
                                 } else {
                                     viewModel.buyItem(item)
                                 }
-                            }
+                            },
                         )
                     }
                 }
@@ -155,6 +170,38 @@ fun ShopScreen(
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
+    }
+
+    showPurchasePlan?.let { plan ->
+        SubscriptionPurchaseConfirmDialog(
+            plan = plan,
+            finalPrice = plan.price,
+            hasDiscount = false,
+            isLoading = uiState.isPurchasing,
+            error = purchaseError,
+            onDismiss = {
+                showPurchasePlan = null
+                purchaseError = null
+            },
+            onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
+            onConfirm = {
+                purchaseError = null
+                viewModel.purchaseSubscriptionPlan(
+                    plan = plan,
+                    onPaymentRequired = { paymentId, paymentUrl ->
+                        showPurchasePlan = null
+                        onNavigateToPayment(paymentId)
+                        openPaymentUrl(context, paymentUrl)
+                    },
+                    onVerificationRequired = { url, message ->
+                        showPurchasePlan = null
+                        scope.launch { snackbarHostState.showSnackbar(message) }
+                        openExternalUrl(context, url)
+                    },
+                    onError = { msg -> purchaseError = msg },
+                )
+            },
+        )
     }
 }
 
@@ -248,4 +295,20 @@ private fun ShopItemCard(
             }
         }
     }
+}
+
+private fun openPaymentUrl(context: Context, url: String) = openExternalUrl(context, url)
+
+private fun openExternalUrl(context: Context, url: String) {
+    val activity = context.findActivity() ?: return
+    CustomTabsIntent.Builder()
+        .setShowTitle(true)
+        .build()
+        .launchUrl(activity, Uri.parse(url))
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

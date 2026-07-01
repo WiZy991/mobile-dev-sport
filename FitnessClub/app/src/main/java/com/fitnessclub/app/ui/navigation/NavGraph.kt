@@ -245,7 +245,10 @@ fun NavGraph(
             PaymentPendingScreen(
                 paymentId = paymentId,
                 onPaymentSuccess = {
-                    navController.popBackStack(Screen.SubscriptionPlans.route, inclusive = true)
+                    navController.navigate(Screen.Profile.route) {
+                        popUpTo(Screen.SubscriptionPlans.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 },
                 onPaymentFailed = { _ ->
                     navController.popBackStack()
@@ -323,7 +326,12 @@ fun NavGraph(
             ShopScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onOpenPurchaseHistory = { navController.navigate(Screen.PurchaseHistory.route) },
-                onNavigateToSubscriptionPlans = { navController.navigate(Screen.SubscriptionPlans.route) }
+                onNavigateToPayment = { paymentId ->
+                    navController.navigate(Screen.PaymentPending.createRoute(paymentId))
+                },
+                onOpenLegalDocument = { type ->
+                    navController.navigate(Screen.LegalDocument.createRoute(type))
+                },
             )
         }
         

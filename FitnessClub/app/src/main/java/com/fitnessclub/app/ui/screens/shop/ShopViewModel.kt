@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.data.repository.ProductRepository
+import com.fitnessclub.app.data.repository.PurchaseSubscriptionOutcome
 import com.fitnessclub.app.data.repository.SubscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,8 +18,10 @@ import javax.inject.Inject
 data class ShopUiState(
     val isLoading: Boolean = true,
     val items: List<ShopItem> = emptyList(),
+    val subscriptionPlansByItemId: Map<String, SubscriptionPlan> = emptyMap(),
+    val isPurchasing: Boolean = false,
     val error: String? = null,
-    val purchaseMessage: String? = null
+    val purchaseMessage: String? = null,
 )
 
 @HiltViewModel
@@ -42,9 +45,14 @@ class ShopViewModel @Inject constructor(
                 when (val result = productRepository.getProducts()) {
                     is ApiResult.Success -> {
                         val apiItems = result.data
-                        val allItems = apiItems + getSubscriptionAndDepositItems()
+                        val (subscriptionItems, plansByItemId) = getSubscriptionAndDepositItems()
+                        val allItems = apiItems + subscriptionItems
                         _uiState.update {
-                            it.copy(isLoading = false, items = allItems)
+                            it.copy(
+                                isLoading = false,
+                                items = allItems,
+                                subscriptionPlansByItemId = plansByItemId,
+                            )
                         }
                     }
                     is ApiResult.Error -> {
@@ -70,11 +78,13 @@ class ShopViewModel @Inject constructor(
         }
     }
     
-    private suspend fun getSubscriptionAndDepositItems(): List<ShopItem> {
-        val subscriptionItems = when (val result = subscriptionRepository.getSubscriptionPlansSuspend()) {
-            is ApiResult.Success -> result.data.map { it.toShopSubscriptionItem() }
+    private suspend fun getSubscriptionAndDepositItems(): Pair<List<ShopItem>, Map<String, SubscriptionPlan>> {
+        val subscriptionPlans = when (val result = subscriptionRepository.getSubscriptionPlansSuspend()) {
+            is ApiResult.Success -> result.data
             else -> emptyList()
         }
+        val subscriptionItems = subscriptionPlans.map { it.toShopSubscriptionItem() }
+        val plansByItemId = subscriptionPlans.associateBy { "sub-${it.safeId}" }
 
         val depositItems = listOf(
             ShopItem(
@@ -86,7 +96,7 @@ class ShopViewModel @Inject constructor(
             )
         )
 
-        return subscriptionItems + depositItems
+        return (subscriptionItems + depositItems) to plansByItemId
     }
 
     private fun getFallbackItems(): List<ShopItem> = listOf(
@@ -98,6 +108,46 @@ class ShopViewModel @Inject constructor(
         ShopItem(id = "dep-1", name = "Пополнение депозита", description = "Пополните депозит на ресепшене клуба.", price = 1000.0, category = ShopCategory.DEPOSITS)
     )
     
+    fun planForItem(itemId: String): SubscriptionPlan? = _uiState.value.subscriptionPlansByItemId[itemId]
+
+    fun purchaseSubscriptionPlan(
+        plan: SubscriptionPlan,
+        onPaymentRequired: (paymentId: Int, paymentUrl: String) -> Unit,
+        onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isPurchasing = true, error = null) }
+            when (
+                val result = subscriptionRepository.purchaseSubscription(
+                    planId = plan.safeId,
+                    promoCode = null,
+                )
+            ) {
+                is PurchaseSubscriptionOutcome.PaymentRequired -> {
+                    _uiState.update { it.copy(isPurchasing = false) }
+                    onPaymentRequired(result.paymentId, result.paymentUrl)
+                }
+                is PurchaseSubscriptionOutcome.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isPurchasing = false,
+                            purchaseMessage = "Абонемент «${plan.safeName}» оформлен",
+                        )
+                    }
+                }
+                is PurchaseSubscriptionOutcome.VerificationRequired -> {
+                    _uiState.update { it.copy(isPurchasing = false) }
+                    onVerificationRequired(result.authorizeUrl, result.message)
+                }
+                is PurchaseSubscriptionOutcome.Error -> {
+                    _uiState.update { it.copy(isPurchasing = false) }
+                    onError(result.message)
+                }
+            }
+        }
+    }
+
     fun buyItem(item: ShopItem) {
         viewModelScope.launch {
             when {

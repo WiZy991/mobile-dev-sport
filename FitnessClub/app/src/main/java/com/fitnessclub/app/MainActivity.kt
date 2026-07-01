@@ -29,7 +29,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
-        dispatchSberCallback(intent)
+        dispatchDeepLinks(intent)
 
         setContent {
             FitnessClubTheme {
@@ -52,10 +52,15 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        dispatchSberCallback(intent)
+        dispatchDeepLinks(intent)
     }
 
-    private fun dispatchSberCallback(intent: Intent?) {
+    override fun onResume() {
+        super.onResume()
+        dispatchDeepLinks(intent)
+    }
+
+    private fun dispatchDeepLinks(intent: Intent?) {
         val data = intent?.data ?: return
         if (data.scheme == "worldfitness" && data.host == "auth" && data.path == "/callback") {
             SberAuthDeepLinkBus.publish(data)

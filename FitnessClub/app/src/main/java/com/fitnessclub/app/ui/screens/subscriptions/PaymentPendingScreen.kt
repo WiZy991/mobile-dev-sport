@@ -60,7 +60,7 @@ fun PaymentPendingScreen(
         PaymentDeepLinkBus.events.collect { uri ->
             val returnedId = uri.getQueryParameter("payment_id")?.toIntOrNull()
             if (returnedId == paymentId) {
-                viewModel.refreshPaymentStatus(paymentId)
+                viewModel.resumePolling(paymentId)
             }
         }
     }
@@ -68,7 +68,7 @@ fun PaymentPendingScreen(
     DisposableEffect(lifecycleOwner, paymentId) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshPaymentStatus(paymentId)
+                viewModel.resumePolling(paymentId)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -78,7 +78,10 @@ fun PaymentPendingScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
             when (event) {
-                is PaymentPendingEvent.Success -> onPaymentSuccess()
+                is PaymentPendingEvent.Success -> {
+                    statusMessage = "Оплата прошла успешно"
+                    onPaymentSuccess()
+                }
                 is PaymentPendingEvent.Failed -> {
                     isFailed = true
                     statusMessage = event.message
