@@ -251,6 +251,12 @@ class AgentApp(tk.Tk):
         self.lbl_cam_stat = ttk.Label(parent, text="Статус камеры: —", foreground="gray")
         self.lbl_cam_stat.pack(anchor=tk.W, pady=(10, 0))
 
+        preflight = ttk.Frame(parent)
+        preflight.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(preflight, text="Проверить готовность ПО", command=self._run_preflight).pack(side=tk.LEFT)
+        self.lbl_preflight = ttk.Label(preflight, text="Готовность ПО: —", foreground="gray")
+        self.lbl_preflight.pack(side=tk.LEFT, padx=(10, 0))
+
     def _load_camera_fields(self) -> None:
         cam = self.cfg.camera
         self.var_cam_enabled.set(cam.enabled)
@@ -807,6 +813,33 @@ class AgentApp(tk.Tk):
             foreground=color,
         )
         self._append_log("info" if ok else "warning", f"Итог прохода: {msg}")
+
+    def _run_preflight(self) -> None:
+        self._crm_from_fields()
+        self._camera_from_fields()
+        try:
+            self._apply_equipment_form()
+        except Exception:
+            pass
+        probe_agent = ClubAgent(self.cfg, self._enqueue_log)
+        ready, checks = probe_agent.preflight_readiness()
+        for name, ok, msg in checks:
+            level = "info" if ok else "warning"
+            self._append_log(level, f"preflight/{name}: {msg}")
+        self.lbl_preflight.configure(
+            text=f"Готовность ПО: {'ГОТОВО' if ready else 'НЕ ГОТОВО'}",
+            foreground="#0a7a0a" if ready else "#a30",
+        )
+        if ready:
+            messagebox.showinfo(
+                "Готовность ПО",
+                "Проверки пройдены. Для запуска на объекте осталось подключение и калибровка оборудования.",
+            )
+        else:
+            messagebox.showwarning(
+                "Готовность ПО",
+                "Есть незакрытые пункты preflight. Подробности смотрите в журнале.",
+            )
 
     def _on_close(self) -> None:
         self._stop_simulators()

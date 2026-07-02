@@ -128,6 +128,21 @@ class DahuaCameraListener:
                     out.append({k: v for k, v in c.items() if k != "mono"})
         return out
 
+    def probe_connectivity(self) -> tuple[bool, str]:
+        """Проверка камеры без запуска фонового потока: auth + доступ к attach endpoint."""
+        if not self.host:
+            return False, "Камера: не указан host"
+        try:
+            opener = self._build_opener()
+            with opener.open(self._attach_url(), timeout=self.open_timeout):
+                return True, "Камера: подключение и авторизация OK"
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                return False, "Камера: HTTP 401 (проверьте логин/пароль Digest)"
+            return False, f"Камера: HTTP {e.code}"
+        except Exception as e:  # noqa: BLE001 — сетевые ошибки/таймаут
+            return False, f"Камера: {e}"
+
     # ── внутреннее ────────────────────────────────────────────────
     def _emit(self, level: str, msg: str) -> None:
         if self.on_log:
@@ -263,11 +278,20 @@ class DahuaCameraListener:
         obj_type = ""
         if isinstance(obj, dict):
             obj_type = str(obj.get("ObjectType", "")).strip()
-        if self.require_human and obj_type and obj_type.lower() != "human":
-            return
+        if self.require_human:
+            if not obj_type:
+                self._emit("debug", "событие отброшено: ObjectType пустой при режиме only Human")
+                return
+            if obj_type.lower() != "human":
+                self._emit("debug", f"событие отброшено: ObjectType={obj_type!r}, ожидается 'Human'")
+                return
 
         direction = str(data.get("Direction", "")).strip() if isinstance(data, dict) else ""
         if self.inbound_direction and direction and direction.lower() != self.inbound_direction.lower():
+            self._emit(
+                "debug",
+                f"событие отброшено: Direction={direction!r}, ожидается {self.inbound_direction!r}",
+            )
             return
 
         record = {

@@ -598,6 +598,46 @@ class ClubAgent:
         ep = self._pick_endpoint()
         return ep.open_door_sync() if ep else False
 
+    def preflight_readiness(self) -> tuple[bool, list[tuple[str, bool, str]]]:
+        """Проверка готовности ПО без запуска прохода с реальным оборудованием."""
+        checks: list[tuple[str, bool, str]] = []
+
+        if self.cfg.crm_ready():
+            ok, msg = self.test_crm()
+            checks.append(("crm", ok, msg))
+        else:
+            checks.append(("crm", False, "CRM не настроен (URL / gateway_token)"))
+
+        cam_cfg = self.cfg.camera
+        if not cam_cfg.enabled:
+            checks.append(("camera", True, "Камера выключена в настройках (не обязательна для базового прохода)"))
+        elif not cam_cfg.host.strip():
+            checks.append(("camera", False, "Камера включена, но host пустой"))
+        else:
+            cam = DahuaCameraListener(
+                host=cam_cfg.host,
+                username=cam_cfg.username,
+                password=cam_cfg.password,
+                channel=cam_cfg.channel,
+                event_codes=cam_cfg.event_codes,
+                inbound_direction=cam_cfg.inbound_direction,
+                require_human=cam_cfg.require_human,
+                https=cam_cfg.https,
+                verify_ssl=cam_cfg.verify_ssl,
+                on_log=self.on_log,
+            )
+            ok_cam, msg_cam = cam.probe_connectivity()
+            checks.append(("camera", ok_cam, msg_cam))
+
+        enabled_eq = self.cfg.enabled_equipment()
+        if not enabled_eq:
+            checks.append(("equipment", False, "Нет включенного оборудования C01/PERCo"))
+        else:
+            checks.append(("equipment", True, f"Включено устройств: {len(enabled_eq)}"))
+
+        ready = all(ok for _name, ok, _msg in checks)
+        return ready, checks
+
     @property
     def crm_online(self) -> bool:
         return self._crm_ok

@@ -23,6 +23,8 @@ final class AccessAlarmNotifier
 {
     /** Роли персонала, которым уходит тревога. */
     private const STAFF_ROLES = ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_MANAGER'];
+    private const STAFF_ROLE_SUPER_ADMIN = 'ROLE_SUPER_ADMIN';
+    private const STAFF_ROLE_CLUB_ALL = 'ROLE_CLUB_ALL';
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -48,7 +50,7 @@ final class AccessAlarmNotifier
         ?string $clientName,
         ?string $referenceId,
     ): void {
-        $recipients = $this->resolveStaffRecipients();
+        $recipients = $this->resolveStaffRecipients($alarm);
         if ($recipients === []) {
             return;
         }
@@ -147,19 +149,43 @@ final class AccessAlarmNotifier
     }
 
     /** @return list<StaffUser> */
-    private function resolveStaffRecipients(): array
+    private function resolveStaffRecipients(AccessAlarm $alarm): array
     {
         $all = $this->em->getRepository(StaffUser::class)->findBy(['isActive' => true]);
         $out = [];
+        $clubId = $alarm->getClub()?->getId();
         foreach ($all as $staff) {
             if (!$staff instanceof StaffUser) {
                 continue;
             }
-            if (array_intersect($staff->getRoles(), self::STAFF_ROLES) !== []) {
+            $roles = $staff->getRoles();
+            if (array_intersect($roles, self::STAFF_ROLES) === []) {
+                continue;
+            }
+            if (\in_array(self::STAFF_ROLE_SUPER_ADMIN, $roles, true)) {
+                $out[] = $staff;
+                continue;
+            }
+            if ($this->hasClubAccess($roles, $clubId)) {
                 $out[] = $staff;
             }
         }
 
         return $out;
+    }
+
+    /**
+     * @param list<string> $roles
+     */
+    private function hasClubAccess(array $roles, ?int $clubId): bool
+    {
+        if (\in_array(self::STAFF_ROLE_CLUB_ALL, $roles, true)) {
+            return true;
+        }
+        if ($clubId === null) {
+            return false;
+        }
+
+        return \in_array('ROLE_CLUB_' . $clubId, $roles, true);
     }
 }
