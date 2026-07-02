@@ -118,9 +118,15 @@ class ClubController extends AbstractController
             $maxCapacity = max(10, (int) $capSetting->getSettingValue());
         }
 
+        $clubName = $get('name', 'Доброзал');
+        // Если в настройках остался "плейсхолдер" по умолчанию, подставляем корректное название из требований.
+        if (trim((string) $clubName) === 'FitnessClub') {
+            $clubName = 'Доброзал';
+        }
+
         return [
             'id' => 'default',
-            'name' => $get('name', 'Доброзал'),
+            'name' => $clubName,
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
             'phone' => $get('phone', '+7 (495) 123-45-67'),
             'email' => $get('email', 'info@fitnessclub.ru'),
@@ -175,8 +181,13 @@ class ClubController extends AbstractController
         $visitingRulesUrl = $get('visiting_rules_url', '');
         $safetyRulesUrl = $get('safety_rules_url', '');
 
+        $clubName = $get('name', 'Доброзал');
+        if (trim((string) $clubName) === 'FitnessClub') {
+            $clubName = 'Доброзал';
+        }
+
         return $this->json([
-            'name' => $get('name', 'Доброзал'),
+            'name' => $clubName,
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
             'phone' => $get('phone', '+7 (495) 123-45-67'),
             'email' => $get('email', 'info@fitnessclub.ru'),
