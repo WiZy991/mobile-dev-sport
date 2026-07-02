@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.ui.theme.AccentOrange
@@ -212,35 +213,37 @@ fun SubscriptionPlansScreen(
     }
 
     showLegalConsentDialog?.let { plan ->
-        val links = uiState.clubLegalLinks
-        if (links != null) {
-            ClubPurchaseConsentDialog(
-                legalLinks = links,
-                onDismiss = { showLegalConsentDialog = null },
-                onConfirm = {
-                    purchaseError = null
-                    showLegalConsentDialog = null
-                    viewModel.purchasePlan(
-                        plan = plan,
-                        onPaymentRequired = { paymentId, paymentUrl ->
-                            showPurchaseDialog = null
-                            onNavigateToPayment(paymentId)
-                            openPaymentUrl(context, paymentUrl)
-                        },
-                        onVerificationRequired = { url, message ->
-                            showPurchaseDialog = null
-                            scope.launch {
-                                snackbarHostState.showSnackbar(message)
-                            }
-                            openExternalUrl(context, url)
-                        },
-                        onError = { msg ->
-                            purchaseError = msg
+        val links = uiState.clubLegalLinks ?: ClubLegalLinks(
+            clubName = "Ваш клуб",
+            offerUrl = AppConfig.TERMS_URL,
+            privacyUrl = AppConfig.PRIVACY_URL,
+        )
+        ClubPurchaseConsentDialog(
+            legalLinks = links,
+            onDismiss = { showLegalConsentDialog = null },
+            onConfirm = {
+                purchaseError = null
+                showLegalConsentDialog = null
+                viewModel.purchasePlan(
+                    plan = plan,
+                    onPaymentRequired = { paymentId, paymentUrl ->
+                        showPurchaseDialog = null
+                        onNavigateToPayment(paymentId)
+                        openPaymentUrl(context, paymentUrl)
+                    },
+                    onVerificationRequired = { url, message ->
+                        showPurchaseDialog = null
+                        scope.launch {
+                            snackbarHostState.showSnackbar(message)
                         }
-                    )
-                }
-            )
-        }
+                        openExternalUrl(context, url)
+                    },
+                    onError = { msg ->
+                        purchaseError = msg
+                    }
+                )
+            }
+        )
     }
 }
 

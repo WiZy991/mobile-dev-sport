@@ -120,7 +120,7 @@ class ClubController extends AbstractController
 
         return [
             'id' => 'default',
-            'name' => $get('name', 'FitnessClub'),
+            'name' => $get('name', 'Доброзал'),
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
             'phone' => $get('phone', '+7 (495) 123-45-67'),
             'email' => $get('email', 'info@fitnessclub.ru'),
@@ -176,7 +176,7 @@ class ClubController extends AbstractController
         $safetyRulesUrl = $get('safety_rules_url', '');
 
         return $this->json([
-            'name' => $get('name', 'FitnessClub'),
+            'name' => $get('name', 'Доброзал'),
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
             'phone' => $get('phone', '+7 (495) 123-45-67'),
             'email' => $get('email', 'info@fitnessclub.ru'),
