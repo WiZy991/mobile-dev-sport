@@ -41,29 +41,37 @@ fun ClubPurchaseConsentDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Я подтверждаю, что перед покупкой абонемента в клубе «${legalLinks.clubName}» ознакомился(ась) с условиями документов:",
+                    text = "Перед приобретением абонемента ознакомьтесь с условиями оказания услуг клуба «${legalLinks.clubName}».",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                Text(
+                    text = "Нажимая кнопку «Согласен, приобрести абонемент», я подтверждаю, что ознакомился(ась) и соглашаюсь с условиями публичной оферты клуба, правилами посещения, условиями выбранного абонемента, его стоимостью, сроком действия, порядком использования и ограничениями.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    text = "Я понимаю и соглашаюсь, что приобретение абонемента означает акцепт публичной оферты клуба, а договор заключается непосредственно между мной и клубом.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 ConsentLinkText(
-                    text = "Договор (оферта) клуба",
+                    text = "С условиями публичной оферты можно ознакомиться по ссылке",
                     url = legalLinks.offerUrl,
                     onOpen = { uriHandler.openUri(it) },
                 )
                 ConsentLinkText(
-                    text = "Политика обработки персональных данных клуба",
+                    text = "С Политикой по обработке персональных данных можно ознакомиться по ссылке",
                     url = legalLinks.privacyUrl,
                     onOpen = { uriHandler.openUri(it) },
                 )
                 legalLinks.visitingRulesUrl?.takeIf { it.isNotBlank() }?.let {
                     ConsentLinkText(
-                        text = "Правила посещения клуба",
+                        text = "С правилами посещения клуба можно ознакомиться по ссылке",
                         url = it,
                         onOpen = { uriHandler.openUri(it) },
                     )
                 }
                 legalLinks.safetyRulesUrl?.takeIf { it.isNotBlank() }?.let {
                     ConsentLinkText(
-                        text = "Правила техники безопасности",
+                        text = "С техникой безопасности клуба можно ознакомиться по ссылке",
                         url = it,
                         onOpen = { uriHandler.openUri(it) },
                     )
