@@ -448,6 +448,40 @@ fun RegisterScreen(
                 }
             )
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.onAcceptedLegalTermsChange(!uiState.acceptedLegalTerms) }
+                    .padding(bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Switch(
+                    checked = uiState.acceptedLegalTerms,
+                    onCheckedChange = viewModel::onAcceptedLegalTermsChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color.White.copy(0.45f),
+                        uncheckedThumbColor = Color.White.copy(0.7f),
+                        uncheckedTrackColor = Color.White.copy(0.25f)
+                    )
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = "Я ознакомился и согласен с условиями",
+                    color = Color.White.copy(0.92f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            uiState.fieldErr(uiState.legalTermsError)?.let {
+                Text(
+                    text = it,
+                    color = Color(0xFFFFE0B2),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             Spacer(Modifier.height(24.dp))
             }
 
@@ -526,19 +560,19 @@ private fun RegisterUiState.fieldErr(message: String?): String? =
     if (submitAttempted) message else null
 
 private fun legalAnnotatedString(): AnnotatedString = buildAnnotatedString {
-    append("Продолжая, вы принимаете ")
-    pushStringAnnotation("URL", AppConfig.TERMS_URL)
+    append("Нажимая кнопку «Зарегистрироваться», я подтверждаю, что ознакомился и соглашаюсь с условиями ")
+    pushStringAnnotation("URL", AppConfig.USER_AGREEMENT_URL)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Правила использования")
+        append("Пользовательского соглашения")
     }
     pop()
-    append(", ")
+    append(", а также подтверждаю ознакомление с ")
     pushStringAnnotation("URL", AppConfig.PRIVACY_URL)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Политику конфиденциальности")
+        append("Политикой по обработке персональных данных")
     }
     pop()
-    append(" и соглашаетесь на обработку персональных данных")
+    append(".")
 }
 
 @Composable

@@ -46,6 +46,7 @@ fun SubscriptionPlansScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showPromoDialog by remember { mutableStateOf(false) }
     var showPurchaseDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
+    var showLegalConsentDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -205,27 +206,41 @@ fun SubscriptionPlansScreen(
             onDismiss = { showPurchaseDialog = null; purchaseError = null },
             onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
             onConfirm = {
-                purchaseError = null
-                viewModel.purchasePlan(
-                    plan = plan,
-                    onPaymentRequired = { paymentId, paymentUrl ->
-                        showPurchaseDialog = null
-                        onNavigateToPayment(paymentId)
-                        openPaymentUrl(context, paymentUrl)
-                    },
-                    onVerificationRequired = { url, message ->
-                        showPurchaseDialog = null
-                        scope.launch {
-                            snackbarHostState.showSnackbar(message)
-                        }
-                        openExternalUrl(context, url)
-                    },
-                    onError = { msg ->
-                        purchaseError = msg
-                    }
-                )
+                showLegalConsentDialog = plan
             }
         )
+    }
+
+    showLegalConsentDialog?.let { plan ->
+        val links = uiState.clubLegalLinks
+        if (links != null) {
+            ClubPurchaseConsentDialog(
+                legalLinks = links,
+                onDismiss = { showLegalConsentDialog = null },
+                onConfirm = {
+                    purchaseError = null
+                    showLegalConsentDialog = null
+                    viewModel.purchasePlan(
+                        plan = plan,
+                        onPaymentRequired = { paymentId, paymentUrl ->
+                            showPurchaseDialog = null
+                            onNavigateToPayment(paymentId)
+                            openPaymentUrl(context, paymentUrl)
+                        },
+                        onVerificationRequired = { url, message ->
+                            showPurchaseDialog = null
+                            scope.launch {
+                                snackbarHostState.showSnackbar(message)
+                            }
+                            openExternalUrl(context, url)
+                        },
+                        onError = { msg ->
+                            purchaseError = msg
+                        }
+                    )
+                }
+            )
+        }
     }
 }
 

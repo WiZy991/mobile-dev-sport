@@ -5,8 +5,6 @@ package com.fitnessclub.app.data.config
  * [SITE_URL] — публичный сайт (юридические страницы, помощь); смените при другом домене.
  */
 object AppConfig {
-    const val APP_VERSION = "1.0.0"
-
     /** Публичный сайт приложения (совпадает с доменом реферальных ссылок и т.п.) */
     const val SITE_URL = "https://worldcashfit.ru"
 
@@ -18,9 +16,10 @@ object AppConfig {
 
     /** Договор-оферта / пользовательское соглашение */
     const val TERMS_URL = "${SITE_URL}/license_agreement/"
+    const val USER_AGREEMENT_URL = "${SITE_URL}/user_agreement/"
 
     /** Политика конфиденциальности */
-    const val PRIVACY_URL = "${SITE_URL}/privacy"
+    const val PRIVACY_URL = "${SITE_URL}/privacy/"
 
     /** Договор с клиентом */
     const val CLIENT_AGREEMENT_URL = "${SITE_URL}/client-agreement"
@@ -29,7 +28,7 @@ object AppConfig {
     const val TRAINER_AGREEMENT_URL = "${SITE_URL}/trainer-agreement"
 
     /** Согласие на обработку персональных данных */
-    const val PERSONAL_DATA_CONSENT_URL = "${SITE_URL}/personal-data-consent"
+    const val PERSONAL_DATA_CONSENT_URL = "${SITE_URL}/consent_user"
 
     /** Все правовые документы */
     const val LEGAL_INDEX_URL = "${SITE_URL}/legal"
@@ -38,5 +37,5 @@ object AppConfig {
     const val REQUISITES_URL = "${SITE_URL}/requisites"
     
     /** Ссылка на страницу приложения в Google Play */
-    const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.fitnessclub.app"
+    const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=ru.worldcashfit.app"
 }

@@ -2,17 +2,24 @@ package com.fitnessclub.app
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatDelegate
 import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
 import com.fitnessclub.app.data.auth.SberAuthDeepLinkBus
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.fragment.app.FragmentActivity
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.core.os.LocaleListCompat
+import com.fitnessclub.app.data.local.AppLanguage
+import com.fitnessclub.app.data.local.AppSettingsStore
+import com.fitnessclub.app.data.local.ThemeMode
 import androidx.navigation.compose.rememberNavController
 import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.ui.navigation.NavGraph
@@ -25,6 +32,9 @@ class MainActivity : FragmentActivity() {
     
     @Inject
     lateinit var authRepository: AuthRepository
+
+    @Inject
+    lateinit var appSettingsStore: AppSettingsStore
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,7 +42,24 @@ class MainActivity : FragmentActivity() {
         dispatchDeepLinks(intent)
 
         setContent {
-            FitnessClubTheme {
+            val themeMode by appSettingsStore.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
+            val appLanguage by appSettingsStore.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
+            val darkTheme = when (themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+
+            LaunchedEffect(appLanguage) {
+                val locales = if (appLanguage == AppLanguage.SYSTEM) {
+                    LocaleListCompat.getEmptyLocaleList()
+                } else {
+                    LocaleListCompat.forLanguageTags(appLanguage.tag)
+                }
+                AppCompatDelegate.setApplicationLocales(locales)
+            }
+
+            FitnessClubTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

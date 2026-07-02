@@ -941,6 +941,51 @@
             .floating-card { display: none; }
             .cta-side { padding: 2rem 1.4rem; }
         }
+
+        .cookie-consent-banner {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            background: rgba(21, 24, 31, 0.97);
+            color: #fff;
+            padding: 12px 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .cookie-consent-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .cookie-consent-content p {
+            margin: 0;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            color: rgba(255, 255, 255, 0.92);
+            max-width: 980px;
+        }
+
+        .cookie-consent-content a {
+            color: #ffcb45;
+            text-decoration: underline;
+        }
+
+        .cookie-consent-content button {
+            border: none;
+            border-radius: 10px;
+            background: #ff5b2e;
+            color: #fff;
+            font-weight: 700;
+            padding: 10px 16px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -1472,7 +1517,10 @@
                             <div class="full">
                                 <button type="submit" class="btn btn-primary btn-lg" style="width: 100%">Получить демо-доступ</button>
                                 <small style="display: block; margin-top: 0.6rem; color: var(--muted-on-dark); font-size: 0.8rem">
-                                    Нажимая кнопку, вы соглашаетесь с обработкой персональных данных
+                                    Нажимая кнопку «Зарегистрироваться», я подтверждаю, что ознакомился и соглашаюсь с условиями
+                                    <a href="{{ path('legal_license_agreement') }}" target="_blank" rel="noopener">Договора присоединения</a>
+                                    к условиям приобретения лицензии на программу «WorldCashFit», а также подтверждаю ознакомление с
+                                    <a href="{{ path('legal_privacy') }}" target="_blank" rel="noopener">Политикой по обработке персональных данных</a>.
                                 </small>
                             </div>
                         </div>
@@ -1510,11 +1558,12 @@
             <div>
                 <h5>Документы</h5>
                 <a href="{{ path('legal_license_agreement') }}">Договор-оферта</a>
+                <a href="{{ path('legal_user_agreement') }}">Пользовательское соглашение</a>
                 <a href="{{ path('legal_requisites') }}">Реквизиты</a>
                 <a href="{{ path('legal_privacy') }}">Политика конфиденциальности</a>
                 <a href="{{ path('legal_client_agreement') }}">Договор с клиентом</a>
                 <a href="{{ path('legal_trainer_agreement') }}">Договор с тренером</a>
-                <a href="{{ path('legal_personal_data_consent') }}">Согласие на обработку ПДн</a>
+                <a href="{{ path('legal_consent_user') }}">Согласие на обработку ПДн</a>
             </div>
             <div>
                 <h5>Контакты</h5>
@@ -1531,6 +1580,7 @@
         </div>
     </div>
 </footer>
+{% include 'partials/cookie_banner.html.twig' %}
 
 </body>
 </html>

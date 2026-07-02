@@ -87,6 +87,10 @@ class ClubController extends AbstractController
             'longitude' => $c->getLongitude(),
             'amenities' => $c->getAmenities(),
             'max_capacity' => $c->getMaxCapacity(),
+            'offer_url' => null,
+            'privacy_url' => null,
+            'visiting_rules_url' => null,
+            'safety_rules_url' => null,
         ], $clubs);
         return $this->json($list);
     }
@@ -125,6 +129,10 @@ class ClubController extends AbstractController
             'longitude' => (float) $get('longitude', '37.6173'),
             'amenities' => $amenities,
             'max_capacity' => $maxCapacity,
+            'offer_url' => $get('offer_url', 'https://worldcashfit.ru/license_agreement/'),
+            'privacy_url' => $get('privacy_url', 'https://worldcashfit.ru/privacy/'),
+            'visiting_rules_url' => $get('visiting_rules_url', ''),
+            'safety_rules_url' => $get('safety_rules_url', ''),
         ];
     }
 
@@ -144,6 +152,10 @@ class ClubController extends AbstractController
             'amenities' => $club->getAmenities(),
             'latitude' => $club->getLatitude(),
             'longitude' => $club->getLongitude(),
+            'offer_url' => null,
+            'privacy_url' => null,
+            'visiting_rules_url' => null,
+            'safety_rules_url' => null,
         ]);
     }
 
@@ -158,6 +170,11 @@ class ClubController extends AbstractController
         $amenitiesStr = $get('amenities', 'Тренажёрный зал, Бассейн, Йога, Групповые занятия');
         $amenities = array_map('trim', array_filter(explode(',', $amenitiesStr)));
 
+        $offerUrl = $get('offer_url', 'https://worldcashfit.ru/license_agreement/');
+        $privacyUrl = $get('privacy_url', 'https://worldcashfit.ru/privacy/');
+        $visitingRulesUrl = $get('visiting_rules_url', '');
+        $safetyRulesUrl = $get('safety_rules_url', '');
+
         return $this->json([
             'name' => $get('name', 'FitnessClub'),
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
@@ -169,6 +186,10 @@ class ClubController extends AbstractController
             'longitude' => (float) $get('longitude', '37.6173'),
             'promo_title' => $get('promo_home_title', 'СКИДКА 20%!'),
             'promo_subtitle' => $get('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
+            'offer_url' => $offerUrl,
+            'privacy_url' => $privacyUrl,
+            'visiting_rules_url' => $visitingRulesUrl !== '' ? $visitingRulesUrl : null,
+            'safety_rules_url' => $safetyRulesUrl !== '' ? $safetyRulesUrl : null,
         ]);
     }
 

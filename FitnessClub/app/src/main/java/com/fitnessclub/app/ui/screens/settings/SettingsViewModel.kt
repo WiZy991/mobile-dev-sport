@@ -6,8 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.FeedbackRequest
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.local.AppLanguage
+import com.fitnessclub.app.data.local.AppSettingsStore
 import com.fitnessclub.app.data.local.BiometricLoginCoordinator
 import com.fitnessclub.app.data.local.BiometricLoginStore
+import com.fitnessclub.app.data.local.ThemeMode
 import com.fitnessclub.app.data.local.TokenManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -25,6 +29,8 @@ data class SettingsUiState(
     val feedbackError: String? = null,
     val cacheCleared: Boolean = false,
     val biometricLoginEnabled: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
 )
 
 @HiltViewModel
@@ -32,6 +38,7 @@ class SettingsViewModel @Inject constructor(
     private val api: FitnessApi,
     private val tokenManager: TokenManager,
     private val biometricLoginStore: BiometricLoginStore,
+    private val appSettingsStore: AppSettingsStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -40,6 +47,20 @@ class SettingsViewModel @Inject constructor(
 
     init {
         refreshBiometricUi()
+        observeAppSettings()
+    }
+
+    private fun observeAppSettings() {
+        viewModelScope.launch {
+            appSettingsStore.themeMode.collect { mode ->
+                _uiState.update { it.copy(themeMode = mode) }
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.appLanguage.collect { language ->
+                _uiState.update { it.copy(appLanguage = language) }
+            }
+        }
     }
 
     fun refreshBiometricUi() {
@@ -53,6 +74,18 @@ class SettingsViewModel @Inject constructor(
                 context.externalCacheDir?.deleteRecursively()
             }
             _uiState.update { it.copy(cacheCleared = true) }
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            appSettingsStore.setThemeMode(mode)
+        }
+    }
+
+    fun setAppLanguage(language: AppLanguage) {
+        viewModelScope.launch {
+            appSettingsStore.setAppLanguage(language)
         }
     }
 

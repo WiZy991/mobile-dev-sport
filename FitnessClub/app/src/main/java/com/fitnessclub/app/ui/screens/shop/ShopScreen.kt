@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.ui.screens.subscriptions.ClubPurchaseConsentDialog
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPurchaseConfirmDialog
 import com.fitnessclub.app.ui.theme.*
 import kotlinx.coroutines.launch
@@ -57,6 +58,7 @@ fun ShopScreen(
     val uiState by viewModel.uiState.collectAsState()
     var selectedCategory by remember { mutableStateOf(ShopCategory.SERVICES) }
     var showPurchasePlan by remember { mutableStateOf<SubscriptionPlan?>(null) }
+    var showLegalConsentForPlan by remember { mutableStateOf<SubscriptionPlan?>(null) }
     var purchaseError by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -185,23 +187,36 @@ fun ShopScreen(
             },
             onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
             onConfirm = {
-                purchaseError = null
-                viewModel.purchaseSubscriptionPlan(
-                    plan = plan,
-                    onPaymentRequired = { paymentId, paymentUrl ->
-                        showPurchasePlan = null
-                        onNavigateToPayment(paymentId)
-                        openPaymentUrl(context, paymentUrl)
-                    },
-                    onVerificationRequired = { url, message ->
-                        showPurchasePlan = null
-                        scope.launch { snackbarHostState.showSnackbar(message) }
-                        openExternalUrl(context, url)
-                    },
-                    onError = { msg -> purchaseError = msg },
-                )
+                showLegalConsentForPlan = plan
             },
         )
+    }
+
+    showLegalConsentForPlan?.let { plan ->
+        uiState.clubLegalLinks?.let { links ->
+            ClubPurchaseConsentDialog(
+                legalLinks = links,
+                onDismiss = { showLegalConsentForPlan = null },
+                onConfirm = {
+                    purchaseError = null
+                    showLegalConsentForPlan = null
+                    viewModel.purchaseSubscriptionPlan(
+                        plan = plan,
+                        onPaymentRequired = { paymentId, paymentUrl ->
+                            showPurchasePlan = null
+                            onNavigateToPayment(paymentId)
+                            openPaymentUrl(context, paymentUrl)
+                        },
+                        onVerificationRequired = { url, message ->
+                            showPurchasePlan = null
+                            scope.launch { snackbarHostState.showSnackbar(message) }
+                            openExternalUrl(context, url)
+                        },
+                        onError = { msg -> purchaseError = msg },
+                    )
+                }
+            )
+        }
     }
 }
 

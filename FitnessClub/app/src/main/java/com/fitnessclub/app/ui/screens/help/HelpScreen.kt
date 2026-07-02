@@ -37,11 +37,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.ui.theme.Primary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +48,6 @@ fun HelpScreen(
     viewModel: HelpViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
 ) {
-    val uriHandler = LocalUriHandler.current
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
@@ -79,16 +76,26 @@ fun HelpScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Часто задаваемые вопросы и инструкции — на странице поддержки.",
-                style = MaterialTheme.typography.bodyLarge,
+                text = "Частые вопросы",
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth()
             )
-            Button(
-                onClick = { uriHandler.openUri(AppConfig.HELP_URL) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Открыть страницу помощи")
-            }
+            HelpFaqCard(
+                question = "Как купить абонемент?",
+                answer = "Откройте «Магазин» или «Профиль» → «Купить абонемент», выберите тариф и подтвердите оплату."
+            )
+            HelpFaqCard(
+                question = "Оплата прошла, но экран долго грузится",
+                answer = "Подождите до 1-2 минут и откройте «Профиль». Если списание было успешным, абонемент уже активирован."
+            )
+            HelpFaqCard(
+                question = "Как отменить запись на тренировку?",
+                answer = "Откройте «Мои записи», выберите тренировку и нажмите «Отменить»."
+            )
+            HelpFaqCard(
+                question = "Где посмотреть юридические документы?",
+                answer = "Раздел «Настройки» → «Правовая информация»."
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -288,6 +295,29 @@ fun HelpScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HelpFaqCard(question: String, answer: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                text = question,
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = answer,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

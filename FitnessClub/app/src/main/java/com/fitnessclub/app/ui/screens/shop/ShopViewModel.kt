@@ -3,10 +3,13 @@ package com.fitnessclub.app.ui.screens.shop
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.ProductRepository
 import com.fitnessclub.app.data.repository.PurchaseSubscriptionOutcome
 import com.fitnessclub.app.data.repository.SubscriptionRepository
+import com.fitnessclub.app.ui.screens.subscriptions.ClubLegalLinks
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,12 +25,14 @@ data class ShopUiState(
     val isPurchasing: Boolean = false,
     val error: String? = null,
     val purchaseMessage: String? = null,
+    val clubLegalLinks: ClubLegalLinks? = null,
 )
 
 @HiltViewModel
 class ShopViewModel @Inject constructor(
     private val productRepository: ProductRepository,
-    private val subscriptionRepository: SubscriptionRepository
+    private val subscriptionRepository: SubscriptionRepository,
+    private val clubRepository: ClubRepository,
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(ShopUiState())
@@ -35,6 +40,39 @@ class ShopViewModel @Inject constructor(
     
     init {
         loadItems()
+        loadClubLegalLinks()
+    }
+
+    private fun loadClubLegalLinks() {
+        viewModelScope.launch {
+            when (val result = clubRepository.getClubInfo()) {
+                is ApiResult.Success -> {
+                    val club = result.data
+                    _uiState.update {
+                        it.copy(
+                            clubLegalLinks = ClubLegalLinks(
+                                clubName = club.name,
+                                offerUrl = club.offerUrl ?: AppConfig.TERMS_URL,
+                                privacyUrl = club.privacyUrl ?: AppConfig.PRIVACY_URL,
+                                visitingRulesUrl = club.visitingRulesUrl,
+                                safetyRulesUrl = club.safetyRulesUrl,
+                            )
+                        )
+                    }
+                }
+                else -> {
+                    _uiState.update {
+                        it.copy(
+                            clubLegalLinks = ClubLegalLinks(
+                                clubName = "Ваш клуб",
+                                offerUrl = AppConfig.TERMS_URL,
+                                privacyUrl = AppConfig.PRIVACY_URL,
+                            )
+                        )
+                    }
+                }
+            }
+        }
     }
     
     fun loadItems() {

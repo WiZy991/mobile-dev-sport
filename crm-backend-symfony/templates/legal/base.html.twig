@@ -140,6 +140,51 @@
             color: var(--muted);
             font-size: 0.88rem;
         }
+
+        .cookie-consent-banner {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            background: rgba(21, 24, 31, 0.97);
+            color: #fff;
+            padding: 12px 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .cookie-consent-content {
+            max-width: 980px;
+            margin: 0 auto;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .cookie-consent-content p {
+            margin: 0;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            color: rgba(255, 255, 255, 0.92);
+            max-width: 760px;
+        }
+
+        .cookie-consent-content a {
+            color: #ffcb45;
+            text-decoration: underline;
+        }
+
+        .cookie-consent-content button {
+            border: none;
+            border-radius: 10px;
+            background: #ff5b2e;
+            color: #fff;
+            font-weight: 700;
+            padding: 10px 16px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -151,6 +196,8 @@
             <a href="{{ path('legal_requisites') }}">Реквизиты</a>
             <a href="{{ path('legal_privacy') }}">Конфиденциальность</a>
             <a href="{{ path('legal_license_agreement') }}">Оферта</a>
+            <a href="{{ path('legal_user_agreement') }}">Пользовательское соглашение</a>
+            <a href="{{ path('legal_consent_user') }}">Согласие ПД</a>
         </nav>
     </div>
 </header>
@@ -162,5 +209,6 @@
 <footer>
     © {{ "now"|date("Y") }} WorldCashFit · <a href="{{ path('legal_index') }}">Правовая информация</a>
 </footer>
+{% include 'partials/cookie_banner.html.twig' %}
 </body>
 </html>

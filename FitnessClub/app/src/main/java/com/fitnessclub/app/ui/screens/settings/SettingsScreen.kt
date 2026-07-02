@@ -25,8 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.AppConfig
+import com.fitnessclub.app.data.local.AppLanguage
+import com.fitnessclub.app.data.local.ThemeMode
 import com.fitnessclub.app.ui.components.GeneralFeedbackDialog
 import com.fitnessclub.app.ui.theme.Primary
 
@@ -48,6 +51,9 @@ fun SettingsScreen(
     val settingsState by viewModel.uiState.collectAsState()
     var pushEnabled by remember { mutableStateOf(true) }
     var showFeedbackDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
+    var showTwoFactorDialog by remember { mutableStateOf(false) }
     var emailEnabled by remember { mutableStateOf(true) }
     var trainingReminders by remember { mutableStateOf(true) }
     var promoNotifications by remember { mutableStateOf(false) }
@@ -158,11 +164,8 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Security,
                     title = "Двухфакторная аутентификация",
-                    onClick = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("2FA появится в обновлении приложения")
-                        }
-                    }
+                    subtitle = "Настройка защиты входа",
+                    onClick = { showTwoFactorDialog = true }
                 )
             }
             
@@ -171,23 +174,19 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Language,
                     title = "Язык",
-                    subtitle = "Русский",
-                    onClick = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Другие языки будут добавлены позже")
-                        }
-                    }
+                    subtitle = settingsState.appLanguage.label,
+                    onClick = { showLanguageDialog = true }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Palette,
                     title = "Тема",
-                    subtitle = "Системная",
-                    onClick = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Выбор темы — в следующем обновлении")
-                        }
-                    }
+                    subtitle = when (settingsState.themeMode) {
+                        ThemeMode.SYSTEM -> "Системная"
+                        ThemeMode.LIGHT -> "Светлая"
+                        ThemeMode.DARK -> "Тёмная"
+                    },
+                    onClick = { showThemeDialog = true }
                 )
                 
                 ClickableSettingItem(
@@ -221,7 +220,7 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Info,
                     title = "О приложении",
-                    subtitle = "Версия 1.0.0",
+                    subtitle = "Версия ${BuildConfig.VERSION_NAME}",
                     onClick = onNavigateToAbout
                 )
             }
@@ -283,6 +282,143 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showLanguageDialog) {
+        AppLanguageDialog(
+            selected = settingsState.appLanguage,
+            onDismiss = { showLanguageDialog = false },
+            onSelect = { selected ->
+                viewModel.setAppLanguage(selected)
+                showLanguageDialog = false
+            },
+        )
+    }
+
+    if (showThemeDialog) {
+        ThemeModeDialog(
+            selected = settingsState.themeMode,
+            onDismiss = { showThemeDialog = false },
+            onSelect = { selected ->
+                viewModel.setThemeMode(selected)
+                showThemeDialog = false
+            },
+        )
+    }
+
+    if (showTwoFactorDialog) {
+        AlertDialog(
+            onDismissRequest = { showTwoFactorDialog = false },
+            title = { Text("Двухфакторная аутентификация") },
+            text = {
+                Text("Серверная 2FA пока не подключена. После backend-обновления включим подтверждение входа по коду.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showTwoFactorDialog = false
+                    onNavigateToHelp()
+                }) {
+                    Text("Открыть помощь")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTwoFactorDialog = false }) {
+                    Text("Понятно")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AppLanguageDialog(
+    selected: AppLanguage,
+    onDismiss: () -> Unit,
+    onSelect: (AppLanguage) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Язык приложения") },
+        text = {
+            Column {
+                Text(
+                    text = "Сейчас полностью поддерживается русский язык. " +
+                        "Мультиязычность добавим в следующих релизах.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                AppLanguage.entries.forEach { language ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(language) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = language == selected,
+                            onClick = { onSelect(language) },
+                        )
+                        Text(
+                            text = language.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Закрыть")
+            }
+        },
+    )
+}
+
+@Composable
+private fun ThemeModeDialog(
+    selected: ThemeMode,
+    onDismiss: () -> Unit,
+    onSelect: (ThemeMode) -> Unit,
+) {
+    val labels = mapOf(
+        ThemeMode.SYSTEM to "Системная",
+        ThemeMode.LIGHT to "Светлая",
+        ThemeMode.DARK to "Тёмная",
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Тема приложения") },
+        text = {
+            Column {
+                ThemeMode.entries.forEach { mode ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(mode) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = mode == selected,
+                            onClick = { onSelect(mode) },
+                        )
+                        Text(
+                            text = labels[mode].orEmpty(),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Закрыть")
+            }
+        },
+    )
 }
 
 @Composable

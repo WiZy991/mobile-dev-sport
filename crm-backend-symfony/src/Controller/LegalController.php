@@ -14,12 +14,20 @@ class LegalController extends AbstractController
         'license_agreement' => [
             'title' => 'Договор-оферта на использование WorldCashFit',
             'content' => 'legal/content/offer.html.twig',
-            'download' => 'offer.docx',
+            'download' => 'license_agreement.pdf',
+            'fallback_download' => 'offer.docx',
+        ],
+        'user_agreement' => [
+            'title' => 'Пользовательское соглашение',
+            'content' => 'legal/content/offer.html.twig',
+            'download' => 'user_agreement.pdf',
+            'fallback_download' => 'offer.docx',
         ],
         'privacy' => [
-            'title' => 'Политика конфиденциальности',
+            'title' => 'Политика по обработке персональных данных',
             'content' => 'legal/content/privacy-policy.html.twig',
-            'download' => 'privacy-policy.docx',
+            'download' => 'privacy.pdf',
+            'fallback_download' => 'privacy-policy.docx',
         ],
         'client-agreement' => [
             'title' => 'Договор с клиентом',
@@ -34,7 +42,8 @@ class LegalController extends AbstractController
         'personal-data-consent' => [
             'title' => 'Согласие на обработку персональных данных',
             'content' => 'legal/content/personal-data-consent.html.twig',
-            'download' => 'personal-data-consent.docx',
+            'download' => 'consent_user.pdf',
+            'fallback_download' => 'personal-data-consent.docx',
         ],
     ];
 
@@ -53,7 +62,14 @@ class LegalController extends AbstractController
         return $this->renderDocument('license_agreement');
     }
 
+    #[Route('/user_agreement/', name: 'legal_user_agreement', methods: ['GET'])]
+    public function userAgreement(): Response
+    {
+        return $this->renderDocument('user_agreement');
+    }
+
     #[Route('/privacy', name: 'legal_privacy', methods: ['GET'])]
+    #[Route('/privacy/', name: 'legal_privacy_slash', methods: ['GET'])]
     public function privacy(): Response
     {
         return $this->renderDocument('privacy');
@@ -77,6 +93,13 @@ class LegalController extends AbstractController
         return $this->renderDocument('personal-data-consent');
     }
 
+    #[Route('/consent_user', name: 'legal_consent_user', methods: ['GET'])]
+    #[Route('/consent_user/', name: 'legal_consent_user_slash', methods: ['GET'])]
+    public function consentUser(): Response
+    {
+        return $this->renderDocument('personal-data-consent');
+    }
+
     #[Route('/requisites', name: 'legal_requisites', methods: ['GET'])]
     public function requisites(): Response
     {
@@ -90,7 +113,7 @@ class LegalController extends AbstractController
             throw $this->createNotFoundException('Документ не найден.');
         }
 
-        $filename = self::DOCUMENTS[$slug]['download'];
+        $filename = $this->resolveDownloadFilename($slug);
         $path = $this->getParameter('kernel.project_dir') . '/public/legal/' . $filename;
 
         if (!is_file($path)) {
@@ -98,8 +121,11 @@ class LegalController extends AbstractController
         }
 
         $response = new BinaryFileResponse($path);
+        $disposition = str_ends_with(strtolower($filename), '.pdf')
+            ? ResponseHeaderBag::DISPOSITION_INLINE
+            : ResponseHeaderBag::DISPOSITION_ATTACHMENT;
         $response->setContentDisposition(
-            ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            $disposition,
             $filename
         );
 
@@ -118,6 +144,7 @@ class LegalController extends AbstractController
             'title' => $doc['title'],
             'content_template' => $doc['content'],
             'download_url' => $this->generateUrl('legal_download', ['slug' => $slug]),
+            'download_label' => $this->downloadLabel($slug),
             'documents' => $this->documentsForIndex(),
         ]);
     }
@@ -129,6 +156,7 @@ class LegalController extends AbstractController
     {
         $routeMap = [
             'license_agreement' => 'legal_license_agreement',
+            'user_agreement' => 'legal_user_agreement',
             'privacy' => 'legal_privacy',
             'client-agreement' => 'legal_client_agreement',
             'trainer-agreement' => 'legal_trainer_agreement',
@@ -151,5 +179,32 @@ class LegalController extends AbstractController
         ];
 
         return $documents;
+    }
+
+    private function resolveDownloadFilename(string $slug): string
+    {
+        $doc = self::DOCUMENTS[$slug];
+        $primary = $doc['download'];
+        $primaryPath = $this->getParameter('kernel.project_dir') . '/public/legal/' . $primary;
+        if (is_file($primaryPath)) {
+            return $primary;
+        }
+
+        $fallback = $doc['fallback_download'] ?? null;
+        if (is_string($fallback) && $fallback !== '') {
+            $fallbackPath = $this->getParameter('kernel.project_dir') . '/public/legal/' . $fallback;
+            if (is_file($fallbackPath)) {
+                return $fallback;
+            }
+        }
+
+        return $primary;
+    }
+
+    private function downloadLabel(string $slug): string
+    {
+        $filename = $this->resolveDownloadFilename($slug);
+
+        return str_ends_with(strtolower($filename), '.pdf') ? 'Открыть PDF' : 'Скачать DOCX';
     }
 }
