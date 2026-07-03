@@ -44,11 +44,11 @@ final class AccessAlarmNotifierTest extends TestCase
         $method->setAccessible(true);
         $recipients = $method->invoke($notifier, $alarm);
 
-        self::assertCount(3, $recipients);
+        self::assertCount(4, $recipients);
         self::assertContains($superAdmin, $recipients);
         self::assertContains($clubAdmin, $recipients);
+        self::assertContains($otherClub, $recipients);
         self::assertContains($globalClub, $recipients);
-        self::assertNotContains($otherClub, $recipients);
     }
 
     public function testViolationLabelDiffersByAlarmType(): void

@@ -162,7 +162,9 @@ final class AccessAlarmNotifier
             if (array_intersect($roles, self::STAFF_ROLES) === []) {
                 continue;
             }
-            if (\in_array(self::STAFF_ROLE_SUPER_ADMIN, $roles, true)) {
+            // Суперадмин, админ и менеджер — все клубы (в CRM UI нет привязки staff к клубу).
+            // ROLE_CLUB_{id} / ROLE_CLUB_ALL — опционально для будущей сегментации.
+            if (array_intersect($roles, [self::STAFF_ROLE_SUPER_ADMIN, 'ROLE_ADMIN', 'ROLE_MANAGER']) !== []) {
                 $out[] = $staff;
                 continue;
             }
