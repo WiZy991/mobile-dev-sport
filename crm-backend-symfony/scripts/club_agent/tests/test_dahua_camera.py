@@ -39,6 +39,32 @@ class DahuaCameraListenerTest(unittest.TestCase):
         cam._handle_event("Code=CrossLineDetection;action=Start;", payload)
         self.assertEqual(1, len(captured))
 
+    def test_accepts_object_type_at_root(self):
+        captured = []
+        cam = DahuaCameraListener(
+            host="127.0.0.1",
+            username="admin",
+            password="x",
+            require_human=True,
+            on_crossing=lambda event: captured.append(event),
+        )
+        payload = json.dumps({"Direction": "LeftToRight", "ObjectType": "Human"})
+        cam._handle_event("Code=CrossLineDetection;action=Start;", payload)
+        self.assertEqual(1, len(captured))
+
+    def test_accepts_action_stop(self):
+        captured = []
+        cam = DahuaCameraListener(
+            host="127.0.0.1",
+            username="admin",
+            password="x",
+            require_human=False,
+            on_crossing=lambda event: captured.append(event),
+        )
+        payload = json.dumps({"Direction": "RightToLeft"})
+        cam._handle_event("Code=CrossLineDetection;action=Stop;", payload)
+        self.assertEqual(1, len(captured))
+
     def test_direction_filter_ignores_wrong_direction(self):
         captured = []
         cam = DahuaCameraListener(

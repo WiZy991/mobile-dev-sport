@@ -609,10 +609,11 @@ class ClubAgent:
             checks.append(("crm", False, "CRM не настроен (URL / gateway_token)"))
 
         cam_cfg = self.cfg.camera
-        if not cam_cfg.enabled:
-            checks.append(("camera", True, "Камера выключена в настройках (не обязательна для базового прохода)"))
-        elif not cam_cfg.host.strip():
-            checks.append(("camera", False, "Камера включена, но host пустой"))
+        if not cam_cfg.host.strip():
+            if cam_cfg.enabled:
+                checks.append(("camera", False, "Камера включена, но host пустой"))
+            else:
+                checks.append(("camera", True, "Камера выключена в настройках (host не указан)"))
         else:
             cam = DahuaCameraListener(
                 host=cam_cfg.host,
@@ -627,7 +628,11 @@ class ClubAgent:
                 on_log=self.on_log,
             )
             ok_cam, msg_cam = cam.probe_connectivity()
-            checks.append(("camera", ok_cam, msg_cam))
+            if not cam_cfg.enabled:
+                prefix = "Камера выключена в настройках; "
+                checks.append(("camera", ok_cam, prefix + msg_cam))
+            else:
+                checks.append(("camera", ok_cam, msg_cam))
 
         enabled_eq = self.cfg.enabled_equipment()
         if not enabled_eq:
