@@ -236,6 +236,16 @@ api_gateway_access_entry:
   controller: App\Controller\Api\GatewayController::entry
   methods: [POST]
 
+api_gateway_access_exit:
+  path: /api/v1/gateway/access/exit
+  controller: App\Controller\Api\GatewayController::exit
+  methods: [POST]
+
+api_gateway_access_alarm:
+  path: /api/v1/gateway/access/alarm
+  controller: App\Controller\Api\GatewayController::alarm
+  methods: [POST]
+
 api_gateway_heartbeat:
   path: /api/v1/gateway/heartbeat
   controller: App\Controller\Api\GatewayController::heartbeat
