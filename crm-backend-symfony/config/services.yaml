@@ -138,5 +138,9 @@ services:
         arguments:
             $defaultOrganizationSlug: '%env(default:default_organization_slug_default:DEFAULT_ORGANIZATION_SLUG)%'
 
+    App\Service\Admin\AdminMenuBuilder:
+        arguments:
+            $defaultOrganizationSlug: '%env(default:default_organization_slug_default:DEFAULT_ORGANIZATION_SLUG)%'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

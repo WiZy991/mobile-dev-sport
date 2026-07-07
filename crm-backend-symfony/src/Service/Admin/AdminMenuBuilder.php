@@ -12,6 +12,7 @@ final class AdminMenuBuilder
 {
     public function __construct(
         private readonly ClubModuleRegistry $clubModules,
+        private readonly string $defaultOrganizationSlug = 'demo',
     ) {
     }
 
@@ -172,7 +173,10 @@ final class AdminMenuBuilder
             if ($key === 'franchise' && !array_intersect($user->getRoles(), ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
                 continue;
             }
-            if ($key === 'platform' && !array_intersect($user->getRoles(), ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])) {
+            if ($key === 'platform' && (
+                !array_intersect($user->getRoles(), ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])
+                || !$this->isMainOrganizationUser($user)
+            )) {
                 continue;
             }
             $menu[$key] = $label;
@@ -221,7 +225,10 @@ final class AdminMenuBuilder
         if ($section === 'franchise' && !array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
             return false;
         }
-        if ($section === 'platform' && !array_intersect($roles, ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])) {
+        if ($section === 'platform' && (
+            !array_intersect($roles, ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])
+            || !$this->isMainOrganizationUser($user)
+        )) {
             return false;
         }
         if (\in_array('ROLE_PLATFORM_ADMIN', $roles, true)) {
@@ -264,5 +271,15 @@ final class AdminMenuBuilder
         }
 
         return array_values(array_unique($result));
+    }
+
+    private function isMainOrganizationUser(StaffUser $user): bool
+    {
+        $organization = $user->getOrganization();
+        if ($organization === null) {
+            return false;
+        }
+
+        return $organization->getSlug() === $this->defaultOrganizationSlug;
     }
 }
