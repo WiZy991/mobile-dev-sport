@@ -172,7 +172,7 @@ final class AdminMenuBuilder
             if ($key === 'franchise' && !array_intersect($user->getRoles(), ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
                 continue;
             }
-            if ($key === 'platform' && !\in_array('ROLE_PLATFORM_ADMIN', $user->getRoles(), true)) {
+            if ($key === 'platform' && !array_intersect($user->getRoles(), ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])) {
                 continue;
             }
             $menu[$key] = $label;
@@ -221,11 +221,11 @@ final class AdminMenuBuilder
         if ($section === 'franchise' && !array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
             return false;
         }
-        if ($section === 'platform' && !\in_array('ROLE_PLATFORM_ADMIN', $roles, true)) {
+        if ($section === 'platform' && !array_intersect($roles, ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])) {
             return false;
         }
         if (\in_array('ROLE_PLATFORM_ADMIN', $roles, true)) {
-            return $section === 'platform';
+            return \in_array($section, ['platform', 'dashboard'], true);
         }
         if (array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
             return true;

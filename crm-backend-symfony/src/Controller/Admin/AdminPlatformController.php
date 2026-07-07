@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/admin/platform')]
-#[IsGranted('ROLE_PLATFORM_ADMIN')]
+#[IsGranted('ROLE_SUPER_ADMIN')]
 final class AdminPlatformController extends AbstractController
 {
     public function __construct(
