@@ -132,17 +132,17 @@ final class AdminPlatformController extends AbstractController
         $subscriptionStartsRaw = trim((string) $request->request->get('subscription_starts_at', ''));
         $subscriptionEndsRaw = trim((string) $request->request->get('subscription_ends_at', ''));
 
-        if ($name === '' || $slug === '' || $adminEmail === '' || $adminPassword === '') {
-            $this->addFlash('danger', 'Заполните название, slug, email и пароль администратора.');
+        if ($name === '' || $slug === '' || $orgEmail === '' || $adminEmail === '' || $adminPassword === '') {
+            $this->addFlash('danger', 'Заполните название, slug, email организации, email и пароль администратора.');
 
             return $this->redirectToRoute('admin_platform_organization_new');
         }
-        if (!filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+        if (!$this->isValidEmail($adminEmail)) {
             $this->addFlash('danger', 'Email администратора указан в неверном формате.');
 
             return $this->redirectToRoute('admin_platform_organization_new');
         }
-        if ($orgEmail !== '' && !filter_var($orgEmail, FILTER_VALIDATE_EMAIL)) {
+        if (!$this->isValidEmail($orgEmail)) {
             $this->addFlash('danger', 'Email организации указан в неверном формате.');
 
             return $this->redirectToRoute('admin_platform_organization_new');
@@ -173,7 +173,7 @@ final class AdminPlatformController extends AbstractController
                 $adminEmail,
                 $adminPassword,
                 $adminName,
-                $orgEmail !== '' ? $orgEmail : null,
+                $orgEmail,
                 $orgPhone !== '' ? $orgPhone : null,
                 $demoDays,
                 $tariff,
@@ -195,5 +195,14 @@ final class AdminPlatformController extends AbstractController
     private function menu(): array
     {
         return $this->adminMenuBuilder->buildFor($this->getUser());
+    }
+
+    private function isValidEmail(string $email): bool
+    {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[^@\s]+@[^@\s]+\.[^@\s]+$/u', $email);
     }
 }
