@@ -23,19 +23,73 @@ final class AdminPlatformController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly AdminMenuBuilder $adminMenuBuilder,
         private readonly OrganizationProvisioner $provisioner,
+        private readonly string $defaultOrganizationSlug = 'demo',
     ) {
     }
 
     #[Route('/organizations', name: 'admin_platform_organizations', methods: ['GET'])]
     public function organizations(): Response
     {
-        $organizations = $this->em->getRepository(Organization::class)->findBy([], ['id' => 'DESC']);
+        $qb = $this->em->getRepository(Organization::class)->createQueryBuilder('o')
+            ->orderBy('o.id', 'DESC');
+        if ($this->defaultOrganizationSlug !== '') {
+            $qb->andWhere('o.slug <> :defaultSlug')
+                ->setParameter('defaultSlug', $this->defaultOrganizationSlug);
+        }
+        $organizations = $qb->getQuery()->getResult();
 
         return $this->render('admin/platform/organizations.html.twig', [
             'menu' => $this->menu(),
             'current' => 'platform',
             'organizations' => $organizations,
         ]);
+    }
+
+    #[Route('/organizations/{id}/toggle-active', name: 'admin_platform_organization_toggle_active', methods: ['POST'])]
+    public function toggleOrganizationActive(int $id): Response
+    {
+        $org = $this->em->getRepository(Organization::class)->find($id);
+        if (!$org instanceof Organization) {
+            throw $this->createNotFoundException('Организация не найдена.');
+        }
+        if ($org->getSlug() === $this->defaultOrganizationSlug) {
+            $this->addFlash('warning', 'Основную CRM нельзя отключать.');
+            return $this->redirectToRoute('admin_platform_organizations');
+        }
+
+        $org->setIsActive(!$org->isActive());
+        $this->em->flush();
+
+        $this->addFlash('success', $org->isActive()
+            ? 'Организация включена.'
+            : 'Организация отключена. Вход в CRM для её сотрудников заблокирован.');
+
+        return $this->redirectToRoute('admin_platform_organizations');
+    }
+
+    #[Route('/organizations/{id}/delete', name: 'admin_platform_organization_delete', methods: ['POST'])]
+    public function deleteOrganization(int $id): Response
+    {
+        $org = $this->em->getRepository(Organization::class)->find($id);
+        if (!$org instanceof Organization) {
+            throw $this->createNotFoundException('Организация не найдена.');
+        }
+        if ($org->getSlug() === $this->defaultOrganizationSlug) {
+            $this->addFlash('warning', 'Основную CRM нельзя удалить.');
+            return $this->redirectToRoute('admin_platform_organizations');
+        }
+
+        try {
+            $this->em->remove($org);
+            $this->em->flush();
+        } catch (\Throwable) {
+            $this->addFlash('danger', 'Не удалось удалить организацию: есть связанные данные или ограничения БД.');
+            return $this->redirectToRoute('admin_platform_organizations');
+        }
+
+        $this->addFlash('success', 'Организация удалена.');
+
+        return $this->redirectToRoute('admin_platform_organizations');
     }
 
     #[Route('/organizations/new', name: 'admin_platform_organization_new', methods: ['GET', 'POST'])]
