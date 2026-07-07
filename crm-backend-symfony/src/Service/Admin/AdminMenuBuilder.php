@@ -47,6 +47,7 @@ final class AdminMenuBuilder
         'promotions' => 'Акции',
         'tags' => 'Теги',
         'settings' => 'Настройки',
+        'platform' => 'Организации',
     ];
 
     /**
@@ -54,6 +55,7 @@ final class AdminMenuBuilder
      * @var array<string, list<string>|null>
      */
     private const ROLE_TO_SECTIONS = [
+        'ROLE_PLATFORM_ADMIN' => ['platform', 'dashboard'],
         'ROLE_SUPER_ADMIN' => null,
         'ROLE_ADMIN' => null,
         /** Операционный блок: лиды, записи, документы, тренеры зала и т.д. */
@@ -170,6 +172,9 @@ final class AdminMenuBuilder
             if ($key === 'franchise' && !array_intersect($user->getRoles(), ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
                 continue;
             }
+            if ($key === 'platform' && !\in_array('ROLE_PLATFORM_ADMIN', $user->getRoles(), true)) {
+                continue;
+            }
             $menu[$key] = $label;
         }
 
@@ -215,6 +220,12 @@ final class AdminMenuBuilder
         }
         if ($section === 'franchise' && !array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
             return false;
+        }
+        if ($section === 'platform' && !\in_array('ROLE_PLATFORM_ADMIN', $roles, true)) {
+            return false;
+        }
+        if (\in_array('ROLE_PLATFORM_ADMIN', $roles, true)) {
+            return $section === 'platform';
         }
         if (array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
             return true;

@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
-use App\Entity\ClubSetting;
-use Doctrine\ORM\EntityManagerInterface;
-
 /**
  * Опциональные модули CRM — включаются в настройках клуба.
  * Базовые разделы (клиенты, расписание, абонементы…) всегда доступны.
@@ -51,14 +48,14 @@ final class ClubModuleRegistry
     ];
 
     public function __construct(
-        private readonly EntityManagerInterface $em,
+        private readonly ClubSettingsStore $settings,
     ) {
     }
 
     /** @return list<string> */
     public function enabledKeys(): array
     {
-        $raw = $this->readSetting('enabled_modules');
+        $raw = $this->settings->get('enabled_modules');
         if ($raw === null || $raw === '') {
             return $this->defaultEnabledKeys();
         }
@@ -74,12 +71,7 @@ final class ClubModuleRegistry
     /** @return list<string> */
     public function defaultEnabledKeys(): array
     {
-        $keys = array_keys(self::OPTIONAL);
-        if ($this->readSetting('perco_enabled') === '1' && !\in_array('access', $keys, true)) {
-            // legacy
-        }
-
-        return $keys;
+        return array_keys(self::OPTIONAL);
     }
 
     public function isEnabled(string $moduleKey): bool
@@ -101,26 +93,7 @@ final class ClubModuleRegistry
     public function saveEnabledKeys(array $keys): void
     {
         $filtered = array_values(array_intersect(array_keys(self::OPTIONAL), $keys));
-        $this->writeSetting('enabled_modules', json_encode($filtered, JSON_UNESCAPED_UNICODE));
-
-        $this->writeSetting('perco_enabled', \in_array('access', $filtered, true) ? '1' : '0');
-    }
-
-    private function readSetting(string $key): ?string
-    {
-        $s = $this->em->getRepository(ClubSetting::class)->find($key);
-
-        return $s?->getSettingValue();
-    }
-
-    private function writeSetting(string $key, ?string $value): void
-    {
-        $setting = $this->em->getRepository(ClubSetting::class)->find($key);
-        if ($setting === null) {
-            $setting = new ClubSetting();
-            $setting->setSettingKey($key);
-        }
-        $setting->setSettingValue($value);
-        $this->em->persist($setting);
+        $this->settings->set('enabled_modules', json_encode($filtered, JSON_UNESCAPED_UNICODE));
+        $this->settings->set('perco_enabled', \in_array('access', $filtered, true) ? '1' : '0');
     }
 }

@@ -2,12 +2,16 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'guest_passes')]
-class GuestPass
+class GuestPass implements TenantAware
 {
+    use OrganizationOwnedTrait;
+
     public const STATUS_ACTIVE = 'active';
     public const STATUS_USED = 'used';
 

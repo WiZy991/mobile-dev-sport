@@ -1,0 +1,59 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM — Новая организация{% endblock %}
+
+{% block body %}
+<div class="content-header">
+    <h1 class="h4 mb-0">Новая организация</h1>
+</div>
+
+<div class="content-card" style="max-width: 640px">
+    <form method="post" action="{{ path('admin_platform_organization_new') }}">
+        <div class="mb-3">
+            <label class="form-label">Название клуба / организации</label>
+            <input type="text" name="name" class="form-control" value="{{ name }}" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Slug (латиница, для API и идентификации)</label>
+            <input type="text" name="slug" class="form-control" value="{{ slug }}" required pattern="[a-z0-9-]+">
+            <div class="form-text">Например: <code>fitpower</code>. Мобильное приложение может передавать заголовок <code>X-Organization-Slug</code>.</div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Email организации</label>
+                <input type="email" name="org_email" class="form-control" value="{{ orgEmail }}">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Телефон</label>
+                <input type="text" name="org_phone" class="form-control" value="{{ orgPhone }}">
+            </div>
+        </div>
+        <hr>
+        <h2 class="h6">Первый администратор CRM</h2>
+        <div class="mb-3">
+            <label class="form-label">Email для входа</label>
+            <input type="email" name="admin_email" class="form-control" value="{{ adminEmail }}" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Имя</label>
+            <input type="text" name="admin_name" class="form-control" value="{{ adminName }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Пароль</label>
+            <input type="password" name="admin_password" class="form-control" required autocomplete="new-password">
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Дней демо</label>
+                <input type="number" name="demo_days" class="form-control" value="{{ demoDays }}" min="1">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Тариф</label>
+                <input type="text" name="tariff" class="form-control" value="{{ tariff }}">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Создать организацию</button>
+        <a href="{{ path('admin_platform_organizations') }}" class="btn btn-outline-secondary ms-2">Отмена</a>
+    </form>
+</div>
+{% endblock %}

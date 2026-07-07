@@ -4,8 +4,8 @@ namespace App\Controller\Api;
 
 use App\Entity\AccessLog;
 use App\Entity\Club;
-use App\Entity\ClubSetting;
 use App\Entity\Promotion;
+use App\Service\Admin\ClubSettingsStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,15 +17,16 @@ class ClubController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly ClubSettingsStore $clubSettings,
     ) {}
 
     #[Route('/occupancy', name: 'api_club_occupancy', methods: ['GET'])]
     public function occupancy(): JsonResponse
     {
         $maxCapacity = 100;
-        $setting = $this->em->getRepository(ClubSetting::class)->find('gym_max_capacity');
-        if ($setting && $setting->getSettingValue() !== null && $setting->getSettingValue() !== '') {
-            $maxCapacity = max(10, (int) $setting->getSettingValue());
+        $capRaw = $this->clubSettings->get('gym_max_capacity');
+        if ($capRaw !== null && $capRaw !== '') {
+            $maxCapacity = max(10, (int) $capRaw);
         }
 
         $today = new \DateTimeImmutable('today');
@@ -104,18 +105,16 @@ class ClubController extends AbstractController
     private function defaultClubListItemFromSettings(): array
     {
         $get = function (string $key, string $default): string {
-            $s = $this->em->getRepository(ClubSetting::class)->find($key);
-
-            return $s?->getSettingValue() ?? $default;
+            return $this->clubSettings->get($key) ?? $default;
         };
 
         $amenitiesStr = $get('amenities', 'Тренажёрный зал, Бассейн, Йога, Групповые занятия');
         $amenities = array_values(array_map('trim', array_filter(explode(',', $amenitiesStr))));
 
         $maxCapacity = null;
-        $capSetting = $this->em->getRepository(ClubSetting::class)->find('gym_max_capacity');
-        if ($capSetting && $capSetting->getSettingValue() !== null && $capSetting->getSettingValue() !== '') {
-            $maxCapacity = max(10, (int) $capSetting->getSettingValue());
+        $capRaw = $this->clubSettings->get('gym_max_capacity');
+        if ($capRaw !== null && $capRaw !== '') {
+            $maxCapacity = max(10, (int) $capRaw);
         }
 
         $clubName = $get('name', 'Доброзал');
@@ -169,8 +168,7 @@ class ClubController extends AbstractController
     public function info(): JsonResponse
     {
         $get = function (string $key, string $default): string {
-            $s = $this->em->getRepository(ClubSetting::class)->find($key);
-            return $s?->getSettingValue() ?? $default;
+            return $this->clubSettings->get($key) ?? $default;
         };
 
         $amenitiesStr = $get('amenities', 'Тренажёрный зал, Бассейн, Йога, Групповые занятия');

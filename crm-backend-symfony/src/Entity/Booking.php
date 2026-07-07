@@ -2,13 +2,16 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use Doctrine\ORM\Mapping as ORM;
 use App\Entity\User;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'bookings')]
-class Booking
+class Booking implements TenantAware
 {
+    use OrganizationOwnedTrait;
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]

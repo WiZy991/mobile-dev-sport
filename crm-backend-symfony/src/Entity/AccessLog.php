@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
@@ -9,8 +11,9 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_access_logs_created_at', columns: ['created_at'])]
 #[ORM\Index(name: 'idx_access_logs_user_event_created', columns: ['user_id', 'event_type', 'created_at'])]
 #[ORM\Index(name: 'idx_access_logs_club_created', columns: ['club_id', 'created_at'])]
-class AccessLog
+class AccessLog implements TenantAware
 {
+    use OrganizationOwnedTrait;
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]

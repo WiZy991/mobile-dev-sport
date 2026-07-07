@@ -2,14 +2,17 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use App\Entity\PromoCode;
 use App\Entity\Subscription;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'sales')]
-class Sale
+class Sale implements TenantAware
 {
+    use OrganizationOwnedTrait;
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]

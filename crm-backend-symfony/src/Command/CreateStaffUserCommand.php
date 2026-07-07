@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Entity\Organization;
 use App\Entity\StaffUser;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -29,7 +30,8 @@ final class CreateStaffUserCommand extends Command
             ->setHelp('Второй аргумент — реальный пароль для входа (не подставляйте слово «ВашПароль» из примера).')
             ->addArgument('email', InputArgument::REQUIRED)
             ->addArgument('password', InputArgument::REQUIRED, 'Пароль для /admin/login')
-            ->addOption('name', null, InputOption::VALUE_REQUIRED, 'Отображаемое имя', 'Администратор');
+            ->addOption('name', null, InputOption::VALUE_REQUIRED, 'Отображаемое имя', 'Администратор')
+            ->addOption('platform', null, InputOption::VALUE_NONE, 'Оператор WorldCashFit (без организации, ROLE_PLATFORM_ADMIN)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -38,6 +40,7 @@ final class CreateStaffUserCommand extends Command
         $email = (string) $input->getArgument('email');
         $password = (string) $input->getArgument('password');
         $name = (string) $input->getOption('name');
+        $isPlatform = (bool) $input->getOption('platform');
 
         if ($this->em->getRepository(StaffUser::class)->findOneBy(['email' => $email])) {
             $io->error('Пользователь с таким email уже существует.');
@@ -48,14 +51,25 @@ final class CreateStaffUserCommand extends Command
         $u = (new StaffUser())
             ->setEmail($email)
             ->setName($name)
-            ->setRoles(['ROLE_SUPER_ADMIN'])
+            ->setRoles($isPlatform ? ['ROLE_PLATFORM_ADMIN'] : ['ROLE_SUPER_ADMIN'])
             ->setIsActive(true);
+
+        if (!$isPlatform) {
+            $org = $this->em->getRepository(Organization::class)->findOneBy(['slug' => 'demo'])
+                ?? $this->em->getRepository(Organization::class)->findOneBy([], ['id' => 'ASC']);
+            if ($org === null) {
+                $io->error('Нет ни одной организации. Сначала выполните миграции или app:create-organization.');
+
+                return Command::FAILURE;
+            }
+            $u->setOrganization($org);
+        }
 
         $u->setPassword($this->passwordHasher->hashPassword($u, $password));
         $this->em->persist($u);
         $this->em->flush();
 
-        $io->success('Создан пользователь ' . $email . ' с ролью ROLE_SUPER_ADMIN.');
+        $io->success('Создан пользователь ' . $email . ' с ролью ' . ($isPlatform ? 'ROLE_PLATFORM_ADMIN' : 'ROLE_SUPER_ADMIN') . '.');
 
         return Command::SUCCESS;
     }

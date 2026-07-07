@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 
 use App\Entity\StaffUser;
 use App\Service\Admin\AdminMenuBuilder;
+use App\Service\Tenant\TenantContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,6 +28,7 @@ final class CrmStaffController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly AdminMenuBuilder $adminMenuBuilder,
+        private readonly TenantContext $tenantContext,
     ) {
     }
 
@@ -106,6 +108,10 @@ final class CrmStaffController extends AbstractController
             ->setName($name)
             ->setRoles($roles)
             ->setIsActive($request->request->get('is_active') === '1');
+
+        if (!$this->getUser() instanceof StaffUser || !$this->getUser()->isPlatformOperator()) {
+            $u->setOrganization($this->tenantContext->requireOrganization());
+        }
 
         $u->setPassword($this->passwordHasher->hashPassword($u, $password));
         $this->em->persist($u);

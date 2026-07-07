@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
 use App\Repository\StaffUserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -9,7 +10,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity(repositoryClass: StaffUserRepository::class)]
 #[ORM\Table(name: 'staff_users')]
-class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface
+class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface, TenantAware
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -45,6 +46,10 @@ class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(name: 'api_access_token_expires_at', type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $apiAccessTokenExpiresAt = null;
+
+    #[ORM\ManyToOne(targetEntity: Organization::class)]
+    #[ORM\JoinColumn(name: 'organization_id', referencedColumnName: 'id', nullable: true, onDelete: 'CASCADE')]
+    private ?Organization $organization = null;
 
     public function __construct()
     {
@@ -160,5 +165,21 @@ class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->apiAccessTokenExpiresAt = $apiAccessTokenExpiresAt;
         return $this;
+    }
+
+    public function getOrganization(): ?Organization
+    {
+        return $this->organization;
+    }
+
+    public function setOrganization(?Organization $organization): self
+    {
+        $this->organization = $organization;
+        return $this;
+    }
+
+    public function isPlatformOperator(): bool
+    {
+        return \in_array('ROLE_PLATFORM_ADMIN', $this->getRoles(), true);
     }
 }

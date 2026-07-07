@@ -2,12 +2,16 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'feedbacks')]
-class Feedback
+class Feedback implements TenantAware
 {
+    use OrganizationOwnedTrait;
+
     public const TYPE_GENERAL = 'general';
     public const TYPE_TRAINING = 'training';
 

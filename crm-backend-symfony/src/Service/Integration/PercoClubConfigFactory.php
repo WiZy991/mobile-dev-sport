@@ -2,8 +2,7 @@
 
 namespace App\Service\Integration;
 
-use App\Entity\ClubSetting;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\Admin\ClubSettingsStore;
 
 /**
  * Читает настройки СКУД из club_settings (экран «Настройки клуба»).
@@ -14,7 +13,7 @@ use Doctrine\ORM\EntityManagerInterface;
 final class PercoClubConfigFactory
 {
     public function __construct(
-        private readonly EntityManagerInterface $em,
+        private readonly ClubSettingsStore $settings,
     ) {}
 
     public function load(): ?PercoClubConfig
@@ -68,8 +67,6 @@ final class PercoClubConfigFactory
 
     private function get(string $key): ?string
     {
-        $s = $this->em->getRepository(ClubSetting::class)->find($key);
-
-        return $s?->getSettingValue();
+        return $this->settings->get($key);
     }
 }
