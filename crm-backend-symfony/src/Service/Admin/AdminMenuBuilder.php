@@ -41,7 +41,7 @@ final class AdminMenuBuilder
         'app_support' => 'Обращения из приложения',
         'trainers' => 'Тренеры',
         'crm_staff' => 'Персонал CRM',
-        'franchise' => 'Франшиза',
+        'franchise' => 'Клубы',
         'documents' => 'Документы',
         'promocodes' => 'Промокоды',
         'promotions' => 'Акции',
