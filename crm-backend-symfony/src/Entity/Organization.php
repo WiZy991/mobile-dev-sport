@@ -40,6 +40,9 @@ class Organization
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $demoUntil = null;
 
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $subscriptionStartsAt = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -150,6 +153,35 @@ class Organization
     }
 
     public function isDemoExpired(): bool
+    {
+        return $this->demoUntil !== null && $this->demoUntil < new \DateTimeImmutable();
+    }
+
+    public function getSubscriptionStartsAt(): ?\DateTimeImmutable
+    {
+        return $this->subscriptionStartsAt;
+    }
+
+    public function setSubscriptionStartsAt(?\DateTimeImmutable $subscriptionStartsAt): self
+    {
+        $this->subscriptionStartsAt = $subscriptionStartsAt;
+
+        return $this;
+    }
+
+    public function getSubscriptionEndsAt(): ?\DateTimeImmutable
+    {
+        return $this->demoUntil;
+    }
+
+    public function setSubscriptionEndsAt(?\DateTimeImmutable $subscriptionEndsAt): self
+    {
+        $this->demoUntil = $subscriptionEndsAt;
+
+        return $this;
+    }
+
+    public function isSubscriptionExpired(): bool
     {
         return $this->demoUntil !== null && $this->demoUntil < new \DateTimeImmutable();
     }

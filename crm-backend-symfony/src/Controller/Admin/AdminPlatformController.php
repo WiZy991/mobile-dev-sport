@@ -112,7 +112,9 @@ final class AdminPlatformController extends AbstractController
             'adminEmail' => '',
             'adminName' => 'Администратор',
             'demoDays' => 14,
-            'tariff' => 'demo',
+            'tariff' => 'start',
+            'subscriptionStartsAt' => (new \DateTimeImmutable('today'))->format('Y-m-d'),
+            'subscriptionEndsAt' => (new \DateTimeImmutable('today'))->modify('+30 days')->format('Y-m-d'),
         ]);
     }
 
@@ -120,16 +122,46 @@ final class AdminPlatformController extends AbstractController
     {
         $name = trim((string) $request->request->get('name', ''));
         $slug = trim((string) $request->request->get('slug', ''));
-        $orgEmail = trim((string) $request->request->get('org_email', ''));
+        $orgEmail = mb_strtolower(trim((string) $request->request->get('org_email', '')));
         $orgPhone = trim((string) $request->request->get('org_phone', ''));
-        $adminEmail = trim((string) $request->request->get('admin_email', ''));
+        $adminEmail = mb_strtolower(trim((string) $request->request->get('admin_email', '')));
         $adminPassword = (string) $request->request->get('admin_password', '');
         $adminName = trim((string) $request->request->get('admin_name', 'Администратор'));
         $demoDays = max(1, (int) $request->request->get('demo_days', 14));
-        $tariff = trim((string) $request->request->get('tariff', 'demo'));
+        $tariff = trim((string) $request->request->get('tariff', 'start'));
+        $subscriptionStartsRaw = trim((string) $request->request->get('subscription_starts_at', ''));
+        $subscriptionEndsRaw = trim((string) $request->request->get('subscription_ends_at', ''));
 
         if ($name === '' || $slug === '' || $adminEmail === '' || $adminPassword === '') {
             $this->addFlash('danger', 'Заполните название, slug, email и пароль администратора.');
+
+            return $this->redirectToRoute('admin_platform_organization_new');
+        }
+        if (!filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+            $this->addFlash('danger', 'Email администратора указан в неверном формате.');
+
+            return $this->redirectToRoute('admin_platform_organization_new');
+        }
+        if ($orgEmail !== '' && !filter_var($orgEmail, FILTER_VALIDATE_EMAIL)) {
+            $this->addFlash('danger', 'Email организации указан в неверном формате.');
+
+            return $this->redirectToRoute('admin_platform_organization_new');
+        }
+        if (!in_array($tariff, ['demo', 'start', 'business', 'network'], true)) {
+            $this->addFlash('danger', 'Выберите тариф из списка.');
+
+            return $this->redirectToRoute('admin_platform_organization_new');
+        }
+
+        $subscriptionStartsAt = \DateTimeImmutable::createFromFormat('Y-m-d', $subscriptionStartsRaw) ?: null;
+        $subscriptionEndsAt = \DateTimeImmutable::createFromFormat('Y-m-d', $subscriptionEndsRaw) ?: null;
+        if (!$subscriptionStartsAt || !$subscriptionEndsAt) {
+            $this->addFlash('danger', 'Укажите корректные даты начала и окончания подписки.');
+
+            return $this->redirectToRoute('admin_platform_organization_new');
+        }
+        if ($subscriptionEndsAt <= $subscriptionStartsAt) {
+            $this->addFlash('danger', 'Дата окончания подписки должна быть позже даты начала.');
 
             return $this->redirectToRoute('admin_platform_organization_new');
         }
@@ -145,6 +177,8 @@ final class AdminPlatformController extends AbstractController
                 $orgPhone !== '' ? $orgPhone : null,
                 $demoDays,
                 $tariff,
+                $subscriptionStartsAt,
+                $subscriptionEndsAt,
             );
         } catch (\InvalidArgumentException $e) {
             $this->addFlash('danger', $e->getMessage());

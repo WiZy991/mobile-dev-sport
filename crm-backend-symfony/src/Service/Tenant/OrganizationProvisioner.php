@@ -33,6 +33,8 @@ final class OrganizationProvisioner
         ?string $orgPhone = null,
         int $demoDays = 14,
         string $tariff = 'demo',
+        ?\DateTimeImmutable $subscriptionStartsAt = null,
+        ?\DateTimeImmutable $subscriptionEndsAt = null,
     ): array {
         $slug = self::normalizeSlug($slug);
         if ($slug === '') {
@@ -47,6 +49,12 @@ final class OrganizationProvisioner
             throw new \InvalidArgumentException('Email администратора уже занят.');
         }
 
+        $subscriptionStartsAt ??= new \DateTimeImmutable('today');
+        $subscriptionEndsAt ??= $subscriptionStartsAt->modify('+' . max(1, $demoDays) . ' days');
+        if ($subscriptionEndsAt <= $subscriptionStartsAt) {
+            throw new \InvalidArgumentException('Дата окончания подписки должна быть позже даты начала.');
+        }
+
         $organization = (new Organization())
             ->setName(trim($name))
             ->setSlug($slug)
@@ -54,7 +62,8 @@ final class OrganizationProvisioner
             ->setPhone($orgPhone)
             ->setTariff($tariff)
             ->setIsActive(true)
-            ->setDemoUntil((new \DateTimeImmutable())->modify('+' . max(1, $demoDays) . ' days'));
+            ->setSubscriptionStartsAt($subscriptionStartsAt)
+            ->setSubscriptionEndsAt($subscriptionEndsAt);
 
         $club = (new Club())
             ->setOrganization($organization)

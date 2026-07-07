@@ -30,11 +30,13 @@ final class StaffUserChecker implements UserCheckerInterface
             if (!$organization->isActive()) {
                 throw new CustomUserMessageAccountStatusException('Доступ к CRM отключён. Свяжитесь с поддержкой WorldCashFit.');
             }
-            if ($organization->isDemoExpired()) {
-                // Автоматически отключаем CRM, когда срок демо/лицензии истёк.
+            if ($organization->isSubscriptionExpired()) {
+                // Автоматически отключаем CRM, когда срок подписки истёк.
                 $organization->setIsActive(false);
                 $this->em->flush();
-                throw new CustomUserMessageAccountStatusException('Демо-период истёк. Оформите лицензию на worldcashfit.ru');
+                throw new CustomUserMessageAccountStatusException(
+                    'Срок подписки закончился. Доступ в CRM приостановлен. Обратитесь к менеджеру WorldCashFit для продления.'
+                );
             }
         }
     }

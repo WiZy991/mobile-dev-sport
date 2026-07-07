@@ -36,7 +36,9 @@ final class CreateOrganizationCommand extends Command
             ->addOption('org-email', null, InputOption::VALUE_REQUIRED, 'Email организации')
             ->addOption('org-phone', null, InputOption::VALUE_REQUIRED, 'Телефон организации')
             ->addOption('demo-days', null, InputOption::VALUE_REQUIRED, 'Дней демо', '14')
-            ->addOption('tariff', null, InputOption::VALUE_REQUIRED, 'Тариф', 'demo');
+            ->addOption('tariff', null, InputOption::VALUE_REQUIRED, 'Тариф', 'start')
+            ->addOption('subscription-start', null, InputOption::VALUE_REQUIRED, 'Начало подписки (Y-m-d)')
+            ->addOption('subscription-end', null, InputOption::VALUE_REQUIRED, 'Окончание подписки (Y-m-d)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -44,6 +46,8 @@ final class CreateOrganizationCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
+            $subscriptionStart = $input->getOption('subscription-start');
+            $subscriptionEnd = $input->getOption('subscription-end');
             $result = $this->provisioner->provision(
                 (string) $input->getArgument('name'),
                 (string) $input->getArgument('slug'),
@@ -54,8 +58,10 @@ final class CreateOrganizationCommand extends Command
                 $input->getOption('org-phone') !== null ? (string) $input->getOption('org-phone') : null,
                 (int) $input->getOption('demo-days'),
                 (string) $input->getOption('tariff'),
+                is_string($subscriptionStart) ? new \DateTimeImmutable($subscriptionStart) : null,
+                is_string($subscriptionEnd) ? new \DateTimeImmutable($subscriptionEnd) : null,
             );
-        } catch (\InvalidArgumentException $e) {
+        } catch (\Throwable $e) {
             $io->error($e->getMessage());
 
             return Command::FAILURE;
