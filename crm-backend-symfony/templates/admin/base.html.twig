@@ -19,7 +19,7 @@
 <div class="layout">
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <div class="logo-mark">Д</div>
+            <div class="logo-mark">{{ app.user and app.user.organization and app.user.organization.name ? app.user.organization.name|slice(0, 1)|upper : 'Д' }}</div>
             <div>
                 <p class="sidebar-brand-title">{{ app.user and app.user.organization ? app.user.organization.name : 'Доброзал' }}</p>
                 <div class="sidebar-brand-sub">Панель клуба</div>
