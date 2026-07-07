@@ -3,16 +3,16 @@
 {% block title %}CRM — Организации{% endblock %}
 
 {% block body %}
-<div class="content-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+<div class="content-header">
     <h1 class="h4 mb-0">Организации (лицензиаты)</h1>
-    <a href="{{ path('admin_platform_organization_new') }}" class="btn btn-primary">Создать организацию</a>
 </div>
 
 <div class="content-card">
-    <p class="text-secondary small mb-3">Каждая организация — изолированный кабинет CRM со своими клиентами, клубами и настройками. После создания передайте клиенту URL <code>/admin</code>, email и пароль администратора.</p>
-    <div class="mb-3">
-        <a href="{{ path('admin_platform_organization_new') }}" class="btn btn-primary btn-lg">+ Создать организацию</a>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+        <a href="{{ path('admin_platform_organization_new') }}" class="btn btn-primary btn-lg" style="display:inline-flex; align-items:center; font-weight:600;">Создать организацию</a>
+        <a href="{{ path('admin_platform_organization_new') }}" class="btn btn-outline-secondary" style="display:inline-flex; align-items:center;">+ Новая организация</a>
     </div>
+    <p class="text-secondary small mb-3">Каждая организация — изолированный кабинет CRM со своими клиентами, клубами и настройками. После создания передайте клиенту URL <code>/admin</code>, email и пароль администратора.</p>
     <div class="table-responsive">
         <table class="table table-sm table-dark align-middle mb-0">
             <thead>
