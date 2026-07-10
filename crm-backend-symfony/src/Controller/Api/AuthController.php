@@ -37,7 +37,7 @@ class AuthController extends AbstractController
         $user = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
 
         if (!$user) {
-            return $this->json(['error' => 'User not found', 'code' => 'invalid_credentials'], 401);
+            return $this->json(['error' => 'Неверный email или пароль', 'code' => 'invalid_credentials'], 401);
         }
         $hash = $user->getPasswordHash();
         if ($hash === null || $hash === '') {
@@ -47,7 +47,7 @@ class AuthController extends AbstractController
             ], 401);
         }
         if (!password_verify($password, $hash)) {
-            return $this->json(['error' => 'User not found', 'code' => 'invalid_credentials'], 401);
+            return $this->json(['error' => 'Неверный email или пароль', 'code' => 'invalid_credentials'], 401);
         }
 
         if ($user->isBlocked()) {
