@@ -30,6 +30,7 @@ parameters:
     alfa_acquiring_password_default: ''
     alfa_acquiring_currency_default: 643
     apple_sign_in_client_id_default: 'co.worldcashbox.WorldFintess'
+    default_organization_slug_default: 'demo'
 
 services:
     # default configuration for services in *this* file
@@ -137,6 +138,14 @@ services:
             $serverKey: '%env(default:fcm_server_key_default:FCM_SERVER_KEY)%'
             $credentials: '%env(default:fcm_credentials_default:FCM_CREDENTIALS_JSON)%'
             $projectId: '%env(default:fcm_project_id_default:FCM_PROJECT_ID)%'
+
+    App\Service\Tenant\OrganizationResolver:
+        arguments:
+            $defaultOrganizationSlug: '%env(default:default_organization_slug_default:DEFAULT_ORGANIZATION_SLUG)%'
+
+    App\Service\Admin\AdminMenuBuilder:
+        arguments:
+            $defaultOrganizationSlug: '%env(default:default_organization_slug_default:DEFAULT_ORGANIZATION_SLUG)%'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

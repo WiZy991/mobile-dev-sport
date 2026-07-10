@@ -113,3 +113,23 @@ API будет доступен, например, по `http://127.0.0.1:8000/a
 - Настроить роли и права доступа (администратор, менеджер, тренер и т.д.).
 - Постепенно отключать `MockInterceptor` в Android‑приложении (`USE_MOCK = false`) и переводить экраны на работу с реальным API.
 
+### Шлюз и камера: только подключить оборудование
+
+Для интеграции проходной используется связка:
+- CRM API `POST /api/v1/gateway/access/entry|exit|alarm`, `POST /api/v1/gateway/heartbeat`, `GET /api/v1/gateway/commands`;
+- локальный агент клуба (`scripts/club_agent`) или шлюз (`scripts/turnstile_gateway`);
+- камера Dahua для IVS Tripwire в сценарии анти-tailgating.
+
+Для камеры Dahua в этом проекте используется стандартный CGI endpoint:
+- `GET /cgi-bin/eventManager.cgi?action=attach&codes=[CrossLineDetection]&heartbeat=5&channel=<n>`
+- авторизация: Digest/Basic (зависит от конфигурации камеры).
+
+Отдельный cloud SDK/API производителя для базового tripwire-сценария не требуется.
+
+Перед выездом на объект пройдите preflight-чек:
+1. Применены миграции, включая `Version20260626090000` (`access_alarms`).
+2. В CRM у клуба заполнен `gateway_token`, heartbeat отвечает `HTTP 200`.
+3. В агенте кнопка `Проверить готовность ПО` возвращает `ГОТОВО`.
+4. Тест QR-входа и тест тревоги проходят на стенде.
+5. После этого остаются только сеть/питание/IP/логин камеры, линия Tripwire и калибровка порогов.
+

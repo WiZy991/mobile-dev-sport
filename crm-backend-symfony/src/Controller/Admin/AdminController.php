@@ -16,7 +16,6 @@ use App\Entity\Training;
 use App\Entity\Trainer;
 use App\Entity\Booking;
 use App\Entity\AccessLog;
-use App\Entity\ClubSetting;
 use App\Entity\Tag;
 use App\Entity\Club;
 use App\Entity\LeadNote;
@@ -34,6 +33,7 @@ use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Admin\ClubModuleRegistry;
+use App\Service\Admin\ClubSettingsStore;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
@@ -65,6 +65,7 @@ class AdminController extends AbstractController
         private readonly SubscriptionFreezeService $freezeService,
         private readonly SubscriptionLifecycleService $lifecycleService,
         private readonly ClubModuleRegistry $clubModules,
+        private readonly ClubSettingsStore $clubSettings,
         private readonly SubscriptionPlanCatalog $planCatalog,
         private readonly LeadIngestionService $leadIngestion,
         private readonly OnboardingQuestCatalog $onboardingQuestCatalog,
@@ -1443,21 +1444,14 @@ class AdminController extends AbstractController
         $menu = $this->buildMenu();
 
         $getSetting = function (string $key, string $default = ''): string {
-            $s = $this->em->getRepository(ClubSetting::class)->find($key);
-            return $s?->getSettingValue() ?? $default;
+            return $this->clubSettings->get($key) ?? $default;
         };
 
         if ($request->isMethod('POST')) {
             $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
-                $setting = $this->em->getRepository(ClubSetting::class)->find($key);
-                if (!$setting) {
-                    $setting = new ClubSetting();
-                    $setting->setSettingKey($key);
-                }
-                $setting->setSettingValue($value ?: null);
-                $this->em->persist($setting);
+                $this->clubSettings->set($key, $value !== '' ? $value : null);
             }
 
             $enabledModules = $request->request->all('enabled_modules');
@@ -1537,13 +1531,7 @@ class AdminController extends AbstractController
 
     private function persistSetting(string $key, ?string $value): void
     {
-        $setting = $this->em->getRepository(ClubSetting::class)->find($key);
-        if (!$setting) {
-            $setting = new ClubSetting();
-            $setting->setSettingKey($key);
-        }
-        $setting->setSettingValue($value);
-        $this->em->persist($setting);
+        $this->clubSettings->set($key, $value);
     }
 
     #[Route('/documents/upload', name: 'admin_document_upload', methods: ['POST'])]
@@ -2502,8 +2490,8 @@ class AdminController extends AbstractController
         }
 
         if ($section === 'mobileapps') {
-            $clubName = $this->em->getRepository(ClubSetting::class)->find('name')?->getSettingValue();
-            $clubAddress = $this->em->getRepository(ClubSetting::class)->find('address')?->getSettingValue();
+            $clubName = $this->clubSettings->get('name');
+            $clubAddress = $this->clubSettings->get('address');
             $clubConfigured = ($clubName !== null && $clubName !== '') || ($clubAddress !== null && $clubAddress !== '');
 
             $plansCount = (int) $this->em->getRepository(SubscriptionPlan::class)->count([]);

@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -15,8 +17,10 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'access_alarms')]
 #[ORM\Index(name: 'idx_access_alarms_created_at', columns: ['created_at'])]
 #[ORM\Index(name: 'idx_access_alarms_club_created', columns: ['club_id', 'created_at'])]
-class AccessAlarm
+class AccessAlarm implements TenantAware
 {
+    use OrganizationOwnedTrait;
+
     public const TYPE_TAILGATING = 'tailgating';
     public const TYPE_GROUP_ENTRY = 'group_entry';
 

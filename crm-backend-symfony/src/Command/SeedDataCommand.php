@@ -7,6 +7,7 @@ namespace App\Command;
 use App\Entity\Club;
 use App\Entity\ClubSetting;
 use App\Entity\Locker;
+use App\Entity\Organization;
 use App\Entity\Booking;
 use App\Entity\Product;
 use App\Entity\Subscription;
@@ -15,6 +16,7 @@ use App\Entity\Trainer;
 use App\Entity\Task;
 use App\Entity\Training;
 use App\Entity\User;
+use App\Service\Tenant\TenantContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -30,6 +32,7 @@ class SeedDataCommand extends Command
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly TenantContext $tenantContext,
     ) {
         parent::__construct();
     }
@@ -45,6 +48,14 @@ class SeedDataCommand extends Command
             $io->note('Основные данные уже есть в БД. Добавлены недостающие задачи/абонементы при необходимости.');
             return Command::SUCCESS;
         }
+
+        $org = (new Organization())
+            ->setName('WorldCashFit Demo')
+            ->setSlug('demo')
+            ->setTariff('demo')
+            ->setIsActive(true);
+        $this->em->persist($org);
+        $this->tenantContext->setOrganization($org);
 
         // 1. Клиенты
         $clients = [];
@@ -223,6 +234,7 @@ class SeedDataCommand extends Command
         ];
         foreach ($settings as [$key, $value]) {
             $s = (new ClubSetting())
+                ->setOrganization($org)
                 ->setSettingKey($key)
                 ->setSettingValue($value);
             $this->em->persist($s);

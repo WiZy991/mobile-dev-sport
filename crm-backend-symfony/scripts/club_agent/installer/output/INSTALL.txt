@@ -1,0 +1,29 @@
+FitnessClub Agent - install guide
+=================================
+
+OPTION A - Setup wizard (if FitnessClubAgent-Setup.exe exists)
+  1. Double-click FitnessClubAgent-Setup.exe
+  2. Follow wizard, enable firewall rule for port 8765
+  3. Launch agent from desktop shortcut
+
+OPTION B - ZIP package
+  1. Extract FitnessClubAgent-Setup-1.0.0.zip
+  2. Double-click install.bat
+  3. Agent installs to %LOCALAPPDATA%\FitnessClubAgent
+
+After install
+  1. Open "FitnessClub Agent"
+  2. CRM tab: base URL (no /admin), gateway_token, Save all
+  3. Equipment: listen 0.0.0.0:8765, configure PERCo net.server
+  4. Camera tab: IP, password, enable IVS control if needed
+  5. Preflight check, then Start agent
+
+Config file
+  %LOCALAPPDATA%\FitnessClubAgent\config\agent_config.json
+
+Uninstall
+  Start menu -> FitnessClub Agent -> Uninstall
+  or Settings -> Apps -> FitnessClub Agent
+
+Rebuild installer (developers)
+  powershell -ExecutionPolicy Bypass -File build_installer.ps1

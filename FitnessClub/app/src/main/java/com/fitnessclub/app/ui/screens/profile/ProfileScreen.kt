@@ -45,6 +45,22 @@ fun ProfileScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var freezeTarget by remember { mutableStateOf<Subscription?>(null) }
     var cancelTarget by remember { mutableStateOf<Subscription?>(null) }
+    var showSubscriptionHistory by remember { mutableStateOf(false) }
+
+    val activeSubscriptions = remember(uiState.subscriptions) {
+        uiState.subscriptions.filter {
+            it.status == SubscriptionStatus.ACTIVE ||
+                it.status == SubscriptionStatus.FROZEN ||
+                it.status == SubscriptionStatus.PENDING
+        }
+    }
+    val archivedSubscriptions = remember(uiState.subscriptions) {
+        uiState.subscriptions.filterNot {
+            it.status == SubscriptionStatus.ACTIVE ||
+                it.status == SubscriptionStatus.FROZEN ||
+                it.status == SubscriptionStatus.PENDING
+        }
+    }
     
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -131,18 +147,65 @@ fun ProfileScreen(
                     )
                 }
                 
-                if (uiState.subscriptions.isEmpty() && !uiState.isLoadingSubscriptions) {
+                if (activeSubscriptions.isEmpty() && archivedSubscriptions.isEmpty() && !uiState.isLoadingSubscriptions) {
                     item {
                         EmptySubscriptionsCard(onBuyClick = onNavigateToSubscriptionPlans)
                     }
                 } else {
-                    items(uiState.subscriptions) { subscription ->
-                        SubscriptionCard(
-                            subscription = subscription,
-                            onFreezeClick = { freezeTarget = subscription },
-                            onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
-                            onCancelClick = { cancelTarget = subscription },
-                        )
+                    if (activeSubscriptions.isNotEmpty()) {
+                        items(activeSubscriptions, key = { it.id }) { subscription ->
+                            SubscriptionCard(
+                                subscription = subscription,
+                                onFreezeClick = { freezeTarget = subscription },
+                                onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
+                                onCancelClick = { cancelTarget = subscription },
+                            )
+                        }
+                    } else if (!uiState.isLoadingSubscriptions) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                Text(
+                                    text = "Сейчас нет активных абонементов",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (archivedSubscriptions.isNotEmpty()) {
+                        item {
+                            TextButton(
+                                onClick = { showSubscriptionHistory = !showSubscriptionHistory },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (showSubscriptionHistory) {
+                                        "Скрыть историю абонементов (${archivedSubscriptions.size})"
+                                    } else {
+                                        "Показать историю абонементов (${archivedSubscriptions.size})"
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (showSubscriptionHistory) {
+                        items(archivedSubscriptions, key = { it.id }) { subscription ->
+                            SubscriptionCard(
+                                subscription = subscription,
+                                onFreezeClick = { freezeTarget = subscription },
+                                onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
+                                onCancelClick = { cancelTarget = subscription },
+                            )
+                        }
                     }
                 }
                 

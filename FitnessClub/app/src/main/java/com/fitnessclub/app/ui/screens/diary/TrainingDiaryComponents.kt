@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +65,7 @@ import com.fitnessclub.app.ui.components.ModernCard
 import com.fitnessclub.app.ui.theme.AccentBlue
 import com.fitnessclub.app.ui.theme.AccentGreen
 import com.fitnessclub.app.ui.theme.Primary
+import com.fitnessclub.app.ui.theme.PrimaryVariant
 import com.fitnessclub.app.ui.theme.Success
 import com.fitnessclub.app.ui.theme.Warning
 import java.text.SimpleDateFormat
@@ -71,13 +73,26 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun DiaryStatsHero(stats: DiaryStatsUi) {
+fun DiaryStatsHero(
+    stats: DiaryStatsUi,
+    modifier: Modifier = Modifier,
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Primary),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(PrimaryVariant, Primary),
+                    ),
+                )
+                .padding(20.dp),
+        ) {
             Text(
                 text = "Ваш прогресс",
                 style = MaterialTheme.typography.titleMedium,

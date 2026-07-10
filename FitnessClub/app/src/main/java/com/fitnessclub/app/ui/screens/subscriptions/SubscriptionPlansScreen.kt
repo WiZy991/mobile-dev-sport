@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.ui.theme.AccentOrange
@@ -46,6 +47,7 @@ fun SubscriptionPlansScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showPromoDialog by remember { mutableStateOf(false) }
     var showPurchaseDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
+    var showLegalConsentDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -205,7 +207,23 @@ fun SubscriptionPlansScreen(
             onDismiss = { showPurchaseDialog = null; purchaseError = null },
             onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
             onConfirm = {
+                showLegalConsentDialog = plan
+            }
+        )
+    }
+
+    showLegalConsentDialog?.let { plan ->
+        val links = uiState.clubLegalLinks ?: ClubLegalLinks(
+            clubName = "Ваш клуб",
+            offerUrl = AppConfig.TERMS_URL,
+            privacyUrl = AppConfig.PRIVACY_URL,
+        )
+        ClubPurchaseConsentDialog(
+            legalLinks = links,
+            onDismiss = { showLegalConsentDialog = null },
+            onConfirm = {
                 purchaseError = null
+                showLegalConsentDialog = null
                 viewModel.purchasePlan(
                     plan = plan,
                     onPaymentRequired = { paymentId, paymentUrl ->

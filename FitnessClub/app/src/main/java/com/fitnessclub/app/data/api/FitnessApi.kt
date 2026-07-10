@@ -509,7 +509,15 @@ data class ClubInfo(
     @com.google.gson.annotations.SerializedName("latitude")
     val latitude: Double = 0.0,
     @com.google.gson.annotations.SerializedName("longitude")
-    val longitude: Double = 0.0
+    val longitude: Double = 0.0,
+    @com.google.gson.annotations.SerializedName("offer_url")
+    val offerUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("privacy_url")
+    val privacyUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("visiting_rules_url")
+    val visitingRulesUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("safety_rules_url")
+    val safetyRulesUrl: String? = null
 )
 
 data class ClubPromotion(

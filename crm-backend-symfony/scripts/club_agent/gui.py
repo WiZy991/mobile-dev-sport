@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import queue
+import threading
 import time
 import tkinter as tk
 import uuid
@@ -11,6 +12,7 @@ from typing import Callable, Optional
 import json
 
 from agent_core import ClubAgent
+from dahua_camera import DahuaCameraListener
 from c01_configurator import apply_club_setup, read_net, read_state, write_net
 from c01_protocol import exdev_close
 from c01_simulator import C01Simulator
@@ -56,6 +58,8 @@ class AgentApp(tk.Tk):
         self._log_queue: queue.Queue[tuple[str, str]] = queue.Queue()
         self._running = False
         self._selected_eq_id: Optional[str] = None
+        self._camera_probe_running = False
+        self._camera_probe_watchdog_id: Optional[str] = None
 
         self._build_ui()
         self._refresh_equipment_list()
@@ -250,6 +254,16 @@ class AgentApp(tk.Tk):
 
         self.lbl_cam_stat = ttk.Label(parent, text="Статус камеры: —", foreground="gray")
         self.lbl_cam_stat.pack(anchor=tk.W, pady=(10, 0))
+
+        preflight = ttk.Frame(parent)
+        preflight.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(preflight, text="Проверить готовность ПО", command=self._run_preflight).pack(side=tk.LEFT)
+        self.btn_cam_probe = ttk.Button(
+            preflight, text="Диагностика потока камеры", command=self._run_camera_stream_probe
+        )
+        self.btn_cam_probe.pack(side=tk.LEFT, padx=(8, 0))
+        self.lbl_preflight = ttk.Label(preflight, text="Готовность ПО: —", foreground="gray")
+        self.lbl_preflight.pack(side=tk.LEFT, padx=(10, 0))
 
     def _load_camera_fields(self) -> None:
         cam = self.cfg.camera
@@ -807,6 +821,149 @@ class AgentApp(tk.Tk):
             foreground=color,
         )
         self._append_log("info" if ok else "warning", f"Итог прохода: {msg}")
+
+    def _run_camera_stream_probe(self) -> None:
+        if self._camera_probe_running:
+            self._append_log("warning", "диагностика потока: уже выполняется — подождите завершения")
+            return
+        if self._running:
+            messagebox.showwarning(
+                "Диагностика потока",
+                "Сначала нажмите «Остановить агент».\n\n"
+                "Dahua принимает обычно только одно attach-подключение к потоку событий.",
+            )
+            return
+        self._camera_from_fields()
+        cam_cfg = self.cfg.camera
+        if not cam_cfg.host.strip():
+            messagebox.showwarning("Диагностика потока", "Укажите IP/host камеры.")
+            return
+        if not cam_cfg.password:
+            messagebox.showwarning(
+                "Диагностика потока",
+                "Пароль камеры пустой. Введите пароль от веб-интерфейса камеры и нажмите «Сохранить всё».",
+            )
+            return
+
+        probe = DahuaCameraListener(
+            host=cam_cfg.host,
+            username=cam_cfg.username,
+            password=cam_cfg.password,
+            channel=cam_cfg.channel,
+            event_codes=cam_cfg.event_codes,
+            inbound_direction=cam_cfg.inbound_direction,
+            require_human=False,
+            https=cam_cfg.https,
+            verify_ssl=cam_cfg.verify_ssl,
+            on_log=self._append_log,
+        )
+        ok_auth, auth_msg = probe.probe_connectivity()
+        if not ok_auth:
+            self._append_log("warning", f"диагностика потока: авторизация не прошла — {auth_msg}")
+            messagebox.showwarning(
+                "Диагностика потока",
+                f"Камера не приняла логин/пароль:\n{auth_msg}\n\n"
+                "Проверьте данные на вкладке «Камера» (как для входа в браузер) и нажмите «Сохранить всё».",
+            )
+            return
+        if not cam_cfg.enabled:
+            self._append_log(
+                "warning",
+                "диагностика потока: камера выключена в настройках — для работы агента включите "
+                "«Включить контроль прохода вдвоём (камера)»",
+            )
+
+        self._camera_probe_running = True
+        self.btn_cam_probe.configure(state=tk.DISABLED)
+        self.lbl_preflight.configure(text="Диагностика потока: идёт (~25 с)...", foreground="#0066aa")
+        self._append_log("info", "══════ Диагностика потока камеры (25 с) — пройдите через линию ══════")
+        self._append_log("info", "диагностика потока: результат появится здесь в журнале (без всплывающих окон)")
+
+        if self._camera_probe_watchdog_id:
+            try:
+                self.after_cancel(self._camera_probe_watchdog_id)
+            except Exception:
+                pass
+        self._camera_probe_watchdog_id = self.after(45000, self._camera_probe_watchdog)
+
+        def worker() -> None:
+            summary = "Готово"
+            try:
+                probe = DahuaCameraListener(
+                    host=cam_cfg.host,
+                    username=cam_cfg.username,
+                    password=cam_cfg.password,
+                    channel=cam_cfg.channel,
+                    event_codes=cam_cfg.event_codes,
+                    inbound_direction=cam_cfg.inbound_direction,
+                    require_human=False,
+                    https=cam_cfg.https,
+                    verify_ssl=cam_cfg.verify_ssl,
+                    on_log=self._enqueue_log,
+                )
+                stats = probe.probe_event_stream(25.0)
+                summary = stats.get("summary", "Готово")
+                self._enqueue_log("info", f"диагностика потока: завершено — {summary}")
+            except Exception as e:  # noqa: BLE001
+                summary = f"Ошибка: {e}"
+                self._enqueue_log("error", f"диагностика потока: {e}")
+            finally:
+                self.after(0, lambda s=summary: self._finish_camera_stream_probe(s))
+
+        threading.Thread(target=worker, name="camera-stream-probe", daemon=True).start()
+
+    def _finish_camera_stream_probe(self, summary: str) -> None:
+        if self._camera_probe_watchdog_id:
+            try:
+                self.after_cancel(self._camera_probe_watchdog_id)
+            except Exception:
+                pass
+            self._camera_probe_watchdog_id = None
+        self._camera_probe_running = False
+        self.btn_cam_probe.configure(state=tk.NORMAL)
+        ok = "CrossLine=" in summary and not summary.rstrip().endswith("CrossLine=0")
+        self.lbl_preflight.configure(
+            text=f"Диагностика: {summary[:80]}",
+            foreground="#0a7a0a" if ok else "#a30",
+        )
+
+    def _camera_probe_watchdog(self) -> None:
+        self._camera_probe_watchdog_id = None
+        if not self._camera_probe_running:
+            return
+        self._append_log(
+            "warning",
+            "диагностика потока: UI-таймаут 45 с — кнопка разблокирована. "
+            "Если нет chunk#/итога — проверьте IP камеры и что агент остановлен.",
+        )
+        self._finish_camera_stream_probe("прервано по таймауту UI")
+
+    def _run_preflight(self) -> None:
+        self._crm_from_fields()
+        self._camera_from_fields()
+        try:
+            self._apply_equipment_form()
+        except Exception:
+            pass
+        probe_agent = ClubAgent(self.cfg, self._enqueue_log)
+        ready, checks = probe_agent.preflight_readiness()
+        for name, ok, msg in checks:
+            level = "info" if ok else "warning"
+            self._append_log(level, f"preflight/{name}: {msg}")
+        self.lbl_preflight.configure(
+            text=f"Готовность ПО: {'ГОТОВО' if ready else 'НЕ ГОТОВО'}",
+            foreground="#0a7a0a" if ready else "#a30",
+        )
+        if ready:
+            messagebox.showinfo(
+                "Готовность ПО",
+                "Проверки пройдены. Для запуска на объекте осталось подключение и калибровка оборудования.",
+            )
+        else:
+            messagebox.showwarning(
+                "Готовность ПО",
+                "Есть незакрытые пункты preflight. Подробности смотрите в журнале.",
+            )
 
     def _on_close(self) -> None:
         self._stop_simulators()

@@ -41,6 +41,10 @@ class GatewayController extends AbstractController
     private const LONG_POLL_SECONDS = 25.0;
     private const POLL_INTERVAL_US = 1_500_000;
     private const COMMAND_BATCH_LIMIT = 5;
+    private const ALARM_TYPES = [
+        AccessAlarm::TYPE_TAILGATING,
+        AccessAlarm::TYPE_GROUP_ENTRY,
+    ];
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -219,7 +223,7 @@ class GatewayController extends AbstractController
 
         $data = json_decode($request->getContent(), true) ?? [];
         $qr = (string) ($data['qr'] ?? '');
-        $type = (string) ($data['type'] ?? AccessAlarm::TYPE_TAILGATING);
+        $type = $this->normalizeAlarmType((string) ($data['type'] ?? AccessAlarm::TYPE_TAILGATING));
         $deviceId = isset($data['device_id']) ? (string) $data['device_id'] : ('club-' . $club->getId());
         $peopleCount = max(2, (int) ($data['people_count'] ?? 2));
         $details = is_array($data['details'] ?? null) ? $data['details'] : [];
@@ -229,7 +233,7 @@ class GatewayController extends AbstractController
         $alarm = (new AccessAlarm())
             ->setClub($club)
             ->setUser($user)
-            ->setType($type === '' ? AccessAlarm::TYPE_TAILGATING : $type)
+            ->setType($type)
             ->setDeviceId($deviceId)
             ->setPeopleCount($peopleCount)
             ->setRawData($qr !== '' ? mb_substr($qr, 0, 255) : null)
@@ -506,5 +510,18 @@ class GatewayController extends AbstractController
             'created_at' => $cmd->getCreatedAt()->format(DATE_ATOM),
             'expires_at' => $cmd->getExpiresAt()?->format(DATE_ATOM),
         ];
+    }
+
+    private function normalizeAlarmType(string $type): string
+    {
+        $normalized = trim(mb_strtolower($type));
+        if ($normalized === '') {
+            return AccessAlarm::TYPE_TAILGATING;
+        }
+        if (in_array($normalized, self::ALARM_TYPES, true)) {
+            return $normalized;
+        }
+
+        return AccessAlarm::TYPE_TAILGATING;
     }
 }

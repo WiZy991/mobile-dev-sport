@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.ui.theme.Primary
 
@@ -53,7 +54,7 @@ fun AboutScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Версия ${AppConfig.APP_VERSION}",
+                text = "Версия ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

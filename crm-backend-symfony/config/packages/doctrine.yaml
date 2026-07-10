@@ -22,6 +22,10 @@ doctrine:
                 alias: App
         controller_resolver:
             auto_mapping: false
+        filters:
+            organization:
+                class: App\Doctrine\Filter\OrganizationFilter
+                enabled: false
 
 when@test:
     doctrine:

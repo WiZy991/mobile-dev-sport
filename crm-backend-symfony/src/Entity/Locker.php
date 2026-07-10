@@ -2,12 +2,16 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'lockers')]
-class Locker
+class Locker implements TenantAware
 {
+    use OrganizationOwnedTrait;
+
     public const STATUS_AVAILABLE = 'available';
     public const STATUS_OCCUPIED = 'occupied';
     public const STATUS_MAINTENANCE = 'maintenance';

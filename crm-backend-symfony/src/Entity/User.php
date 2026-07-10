@@ -2,20 +2,24 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'users')]
-class User
+#[ORM\UniqueConstraint(name: 'uniq_user_org_email', columns: ['organization_id', 'email'])]
+class User implements TenantAware
 {
+    use OrganizationOwnedTrait;
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\Column(type: 'string', length: 180, unique: true)]
+    #[ORM\Column(type: 'string', length: 180)]
     private string $email;
 
     #[ORM\Column(type: 'string', length: 32)]

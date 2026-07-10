@@ -12,6 +12,7 @@ final class AdminMenuBuilder
 {
     public function __construct(
         private readonly ClubModuleRegistry $clubModules,
+        private readonly string $defaultOrganizationSlug = 'demo',
     ) {
     }
 
@@ -41,12 +42,13 @@ final class AdminMenuBuilder
         'app_support' => 'Обращения из приложения',
         'trainers' => 'Тренеры',
         'crm_staff' => 'Персонал CRM',
-        'franchise' => 'Франшиза',
+        'franchise' => 'Клубы',
         'documents' => 'Документы',
         'promocodes' => 'Промокоды',
         'promotions' => 'Акции',
         'tags' => 'Теги',
         'settings' => 'Настройки',
+        'platform' => 'Организации',
     ];
 
     /**
@@ -54,6 +56,7 @@ final class AdminMenuBuilder
      * @var array<string, list<string>|null>
      */
     private const ROLE_TO_SECTIONS = [
+        'ROLE_PLATFORM_ADMIN' => ['platform', 'dashboard'],
         'ROLE_SUPER_ADMIN' => null,
         'ROLE_ADMIN' => null,
         /** Операционный блок: лиды, записи, документы, тренеры зала и т.д. */
@@ -170,6 +173,12 @@ final class AdminMenuBuilder
             if ($key === 'franchise' && !array_intersect($user->getRoles(), ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
                 continue;
             }
+            if ($key === 'platform' && (
+                !array_intersect($user->getRoles(), ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])
+                || !$this->isMainOrganizationUser($user)
+            )) {
+                continue;
+            }
             $menu[$key] = $label;
         }
 
@@ -216,6 +225,15 @@ final class AdminMenuBuilder
         if ($section === 'franchise' && !array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
             return false;
         }
+        if ($section === 'platform' && (
+            !array_intersect($roles, ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])
+            || !$this->isMainOrganizationUser($user)
+        )) {
+            return false;
+        }
+        if (\in_array('ROLE_PLATFORM_ADMIN', $roles, true)) {
+            return \in_array($section, ['platform', 'dashboard'], true);
+        }
         if (array_intersect($roles, ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
             return true;
         }
@@ -253,5 +271,15 @@ final class AdminMenuBuilder
         }
 
         return array_values(array_unique($result));
+    }
+
+    private function isMainOrganizationUser(StaffUser $user): bool
+    {
+        $organization = $user->getOrganization();
+        if ($organization === null) {
+            return false;
+        }
+
+        return $organization->getSlug() === $this->defaultOrganizationSlug;
     }
 }

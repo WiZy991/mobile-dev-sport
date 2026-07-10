@@ -2,12 +2,16 @@
 
 namespace App\Entity;
 
+use App\Entity\Contract\TenantAware;
+use App\Entity\Trait\OrganizationOwnedTrait;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'support_tickets')]
-class SupportTicket
+class SupportTicket implements TenantAware
 {
+    use OrganizationOwnedTrait;
+
     public const CATEGORY_QUESTION = 'question';
     public const CATEGORY_COMPLAINT = 'complaint';
     public const CATEGORY_SUGGESTION = 'suggestion';

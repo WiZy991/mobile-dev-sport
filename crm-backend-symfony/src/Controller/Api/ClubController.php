@@ -4,8 +4,8 @@ namespace App\Controller\Api;
 
 use App\Entity\AccessLog;
 use App\Entity\Club;
-use App\Entity\ClubSetting;
 use App\Entity\Promotion;
+use App\Service\Admin\ClubSettingsStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,15 +17,16 @@ class ClubController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly ClubSettingsStore $clubSettings,
     ) {}
 
     #[Route('/occupancy', name: 'api_club_occupancy', methods: ['GET'])]
     public function occupancy(): JsonResponse
     {
         $maxCapacity = 100;
-        $setting = $this->em->getRepository(ClubSetting::class)->find('gym_max_capacity');
-        if ($setting && $setting->getSettingValue() !== null && $setting->getSettingValue() !== '') {
-            $maxCapacity = max(10, (int) $setting->getSettingValue());
+        $capRaw = $this->clubSettings->get('gym_max_capacity');
+        if ($capRaw !== null && $capRaw !== '') {
+            $maxCapacity = max(10, (int) $capRaw);
         }
 
         $today = new \DateTimeImmutable('today');
@@ -87,6 +88,10 @@ class ClubController extends AbstractController
             'longitude' => $c->getLongitude(),
             'amenities' => $c->getAmenities(),
             'max_capacity' => $c->getMaxCapacity(),
+            'offer_url' => null,
+            'privacy_url' => null,
+            'visiting_rules_url' => null,
+            'safety_rules_url' => null,
         ], $clubs);
         return $this->json($list);
     }
@@ -100,23 +105,27 @@ class ClubController extends AbstractController
     private function defaultClubListItemFromSettings(): array
     {
         $get = function (string $key, string $default): string {
-            $s = $this->em->getRepository(ClubSetting::class)->find($key);
-
-            return $s?->getSettingValue() ?? $default;
+            return $this->clubSettings->get($key) ?? $default;
         };
 
         $amenitiesStr = $get('amenities', 'Тренажёрный зал, Бассейн, Йога, Групповые занятия');
         $amenities = array_values(array_map('trim', array_filter(explode(',', $amenitiesStr))));
 
         $maxCapacity = null;
-        $capSetting = $this->em->getRepository(ClubSetting::class)->find('gym_max_capacity');
-        if ($capSetting && $capSetting->getSettingValue() !== null && $capSetting->getSettingValue() !== '') {
-            $maxCapacity = max(10, (int) $capSetting->getSettingValue());
+        $capRaw = $this->clubSettings->get('gym_max_capacity');
+        if ($capRaw !== null && $capRaw !== '') {
+            $maxCapacity = max(10, (int) $capRaw);
+        }
+
+        $clubName = $get('name', 'Доброзал');
+        // Если в настройках остался "плейсхолдер" по умолчанию, подставляем корректное название из требований.
+        if (trim((string) $clubName) === 'FitnessClub') {
+            $clubName = 'Доброзал';
         }
 
         return [
             'id' => 'default',
-            'name' => $get('name', 'FitnessClub'),
+            'name' => $clubName,
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
             'phone' => $get('phone', '+7 (495) 123-45-67'),
             'email' => $get('email', 'info@fitnessclub.ru'),
@@ -125,6 +134,10 @@ class ClubController extends AbstractController
             'longitude' => (float) $get('longitude', '37.6173'),
             'amenities' => $amenities,
             'max_capacity' => $maxCapacity,
+            'offer_url' => $get('offer_url', 'https://worldcashfit.ru/license_agreement/'),
+            'privacy_url' => $get('privacy_url', 'https://worldcashfit.ru/privacy/'),
+            'visiting_rules_url' => $get('visiting_rules_url', ''),
+            'safety_rules_url' => $get('safety_rules_url', ''),
         ];
     }
 
@@ -144,6 +157,10 @@ class ClubController extends AbstractController
             'amenities' => $club->getAmenities(),
             'latitude' => $club->getLatitude(),
             'longitude' => $club->getLongitude(),
+            'offer_url' => null,
+            'privacy_url' => null,
+            'visiting_rules_url' => null,
+            'safety_rules_url' => null,
         ]);
     }
 
@@ -151,15 +168,24 @@ class ClubController extends AbstractController
     public function info(): JsonResponse
     {
         $get = function (string $key, string $default): string {
-            $s = $this->em->getRepository(ClubSetting::class)->find($key);
-            return $s?->getSettingValue() ?? $default;
+            return $this->clubSettings->get($key) ?? $default;
         };
 
         $amenitiesStr = $get('amenities', 'Тренажёрный зал, Бассейн, Йога, Групповые занятия');
         $amenities = array_map('trim', array_filter(explode(',', $amenitiesStr)));
 
+        $offerUrl = $get('offer_url', 'https://worldcashfit.ru/license_agreement/');
+        $privacyUrl = $get('privacy_url', 'https://worldcashfit.ru/privacy/');
+        $visitingRulesUrl = $get('visiting_rules_url', '');
+        $safetyRulesUrl = $get('safety_rules_url', '');
+
+        $clubName = $get('name', 'Доброзал');
+        if (trim((string) $clubName) === 'FitnessClub') {
+            $clubName = 'Доброзал';
+        }
+
         return $this->json([
-            'name' => $get('name', 'FitnessClub'),
+            'name' => $clubName,
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
             'phone' => $get('phone', '+7 (495) 123-45-67'),
             'email' => $get('email', 'info@fitnessclub.ru'),
@@ -169,6 +195,10 @@ class ClubController extends AbstractController
             'longitude' => (float) $get('longitude', '37.6173'),
             'promo_title' => $get('promo_home_title', 'СКИДКА 20%!'),
             'promo_subtitle' => $get('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
+            'offer_url' => $offerUrl,
+            'privacy_url' => $privacyUrl,
+            'visiting_rules_url' => $visitingRulesUrl !== '' ? $visitingRulesUrl : null,
+            'safety_rules_url' => $safetyRulesUrl !== '' ? $safetyRulesUrl : null,
         ]);
     }
 

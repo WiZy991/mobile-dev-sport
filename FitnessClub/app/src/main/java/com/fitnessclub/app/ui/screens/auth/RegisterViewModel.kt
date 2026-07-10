@@ -65,6 +65,7 @@ data class RegisterUiState(
     val passport: PassportDraft = PassportDraft(),
     val promoCode: String = "",
     val newsletter: Boolean = true,
+    val acceptedLegalTerms: Boolean = false,
     val password: String = "",
     val confirmPassword: String = "",
     /** Опросник «Откуда узнали о нас»: выбранный ключ варианта (см. ReferralSourceOptions). */
@@ -82,6 +83,7 @@ data class RegisterUiState(
     val passwordError: String? = null,
     val confirmPasswordError: String? = null,
     val clubError: String? = null,
+    val legalTermsError: String? = null,
     /** После первого нажатия «Зарегистрироваться» показываем ошибки полей (до этого — спокойный вид) */
     val submitAttempted: Boolean = false,
     val isLoading: Boolean = false,
@@ -223,6 +225,10 @@ class RegisterViewModel @Inject constructor(
 
     fun onNewsletterChange(v: Boolean) {
         _uiState.value = _uiState.value.copy(newsletter = v)
+    }
+
+    fun onAcceptedLegalTermsChange(v: Boolean) {
+        _uiState.value = _uiState.value.copy(acceptedLegalTerms = v, legalTermsError = null)
     }
 
     fun onPasswordChange(v: String) {
@@ -371,10 +377,15 @@ class RegisterViewModel @Inject constructor(
         var passwordError: String? = null
         var confirmPasswordError: String? = null
         var clubError: String? = null
+        var legalTermsError: String? = null
         var hasError = false
 
         if (state.selectedClub == null) {
             clubError = "Выберите клуб"
+            hasError = true
+        }
+        if (!state.acceptedLegalTerms) {
+            legalTermsError = "Необходимо подтвердить согласие с условиями"
             hasError = true
         }
         if (state.lastName.isBlank()) {
@@ -438,7 +449,8 @@ class RegisterViewModel @Inject constructor(
                 passportError = passportError,
                 passwordError = passwordError,
                 confirmPasswordError = confirmPasswordError,
-                clubError = clubError
+                clubError = clubError,
+                legalTermsError = legalTermsError
             )
             return null
         }

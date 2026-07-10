@@ -88,7 +88,10 @@ fun TrainingDiaryScreen(
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding(),
         ) {
-            DiaryStatsHero(stats = uiState.stats)
+            DiaryStatsHero(
+                stats = uiState.stats,
+                modifier = Modifier.padding(top = 16.dp),
+            )
             Column(modifier = Modifier.padding(top = 16.dp)) {
                 DiaryQuickStartRow(onTemplateSelected = viewModel::openNewWorkout)
             }

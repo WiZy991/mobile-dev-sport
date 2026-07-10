@@ -1,0 +1,56 @@
+<div id="cookie-consent-banner" class="cookie-consent-banner" hidden>
+    <div class="cookie-consent-content">
+        <p>
+            Этот сайт использует куки-файлы для улучшения пользовательского опыта и сбора статистики.
+            Нажимая на кнопку «Согласен», а также оставаясь на сайте, вы предоставляете согласие на использование файлов куки.
+            При несогласии вы можете покинуть сайт или самостоятельно изменить настройки работы с куки-файлами в используемом браузере.
+            Подробнее:
+            <a href="{{ path('legal_consent_user') }}" target="_blank" rel="noopener">согласие</a>.
+        </p>
+        <button id="cookie-consent-accept" type="button">СОГЛАСЕН</button>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var consentKey = "wcf_cookie_consent_v1";
+        var banner = document.getElementById("cookie-consent-banner");
+        var acceptBtn = document.getElementById("cookie-consent-accept");
+        if (!banner || !acceptBtn) {
+            return;
+        }
+
+        function hasConsent() {
+            try {
+                return localStorage.getItem(consentKey) === "accepted";
+            } catch (e) {
+                return document.cookie.indexOf(consentKey + "=accepted") !== -1;
+            }
+        }
+
+        function persistConsent() {
+            try {
+                localStorage.setItem(consentKey, "accepted");
+            } catch (e) {}
+            var expires = new Date();
+            expires.setFullYear(expires.getFullYear() + 1);
+            document.cookie = consentKey + "=accepted; expires=" + expires.toUTCString() + "; path=/; SameSite=Lax";
+        }
+
+        function emitConsentEvent() {
+            document.dispatchEvent(new CustomEvent("wcf:cookie-consent-granted"));
+        }
+
+        if (hasConsent()) {
+            emitConsentEvent();
+            return;
+        }
+
+        banner.hidden = false;
+        acceptBtn.addEventListener("click", function () {
+            persistConsent();
+            banner.hidden = true;
+            emitConsentEvent();
+        });
+    })();
+</script>

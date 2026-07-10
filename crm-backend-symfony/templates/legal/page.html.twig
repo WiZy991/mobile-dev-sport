@@ -5,7 +5,7 @@
 {% block body %}
     <h1>{{ title }}</h1>
     <div class="meta">
-        <a href="{{ download_url }}" class="download-btn">Скачать DOCX</a>
+        <a href="{{ download_url }}" class="download-btn">{{ download_label|default('Открыть документ') }}</a>
     </div>
     <article class="content">
         {% include content_template %}
