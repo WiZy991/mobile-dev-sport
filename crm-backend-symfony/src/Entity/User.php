@@ -106,6 +106,10 @@ class User
     #[ORM\Column(name: 'sber_id', type: 'string', length: 128, nullable: true, unique: true)]
     private ?string $sberId = null;
 
+    /** Стабильный идентификатор Sign in with Apple (sub из identity token). */
+    #[ORM\Column(name: 'apple_id', type: 'string', length: 128, nullable: true, unique: true)]
+    private ?string $appleId = null;
+
     /** Верифицирован ли профиль через Сбер ID (упрощённый флаг для CRM/API). */
     #[ORM\Column(name: 'is_verified', type: 'boolean')]
     private bool $verified = false;
@@ -462,6 +466,17 @@ class User
     public function setSberId(?string $sberId): self
     {
         $this->sberId = $sberId;
+        return $this;
+    }
+
+    public function getAppleId(): ?string
+    {
+        return $this->appleId;
+    }
+
+    public function setAppleId(?string $appleId): self
+    {
+        $this->appleId = $appleId;
         return $this;
     }
 

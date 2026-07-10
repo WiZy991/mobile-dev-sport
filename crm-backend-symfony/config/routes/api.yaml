@@ -28,6 +28,11 @@ api_auth_logout:
   controller: App\Controller\Api\AuthController::logout
   methods: [POST]
 
+api_auth_apple_sign_in:
+  path: /api/v1/auth/apple
+  controller: App\Controller\Api\AppleAuthController::signIn
+  methods: [POST]
+
 api_auth_sber_authorize_url:
   path: /api/v1/auth/sber/authorize-url
   controller: App\Controller\Api\SberAuthController::authorizeUrl
@@ -72,6 +77,11 @@ api_user_profile_update:
   path: /api/v1/user/profile
   controller: App\Controller\Api\UserController::updateProfile
   methods: [PUT]
+
+api_user_account_delete:
+  path: /api/v1/user/account
+  controller: App\Controller\Api\UserController::deleteAccount
+  methods: [DELETE]
 
 api_trainings_list:
   path: /api/v1/trainings

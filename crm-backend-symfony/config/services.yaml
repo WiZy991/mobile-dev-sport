@@ -29,6 +29,7 @@ parameters:
     alfa_acquiring_username_default: ''
     alfa_acquiring_password_default: ''
     alfa_acquiring_currency_default: 643
+    apple_sign_in_client_id_default: 'co.worldcashbox.WorldFintess'
 
 services:
     # default configuration for services in *this* file
@@ -82,6 +83,10 @@ services:
     App\Service\Api\MobileAuthTokenIssuer:
         arguments:
             $accessTokenTtlSeconds: '%env(int:default:mobile_api_access_ttl_default:MOBILE_API_ACCESS_TTL)%'
+
+    App\Service\Api\AppleSignInTokenVerifier:
+        arguments:
+            $clientId: '%env(default:apple_sign_in_client_id_default:APPLE_SIGN_IN_CLIENT_ID)%'
 
     App\Service\Api\SberIdTokenValidator:
         arguments:

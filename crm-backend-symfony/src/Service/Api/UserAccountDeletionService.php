@@ -35,6 +35,8 @@ final class UserAccountDeletionService
             ->setGender(null)
             ->setAvatarUrl(null)
             ->setSberId(null)
+            ->setAppleId(null)
+            ->setPasswordHash(null)
             ->setVerified(false)
             ->setPassportVerificationStatus('none')
             ->setPassportVerifiedAt(null)
