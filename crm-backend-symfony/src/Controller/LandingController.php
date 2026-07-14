@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Service\Admin\ClubSettingsStore;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,6 +16,7 @@ class LandingController extends AbstractController
     public function __construct(
         private readonly LeadIngestionService $leadIngestion,
         private readonly EntityManagerInterface $em,
+        private readonly ClubSettingsStore $clubSettings,
     ) {
     }
 
@@ -23,6 +25,25 @@ class LandingController extends AbstractController
     {
         return $this->render('landing/index.html.twig', [
             'admin_url' => '/admin',
+        ]);
+    }
+
+    #[Route('/forgot-password', name: 'forgot_password', methods: ['GET'])]
+    public function forgotPassword(): Response
+    {
+        $get = function (string $key, string $default): string {
+            return $this->clubSettings->get($key) ?? $default;
+        };
+
+        $clubName = $get('name', 'Доброзал');
+        if (trim($clubName) === 'FitnessClub') {
+            $clubName = 'Доброзал';
+        }
+
+        return $this->render('landing/forgot_password.html.twig', [
+            'club_name' => $clubName,
+            'phone' => $get('phone', '+7 (495) 123-45-67'),
+            'email' => $get('email', 'info@fitnessclub.ru'),
         ]);
     }
 

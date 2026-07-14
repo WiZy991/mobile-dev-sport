@@ -175,11 +175,6 @@ class ShopViewModel @Inject constructor(
                         is ApiResult.Loading -> { /* no-op */ }
                     }
                 }
-                item.category == ShopCategory.DEPOSITS || item.id.startsWith("dep-") -> {
-                    _uiState.update {
-                        it.copy(purchaseMessage = "Депозит пополняется на ресепшене клуба или через администратора.")
-                    }
-                }
                 item.price == 0.0 -> {
                     _uiState.update {
                         it.copy(purchaseMessage = "Бесплатная услуга: запись в разделе «Расписание» или у администратора.")

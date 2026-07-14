@@ -7,10 +7,12 @@ use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\GatewayCommand;
 use App\Entity\GuestPass;
+use App\Entity\StaffNotification;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\SubscriptionGateResolver;
 use App\Service\Security\AccessAlarmNotifier;
+use App\Service\Staff\StaffEventNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -50,6 +52,7 @@ class GatewayController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly SubscriptionGateResolver $subscriptionGateResolver,
         private readonly AccessAlarmNotifier $accessAlarmNotifier,
+        private readonly StaffEventNotifier $staffEventNotifier,
     ) {
     }
 
@@ -429,6 +432,15 @@ class GatewayController extends AbstractController
         $this->em->persist($log);
         $this->em->persist($guestPass);
         $this->em->flush();
+
+        $guestName = $guestPass->getGuestName() ?: ('Гость ' . $owner->getName());
+        $this->staffEventNotifier->notifyBySection(
+            'visits',
+            StaffNotification::TYPE_GUEST_PASS,
+            'Гостевой пропуск использован',
+            sprintf('%s вошёл в %s (владелец: %s)', $guestName, $club->getName(), $owner->getName()),
+            $guestPass->getId() !== null ? (string) $guestPass->getId() : null,
+        );
 
         return $this->json($this->grantedPayload($club, [
             'access_granted' => true,

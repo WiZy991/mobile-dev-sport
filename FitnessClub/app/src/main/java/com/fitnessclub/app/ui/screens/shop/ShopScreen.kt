@@ -33,7 +33,6 @@ import kotlinx.coroutines.launch
 enum class ShopCategory(val title: String) {
     SERVICES("Услуги"),
     SUBSCRIPTIONS("Абонементы"),
-    DEPOSITS("Депозиты"),
     GOODS("Товары")
 }
 

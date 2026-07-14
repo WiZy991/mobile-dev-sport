@@ -2,11 +2,13 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\StaffNotification;
 use App\Entity\User;
 use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
 use App\Service\MobileClientPayloadApplier;
+use App\Service\Staff\StaffEventNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,6 +23,7 @@ class AuthController extends AbstractController
         private readonly MobileClientPayloadApplier $mobileClientPayloadApplier,
         private readonly MobileAuthTokenIssuer $mobileTokens,
         private readonly LeadIngestionService $leadIngestion,
+        private readonly StaffEventNotifier $staffEventNotifier,
     ) {}
 
     #[Route('/login', name: 'api_auth_login', methods: ['POST'])]
@@ -119,6 +122,14 @@ class AuthController extends AbstractController
             );
             $this->em->flush();
         }
+
+        $this->staffEventNotifier->notifyBySection(
+            'clients',
+            StaffNotification::TYPE_CLIENT,
+            'Новый клиент в приложении',
+            sprintf('%s (%s) зарегистрировался', $user->getName(), $user->getEmail()),
+            $user->getId() !== null ? (string) $user->getId() : null,
+        );
 
         return $this->json($this->mobileTokens->issue($user, true));
     }

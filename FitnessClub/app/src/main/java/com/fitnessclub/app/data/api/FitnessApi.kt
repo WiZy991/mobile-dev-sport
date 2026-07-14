@@ -39,6 +39,9 @@ interface FitnessApi {
     @GET("user/access-status")
     suspend fun getAccessStatus(): Response<AccessStatus>
 
+    @POST("user/change-password")
+    suspend fun changePassword(@Body request: ChangePasswordRequest): Response<Unit>
+
     @GET("user/purchases")
     suspend fun getPurchases(): Response<List<PurchaseItem>>
     

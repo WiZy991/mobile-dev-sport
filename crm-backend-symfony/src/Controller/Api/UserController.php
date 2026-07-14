@@ -181,6 +181,50 @@ class UserController extends AbstractController
         return $this->json(['success' => true]);
     }
 
+    #[Route('/change-password', name: 'api_user_change_password', methods: ['POST'])]
+    public function changePassword(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $currentPassword = (string) ($data['current_password'] ?? '');
+        $newPassword = (string) ($data['new_password'] ?? '');
+
+        if (mb_strlen($newPassword) < 6) {
+            return $this->json([
+                'error' => 'Пароль должен быть не менее 6 символов',
+                'code' => 'weak_password',
+            ], 400);
+        }
+
+        $hash = $user->getPasswordHash();
+        if ($hash !== null && $hash !== '') {
+            if ($currentPassword === '' || !password_verify($currentPassword, $hash)) {
+                return $this->json([
+                    'error' => 'Неверный текущий пароль',
+                    'code' => 'invalid_current_password',
+                ], 401);
+            }
+        }
+
+        if ($hash !== null && $hash !== '' && password_verify($newPassword, $hash)) {
+            return $this->json([
+                'error' => 'Новый пароль должен отличаться от текущего',
+                'code' => 'same_password',
+            ], 400);
+        }
+
+        $user->setPasswordHash(password_hash($newPassword, PASSWORD_BCRYPT));
+        $this->em->persist($user);
+        $this->em->flush();
+
+        return $this->json(['success' => true]);
+    }
+
     /** @return array<string, mixed> */
     private function serializeUserProfile(User $user): array
     {

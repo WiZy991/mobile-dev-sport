@@ -3,6 +3,7 @@ package com.fitnessclub.app.data.repository
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.local.TokenManager
+import com.fitnessclub.app.data.model.ChangePasswordRequest
 import com.fitnessclub.app.data.model.LoginRequest
 import com.fitnessclub.app.data.model.RegisterRequest
 import com.fitnessclub.app.data.model.SberCallbackRequest
@@ -163,6 +164,28 @@ class AuthRepository @Inject constructor(
     
     suspend fun getAccessToken(): String? = tokenManager.getAccessToken()
 
+    fun changePassword(
+        currentPassword: String,
+        newPassword: String,
+    ): Flow<ApiResult<Unit>> = flow {
+        emit(ApiResult.Loading)
+        try {
+            val response = api.changePassword(
+                ChangePasswordRequest(
+                    currentPassword = currentPassword,
+                    newPassword = newPassword,
+                )
+            )
+            if (response.isSuccessful) {
+                emit(ApiResult.Success(Unit))
+            } else {
+                emit(ApiResult.Error(authErrorMessage(response, "Не удалось сменить пароль"), response.code()))
+            }
+        } catch (e: Exception) {
+            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+        }
+    }
+
     private fun authErrorMessage(response: Response<*>, fallback: String): String {
         val raw = runCatching { response.errorBody()?.string() }.getOrNull().orEmpty()
         val parsed = runCatching { gson.fromJson(raw, ApiJsonError::class.java) }.getOrNull()
@@ -190,6 +213,8 @@ class AuthRepository @Inject constructor(
         "Пользователь с таким email уже зарегистрирован" ->
             "Этот email уже зарегистрирован. Войдите в аккаунт или укажите другой адрес."
         "Email is required", "Укажите email" -> "Укажите email"
+        "Неверный текущий пароль" -> "Неверный текущий пароль"
+        "Новый пароль должен отличаться от текущего" -> "Новый пароль должен отличаться от текущего"
         "User not found" -> "Неверный email или пароль"
         "Access denied" -> "Доступ запрещён"
         else -> text

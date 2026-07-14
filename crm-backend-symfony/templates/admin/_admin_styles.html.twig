@@ -592,4 +592,129 @@ a.text-reset:hover .content-card {
 .crm-onboarding-tip i { color: var(--primary); font-size: 1.1rem; flex-shrink: 0; }
 .crm-onboarding-footer { padding: 1.5rem; }
 .crm-onboarding-footer .text-secondary { color: #b8c0d0 !important; }
+
+/* ——— CRM desktop notifications ——— */
+.sidebar-notifications {
+    position: relative;
+    margin-left: auto;
+}
+
+.crm-notif-bell-btn {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.crm-notif-bell-btn:hover {
+    background: rgba(255, 91, 46, 0.18);
+    border-color: rgba(255, 91, 46, 0.45);
+}
+
+.crm-notif-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ff3b30;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+.crm-notif-dropdown {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 8px);
+    width: min(360px, 82vw);
+    z-index: 1200;
+    background: var(--bg-card-solid);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.crm-notif-dropdown-head,
+.crm-notif-desktop-row,
+.crm-notif-dropdown-foot {
+    padding: 10px 12px;
+}
+
+.crm-notif-dropdown-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+}
+
+.crm-notif-desktop-row {
+    border-bottom: 1px solid var(--border);
+}
+
+.crm-notif-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.crm-notif-item {
+    display: block;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.crm-notif-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+}
+
+.crm-notif-item.is-unread {
+    border-left: 3px solid var(--primary);
+    padding-left: 9px;
+}
+
+.crm-notif-item-title {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+
+.crm-notif-item-body {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+}
+
+.crm-notif-item-time {
+    font-size: 11px;
+    color: #8a94a8;
+    margin-top: 4px;
+}
+
+.crm-notif-dropdown-foot {
+    display: block;
+    font-size: 12px;
+    text-align: center;
+    color: var(--primary);
+    border-top: 1px solid var(--border);
+}
+
+.crm-notif-list-empty {
+    padding: 16px 12px;
+}
 </style>

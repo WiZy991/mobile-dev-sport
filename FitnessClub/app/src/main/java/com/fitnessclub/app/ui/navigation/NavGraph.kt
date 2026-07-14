@@ -34,6 +34,7 @@ import com.fitnessclub.app.ui.screens.profile.EditProfileScreen
 import com.fitnessclub.app.ui.screens.qrcode.QrCodeScreen
 import com.fitnessclub.app.ui.screens.referral.ReferralScreen
 import com.fitnessclub.app.ui.screens.lockers.LockerScreen
+import com.fitnessclub.app.ui.screens.settings.ChangePasswordScreen
 import com.fitnessclub.app.ui.screens.settings.SettingsScreen
 import com.fitnessclub.app.ui.screens.help.HelpScreen
 import com.fitnessclub.app.ui.screens.about.AboutScreen
@@ -266,7 +267,10 @@ fun NavGraph(
         // Edit Profile
         composable(Screen.EditProfile.route) {
             EditProfileScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToChangePassword = {
+                    navController.navigate(Screen.ChangePassword.route)
+                },
             )
         }
         
@@ -290,9 +294,18 @@ fun NavGraph(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHelp = { navController.navigate(Screen.Help.route) },
                 onNavigateToAbout = { navController.navigate(Screen.About.route) },
+                onNavigateToChangePassword = {
+                    navController.navigate(Screen.ChangePassword.route)
+                },
                 onOpenLegalDocument = { type ->
                     navController.navigate(Screen.LegalDocument.createRoute(type))
                 },
+            )
+        }
+
+        composable(Screen.ChangePassword.route) {
+            ChangePasswordScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

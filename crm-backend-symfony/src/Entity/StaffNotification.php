@@ -10,6 +10,16 @@ class StaffNotification
 {
     public const TYPE_SUPPORT_TICKET = 'support_ticket';
     public const TYPE_ACCESS_ALARM = 'access_alarm';
+    public const TYPE_LEAD = 'lead';
+    public const TYPE_BOOKING = 'booking';
+    public const TYPE_SALE = 'sale';
+    public const TYPE_PAYMENT = 'payment';
+    public const TYPE_SUBSCRIPTION = 'subscription';
+    public const TYPE_FEEDBACK = 'feedback';
+    public const TYPE_CLIENT = 'client';
+    public const TYPE_GUEST_PASS = 'guest_pass';
+    public const TYPE_TASK = 'task';
+    public const TYPE_SYSTEM = 'system';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

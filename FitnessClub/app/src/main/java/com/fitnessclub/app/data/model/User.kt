@@ -51,6 +51,14 @@ data class LoginRequest(
     val password: String
 )
 
+data class ChangePasswordRequest(
+    @SerializedName("current_password")
+    val currentPassword: String = "",
+
+    @SerializedName("new_password")
+    val newPassword: String,
+)
+
 data class RegisterRequest(
     @SerializedName("email")
     val email: String,

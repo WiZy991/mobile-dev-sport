@@ -41,6 +41,7 @@ fun SettingsScreen(
     onNavigateToSecuritySettings: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
+    onNavigateToChangePassword: () -> Unit = {},
     onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -53,7 +54,6 @@ fun SettingsScreen(
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showTwoFactorDialog by remember { mutableStateOf(false) }
     var emailEnabled by remember { mutableStateOf(true) }
     var trainingReminders by remember { mutableStateOf(true) }
     var promoNotifications by remember { mutableStateOf(false) }
@@ -138,14 +138,7 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Lock,
                     title = "Изменить пароль",
-                    onClick = {
-                        runCatching { uriHandler.openUri(AppConfig.FORGOT_PASSWORD_URL) }
-                            .onFailure {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Не удалось открыть страницу восстановления")
-                                }
-                            }
-                    }
+                    onClick = onNavigateToChangePassword
                 )
 
                 SwitchSettingItem(
@@ -161,12 +154,6 @@ fun SettingsScreen(
                     },
                 )
 
-                ClickableSettingItem(
-                    icon = Icons.Default.Security,
-                    title = "Двухфакторная аутентификация",
-                    subtitle = "Настройка защиты входа",
-                    onClick = { showTwoFactorDialog = true }
-                )
             }
             
             // App section
@@ -305,28 +292,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showTwoFactorDialog) {
-        AlertDialog(
-            onDismissRequest = { showTwoFactorDialog = false },
-            title = { Text("Двухфакторная аутентификация") },
-            text = {
-                Text("Серверная 2FA пока не подключена. После backend-обновления включим подтверждение входа по коду.")
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    showTwoFactorDialog = false
-                    onNavigateToHelp()
-                }) {
-                    Text("Открыть помощь")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTwoFactorDialog = false }) {
-                    Text("Понятно")
-                }
-            }
-        )
-    }
 }
 
 @Composable

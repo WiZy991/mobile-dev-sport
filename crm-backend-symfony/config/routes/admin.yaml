@@ -322,3 +322,20 @@ admin_expense_delete:
   controller: App\Controller\Admin\AdminController::deleteExpense
   methods: [POST]
 
+admin_api_notifications_poll:
+  path: /admin/api/notifications/poll
+  controller: App\Controller\Admin\AdminStaffNotificationController::poll
+  methods: [GET]
+
+admin_api_notifications_read_all:
+  path: /admin/api/notifications/read-all
+  controller: App\Controller\Admin\AdminStaffNotificationController::readAll
+  methods: [POST]
+
+admin_api_notifications_read:
+  path: /admin/api/notifications/{id}/read
+  controller: App\Controller\Admin\AdminStaffNotificationController::read
+  methods: [POST]
+  requirements:
+    id: '\d+'
+

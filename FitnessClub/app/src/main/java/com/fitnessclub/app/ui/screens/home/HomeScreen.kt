@@ -25,7 +25,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.data.api.ClubPromotion
 import coil.compose.AsyncImage
 import com.fitnessclub.app.ui.components.OccupancyCard
-import com.fitnessclub.app.ui.components.SecondaryButton
 import com.fitnessclub.app.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -44,7 +43,6 @@ fun HomeScreen(
     onNavigateToTrainingDetails: (String) -> Unit = {},
     onNavigateToTrainingDiary: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
-    onNavigateToReferral: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -142,17 +140,6 @@ fun HomeScreen(
                         onClick = onNavigateToTrainingDetails
                     )
                 }
-            }
-            
-            // Special offers
-            item(key = "offers_title") {
-                SectionTitle("Специальные предложения")
-            }
-            item(key = "offers") {
-                SpecialOffersSection(
-                    onShopClick = onNavigateToShop,
-                    onReferralClick = onNavigateToReferral
-                )
             }
         }
     }
@@ -472,76 +459,6 @@ private fun UpcomingTrainingCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
-
-@Composable
-private fun SpecialOffersSection(
-    onShopClick: () -> Unit,
-    onReferralClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        OfferCard(
-            title = "Пробная тренировка",
-            description = "Бесплатно для новых клиентов",
-            buttonText = "Получить",
-            onClick = onShopClick
-        )
-        OfferCard(
-            title = "Приведи друга",
-            description = "500 бонусов за каждого друга",
-            buttonText = "Узнать больше",
-            onClick = onReferralClick
-        )
-        OfferCard(
-            title = "-20% на годовой",
-            description = "При покупке до конца месяца",
-            buttonText = "Купить",
-            onClick = onShopClick
-        )
-    }
-}
-
-@Composable
-private fun OfferCard(
-    title: String,
-    description: String,
-    buttonText: String,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.width(180.dp),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = AccentOrange.copy(alpha = 0.08f)
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            SecondaryButton(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(buttonText, style = MaterialTheme.typography.labelSmall)
-            }
         }
     }
 }

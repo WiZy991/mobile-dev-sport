@@ -38,6 +38,7 @@
             <div class="sidebar-user">
                 <i class="bi bi-person-circle"></i>
                 <span>{{ app.user.userIdentifier }}</span>
+                {% include 'admin/partials/_crm_notifications.html.twig' %}
                 <a href="{{ path('admin_logout') }}">Выйти</a>
             </div>
         {% endif %}
@@ -103,5 +104,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script charset="UTF-8">{% include 'admin/partials/_admin_crm_select_boot.js.twig' %}</script>
 <script charset="UTF-8">{% include 'admin/partials/_dobrozal_onboarding_boot.js.twig' %}</script>
+<script charset="UTF-8">{% include 'admin/partials/_crm_notifications_boot.js.twig' %}</script>
 </body>
 </html>

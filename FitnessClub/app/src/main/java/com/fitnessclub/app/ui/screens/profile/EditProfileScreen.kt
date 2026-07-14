@@ -14,14 +14,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.ui.theme.Primary
 import kotlinx.coroutines.launch
 
@@ -29,10 +27,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun EditProfileScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToChangePassword: () -> Unit = {},
     viewModel: EditProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val uriHandler = LocalUriHandler.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -228,14 +226,7 @@ fun EditProfileScreen(
             
             // Change password button
             OutlinedButton(
-                onClick = {
-                    runCatching { uriHandler.openUri(AppConfig.FORGOT_PASSWORD_URL) }
-                        .onFailure {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("Не удалось открыть ссылку восстановления пароля")
-                            }
-                        }
-                },
+                onClick = onNavigateToChangePassword,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Lock, contentDescription = null)

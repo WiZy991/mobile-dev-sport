@@ -1,0 +1,204 @@
+(function () {
+    'use strict';
+
+    var root = document.getElementById('dz-crm-notifications-root');
+    if (!root) return;
+
+    var pollUrl = root.getAttribute('data-poll-url');
+    var readAllUrl = root.getAttribute('data-read-all-url');
+    var csrfToken = root.getAttribute('data-csrf') || '';
+    var userId = root.getAttribute('data-user-id') || '0';
+
+    var bell = document.getElementById('dz-notif-bell');
+    var badge = document.getElementById('dz-notif-badge');
+    var dropdown = document.getElementById('dz-notif-dropdown');
+    var list = document.getElementById('dz-notif-list');
+    var markReadBtn = document.getElementById('dz-notif-mark-read');
+    var enableDesktopBtn = document.getElementById('dz-notif-enable-desktop');
+
+    var sinceKey = 'dz-notif-since-' + userId;
+    var desktopKey = 'dz-notif-desktop-' + userId;
+    var shownKey = 'dz-notif-shown-' + userId;
+
+    var sinceId = parseInt(localStorage.getItem(sinceKey) || '0', 10) || 0;
+    var desktopEnabled = localStorage.getItem(desktopKey) === '1';
+    var shownIds = {};
+
+    try {
+        var storedShown = JSON.parse(sessionStorage.getItem(shownKey) || '[]');
+        if (Array.isArray(storedShown)) {
+            storedShown.forEach(function (id) { shownIds[id] = true; });
+        }
+    } catch (e) {
+        shownIds = {};
+    }
+
+    function saveShownIds() {
+        try {
+            sessionStorage.setItem(shownKey, JSON.stringify(Object.keys(shownIds)));
+        } catch (e) {}
+    }
+
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function formatTime(iso) {
+        try {
+            var d = new Date(iso);
+            return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function updateBadge(count) {
+        if (!badge) return;
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : String(count);
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    }
+
+    function renderList(items) {
+        if (!list) return;
+        if (!items || items.length === 0) {
+            list.innerHTML = '<div class="crm-notif-list-empty text-secondary small">Нет уведомлений</div>';
+            return;
+        }
+
+        list.innerHTML = items.map(function (item) {
+            var unreadClass = item.is_read ? '' : ' is-unread';
+            var url = item.url || '#';
+            return (
+                '<a class="crm-notif-item' + unreadClass + '" href="' + escapeHtml(url) + '" data-id="' + item.id + '">' +
+                    '<div class="crm-notif-item-title">' + escapeHtml(item.title) + '</div>' +
+                    '<div class="crm-notif-item-body">' + escapeHtml(item.body) + '</div>' +
+                    '<div class="crm-notif-item-time">' + escapeHtml(formatTime(item.created_at)) + '</div>' +
+                '</a>'
+            );
+        }).join('');
+    }
+
+    function showDesktopNotification(item) {
+        if (!desktopEnabled || !window.Notification) return;
+        if (Notification.permission !== 'granted') return;
+        if (shownIds[item.id]) return;
+
+        shownIds[item.id] = true;
+        saveShownIds();
+
+        var n = new Notification(item.title, {
+            body: item.body,
+            icon: '/favicon.ico',
+            tag: 'crm-notif-' + item.id,
+        });
+        n.onclick = function () {
+            window.focus();
+            if (item.url) window.location.href = item.url;
+            n.close();
+        };
+    }
+
+    function poll() {
+        if (!pollUrl) return;
+
+        fetch(pollUrl + '?since_id=' + encodeURIComponent(String(sinceId)), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data || !data.enabled) return;
+
+                updateBadge(data.unread_count || 0);
+                renderList(data.items || []);
+
+                var newItems = data.new_items || [];
+                newItems.forEach(function (item) {
+                    showDesktopNotification(item);
+                });
+
+                if (data.latest_id && data.latest_id > sinceId) {
+                    sinceId = data.latest_id;
+                    localStorage.setItem(sinceKey, String(sinceId));
+                }
+            })
+            .catch(function () {});
+    }
+
+    function markAllRead() {
+        if (!readAllUrl) return;
+
+        fetch(readAllUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-Token': csrfToken,
+            },
+        })
+            .then(function () { poll(); })
+            .catch(function () {});
+    }
+
+    function toggleDropdown() {
+        if (!dropdown || !bell) return;
+        var open = !dropdown.classList.contains('d-none');
+        dropdown.classList.toggle('d-none', open);
+        bell.setAttribute('aria-expanded', open ? 'false' : 'true');
+    }
+
+    function enableDesktop() {
+        if (!window.Notification) {
+            alert('Браузер не поддерживает уведомления на рабочем столе.');
+            return;
+        }
+
+        Notification.requestPermission().then(function (perm) {
+            if (perm === 'granted') {
+                desktopEnabled = true;
+                localStorage.setItem(desktopKey, '1');
+                if (enableDesktopBtn) {
+                    enableDesktopBtn.textContent = 'Уведомления на рабочем столе включены';
+                    enableDesktopBtn.disabled = true;
+                }
+                poll();
+            }
+        });
+    }
+
+    if (bell) bell.addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggleDropdown();
+    });
+
+    if (markReadBtn) markReadBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        markAllRead();
+    });
+
+    if (enableDesktopBtn) {
+        if (desktopEnabled && window.Notification && Notification.permission === 'granted') {
+            enableDesktopBtn.textContent = 'Уведомления на рабочем столе включены';
+            enableDesktopBtn.disabled = true;
+        }
+        enableDesktopBtn.addEventListener('click', enableDesktop);
+    }
+
+    document.addEventListener('click', function (e) {
+        if (!dropdown || dropdown.classList.contains('d-none')) return;
+        if (root.contains(e.target)) return;
+        dropdown.classList.add('d-none');
+        if (bell) bell.setAttribute('aria-expanded', 'false');
+    });
+
+    poll();
+    setInterval(poll, 10000);
+})();

@@ -88,6 +88,11 @@ api_user_account_delete:
   controller: App\Controller\Api\UserController::deleteAccount
   methods: [DELETE]
 
+api_user_change_password:
+  path: /api/v1/user/change-password
+  controller: App\Controller\Api\UserController::changePassword
+  methods: [POST]
+
 api_trainings_list:
   path: /api/v1/trainings
   controller: App\Controller\Api\TrainingController::list

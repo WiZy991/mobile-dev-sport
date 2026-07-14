@@ -177,7 +177,6 @@ fun MainScreen(
                     },
                     onNavigateToTrainingDiary = { navController.navigate(Screen.TrainingDiary.route) },
                     onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
-                    onNavigateToReferral = { navController.navigate(Screen.Referral.route) }
                 )
             }
             1 -> {

@@ -4,9 +4,11 @@ namespace App\Controller\Api;
 
 use App\Entity\Booking;
 use App\Entity\Notification;
+use App\Entity\StaffNotification;
 use App\Entity\Training;
 use App\Entity\User;
 use App\Service\CurrentUserResolver;
+use App\Service\Staff\StaffEventNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,6 +21,7 @@ class BookingController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
+        private readonly StaffEventNotifier $staffEventNotifier,
     ) {}
 
     #[Route('/bookings', name: 'api_bookings_list', methods: ['GET'])]
@@ -145,6 +148,17 @@ class BookingController extends AbstractController
         $booking->setStatus('cancelled');
         $this->em->persist($booking);
         $this->em->flush();
+
+        $client = $booking->getClientName() ?: ($booking->getUser()?->getName() ?? 'Клиент');
+        $trainingName = $training->getName();
+        $when = $training->getStartAt()->format('d.m.Y H:i');
+        $this->staffEventNotifier->notifyBySection(
+            'bookings',
+            StaffNotification::TYPE_BOOKING,
+            'Отмена записи на тренировку',
+            sprintf('%s отменил запись на «%s» (%s)', $client, $trainingName, $when),
+            $booking->getId() !== null ? (string) $booking->getId() : null,
+        );
 
         return $this->json(['success' => true]);
     }

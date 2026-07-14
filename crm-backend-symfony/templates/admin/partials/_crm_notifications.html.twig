@@ -1,0 +1,27 @@
+{% if app.user is instanceof('App\\Entity\\StaffUser') %}
+    <div class="sidebar-notifications" id="dz-crm-notifications-root"
+         data-poll-url="{{ path('admin_api_notifications_poll') }}"
+         data-read-all-url="{{ path('admin_api_notifications_read_all') }}"
+         data-csrf="{{ csrf_token('crm_notifications') }}"
+         data-user-id="{{ app.user.id }}">
+        <button type="button" class="crm-notif-bell-btn" id="dz-notif-bell" aria-label="Уведомления CRM" aria-expanded="false">
+            <i class="bi bi-bell-fill"></i>
+            <span class="crm-notif-badge d-none" id="dz-notif-badge">0</span>
+        </button>
+        <div class="crm-notif-dropdown d-none" id="dz-notif-dropdown" role="dialog" aria-label="Уведомления CRM">
+            <div class="crm-notif-dropdown-head">
+                <span class="fw-semibold">Уведомления</span>
+                <button type="button" class="btn btn-link btn-sm p-0 crm-notif-mark-read" id="dz-notif-mark-read">Прочитать все</button>
+            </div>
+            <div class="crm-notif-desktop-row">
+                <button type="button" class="btn btn-sm btn-outline-warning w-100" id="dz-notif-enable-desktop">
+                    <i class="bi bi-pc-display-horizontal me-1"></i> Уведомления на рабочем столе
+                </button>
+            </div>
+            <div class="crm-notif-list" id="dz-notif-list">
+                <div class="crm-notif-list-empty text-secondary small">Загрузка…</div>
+            </div>
+            <a href="{{ path('admin_dashboard') }}" class="crm-notif-dropdown-foot">На дашборд →</a>
+        </div>
+    </div>
+{% endif %}
