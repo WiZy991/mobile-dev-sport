@@ -27,6 +27,7 @@ use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClientImportService;
 use App\Service\Admin\OnboardingQuestCatalog;
 use App\Service\Admin\SubscriptionPlanCatalog;
+use App\Service\Admin\SubscriptionPlanDeletionService;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
 use App\Service\Api\SubscriptionFreezePolicy;
@@ -67,6 +68,7 @@ class AdminController extends AbstractController
         private readonly ClubModuleRegistry $clubModules,
         private readonly ClubSettingsStore $clubSettings,
         private readonly SubscriptionPlanCatalog $planCatalog,
+        private readonly SubscriptionPlanDeletionService $planDeletionService,
         private readonly LeadIngestionService $leadIngestion,
         private readonly OnboardingQuestCatalog $onboardingQuestCatalog,
     ) {}
@@ -1379,32 +1381,92 @@ class AdminController extends AbstractController
     #[Route('/plans/{id}/update', name: 'admin_plan_update', methods: ['POST'])]
     public function updatePlan(int $id, Request $request): Response
     {
-        $plan = $this->em->getRepository(SubscriptionPlan::class)->find($id);
+        $planRepo = $this->em->getRepository(SubscriptionPlan::class);
+        $plan = $planRepo->find($id);
         if (!$plan) {
             throw $this->createNotFoundException();
         }
 
-        $plan->setPrice((float) $request->request->get('price'))
+        $name = trim((string) $request->request->get('name', ''));
+        if ($name === '') {
+            $this->addFlash('danger', 'Укажите название тарифа.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
+        $duplicate = $planRepo->findOneBy(['name' => $name]);
+        if ($duplicate !== null && $duplicate->getId() !== $plan->getId()) {
+            $this->addFlash('warning', 'Тариф с названием «' . $name . '» уже есть.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
+        $type = (string) $request->request->get('type', 'unlimited');
+        if (!\in_array($type, ['unlimited', 'limited', 'personal'], true)) {
+            $type = 'unlimited';
+        }
+
+        $durationRaw = $request->request->get('duration_days');
+        $visitsRaw = $request->request->get('visits_count');
+        $durationDays = $durationRaw !== null && $durationRaw !== '' ? max(0, (int) $durationRaw) : null;
+        $visitsCount = $visitsRaw !== null && $visitsRaw !== '' ? max(0, (int) $visitsRaw) : null;
+        if ($durationDays === 0) {
+            $durationDays = null;
+        }
+        if ($visitsCount === 0) {
+            $visitsCount = null;
+        }
+
+        $description = trim((string) $request->request->get('description', ''));
+
+        $plan
+            ->setName($name)
+            ->setDescription($description !== '' ? $description : null)
+            ->setPrice((float) $request->request->get('price'))
+            ->setType($type)
+            ->setDurationDays($durationDays)
+            ->setVisitsCount($visitsCount)
             ->setIsPopular((bool) $request->request->get('is_popular', false));
 
         $this->em->flush();
-        $this->addFlash('success', 'Тарифный план обновлён.');
+
+        $issuedCount = $this->em->getRepository(Subscription::class)->count(['plan' => $plan]);
+        if ($issuedCount > 0) {
+            $this->addFlash(
+                'success',
+                'Тариф обновлён. Новые условия действуют только для новых абонементов; у ' . $issuedCount . ' выданных клиентов остаются срок, посещения и заморозка на момент покупки.',
+            );
+        } else {
+            $this->addFlash('success', 'Тарифный план обновлён.');
+        }
 
         return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
     }
 
     #[Route('/plans/{id}/delete', name: 'admin_plan_delete', methods: ['POST'])]
-    public function deletePlan(int $id): Response
+    public function deletePlan(int $id, Request $request): Response
     {
         $plan = $this->em->getRepository(SubscriptionPlan::class)->find($id);
         if ($plan) {
-            $count = $this->em->getRepository(Subscription::class)->count(['plan' => $plan]);
-            if ($count === 0) {
-                $this->em->remove($plan);
-                $this->em->flush();
-                $this->addFlash('success', 'Тарифный план удалён.');
-            } else {
-                $this->addFlash('warning', 'Нельзя удалить план: по нему выданы абонементы.');
+            $force = $request->request->getBoolean('force');
+            try {
+                $stats = $this->planDeletionService->delete($plan, $force);
+                if ($stats['subscriptions'] > 0 || $stats['payments'] > 0) {
+                    $this->addFlash(
+                        'success',
+                        'Тариф «' . $plan->getName() . '» удалён вместе с ' . $stats['subscriptions'] . ' абонемент(ами) и ' . $stats['payments'] . ' платеж(ами).',
+                    );
+                } else {
+                    $this->addFlash('success', 'Тарифный план удалён.');
+                }
+            } catch (\RuntimeException $e) {
+                $issued = $this->planDeletionService->countIssued($plan);
+                $payments = $this->planDeletionService->countPayments($plan);
+                $this->addFlash(
+                    'warning',
+                    'Нельзя удалить тариф: выдано абонементов — ' . $issued . ', платежей — ' . $payments . '. '
+                    . 'Измените условия кнопкой «Изменить» или подтвердите удаление вместе со связанными записями.',
+                );
             }
         }
 
@@ -2031,6 +2093,11 @@ class AdminController extends AbstractController
             }
 
             $plans = $planRepo->findBy([], ['id' => 'ASC']);
+            $issuedByPlan = [];
+            $subRepo = $this->em->getRepository(Subscription::class);
+            foreach ($plans as $plan) {
+                $issuedByPlan[$plan->getId()] = $subRepo->count(['plan' => $plan]);
+            }
             $users = $this->em->getRepository(User::class)->findBy([], ['id' => 'ASC']);
             $statusFilter = $request->query->get('status', '');
             $subsQb = $this->em->createQueryBuilder()->select('s')->from(Subscription::class, 's')->orderBy('s.id', 'DESC');
@@ -2048,6 +2115,7 @@ class AdminController extends AbstractController
                 'menu' => $menu,
                 'current' => $section,
                 'plans' => $plans,
+                'issuedByPlan' => $issuedByPlan,
                 'planTemplates' => $this->planCatalog->all(),
                 'availablePlanTemplates' => $this->planCatalog->availableFor($plans),
                 'users' => $users,

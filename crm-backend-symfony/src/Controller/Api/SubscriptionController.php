@@ -46,9 +46,20 @@ class SubscriptionController extends AbstractController
 
         $data = array_map(static function (Subscription $s) {
             $plan = $s->getPlan();
+            $sale = $s->getSales()->first();
+            $displayName = $plan->getName();
+            $displayPrice = $plan->getPrice();
+            if ($sale !== false && $sale !== null) {
+                $displayPrice = $sale->getPrice();
+                $productName = $sale->getProductName();
+                if (str_starts_with($productName, 'Абонемент: ')) {
+                    $displayName = substr($productName, strlen('Абонемент: '));
+                }
+            }
+
             return [
                 'id' => 'sub-' . $s->getId(),
-                'name' => $plan->getName(),
+                'name' => $displayName,
                 'description' => $plan->getDescription(),
                 'type' => $plan->getType(),
                 'start_date' => $s->getStartDate()->format('Y-m-d'),
@@ -59,7 +70,7 @@ class SubscriptionController extends AbstractController
                 'freeze_days_total' => $s->getFreezeDaysTotal(),
                 'freeze_days_used' => $s->getFreezeDaysUsed(),
                 'is_frozen' => $s->getStatus() === 'frozen',
-                'price' => $plan->getPrice(),
+                'price' => $displayPrice,
                 'club_id' => $s->getClub()?->getId(),
                 'club_name' => $s->getClub()?->getName(),
             ];
