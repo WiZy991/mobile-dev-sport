@@ -51,43 +51,55 @@ final class SubscriptionPlanDeletionService
         $stats = ['subscriptions' => 0, 'sales' => 0, 'payments' => 0];
 
         $subscriptions = $this->em->getRepository(Subscription::class)->findBy(['plan' => $plan]);
+
+        /** @var array<int, Sale> $salesToRemove */
+        $salesToRemove = [];
         foreach ($subscriptions as $subscription) {
             foreach ($subscription->getSales()->toArray() as $sale) {
-                $this->unlinkPaymentsFromSale($sale);
-                $this->em->remove($sale);
-                ++$stats['sales'];
+                $salesToRemove[$sale->getId() ?? 0] = $sale;
             }
-
-            foreach ($this->em->getRepository(Payment::class)->findBy(['subscription' => $subscription]) as $payment) {
-                $payment->setSubscription(null);
-            }
-
-            $this->em->remove($subscription);
-            ++$stats['subscriptions'];
         }
 
+        /** @var array<int, Payment> $paymentsToRemove */
+        $paymentsToRemove = [];
         foreach ($this->em->getRepository(Payment::class)->findBy(['subscriptionPlan' => $plan]) as $payment) {
-            $sale = $payment->getSale();
-            $payment->setSale(null);
+            $paymentsToRemove[$payment->getId() ?? 0] = $payment;
+        }
+        foreach ($subscriptions as $subscription) {
+            foreach ($this->em->getRepository(Payment::class)->findBy(['subscription' => $subscription]) as $payment) {
+                $paymentsToRemove[$payment->getId() ?? 0] = $payment;
+            }
+        }
+        foreach ($salesToRemove as $sale) {
+            foreach ($this->em->getRepository(Payment::class)->findBy(['sale' => $sale]) as $payment) {
+                $paymentsToRemove[$payment->getId() ?? 0] = $payment;
+            }
+        }
+
+        foreach ($paymentsToRemove as $payment) {
             $this->em->remove($payment);
             ++$stats['payments'];
+        }
+        if ($stats['payments'] > 0) {
+            $this->em->flush();
+        }
 
-            if ($sale !== null && $this->em->contains($sale)) {
-                $this->em->remove($sale);
-                ++$stats['sales'];
-            }
+        foreach ($salesToRemove as $sale) {
+            $this->em->remove($sale);
+            ++$stats['sales'];
+        }
+        if ($stats['sales'] > 0) {
+            $this->em->flush();
+        }
+
+        foreach ($subscriptions as $subscription) {
+            $this->em->remove($subscription);
+            ++$stats['subscriptions'];
         }
 
         $this->em->remove($plan);
         $this->em->flush();
 
         return $stats;
-    }
-
-    private function unlinkPaymentsFromSale(Sale $sale): void
-    {
-        foreach ($this->em->getRepository(Payment::class)->findBy(['sale' => $sale]) as $payment) {
-            $payment->setSale(null);
-        }
     }
 }
