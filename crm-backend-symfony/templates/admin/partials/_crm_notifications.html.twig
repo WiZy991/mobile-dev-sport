@@ -1,6 +1,7 @@
 <div class="sidebar-notifications" id="dz-crm-notifications-root"
      data-poll-url="{{ path('admin_api_notifications_poll') }}"
      data-read-all-url="{{ path('admin_api_notifications_read_all') }}"
+     data-read-url-template="{{ path('admin_api_notifications_read', {id: 0})|replace({'/0/': '/__ID__/'}) }}"
      data-csrf="{{ csrf_token('crm_notifications') }}"
      data-user-id="{{ app.user.id }}">
     <button type="button" class="crm-notif-bell-btn" id="dz-notif-bell" aria-label="Уведомления CRM" aria-expanded="false">

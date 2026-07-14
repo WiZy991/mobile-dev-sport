@@ -6,6 +6,7 @@
 
     var pollUrl = root.getAttribute('data-poll-url');
     var readAllUrl = root.getAttribute('data-read-all-url');
+    var readUrlTemplate = root.getAttribute('data-read-url-template') || '';
     var csrfToken = root.getAttribute('data-csrf') || '';
     var userId = root.getAttribute('data-user-id') || '0';
 
@@ -15,6 +16,7 @@
     var list = document.getElementById('dz-notif-list');
     var markReadBtn = document.getElementById('dz-notif-mark-read');
     var enableDesktopBtn = document.getElementById('dz-notif-enable-desktop');
+    var unreadCount = 0;
 
     var sinceKey = 'dz-notif-since-' + userId;
     var desktopKey = 'dz-notif-desktop-' + userId;
@@ -57,6 +59,7 @@
     }
 
     function updateBadge(count) {
+        unreadCount = count;
         if (!badge) return;
         if (count > 0) {
             badge.textContent = count > 99 ? '99+' : String(count);
@@ -64,6 +67,25 @@
         } else {
             badge.classList.add('d-none');
         }
+    }
+
+    function readUrlFor(id) {
+        return readUrlTemplate.replace('__ID__', String(id));
+    }
+
+    function markRead(id) {
+        if (!readUrlTemplate || !id) {
+            return Promise.resolve();
+        }
+
+        return fetch(readUrlFor(id), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-Token': csrfToken,
+            },
+        }).catch(function () {});
     }
 
     function renderList(items) {
@@ -101,7 +123,9 @@
         });
         n.onclick = function () {
             window.focus();
-            if (item.url) window.location.href = item.url;
+            markRead(item.id).finally(function () {
+                if (item.url) window.location.href = item.url;
+            });
             n.close();
         };
     }
@@ -223,6 +247,30 @@
     if (markReadBtn) markReadBtn.addEventListener('click', function (e) {
         e.preventDefault();
         markAllRead();
+    });
+
+    if (list) list.addEventListener('click', function (e) {
+        var link = e.target.closest('.crm-notif-item');
+        if (!link) return;
+
+        var id = link.getAttribute('data-id');
+        var url = link.getAttribute('href') || '#';
+        if (!id || !link.classList.contains('is-unread')) return;
+
+        e.preventDefault();
+
+        link.classList.remove('is-unread');
+        if (unreadCount > 0) {
+            updateBadge(unreadCount - 1);
+        }
+
+        markRead(id).finally(function () {
+            if (url && url !== '#') {
+                window.location.href = url;
+            } else {
+                poll();
+            }
+        });
     });
 
     if (enableDesktopBtn) {
