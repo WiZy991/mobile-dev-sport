@@ -148,12 +148,53 @@
             .catch(function () {});
     }
 
+    function positionDropdown() {
+        if (!dropdown || !bell) return;
+
+        var width = Math.min(360, window.innerWidth - 24);
+        var rect = bell.getBoundingClientRect();
+        var left = rect.right - width;
+        var top = rect.bottom + 8;
+
+        if (left < 12) {
+            left = 12;
+        }
+        if (left + width > window.innerWidth - 12) {
+            left = window.innerWidth - width - 12;
+        }
+
+        var estimatedHeight = Math.min(window.innerHeight * 0.7, 480);
+        if (top + estimatedHeight > window.innerHeight - 12) {
+            top = Math.max(12, rect.top - estimatedHeight - 8);
+        }
+
+        dropdown.style.width = width + 'px';
+        dropdown.style.left = left + 'px';
+        dropdown.style.top = top + 'px';
+    }
+
     function toggleDropdown() {
         if (!dropdown || !bell) return;
         var open = !dropdown.classList.contains('d-none');
-        dropdown.classList.toggle('d-none', open);
-        bell.setAttribute('aria-expanded', open ? 'false' : 'true');
+        if (open) {
+            dropdown.classList.add('d-none');
+            bell.setAttribute('aria-expanded', 'false');
+            return;
+        }
+        positionDropdown();
+        dropdown.classList.remove('d-none');
+        bell.setAttribute('aria-expanded', 'true');
     }
+
+    if (dropdown && document.body) {
+        document.body.appendChild(dropdown);
+    }
+
+    window.addEventListener('resize', function () {
+        if (dropdown && !dropdown.classList.contains('d-none')) {
+            positionDropdown();
+        }
+    });
 
     function enableDesktop() {
         if (!window.Notification) {
@@ -194,7 +235,7 @@
 
     document.addEventListener('click', function (e) {
         if (!dropdown || dropdown.classList.contains('d-none')) return;
-        if (root.contains(e.target)) return;
+        if (root.contains(e.target) || dropdown.contains(e.target)) return;
         dropdown.classList.add('d-none');
         if (bell) bell.setAttribute('aria-expanded', 'false');
     });

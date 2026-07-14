@@ -636,11 +636,11 @@ a.text-reset:hover .content-card {
 }
 
 .crm-notif-dropdown {
-    position: absolute;
-    left: 0;
-    top: calc(100% + 8px);
-    width: min(360px, 82vw);
-    z-index: 1200;
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    width: min(360px, calc(100vw - 24px));
+    z-index: 10050;
     background: var(--bg-card-solid);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -658,15 +658,29 @@ a.text-reset:hover .content-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     border-bottom: 1px solid var(--border);
+}
+
+.crm-notif-dropdown-head .fw-semibold,
+.crm-notif-mark-read {
+    white-space: nowrap;
 }
 
 .crm-notif-desktop-row {
     border-bottom: 1px solid var(--border);
 }
 
+.crm-notif-desktop-row .btn {
+    white-space: normal;
+    line-height: 1.35;
+    padding: 8px 10px;
+    height: auto;
+    text-align: center;
+}
+
 .crm-notif-list {
-    max-height: 320px;
+    max-height: min(50vh, 360px);
     overflow-y: auto;
 }
 
@@ -676,6 +690,7 @@ a.text-reset:hover .content-card {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     color: var(--text);
     text-decoration: none;
+    overflow: hidden;
 }
 
 .crm-notif-item:hover {
@@ -692,12 +707,16 @@ a.text-reset:hover .content-card {
     font-weight: 600;
     font-size: 13px;
     margin-bottom: 2px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .crm-notif-item-body {
     font-size: 12px;
     color: var(--muted);
-    line-height: 1.4;
+    line-height: 1.45;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .crm-notif-item-time {
