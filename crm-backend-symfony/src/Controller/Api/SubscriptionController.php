@@ -7,6 +7,7 @@ use App\Entity\Sale;
 use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
 use App\Entity\User;
+use App\Service\Admin\SubscriptionPlanCatalog;
 use App\Service\Api\SberMobileAuthService;
 use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
@@ -30,6 +31,7 @@ class SubscriptionController extends AbstractController
         private readonly SubscriptionFreezeService $freezeService,
         private readonly SubscriptionLifecycleService $lifecycleService,
         private readonly SubscriptionPurchaseQuoteService $quoteService,
+        private readonly SubscriptionPlanCatalog $planCatalog,
         private readonly bool $requireSberVerificationBeforePurchase = false,
         private readonly bool $alfaAcquiringEnabled = false,
     ) {}
@@ -176,7 +178,9 @@ class SubscriptionController extends AbstractController
     #[Route('/plans', name: 'api_subscriptions_plans', methods: ['GET'])]
     public function plans(): JsonResponse
     {
-        $plans = $this->em->getRepository(SubscriptionPlan::class)->findAll();
+        $plans = $this->planCatalog->sortForDisplay(
+            $this->em->getRepository(SubscriptionPlan::class)->findAll(),
+        );
 
         $freezePolicy = $this->freezePolicy;
         $data = array_map(static function (SubscriptionPlan $p) use ($freezePolicy) {

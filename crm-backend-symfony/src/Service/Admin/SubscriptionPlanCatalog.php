@@ -43,20 +43,20 @@ final class SubscriptionPlanCatalog
                 'type' => 'unlimited',
                 'is_popular' => false,
             ],
-            'plan-3m' => [
-                'name' => 'На 3 месяца',
-                'description' => 'Неограниченное посещение. Заморозка: +14 дней.',
-                'price' => 16_500.0,
-                'duration_days' => 90,
-                'visits_count' => null,
-                'type' => 'unlimited',
-                'is_popular' => false,
-            ],
             'plan-4m' => [
                 'name' => 'На 4 месяца',
                 'description' => 'Неограниченное посещение. Заморозка: +14 дней.',
                 'price' => 18_000.0,
                 'duration_days' => 120,
+                'visits_count' => null,
+                'type' => 'unlimited',
+                'is_popular' => false,
+            ],
+            'plan-3m' => [
+                'name' => 'На 3 месяца',
+                'description' => 'Неограниченное посещение. Заморозка: +14 дней.',
+                'price' => 16_500.0,
+                'duration_days' => 90,
                 'visits_count' => null,
                 'type' => 'unlimited',
                 'is_popular' => false,
@@ -114,6 +114,31 @@ final class SubscriptionPlanCatalog
         }
 
         return null;
+    }
+
+    /**
+     * @param list<SubscriptionPlan> $plans
+     * @return list<SubscriptionPlan>
+     */
+    public function sortForDisplay(array $plans): array
+    {
+        usort($plans, static function (SubscriptionPlan $a, SubscriptionPlan $b): int {
+            $durationA = $a->getDurationDays() ?? 0;
+            $durationB = $b->getDurationDays() ?? 0;
+            if ($durationA !== $durationB) {
+                return $durationB <=> $durationA;
+            }
+
+            $visitsA = $a->getVisitsCount() ?? PHP_INT_MAX;
+            $visitsB = $b->getVisitsCount() ?? PHP_INT_MAX;
+            if ($visitsA !== $visitsB) {
+                return $visitsB <=> $visitsA;
+            }
+
+            return ($a->getId() ?? 0) <=> ($b->getId() ?? 0);
+        });
+
+        return $plans;
     }
 
     /**

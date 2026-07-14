@@ -2092,7 +2092,7 @@ class AdminController extends AbstractController
                 return $redirect;
             }
 
-            $plans = $planRepo->findBy([], ['id' => 'ASC']);
+            $plans = $this->planCatalog->sortForDisplay($planRepo->findAll());
             $issuedByPlan = [];
             $subRepo = $this->em->getRepository(Subscription::class);
             foreach ($plans as $plan) {
