@@ -138,13 +138,17 @@ fun QrCodeScreen(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "Как использовать",
+                        text = if (uiState.isInsideGym) "Выход из зала" else "Вход в зал",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Поднесите QR-код к сканеру на входе в клуб. Турникет откроется автоматически.",
+                        text = if (uiState.isInsideGym) {
+                            "Поднесите QR-код к сканеру на выходе. Турникет откроется автоматически."
+                        } else {
+                            "Поднесите QR-код к сканеру на входе в клуб. Турникет откроется автоматически."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -167,10 +171,10 @@ fun QrCodeScreen(
             
             // Valid until
             Text(
-                text = if (uiState.secondsRemaining > 0) {
-                    "Код обновится через ${uiState.secondsRemaining} сек (действует 15 сек)"
-                } else {
-                    "Обновление…"
+                text = when {
+                    uiState.isInsideGym && uiState.qrCodeData != null -> "Код для выхода из зала"
+                    uiState.secondsRemaining > 0 -> "Код обновится через ${uiState.secondsRemaining} сек (действует 15 сек)"
+                    else -> "Обновление…"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -119,6 +119,7 @@ fun HomeScreen(
             // Quick menu
             item(key = "quickmenu") {
                 QuickMenuSection(
+                    isInsideGym = uiState.isInsideGym,
                     onQrCode = onNavigateToQrCode,
                     onPersonalTraining = onNavigateToPersonalTraining,
                     onSchedule = onNavigateToSchedule,
@@ -268,6 +269,7 @@ private fun parsePromoColor(hex: String?, fallback: Color): Color {
 
 @Composable
 private fun QuickMenuSection(
+    isInsideGym: Boolean,
     onQrCode: () -> Unit,
     onPersonalTraining: () -> Unit,
     onSchedule: () -> Unit,
@@ -287,8 +289,8 @@ private fun QuickMenuSection(
         Column(modifier = Modifier.padding(8.dp)) {
             QuickMenuItem(
                 icon = Icons.Default.QrCode2,
-                title = "Вход в зал",
-                subtitle = "Показать QR-код для прохода",
+                title = if (isInsideGym) "Выход из зала" else "Вход в зал",
+                subtitle = if (isInsideGym) "Показать QR-код для выхода" else "Показать QR-код для прохода",
                 onClick = onQrCode
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

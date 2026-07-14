@@ -9,6 +9,7 @@ use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\Api\UserAccountDeletionService;
 use App\Service\CurrentUserResolver;
 use App\Service\MobileClientPayloadApplier;
+use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,7 +25,21 @@ class UserController extends AbstractController
         private readonly MobileClientPayloadApplier $mobileClientPayloadApplier,
         private readonly MobileAuthTokenIssuer $mobileTokens,
         private readonly UserAccountDeletionService $accountDeletion,
+        private readonly OccupancyService $occupancyService,
     ) {}
+
+    #[Route('/access-status', name: 'api_user_access_status', methods: ['GET'])]
+    public function accessStatus(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $snapshot = $this->occupancyService->getUserAccessSnapshot($user, $user->getClub());
+
+        return $this->json($snapshot);
+    }
 
     #[Route('/stats', name: 'api_user_stats', methods: ['GET'])]
     public function stats(Request $request): JsonResponse

@@ -182,6 +182,57 @@ final class OccupancyService
         return ($row['event_type'] ?? '') === 'entry';
     }
 
+    /**
+     * Статус прохода клиента для мобильного приложения.
+     *
+     * @return array{is_inside: bool, club_id: ?int, last_entry_at: ?string, last_exit_at: ?string}
+     */
+    public function getUserAccessSnapshot(User $user, ?Club $club = null): array
+    {
+        $todayStart = (new \DateTimeImmutable('today'))->format('Y-m-d H:i:s');
+        $tomorrow = (new \DateTimeImmutable('today'))->modify('+1 day')->format('Y-m-d H:i:s');
+
+        $params = [
+            'user_id' => $user->getId(),
+            'from' => $todayStart,
+            'to' => $tomorrow,
+        ];
+        $clubFilter = '';
+        if ($club instanceof Club) {
+            $clubFilter = ' AND club_id = :club_id';
+            $params['club_id'] = $club->getId();
+        }
+
+        $fetchLast = function (string $eventType) use ($params, $clubFilter): ?\DateTimeImmutable {
+            $sql = "SELECT created_at
+                    FROM access_logs
+                    WHERE result = 'granted'
+                      AND user_id = :user_id
+                      AND event_type = :event_type
+                      AND created_at >= :from
+                      AND created_at < :to" . $clubFilter . "
+                    ORDER BY created_at DESC
+                    LIMIT 1";
+            $queryParams = $params + ['event_type' => $eventType];
+            $row = $this->connection()->executeQuery($sql, $queryParams)->fetchAssociative();
+            if ($row === false) {
+                return null;
+            }
+
+            return new \DateTimeImmutable((string) $row['created_at']);
+        };
+
+        $lastEntry = $fetchLast('entry');
+        $lastExit = $fetchLast('exit');
+
+        return [
+            'is_inside' => $this->isUserCurrentlyInside($user, $club),
+            'club_id' => $club?->getId(),
+            'last_entry_at' => $lastEntry?->format(\DateTimeInterface::ATOM),
+            'last_exit_at' => $lastExit?->format(\DateTimeInterface::ATOM),
+        ];
+    }
+
     private function connection(): Connection
     {
         return $this->em->getConnection();

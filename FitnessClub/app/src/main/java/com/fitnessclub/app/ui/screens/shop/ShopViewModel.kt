@@ -78,73 +78,44 @@ class ShopViewModel @Inject constructor(
     fun loadItems() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            
-            runCatching {
-                when (val result = productRepository.getProducts()) {
-                    is ApiResult.Success -> {
-                        val apiItems = result.data
-                        val (subscriptionItems, plansByItemId) = getSubscriptionAndDepositItems()
-                        val allItems = apiItems + subscriptionItems
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                items = allItems,
-                                subscriptionPlansByItemId = plansByItemId,
-                            )
-                        }
+
+            when (val result = productRepository.getProducts()) {
+                is ApiResult.Success -> {
+                    val (subscriptionItems, plansByItemId) = getSubscriptionItems()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            items = result.data + subscriptionItems,
+                            subscriptionPlansByItemId = plansByItemId,
+                            error = null,
+                        )
                     }
-                    is ApiResult.Error -> {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                items = getFallbackItems(),
-                                error = result.message
-                            )
-                        }
+                }
+                is ApiResult.Error -> {
+                    val (subscriptionItems, plansByItemId) = getSubscriptionItems()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            items = subscriptionItems,
+                            subscriptionPlansByItemId = plansByItemId,
+                            error = result.message,
+                        )
                     }
-                    is ApiResult.Loading -> { /* no-op */ }
                 }
-            }.onFailure { e ->
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        items = getFallbackItems(),
-                        error = e.message ?: "Ошибка загрузки"
-                    )
-                }
+                is ApiResult.Loading -> Unit
             }
         }
     }
-    
-    private suspend fun getSubscriptionAndDepositItems(): Pair<List<ShopItem>, Map<String, SubscriptionPlan>> {
+
+    private suspend fun getSubscriptionItems(): Pair<List<ShopItem>, Map<String, SubscriptionPlan>> {
         val subscriptionPlans = when (val result = subscriptionRepository.getSubscriptionPlansSuspend()) {
             is ApiResult.Success -> result.data
             else -> emptyList()
         }
         val subscriptionItems = subscriptionPlans.map { it.toShopSubscriptionItem() }
         val plansByItemId = subscriptionPlans.associateBy { "sub-${it.safeId}" }
-
-        val depositItems = listOf(
-            ShopItem(
-                id = "dep-1",
-                name = "Пополнение депозита",
-                description = "Пополните депозит на ресепшене клуба.",
-                price = 1000.0,
-                category = ShopCategory.DEPOSITS
-            )
-        )
-
-        return (subscriptionItems + depositItems) to plansByItemId
+        return subscriptionItems to plansByItemId
     }
-
-    private fun getFallbackItems(): List<ShopItem> = listOf(
-        ShopItem(id = "srv-1", name = "Пробная тренировка", description = "Пробная тренировка — отличная возможность познакомиться с клубом.", price = 0.0, category = ShopCategory.SERVICES),
-        ShopItem(id = "srv-2", name = "Йога", description = "Йога – отличный способ отвлечься от проблем.", price = 350.0, category = ShopCategory.SERVICES),
-        ShopItem(id = "sub-1", name = "Абонемент", description = "Тарифы абонементов временно недоступны. Попробуйте позже.", price = 0.0, category = ShopCategory.SUBSCRIPTIONS),
-        ShopItem(id = "good-1", name = "Полотенце с логотипом", description = "Мягкое хлопковое полотенце.", price = 800.0, category = ShopCategory.GOODS)
-    ) + listOf(
-        ShopItem(id = "dep-1", name = "Пополнение депозита", description = "Пополните депозит на ресепшене клуба.", price = 1000.0, category = ShopCategory.DEPOSITS)
-    )
     
     fun planForItem(itemId: String): SubscriptionPlan? = _uiState.value.subscriptionPlansByItemId[itemId]
 

@@ -68,6 +68,11 @@ api_user_stats:
   controller: App\Controller\Api\UserController::stats
   methods: [GET]
 
+api_user_access_status:
+  path: /api/v1/user/access-status
+  controller: App\Controller\Api\UserController::accessStatus
+  methods: [GET]
+
 api_user_profile_get:
   path: /api/v1/user/profile
   controller: App\Controller\Api\UserController::profile

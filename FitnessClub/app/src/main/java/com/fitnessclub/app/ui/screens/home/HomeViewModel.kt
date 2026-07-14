@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.model.BookingStatus
+import com.fitnessclub.app.data.repository.AccessRepository
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -32,12 +33,14 @@ data class HomeUiState(
     val occupancyCurrent: Int? = null,
     val occupancyMax: Int? = null,
     val occupancyPercentage: Int? = null,
-    val occupancyStatus: String? = null
+    val occupancyStatus: String? = null,
+    val isInsideGym: Boolean = false,
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val api: FitnessApi
+    private val api: FitnessApi,
+    private val accessRepository: AccessRepository,
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -83,6 +86,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             loadOccupancy()
             loadUnreadCount()
+            accessRepository.refreshAccessStatus()
+            _uiState.update { it.copy(isInsideGym = accessRepository.accessStatus.value.isInside) }
             try {
                 val promosRes = api.getClubPromotions()
                 if (promosRes.isSuccessful) {

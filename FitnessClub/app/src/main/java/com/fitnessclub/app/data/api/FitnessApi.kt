@@ -36,6 +36,9 @@ interface FitnessApi {
     @GET("user/stats")
     suspend fun getUserStats(): Response<UserStats>
 
+    @GET("user/access-status")
+    suspend fun getAccessStatus(): Response<AccessStatus>
+
     @GET("user/purchases")
     suspend fun getPurchases(): Response<List<PurchaseItem>>
     
@@ -292,6 +295,17 @@ data class UserStats(
     val streakDays: Int,
     @com.google.gson.annotations.SerializedName("achievements")
     val achievements: List<Achievement>
+)
+
+data class AccessStatus(
+    @com.google.gson.annotations.SerializedName("is_inside")
+    val isInside: Boolean = false,
+    @com.google.gson.annotations.SerializedName("club_id")
+    val clubId: Int? = null,
+    @com.google.gson.annotations.SerializedName("last_entry_at")
+    val lastEntryAt: String? = null,
+    @com.google.gson.annotations.SerializedName("last_exit_at")
+    val lastExitAt: String? = null,
 )
 
 data class Achievement(

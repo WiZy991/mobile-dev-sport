@@ -70,6 +70,7 @@ fun MainScreen(
     }
     var showQrSheet by remember { mutableStateOf(false) }
     val qrViewModel: QrCodeViewModel = hiltViewModel()
+    val qrUiState by qrViewModel.uiState.collectAsState()
     
     val navItems = listOf(
         BottomNavItem(
@@ -112,7 +113,10 @@ fun MainScreen(
                         focusedElevation = 6.dp
                     )
                 ) {
-                    Icon(Icons.Default.QrCode2, contentDescription = "Вход в зал")
+                    Icon(
+                        Icons.Default.QrCode2,
+                        contentDescription = if (qrUiState.isInsideGym) "Выход из зала" else "Вход в зал"
+                    )
                 }
             }
         },
@@ -277,7 +281,7 @@ private fun QrQuickAccessContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Вход в зал",
+            text = if (uiState.isInsideGym) "Выход из зала" else "Вход в зал",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
@@ -320,16 +324,22 @@ private fun QrQuickAccessContent(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        if (uiState.secondsRemaining > 0 && uiState.qrCodeData != null) {
+        if (uiState.secondsRemaining > 0 && uiState.qrCodeData != null && !uiState.isInsideGym) {
             Text(
                 text = "Обновление кода через ${uiState.secondsRemaining} сек",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else if (uiState.isInsideGym && uiState.qrCodeData != null) {
+            Text(
+                text = "Код для выхода из зала",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Поднесите к сканеру",
+            text = if (uiState.isInsideGym) "Поднесите к сканеру на выходе" else "Поднесите к сканеру",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
