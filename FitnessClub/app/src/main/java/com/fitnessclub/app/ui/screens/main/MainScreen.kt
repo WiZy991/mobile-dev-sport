@@ -36,6 +36,7 @@ import com.fitnessclub.app.ui.screens.qrcode.QrCodeViewModel
 import com.fitnessclub.app.ui.screens.schedule.ScheduleScreen
 import com.fitnessclub.app.ui.screens.schedule.ScheduleViewModel
 import com.fitnessclub.app.ui.components.SecureScreenEffect
+import com.fitnessclub.app.ui.components.StatusBarEffect
 import com.fitnessclub.app.ui.theme.AppShapes
 import com.fitnessclub.app.ui.theme.Primary
 import com.google.zxing.BarcodeFormat
@@ -71,6 +72,12 @@ fun MainScreen(
     var showQrSheet by remember { mutableStateOf(false) }
     val qrViewModel: QrCodeViewModel = hiltViewModel()
     val qrUiState by qrViewModel.uiState.collectAsState()
+
+    StatusBarEffect(
+        color = Primary,
+        darkIcons = false,
+        navigationKey = selectedTab,
+    )
     
     val navItems = listOf(
         BottomNavItem(

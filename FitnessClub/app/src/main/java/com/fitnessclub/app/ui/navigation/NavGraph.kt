@@ -10,7 +10,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navigation
+import com.fitnessclub.app.ui.components.StatusBarEffect
+import com.fitnessclub.app.ui.theme.Primary
 import com.fitnessclub.app.ui.navigation.NavArgs
 import androidx.navigation.navArgument
 import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
@@ -76,6 +79,13 @@ fun NavGraph(
     val openLegalPdf: (LegalPdfAsset) -> Unit = { asset ->
         navController.navigate(Screen.LegalPdf.createRoute(asset))
     }
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    StatusBarEffect(
+        color = Primary,
+        darkIcons = false,
+        navigationKey = navBackStackEntry?.id,
+    )
 
     NavHost(
         navController = navController,
