@@ -25,7 +25,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.fitnessclub.app.data.config.AppConfig
+import androidx.compose.ui.platform.LocalUriHandler
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.ui.theme.AccentOrange
@@ -49,6 +49,7 @@ fun SubscriptionPlansScreen(
     var showPurchaseDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
     var showLegalConsentDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -206,21 +207,16 @@ fun SubscriptionPlansScreen(
             error = purchaseError,
             onDismiss = { showPurchaseDialog = null; purchaseError = null },
             onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
-            onConfirm = {
-                showLegalConsentDialog = plan
-            }
+            onConfirm = { showLegalConsentDialog = plan }
         )
     }
 
     showLegalConsentDialog?.let { plan ->
-        val links = uiState.clubLegalLinks ?: ClubLegalLinks(
-            clubName = "Ваш клуб",
-            offerUrl = AppConfig.TERMS_URL,
-            privacyUrl = AppConfig.PRIVACY_URL,
-        )
         ClubPurchaseConsentDialog(
-            legalLinks = links,
+            context = uiState.clubPurchaseContext,
             onDismiss = { showLegalConsentDialog = null },
+            onOpenDocument = onOpenLegalDocument,
+            onOpenExternalUrl = { uriHandler.openUri(it) },
             onConfirm = {
                 purchaseError = null
                 showLegalConsentDialog = null

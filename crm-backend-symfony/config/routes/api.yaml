@@ -93,6 +93,21 @@ api_user_change_password:
   controller: App\Controller\Api\UserController::changePassword
   methods: [POST]
 
+api_user_notification_settings_get:
+  path: /api/v1/user/notification-settings
+  controller: App\Controller\Api\UserController::notificationSettings
+  methods: [GET]
+
+api_user_notification_settings_update:
+  path: /api/v1/user/notification-settings
+  controller: App\Controller\Api\UserController::updateNotificationSettings
+  methods: [PUT]
+
+api_user_push_token_delete:
+  path: /api/v1/user/push-token
+  controller: App\Controller\Api\PushTokenController::unregister
+  methods: [DELETE]
+
 api_trainings_list:
   path: /api/v1/trainings
   controller: App\Controller\Api\TrainingController::list

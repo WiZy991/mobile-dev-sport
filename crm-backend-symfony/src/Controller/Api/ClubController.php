@@ -69,6 +69,37 @@ class ClubController extends AbstractController
         ]);
     }
 
+    private function legalUrlsFromSettings(): array
+    {
+        $offer = $this->normalizeClubOfferUrl(trim((string) ($this->clubSettings->get('offer_url') ?? '')));
+        $privacy = trim((string) ($this->clubSettings->get('privacy_url') ?? ''));
+        $visiting = trim((string) ($this->clubSettings->get('visiting_rules_url') ?? ''));
+        $safety = trim((string) ($this->clubSettings->get('safety_rules_url') ?? ''));
+
+        return [
+            'offer_url' => $offer !== '' ? $offer : null,
+            'privacy_url' => $privacy !== '' ? $privacy : null,
+            'visiting_rules_url' => $visiting !== '' ? $visiting : null,
+            'safety_rules_url' => $safety !== '' ? $safety : null,
+        ];
+    }
+
+    /**
+     * В CRM иногда ошибочно указывают документы WorldCashFit вместо оферты клуба (ИП).
+     */
+    private function normalizeClubOfferUrl(string $url): string
+    {
+        if ($url === '') {
+            return '';
+        }
+        $lower = strtolower($url);
+        if (str_contains($lower, 'license_agreement') || str_contains($lower, 'user_agreement')) {
+            return 'https://worldcashfit.ru/client-agreement';
+        }
+
+        return $url;
+    }
+
     public function list(): JsonResponse
     {
         $clubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
@@ -77,6 +108,7 @@ class ClubController extends AbstractController
             // клуб из настроек CRM — тот же источник, что и GET /club/info.
             return $this->json([$this->defaultClubListItemFromSettings()]);
         }
+        $legal = $this->legalUrlsFromSettings();
         $list = array_map(fn (Club $c) => [
             'id' => (string) $c->getId(),
             'name' => $c->getName(),
@@ -88,10 +120,7 @@ class ClubController extends AbstractController
             'longitude' => $c->getLongitude(),
             'amenities' => $c->getAmenities(),
             'max_capacity' => $c->getMaxCapacity(),
-            'offer_url' => null,
-            'privacy_url' => null,
-            'visiting_rules_url' => null,
-            'safety_rules_url' => null,
+            ...$legal,
         ], $clubs);
         return $this->json($list);
     }
@@ -134,10 +163,7 @@ class ClubController extends AbstractController
             'longitude' => (float) $get('longitude', '37.6173'),
             'amenities' => $amenities,
             'max_capacity' => $maxCapacity,
-            'offer_url' => $get('offer_url', 'https://worldcashfit.ru/license_agreement/'),
-            'privacy_url' => $get('privacy_url', 'https://worldcashfit.ru/privacy/'),
-            'visiting_rules_url' => $get('visiting_rules_url', ''),
-            'safety_rules_url' => $get('safety_rules_url', ''),
+            ...$this->legalUrlsFromSettings(),
         ];
     }
 
@@ -147,6 +173,8 @@ class ClubController extends AbstractController
         if (!$club) {
             return $this->json(['error' => 'Club not found'], 404);
         }
+        $legal = $this->legalUrlsFromSettings();
+
         return $this->json([
             'id' => (string) $club->getId(),
             'name' => $club->getName(),
@@ -157,10 +185,7 @@ class ClubController extends AbstractController
             'amenities' => $club->getAmenities(),
             'latitude' => $club->getLatitude(),
             'longitude' => $club->getLongitude(),
-            'offer_url' => null,
-            'privacy_url' => null,
-            'visiting_rules_url' => null,
-            'safety_rules_url' => null,
+            ...$legal,
         ]);
     }
 
@@ -173,11 +198,6 @@ class ClubController extends AbstractController
 
         $amenitiesStr = $get('amenities', 'Тренажёрный зал, Бассейн, Йога, Групповые занятия');
         $amenities = array_map('trim', array_filter(explode(',', $amenitiesStr)));
-
-        $offerUrl = $get('offer_url', 'https://worldcashfit.ru/license_agreement/');
-        $privacyUrl = $get('privacy_url', 'https://worldcashfit.ru/privacy/');
-        $visitingRulesUrl = $get('visiting_rules_url', '');
-        $safetyRulesUrl = $get('safety_rules_url', '');
 
         $clubName = $get('name', 'Доброзал');
         if (trim((string) $clubName) === 'FitnessClub') {
@@ -195,10 +215,7 @@ class ClubController extends AbstractController
             'longitude' => (float) $get('longitude', '37.6173'),
             'promo_title' => $get('promo_home_title', 'СКИДКА 20%!'),
             'promo_subtitle' => $get('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
-            'offer_url' => $offerUrl,
-            'privacy_url' => $privacyUrl,
-            'visiting_rules_url' => $visitingRulesUrl !== '' ? $visitingRulesUrl : null,
-            'safety_rules_url' => $safetyRulesUrl !== '' ? $safetyRulesUrl : null,
+            ...$this->legalUrlsFromSettings(),
         ]);
     }
 

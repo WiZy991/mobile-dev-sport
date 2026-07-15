@@ -48,6 +48,17 @@ data class PassportDraft(
             region.isNotBlank() && city.isNotBlank() && streetHouse.isNotBlank()
 }
 
+enum class RegisterFormStep(val title: String, val index: Int) {
+    PERSONAL("Личные данные", 1),
+    PASSPORT("Паспорт", 2),
+    ACCOUNT("Пароль и согласие", 3),
+    ;
+
+    companion object {
+        val LAST = ACCOUNT
+    }
+}
+
 data class RegisterUiState(
     val clubs: List<ClubItem> = emptyList(),
     val clubsLoading: Boolean = false,
@@ -84,6 +95,11 @@ data class RegisterUiState(
     val confirmPasswordError: String? = null,
     val clubError: String? = null,
     val legalTermsError: String? = null,
+    /** Показывать ошибки полей после попытки «Далее» / «Зарегистрироваться». */
+    val showValidationErrors: Boolean = false,
+    val formStep: RegisterFormStep = RegisterFormStep.PERSONAL,
+    /** Краткое сообщение над кнопкой, если форма не прошла проверку. */
+    val validationSummary: String? = null,
     /** После первого нажатия «Зарегистрироваться» показываем ошибки полей (до этого — спокойный вид) */
     val submitAttempted: Boolean = false,
     val isLoading: Boolean = false,
@@ -95,6 +111,24 @@ data class RegisterUiState(
             passport.series.isNotBlank() || passport.number.isNotBlank() -> "Заполнение…"
             else -> "Заполните паспорт"
         }
+
+    fun fieldError(message: String?): String? =
+        if (showValidationErrors || submitAttempted) message else null
+
+    val firstBlockingError: String?
+        get() = listOfNotNull(
+            clubError,
+            lastNameError,
+            firstNameError,
+            birthDateError,
+            phoneError,
+            emailError,
+            genderError,
+            passportError,
+            passwordError,
+            confirmPasswordError,
+            legalTermsError,
+        ).firstOrNull()
 }
 
 sealed class RegisterEvent {
@@ -132,6 +166,11 @@ class RegisterViewModel @Inject constructor(
     
     private val displayDateFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
+    /** Обновление полей формы: сбрасывает краткое сообщение над кнопкой при исправлении. */
+    private inline fun updateForm(crossinline block: (RegisterUiState) -> RegisterUiState) {
+        _uiState.update { block(it).copy(validationSummary = null) }
+    }
+
     init {
         loadClubs()
     }
@@ -165,10 +204,10 @@ class RegisterViewModel @Inject constructor(
 
     fun onClubSelected(club: ClubItem?) {
         if (club == null) {
-            _uiState.value = _uiState.value.copy(selectedClub = null, clubError = null)
+            updateForm { it.copy(selectedClub = null, clubError = null) }
             return
         }
-        _uiState.update { state ->
+        updateForm { state ->
             val merged = if (state.clubs.none { it.id == club.id }) {
                 listOf(club) + state.clubs
             } else {
@@ -179,125 +218,132 @@ class RegisterViewModel @Inject constructor(
     }
 
     fun onRegistrationTypeChange(option: RegistrationTypeOption) {
-        _uiState.value = _uiState.value.copy(registrationType = option)
+        updateForm { it.copy(registrationType = option) }
     }
 
     fun onLastNameChange(v: String) {
-        _uiState.value = _uiState.value.copy(lastName = v, lastNameError = null)
+        updateForm { it.copy(lastName = v, lastNameError = null) }
     }
 
     fun onFirstNameChange(v: String) {
-        _uiState.value = _uiState.value.copy(firstName = v, firstNameError = null)
+        updateForm { it.copy(firstName = v, firstNameError = null) }
     }
 
     fun onMiddleNameChange(v: String) {
-        _uiState.value = _uiState.value.copy(middleName = v)
+        updateForm { it.copy(middleName = v) }
     }
 
     fun onBirthDateChange(v: String) {
-        _uiState.value = _uiState.value.copy(birthDateDisplay = v, birthDateError = null)
+        updateForm { it.copy(birthDateDisplay = v, birthDateError = null) }
     }
 
     fun setBirthDateFromMillis(millis: Long) {
         val ld = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-        _uiState.value = _uiState.value.copy(
-            birthDateDisplay = ld.format(displayDateFormat),
-            birthDateError = null
-        )
+        updateForm {
+            it.copy(
+                birthDateDisplay = ld.format(displayDateFormat),
+                birthDateError = null,
+            )
+        }
     }
 
     fun onPhoneChange(raw: String) {
         val national = normalizeRussianNationalDigits(raw)
-        _uiState.value = _uiState.value.copy(phoneNationalDigits = national, phoneError = null)
+        updateForm { it.copy(phoneNationalDigits = national, phoneError = null) }
     }
 
     fun onEmailChange(v: String) {
-        _uiState.value = _uiState.value.copy(email = v.trim(), emailError = null)
+        updateForm { it.copy(email = v.trim(), emailError = null) }
     }
 
     fun onGenderChange(g: GenderOption?) {
-        _uiState.value = _uiState.value.copy(gender = g, genderError = null)
+        updateForm { it.copy(gender = g, genderError = null) }
     }
 
     fun onPromoChange(v: String) {
-        _uiState.value = _uiState.value.copy(promoCode = v)
+        updateForm { it.copy(promoCode = v) }
     }
 
     fun onNewsletterChange(v: Boolean) {
-        _uiState.value = _uiState.value.copy(newsletter = v)
+        updateForm { it.copy(newsletter = v) }
     }
 
     fun onAcceptedLegalTermsChange(v: Boolean) {
-        _uiState.value = _uiState.value.copy(acceptedLegalTerms = v, legalTermsError = null)
+        updateForm { it.copy(acceptedLegalTerms = v, legalTermsError = null) }
     }
 
     fun onPasswordChange(v: String) {
-        _uiState.value = _uiState.value.copy(password = v, passwordError = null)
+        updateForm { it.copy(password = v, passwordError = null) }
     }
 
     fun onConfirmPasswordChange(v: String) {
-        _uiState.value = _uiState.value.copy(confirmPassword = v, confirmPasswordError = null)
+        updateForm { it.copy(confirmPassword = v, confirmPasswordError = null) }
     }
 
     fun onReferralSourceSelected(key: String) {
-        _uiState.value = _uiState.value.copy(referralSource = key, referralError = null)
+        updateForm { it.copy(referralSource = key, referralError = null) }
     }
 
     fun onReferralSourceOtherChange(v: String) {
-        _uiState.value = _uiState.value.copy(referralSourceOther = v.take(255), referralError = null)
+        updateForm { it.copy(referralSourceOther = v.take(255), referralError = null) }
     }
 
     fun onPassportSeriesChange(v: String) {
-        _uiState.value = _uiState.value.copy(
-            passport = _uiState.value.passport.copy(series = v.take(5)),
-            passportError = null
-        )
+        updateForm {
+            it.copy(
+                passport = it.passport.copy(series = v.take(5)),
+                passportError = null,
+            )
+        }
     }
 
     fun onPassportNumberChange(v: String) {
-        _uiState.value = _uiState.value.copy(
-            passport = _uiState.value.passport.copy(number = v.take(7)),
-            passportError = null
-        )
+        updateForm {
+            it.copy(
+                passport = it.passport.copy(number = v.take(7)),
+                passportError = null,
+            )
+        }
     }
 
     fun onPassportIssuedByChange(v: String) {
-        _uiState.value = _uiState.value.copy(
-            passport = _uiState.value.passport.copy(issuedBy = v.take(300))
-        )
+        updateForm {
+            it.copy(passport = it.passport.copy(issuedBy = v.take(300)), passportError = null)
+        }
     }
 
     fun onPassportIssuedDateChange(v: String) {
-        _uiState.value = _uiState.value.copy(
-            passport = _uiState.value.passport.copy(issuedDateDisplay = v)
-        )
+        updateForm {
+            it.copy(passport = it.passport.copy(issuedDateDisplay = v), passportError = null)
+        }
     }
 
     fun setPassportIssuedDateFromMillis(millis: Long) {
         val ld = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-        _uiState.value = _uiState.value.copy(
-            passport = _uiState.value.passport.copy(
-                issuedDateDisplay = ld.format(displayDateFormat)
+        updateForm {
+            it.copy(
+                passport = it.passport.copy(issuedDateDisplay = ld.format(displayDateFormat)),
+                passportError = null,
             )
-        )
+        }
     }
 
     fun onPassportRegionChange(v: String) {
-        _uiState.value = _uiState.value.copy(
-            passport = _uiState.value.passport.copy(region = v)
-        )
+        updateForm {
+            it.copy(passport = it.passport.copy(region = v), passportError = null)
+        }
     }
 
     fun onPassportCityChange(v: String) {
-        _uiState.value = _uiState.value.copy(
-            passport = _uiState.value.passport.copy(city = v)
-        )
+        updateForm {
+            it.copy(passport = it.passport.copy(city = v), passportError = null)
+        }
     }
 
     fun onPassportStreetChange(v: String) {
-        _uiState.value = _uiState.value.copy(
-            passport = _uiState.value.passport.copy(streetHouse = v)
-        )
+        updateForm {
+            it.copy(passport = it.passport.copy(streetHouse = v), passportError = null)
+        }
     }
 
     /** Валидация экрана паспорта перед возвратом. */
@@ -319,6 +365,54 @@ class RegisterViewModel @Inject constructor(
 
     fun clearPassportError() {
         _uiState.value = _uiState.value.copy(passportError = null)
+    }
+
+    fun goToPreviousFormStep() {
+        val prev = when (_uiState.value.formStep) {
+            RegisterFormStep.PERSONAL -> return
+            RegisterFormStep.PASSPORT -> RegisterFormStep.PERSONAL
+            RegisterFormStep.ACCOUNT -> RegisterFormStep.PASSPORT
+        }
+        _uiState.update {
+            it.copy(
+                formStep = prev,
+                validationSummary = null,
+                showValidationErrors = false,
+            )
+        }
+    }
+
+    /** Следующий шаг формы. При ошибке — подсветка полей и текст над кнопкой. */
+    fun advanceFormStep(): Boolean {
+        val step = _uiState.value.formStep
+        val errors = validateStep(step)
+        if (errors.hasError) {
+            applyValidationErrors(errors, summaryForStep(step, errors), step)
+            return false
+        }
+        if (step == RegisterFormStep.LAST) return true
+        val next = when (step) {
+            RegisterFormStep.PERSONAL -> RegisterFormStep.PASSPORT
+            RegisterFormStep.PASSPORT -> RegisterFormStep.ACCOUNT
+            RegisterFormStep.ACCOUNT -> RegisterFormStep.ACCOUNT
+        }
+        _uiState.update {
+            it.copy(
+                formStep = next,
+                showValidationErrors = false,
+                validationSummary = null,
+            )
+        }
+        return true
+    }
+
+    fun onPrimaryFormAction() {
+        val step = _uiState.value.formStep
+        if (step == RegisterFormStep.ACCOUNT) {
+            register()
+        } else {
+            advanceFormStep()
+        }
     }
     
     /**
@@ -365,95 +459,28 @@ class RegisterViewModel @Inject constructor(
 
     /** Валидация полей формы. Возвращает готовый запрос (с данными опросника) или null при ошибке. */
     private fun validateAndBuild(): RegisterRequest? {
-        _uiState.value = _uiState.value.copy(submitAttempted = true)
-        val state = _uiState.value
-        var lastNameError: String? = null
-        var firstNameError: String? = null
-        var birthDateError: String? = null
-        var phoneError: String? = null
-        var emailError: String? = null
-        var genderError: String? = null
-        var passportError: String? = null
-        var passwordError: String? = null
-        var confirmPasswordError: String? = null
-        var clubError: String? = null
-        var legalTermsError: String? = null
-        var hasError = false
-
-        if (state.selectedClub == null) {
-            clubError = "Выберите клуб"
-            hasError = true
-        }
-        if (!state.acceptedLegalTerms) {
-            legalTermsError = "Необходимо подтвердить согласие с условиями"
-            hasError = true
-        }
-        if (state.lastName.isBlank()) {
-            lastNameError = "Введите фамилию"
-            hasError = true
-        }
-        if (state.firstName.isBlank()) {
-            firstNameError = "Введите имя"
-            hasError = true
-        }
-        val birthIso = parseToIsoDate(state.birthDateDisplay)
-        if (birthIso == null) {
-            birthDateError = "Укажите дату рождения (дд.мм.гггг)"
-            hasError = true
-        }
-        val phoneApi = phoneForApi(state.phoneNationalDigits)
-        if (phoneApi.isEmpty()) {
-            phoneError = "Введите полный номер телефона"
-            hasError = true
-        }
-        if (state.email.isBlank()) {
-            emailError = "Введите email"
-            hasError = true
-        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(state.email).matches()) {
-            emailError = "Неверный формат email"
-            hasError = true
-        }
-        if (state.gender == null) {
-            genderError = "Выберите пол"
-            hasError = true
-        }
-        if (!state.passport.isCompleteForRegister()) {
-            passportError = "Заполните паспорт"
-            hasError = true
-        }
-        val passportIssueIso = parseToIsoDate(state.passport.issuedDateDisplay)
-        if (state.passport.isCompleteForRegister() && passportIssueIso == null) {
-            passportError = "Неверная дата выдачи паспорта"
-            hasError = true
-        }
-        if (state.password.isBlank()) {
-            passwordError = "Введите пароль"
-            hasError = true
-        } else if (state.password.length < 6) {
-            passwordError = "Пароль не менее 6 символов"
-            hasError = true
-        }
-        if (state.confirmPassword != state.password) {
-            confirmPasswordError = "Пароли не совпадают"
-            hasError = true
-        }
-        
-        if (hasError) {
-            _uiState.value = state.copy(
-                lastNameError = lastNameError,
-                firstNameError = firstNameError,
-                birthDateError = birthDateError,
-                phoneError = phoneError,
-                emailError = emailError,
-                genderError = genderError,
-                passportError = passportError,
-                passwordError = passwordError,
-                confirmPasswordError = confirmPasswordError,
-                clubError = clubError,
-                legalTermsError = legalTermsError
+        val personal = validateStep(RegisterFormStep.PERSONAL)
+        val passport = validateStep(RegisterFormStep.PASSPORT)
+        val account = validateStep(RegisterFormStep.ACCOUNT)
+        val merged = personal.merge(passport).merge(account)
+        if (merged.hasError) {
+            val targetStep = when {
+                personal.hasError -> RegisterFormStep.PERSONAL
+                passport.hasError -> RegisterFormStep.PASSPORT
+                else -> RegisterFormStep.ACCOUNT
+            }
+            applyValidationErrors(
+                merged,
+                merged.firstMessage() ?: "Заполните обязательные поля",
+                targetStep,
             )
             return null
         }
+
+        val state = _uiState.value
+        val birthIso = parseToIsoDate(state.birthDateDisplay)!!
+        val phoneApi = phoneForApi(state.phoneNationalDigits)
+        val passportIssueIso = parseToIsoDate(state.passport.issuedDateDisplay)!!
 
         val fullName = listOf(state.lastName, state.firstName, state.middleName)
             .filter { it.isNotBlank() }
@@ -489,6 +516,152 @@ class RegisterViewModel @Inject constructor(
     
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    private data class FieldErrors(
+        val lastNameError: String? = null,
+        val firstNameError: String? = null,
+        val birthDateError: String? = null,
+        val phoneError: String? = null,
+        val emailError: String? = null,
+        val genderError: String? = null,
+        val passportError: String? = null,
+        val passwordError: String? = null,
+        val confirmPasswordError: String? = null,
+        val clubError: String? = null,
+        val legalTermsError: String? = null,
+    ) {
+        val hasError: Boolean
+            get() = listOfNotNull(
+                lastNameError,
+                firstNameError,
+                birthDateError,
+                phoneError,
+                emailError,
+                genderError,
+                passportError,
+                passwordError,
+                confirmPasswordError,
+                clubError,
+                legalTermsError,
+            ).isNotEmpty()
+
+        fun firstMessage(): String? = listOfNotNull(
+            clubError,
+            lastNameError,
+            firstNameError,
+            birthDateError,
+            phoneError,
+            emailError,
+            genderError,
+            passportError,
+            passwordError,
+            confirmPasswordError,
+            legalTermsError,
+        ).firstOrNull()
+
+        fun merge(other: FieldErrors): FieldErrors = copy(
+            lastNameError = lastNameError ?: other.lastNameError,
+            firstNameError = firstNameError ?: other.firstNameError,
+            birthDateError = birthDateError ?: other.birthDateError,
+            phoneError = phoneError ?: other.phoneError,
+            emailError = emailError ?: other.emailError,
+            genderError = genderError ?: other.genderError,
+            passportError = passportError ?: other.passportError,
+            passwordError = passwordError ?: other.passwordError,
+            confirmPasswordError = confirmPasswordError ?: other.confirmPasswordError,
+            clubError = clubError ?: other.clubError,
+            legalTermsError = legalTermsError ?: other.legalTermsError,
+        )
+    }
+
+    private fun validateStep(step: RegisterFormStep): FieldErrors {
+        val state = _uiState.value
+        var errors = FieldErrors()
+        when (step) {
+            RegisterFormStep.PERSONAL -> {
+                if (state.selectedClub == null) {
+                    errors = errors.copy(clubError = "Выберите клуб на предыдущем шаге")
+                }
+                if (state.lastName.isBlank()) {
+                    errors = errors.copy(lastNameError = "Введите фамилию")
+                }
+                if (state.firstName.isBlank()) {
+                    errors = errors.copy(firstNameError = "Введите имя")
+                }
+                if (parseToIsoDate(state.birthDateDisplay) == null) {
+                    errors = errors.copy(birthDateError = "Укажите дату рождения (дд.мм.гггг)")
+                }
+                if (phoneForApi(state.phoneNationalDigits).isEmpty()) {
+                    errors = errors.copy(phoneError = "Введите полный номер телефона")
+                }
+                if (state.email.isBlank()) {
+                    errors = errors.copy(emailError = "Введите email")
+                } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(state.email).matches()) {
+                    errors = errors.copy(emailError = "Неверный формат email")
+                }
+                if (state.gender == null) {
+                    errors = errors.copy(genderError = "Выберите пол")
+                }
+            }
+            RegisterFormStep.PASSPORT -> {
+                if (!state.passport.isCompleteForRegister()) {
+                    errors = errors.copy(passportError = "Заполните все поля паспорта")
+                } else if (parseToIsoDate(state.passport.issuedDateDisplay) == null) {
+                    errors = errors.copy(passportError = "Неверная дата выдачи паспорта")
+                }
+            }
+            RegisterFormStep.ACCOUNT -> {
+                if (state.password.isBlank()) {
+                    errors = errors.copy(passwordError = "Введите пароль")
+                } else if (state.password.length < 6) {
+                    errors = errors.copy(passwordError = "Пароль не менее 6 символов")
+                }
+                if (state.confirmPassword != state.password) {
+                    errors = errors.copy(confirmPasswordError = "Пароли не совпадают")
+                }
+                if (!state.acceptedLegalTerms) {
+                    errors = errors.copy(legalTermsError = "Подтвердите согласие с условиями")
+                }
+            }
+        }
+        return errors
+    }
+
+    private fun applyValidationErrors(
+        errors: FieldErrors,
+        summary: String,
+        targetStep: RegisterFormStep? = null,
+    ) {
+        val step = targetStep ?: _uiState.value.formStep
+        _uiState.update { state ->
+            state.copy(
+                formStep = step,
+                showValidationErrors = true,
+                submitAttempted = step == RegisterFormStep.ACCOUNT,
+                validationSummary = summary,
+                lastNameError = errors.lastNameError,
+                firstNameError = errors.firstNameError,
+                birthDateError = errors.birthDateError,
+                phoneError = errors.phoneError,
+                emailError = errors.emailError,
+                genderError = errors.genderError,
+                passportError = errors.passportError,
+                passwordError = errors.passwordError,
+                confirmPasswordError = errors.confirmPasswordError,
+                clubError = errors.clubError,
+                legalTermsError = errors.legalTermsError,
+            )
+        }
+    }
+
+    private fun summaryForStep(step: RegisterFormStep, errors: FieldErrors): String {
+        val detail = errors.firstMessage()
+        return when (step) {
+            RegisterFormStep.PERSONAL -> detail ?: "Заполните личные данные"
+            RegisterFormStep.PASSPORT -> detail ?: "Заполните паспортные данные"
+            RegisterFormStep.ACCOUNT -> detail ?: "Заполните пароль и подтвердите согласие"
+        }
     }
 
     private fun parseToIsoDate(text: String): String? {

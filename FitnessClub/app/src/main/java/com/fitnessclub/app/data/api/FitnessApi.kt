@@ -10,6 +10,9 @@ interface FitnessApi {
     // Auth
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
+
+    @POST("auth/login-hint")
+    suspend fun loginHint(@Body request: LoginHintRequest): Response<LoginHintResponse>
     
     @POST("auth/register")
     suspend fun register(@Body request: RegisterRequest): Response<AuthResponse>
@@ -38,6 +41,12 @@ interface FitnessApi {
 
     @GET("user/access-status")
     suspend fun getAccessStatus(): Response<AccessStatus>
+
+    @GET("user/notification-settings")
+    suspend fun getNotificationSettings(): Response<NotificationSettings>
+
+    @PUT("user/notification-settings")
+    suspend fun updateNotificationSettings(@Body settings: NotificationSettings): Response<NotificationSettings>
 
     @POST("user/change-password")
     suspend fun changePassword(@Body request: ChangePasswordRequest): Response<Unit>
@@ -112,6 +121,9 @@ interface FitnessApi {
     // Push tokens
     @POST("user/push-token")
     suspend fun registerPushToken(@Body token: PushTokenRequest): Response<Unit>
+
+    @DELETE("user/push-token")
+    suspend fun unregisterPushToken(): Response<Unit>
     
     // Products (Shop)
     @GET("products")

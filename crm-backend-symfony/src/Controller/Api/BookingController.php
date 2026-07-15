@@ -8,6 +8,7 @@ use App\Entity\StaffNotification;
 use App\Entity\Training;
 use App\Entity\User;
 use App\Service\CurrentUserResolver;
+use App\Service\Notification\ClientNotificationService;
 use App\Service\Staff\StaffEventNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,6 +23,7 @@ class BookingController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
         private readonly StaffEventNotifier $staffEventNotifier,
+        private readonly ClientNotificationService $clientNotifications,
     ) {}
 
     #[Route('/bookings', name: 'api_bookings_list', methods: ['GET'])]
@@ -133,14 +135,14 @@ class BookingController extends AbstractController
             $startTime = $training->getStartAt()->format('d.m.Y H:i');
             foreach ($waitingBookings as $wb) {
                 $wu = $wb->getUser();
-                if ($wu && $wu->getId() !== $booking->getUser()?->getId()) {
-                    $notif = (new Notification())
-                        ->setUser($wu)
-                        ->setType(Notification::TYPE_SPOT_FREED)
-                        ->setTitle('Освободилось место!')
-                        ->setBody("Освободилось место на тренировку «{$trainingName}» ({$startTime}). Запишитесь, пока место свободно!")
-                        ->setReferenceId('training-' . $training->getId());
-                    $this->em->persist($notif);
+                if ($wu instanceof User && $wu->getId() !== $booking->getUser()?->getId()) {
+                    $this->clientNotifications->notify(
+                        $wu,
+                        Notification::TYPE_SPOT_FREED,
+                        'Освободилось место!',
+                        "Освободилось место на тренировку «{$trainingName}» ({$startTime}). Запишитесь, пока место свободно!",
+                        'training-' . $training->getId() . '-u' . $wu->getId(),
+                    );
                 }
             }
         }

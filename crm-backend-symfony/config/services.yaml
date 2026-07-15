@@ -31,6 +31,14 @@ parameters:
     alfa_acquiring_currency_default: 643
     apple_sign_in_client_id_default: 'co.worldcashbox.WorldFintess'
     default_organization_slug_default: 'demo'
+    mail_from_default: 'noreply@worldcashfit.ru'
+    mail_from_name_default: 'WorldCashFit'
+    mail_enabled_default: '1'
+    smtp_host_default: ''
+    smtp_port_default: '587'
+    smtp_user_default: ''
+    smtp_password_default: ''
+    smtp_encryption_default: 'tls'
 
 services:
     # default configuration for services in *this* file
@@ -146,6 +154,17 @@ services:
     App\Service\Admin\AdminMenuBuilder:
         arguments:
             $defaultOrganizationSlug: '%env(default:default_organization_slug_default:DEFAULT_ORGANIZATION_SLUG)%'
+
+    App\Service\Notification\ClientEmailNotifier:
+        arguments:
+            $mailFrom: '%env(default:mail_from_default:MAIL_FROM)%'
+            $mailFromName: '%env(default:mail_from_name_default:MAIL_FROM_NAME)%'
+            $smtpHost: '%env(default:smtp_host_default:SMTP_HOST)%'
+            $smtpPort: '%env(int:default:smtp_port_default:SMTP_PORT)%'
+            $smtpUser: '%env(default:smtp_user_default:SMTP_USER)%'
+            $smtpPassword: '%env(default:smtp_password_default:SMTP_PASSWORD)%'
+            $smtpEncryption: '%env(default:smtp_encryption_default:SMTP_ENCRYPTION)%'
+            $enabled: '%env(bool:default:mail_enabled_default:MAIL_ENABLED)%'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

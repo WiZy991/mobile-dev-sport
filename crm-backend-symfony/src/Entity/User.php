@@ -118,6 +118,21 @@ class User implements TenantAware
     #[ORM\Column(name: 'is_verified', type: 'boolean')]
     private bool $verified = false;
 
+    #[ORM\Column(name: 'notify_push_enabled', type: 'boolean')]
+    private bool $notifyPushEnabled = true;
+
+    #[ORM\Column(name: 'notify_email_enabled', type: 'boolean')]
+    private bool $notifyEmailEnabled = true;
+
+    #[ORM\Column(name: 'notify_training_reminders', type: 'boolean')]
+    private bool $notifyTrainingReminders = true;
+
+    #[ORM\Column(name: 'notify_schedule_changes', type: 'boolean')]
+    private bool $notifyScheduleChanges = true;
+
+    #[ORM\Column(name: 'notify_promo', type: 'boolean')]
+    private bool $notifyPromo = false;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -523,6 +538,66 @@ class User implements TenantAware
     {
         return $this->passportVerificationProvider === 'sber_id'
             && $this->passportVerificationStatus === 'verified';
+    }
+
+    public function isNotifyPushEnabled(): bool
+    {
+        return $this->notifyPushEnabled;
+    }
+
+    public function setNotifyPushEnabled(bool $notifyPushEnabled): self
+    {
+        $this->notifyPushEnabled = $notifyPushEnabled;
+
+        return $this;
+    }
+
+    public function isNotifyEmailEnabled(): bool
+    {
+        return $this->notifyEmailEnabled;
+    }
+
+    public function setNotifyEmailEnabled(bool $notifyEmailEnabled): self
+    {
+        $this->notifyEmailEnabled = $notifyEmailEnabled;
+
+        return $this;
+    }
+
+    public function isNotifyTrainingReminders(): bool
+    {
+        return $this->notifyTrainingReminders;
+    }
+
+    public function setNotifyTrainingReminders(bool $notifyTrainingReminders): self
+    {
+        $this->notifyTrainingReminders = $notifyTrainingReminders;
+
+        return $this;
+    }
+
+    public function isNotifyScheduleChanges(): bool
+    {
+        return $this->notifyScheduleChanges;
+    }
+
+    public function setNotifyScheduleChanges(bool $notifyScheduleChanges): self
+    {
+        $this->notifyScheduleChanges = $notifyScheduleChanges;
+
+        return $this;
+    }
+
+    public function isNotifyPromo(): bool
+    {
+        return $this->notifyPromo;
+    }
+
+    public function setNotifyPromo(bool $notifyPromo): self
+    {
+        $this->notifyPromo = $notifyPromo;
+
+        return $this;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

@@ -9,8 +9,11 @@ import com.fitnessclub.app.data.auth.SberPkce
 import com.fitnessclub.app.data.local.BiometricLoginCoordinator
 import com.fitnessclub.app.data.local.BiometricLoginStore
 import com.fitnessclub.app.data.local.TokenManager
+import com.fitnessclub.app.data.model.LoginHintResult
 import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
+import com.fitnessclub.app.data.repository.loginPasswordRequiredMessage
+import com.fitnessclub.app.data.repository.passwordNotSetHintMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -106,11 +109,19 @@ class LoginViewModel @Inject constructor(
     }
 
     fun onEmailChange(email: String) {
-        _uiState.value = _uiState.value.copy(email = email.trim(), emailError = null)
+        _uiState.value = _uiState.value.copy(
+            email = email.trim(),
+            emailError = null,
+            validationSummary = null,
+        )
     }
 
     fun onPasswordChange(password: String) {
-        _uiState.value = _uiState.value.copy(password = password, passwordError = null)
+        _uiState.value = _uiState.value.copy(
+            password = password,
+            passwordError = null,
+            validationSummary = null,
+        )
     }
 
     /** После ввода номера — показать поля email/пароль (API входа по email). */
@@ -137,16 +148,25 @@ class LoginViewModel @Inject constructor(
             hasError = true
         }
 
-        if (state.password.isBlank()) {
-            passwordError = "Введите пароль"
-            hasError = true
-        } else if (state.password.length < 6) {
+        if (state.password.isNotBlank() && state.password.length < 6) {
             passwordError = "Пароль не менее 6 символов"
             hasError = true
         }
 
         if (hasError) {
-            _uiState.value = state.copy(emailError = emailError, passwordError = passwordError)
+            val summary = listOfNotNull(emailError, passwordError).firstOrNull()
+            _uiState.value = state.copy(
+                emailError = emailError,
+                passwordError = passwordError,
+                validationSummary = summary,
+                showValidationAttempted = true,
+                error = null,
+            )
+            return
+        }
+
+        if (state.password.isBlank()) {
+            requestLoginHint(state.email)
             return
         }
 
@@ -154,7 +174,11 @@ class LoginViewModel @Inject constructor(
             authRepository.login(state.email, state.password).collect { result ->
                 when (result) {
                     is ApiResult.Loading -> {
-                        _uiState.value = _uiState.value.copy(isLoading = true)
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = true,
+                            error = null,
+                            validationSummary = null,
+                        )
                     }
                     is ApiResult.Success -> {
                         val rebindRefresh = if (biometricLoginStore.hasStoredCredential()) {
@@ -170,12 +194,104 @@ class LoginViewModel @Inject constructor(
                         _events.emit(LoginEvent.Success(result.data, rebindRefresh))
                     }
                     is ApiResult.Error -> {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            error = result.message
-                        )
+                        val hint = when (result.authCode) {
+                            "password_not_set" -> LoginHintResult(
+                                passwordNotSetHintMessage(),
+                                "password_not_set",
+                            )
+                            else -> LoginHintResult(
+                                loginPasswordRequiredMessage(),
+                                "password_required",
+                            )
+                        }
+                        applyLoginHint(hint)
                     }
                 }
+            }
+        }
+    }
+
+    private fun requestLoginHint(email: String) {
+        viewModelScope.launch {
+            authRepository.loginHint(email).collect { result ->
+                when (result) {
+                    is ApiResult.Loading -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = true,
+                            error = null,
+                            validationSummary = null,
+                        )
+                    }
+                    is ApiResult.Success -> applyLoginHint(result.data)
+                    is ApiResult.Error -> {
+                        if (result.authCode == "password_not_set") {
+                            applyLoginHint(
+                                LoginHintResult(passwordNotSetHintMessage(), "password_not_set"),
+                            )
+                        } else {
+                            requestLoginHintViaLogin(email)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Если login-hint ещё не задеплоен — проверяем через POST /login с пустым паролем. */
+    private fun requestLoginHintViaLogin(email: String) {
+        viewModelScope.launch {
+            authRepository.login(email, "").collect { result ->
+                when (result) {
+                    is ApiResult.Loading -> Unit
+                    is ApiResult.Success -> applyLoginHint(
+                        LoginHintResult(loginPasswordRequiredMessage(), "password_required"),
+                    )
+                    is ApiResult.Error -> {
+                        val hint = when (result.authCode) {
+                            "password_not_set" -> LoginHintResult(
+                                passwordNotSetHintMessage(),
+                                "password_not_set",
+                            )
+                            else -> LoginHintResult(
+                                loginPasswordRequiredMessage(),
+                                "password_required",
+                            )
+                        }
+                        applyLoginHint(hint)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun applyLoginHint(hint: LoginHintResult) {
+        when (hint.code) {
+            "password_not_set" -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    validationSummary = hint.message,
+                    passwordError = null,
+                    showValidationAttempted = true,
+                    error = null,
+                )
+            }
+            "email_unknown" -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    validationSummary = hint.message,
+                    passwordError = loginPasswordRequiredMessage(),
+                    showValidationAttempted = true,
+                    error = null,
+                )
+            }
+            else -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    validationSummary = null,
+                    passwordError = loginPasswordRequiredMessage(),
+                    showValidationAttempted = true,
+                    error = null,
+                )
             }
         }
     }
@@ -286,6 +402,9 @@ data class LoginUiState(
     val password: String = "",
     val emailError: String? = null,
     val passwordError: String? = null,
+    /** Сообщение над кнопкой после неудачной попытки входа. */
+    val validationSummary: String? = null,
+    val showValidationAttempted: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
     /** В настройках сохранён вход по отпечатку (есть зашифрованный refresh). */

@@ -394,7 +394,17 @@ HTML;
 
         $candidates = [];
         if ($email !== null) {
-            $candidates[] = $repo->findOneBy(['email' => $email]);
+            $byEmail = $this->em->createQueryBuilder()
+                ->select('u')
+                ->from(User::class, 'u')
+                ->where('LOWER(u.email) = :email')
+                ->setParameter('email', mb_strtolower($email))
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getOneOrNullResult();
+            if ($byEmail instanceof User) {
+                $candidates[] = $byEmail;
+            }
         }
         if ($phone !== null) {
             $candidates[] = $this->findUserByNormalizedPhone($phone);

@@ -21,7 +21,9 @@ import com.fitnessclub.app.data.local.AppLanguage
 import com.fitnessclub.app.data.local.AppSettingsStore
 import com.fitnessclub.app.data.local.ThemeMode
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.LaunchedEffect
 import com.fitnessclub.app.data.repository.AuthRepository
+import com.fitnessclub.app.push.PushTokenRegistrar
 import com.fitnessclub.app.ui.navigation.NavGraph
 import com.fitnessclub.app.ui.theme.FitnessClubTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,6 +37,9 @@ class MainActivity : FragmentActivity() {
 
     @Inject
     lateinit var appSettingsStore: AppSettingsStore
+
+    @Inject
+    lateinit var pushTokenRegistrar: PushTokenRegistrar
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +71,12 @@ class MainActivity : FragmentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val isLoggedIn by authRepository.isLoggedIn().collectAsState(initial = false)
+
+                    LaunchedEffect(isLoggedIn) {
+                        if (isLoggedIn) {
+                            pushTokenRegistrar.register()
+                        }
+                    }
                     
                     NavGraph(
                         navController = navController,

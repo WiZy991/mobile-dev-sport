@@ -559,7 +559,6 @@ class MockInterceptor : Interceptor {
     
     private fun mockClubsListResponse(): String = """
     [
-        {"id":"1","name":"ТЦ Формат","address":"ул. Центральная, 18, 2 этаж","phone":null,"email":null,"working_hours":null,"latitude":0,"longitude":0,"amenities":[],"max_capacity":null},
         {"id":"2","name":"ТЦ Новый де Фриз","address":"ул. Купера, 2, 2 этаж","phone":null,"email":null,"working_hours":null,"latitude":0,"longitude":0,"amenities":[],"max_capacity":null},
         {"id":"3","name":"ул. Купера, 2","address":"Основной зал","phone":null,"email":null,"working_hours":null,"latitude":0,"longitude":0,"amenities":[],"max_capacity":null}
     ]

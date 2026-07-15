@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.SubscriptionPlan
-import com.fitnessclub.app.data.config.AppConfig
 import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.PurchaseSubscriptionOutcome
 import com.fitnessclub.app.data.repository.SubscriptionRepository
@@ -27,7 +26,7 @@ data class SubscriptionPlansUiState(
     val promoDiscountAmount: Double? = null,
     val isApplyingPromo: Boolean = false,
     val purchaseSuccess: Boolean = false,
-    val clubLegalLinks: ClubLegalLinks? = null,
+    val clubPurchaseContext: ClubPurchaseContext = ClubPurchaseContext(clubName = "Ваш клуб"),
 )
 
 @HiltViewModel
@@ -41,38 +40,23 @@ class SubscriptionPlansViewModel @Inject constructor(
     
     init {
         loadPlans()
-        loadClubLegalLinks()
+        loadClubPurchaseContext()
     }
 
-    private fun loadClubLegalLinks() {
+    private fun loadClubPurchaseContext() {
         viewModelScope.launch {
-            when (val result = clubRepository.getClubInfo()) {
+            val context = when (val result = clubRepository.getClubInfo()) {
                 is ApiResult.Success -> {
                     val club = result.data
-                    _uiState.update {
-                        it.copy(
-                            clubLegalLinks = ClubLegalLinks(
-                                clubName = club.name,
-                                offerUrl = club.offerUrl ?: AppConfig.TERMS_URL,
-                                privacyUrl = club.privacyUrl ?: AppConfig.PRIVACY_URL,
-                                visitingRulesUrl = club.visitingRulesUrl,
-                                safetyRulesUrl = club.safetyRulesUrl,
-                            )
-                        )
-                    }
+                    ClubPurchaseContext(
+                        clubName = club.name.ifBlank { "Ваш клуб" },
+                        visitingRulesUrl = club.visitingRulesUrl,
+                        safetyRulesUrl = club.safetyRulesUrl,
+                    )
                 }
-                else -> {
-                    _uiState.update {
-                        it.copy(
-                            clubLegalLinks = ClubLegalLinks(
-                                clubName = "Ваш клуб",
-                                offerUrl = AppConfig.TERMS_URL,
-                                privacyUrl = AppConfig.PRIVACY_URL,
-                            )
-                        )
-                    }
-                }
+                else -> ClubPurchaseContext(clubName = "Ваш клуб")
             }
+            _uiState.update { it.copy(clubPurchaseContext = context) }
         }
     }
     

@@ -9,11 +9,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.BuildConfig
-import com.fitnessclub.app.data.config.AppConfig
+import com.fitnessclub.app.data.config.AppDistribution
 import com.fitnessclub.app.ui.theme.Primary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -22,6 +23,8 @@ fun AboutScreen(
     onNavigateBack: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val rateLabel = AppDistribution.rateAppButtonLabel(context)
     
     Scaffold(
         topBar = {
@@ -67,10 +70,10 @@ fun AboutScreen(
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
-                onClick = { uriHandler.openUri(AppConfig.PLAY_STORE_URL) },
+                onClick = { uriHandler.openUri(AppDistribution.storeListingUrl(context)) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Оценить в Google Play")
+                Text(rateLabel)
             }
         }
     }

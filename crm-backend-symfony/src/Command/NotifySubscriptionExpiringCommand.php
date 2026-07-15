@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Entity\Notification;
 use App\Entity\Subscription;
+use App\Service\Notification\ClientNotificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -23,6 +24,7 @@ final class NotifySubscriptionExpiringCommand extends Command
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly ClientNotificationService $clientNotifications,
     ) {
         parent::__construct();
     }
@@ -61,23 +63,21 @@ final class NotifySubscriptionExpiringCommand extends Command
             }
 
             $daysLeft = (int) $today->diff($end)->format('%a');
-            $n = (new Notification())
-                ->setUser($sub->getUser())
-                ->setType(Notification::TYPE_SUBSCRIPTION)
-                ->setTitle('Абонемент скоро закончится')
-                ->setBody(sprintf(
+            $this->clientNotifications->notify(
+                $sub->getUser(),
+                Notification::TYPE_SUBSCRIPTION,
+                'Абонемент скоро закончится',
+                sprintf(
                     'До окончания абонемента «%s» осталось %d дн. Оформите продление в приложении.',
                     $sub->getPlan()->getName(),
                     $daysLeft
-                ))
-                ->setReferenceId($ref);
-
-            $this->em->persist($n);
+                ),
+                $ref,
+            );
             ++$created;
         }
 
-        $this->em->flush();
-        $io->success(sprintf('Создано уведомлений: %d (проверено абонементов в окне 5–7 дней: %d)', $created, count($subs)));
+        $io->success(sprintf('Отправлено уведомлений: %d (проверено абонементов в окне 5–7 дней: %d)', $created, count($subs)));
 
         return Command::SUCCESS;
     }

@@ -33,23 +33,36 @@ class AuthController extends AbstractController
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         $password = (string) ($data['password'] ?? '');
 
-        if ($email === '' || $password === '') {
-            return $this->json(['error' => 'Укажите email и password', 'code' => 'missing_credentials'], 400);
+        if ($email === '') {
+            return $this->json(['error' => 'Укажите email', 'code' => 'missing_email'], 400);
         }
 
-        $user = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
+        $user = $this->findUserByEmail($email);
+
+        if ($password === '') {
+            if ($user !== null && $this->userPasswordNotSet($user)) {
+                $hint = $this->loginHintForUser($user);
+
+                return $this->json([
+                    'error' => $hint['message'],
+                    'code' => $hint['code'],
+                ], 401);
+            }
+            return $this->json(['error' => 'Введите пароль', 'code' => 'missing_password'], 400);
+        }
 
         if (!$user) {
             return $this->json(['error' => 'Неверный email или пароль', 'code' => 'invalid_credentials'], 401);
         }
-        $hash = $user->getPasswordHash();
-        if ($hash === null || $hash === '') {
+        if ($this->userPasswordNotSet($user)) {
+            $hint = $this->loginHintForUser($user);
+
             return $this->json([
-                'error' => 'Для этого аккаунта вход по паролю не настроен',
-                'code' => 'password_not_set',
+                'error' => $hint['message'],
+                'code' => $hint['code'],
             ], 401);
         }
-        if (!password_verify($password, $hash)) {
+        if (!password_verify($password, (string) $user->getPasswordHash())) {
             return $this->json(['error' => 'Неверный email или пароль', 'code' => 'invalid_credentials'], 401);
         }
 
@@ -58,6 +71,52 @@ class AuthController extends AbstractController
         }
 
         return $this->json($this->mobileTokens->issue($user, false));
+    }
+
+    /**
+     * Подсказка для экрана входа: есть ли аккаунт и нужен ли пароль.
+     * Не раскрывает лишнего — только то, что и так видно при попытке входа.
+     */
+    #[Route('/login-hint', name: 'api_auth_login_hint', methods: ['POST'])]
+    public function loginHint(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true) ?? [];
+        $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
+
+        if ($email === '') {
+            return $this->json(['error' => 'Укажите email', 'code' => 'missing_email'], 400);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->json(['error' => 'Некорректный email', 'code' => 'invalid_email'], 400);
+        }
+
+        $user = $this->findUserByEmail($email);
+
+        return $this->json($this->loginHintForUser($user));
+    }
+
+    private function loginHintForUser(?User $user): array
+    {
+        if ($user === null) {
+            return [
+                'message' => 'Введите пароль. Если аккаунта ещё нет — пройдите регистрацию.',
+                'code' => 'email_unknown',
+            ];
+        }
+
+        if ($this->userPasswordNotSet($user)) {
+            return [
+                'message' => $this->isSberLinkedAccount($user)
+                    ? $this->passwordNotSetMessage()
+                    : 'Аккаунт найден, но пароль для входа по email не задан. Задайте пароль в профиле или обратитесь в клуб.',
+                'code' => 'password_not_set',
+            ];
+        }
+
+        return [
+            'message' => 'Введите пароль',
+            'code' => 'password_required',
+        ];
     }
 
     #[Route('/register', name: 'api_auth_register', methods: ['POST'])]
@@ -79,8 +138,17 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Пароль должен быть не менее 6 символов', 'code' => 'weak_password'], 400);
         }
 
-        $existing = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
+        $existing = $this->findUserByEmail($email);
         if ($existing !== null) {
+            $existingHash = $existing->getPasswordHash();
+            if ($existingHash === null || $existingHash === '') {
+                return $this->json([
+                    'error' => 'Этот email уже привязан к аккаунту Сбер ID. Войдите через Сбер ID '
+                        . 'и задайте пароль в Профиле → Изменить пароль.',
+                    'code' => 'password_not_set',
+                ], 409);
+            }
+
             return $this->json([
                 'error' => 'Пользователь с таким email уже зарегистрирован',
                 'code' => 'email_already_exists',
@@ -184,6 +252,46 @@ class AuthController extends AbstractController
         }
 
         return null;
+    }
+
+    /** Поиск по email без учёта регистра (Сбер ID может сохранить mixed case). */
+    private function findUserByEmail(string $email): ?User
+    {
+        $normalized = mb_strtolower(trim($email));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return $this->em->createQueryBuilder()
+            ->select('u')
+            ->from(User::class, 'u')
+            ->where('LOWER(u.email) = :email')
+            ->setParameter('email', $normalized)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    private function userPasswordNotSet(User $user): bool
+    {
+        $hash = $user->getPasswordHash();
+
+        return $hash === null || trim((string) $hash) === '';
+    }
+
+    private function isSberLinkedAccount(User $user): bool
+    {
+        $sberId = $user->getSberId();
+
+        return ($sberId !== null && trim($sberId) !== '')
+            || $user->getPassportVerificationProvider() === 'sber_id';
+    }
+
+    private function passwordNotSetMessage(): string
+    {
+        return 'Аккаунт с этим email есть, но пароль не задан (вход через Сбер ID). '
+            . 'Нажмите «Войти через Сбер ID» ниже, затем Профиль → Изменить пароль — '
+            . 'и задайте пароль для входа по email.';
     }
 }
 

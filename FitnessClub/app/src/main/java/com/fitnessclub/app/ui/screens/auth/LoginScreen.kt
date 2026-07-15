@@ -28,6 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
@@ -228,7 +230,23 @@ fun LoginScreen(
                     }
                 },
             )
+            uiState.validationSummary?.let { summary ->
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF5D2E00).copy(0.55f)),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(
+                        text = summary,
+                        color = Color(0xFFFFE0B2),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(14.dp),
+                    )
+                }
+            }
             Spacer(Modifier.height(16.dp))
+            val hasFormIssue = uiState.validationSummary != null
             Button(
                 onClick = { viewModel.login() },
                 enabled = !uiState.isLoading,
@@ -237,7 +255,11 @@ fun LoginScreen(
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = LoginSurfaceWhite,
+                    containerColor = if (hasFormIssue) {
+                        LoginSurfaceWhite.copy(0.45f)
+                    } else {
+                        LoginSurfaceWhite
+                    },
                     contentColor = LoginBackground,
                     disabledContainerColor = LoginSurfaceWhite.copy(0.5f),
                 ),
@@ -264,14 +286,16 @@ fun LoginScreen(
                     .padding(vertical = 8.dp)
             )
 
-            uiState.error?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = it,
-                    color = LoginSurfaceWhite,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center
-                )
+            uiState.error?.let { err ->
+                if (uiState.validationSummary == null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = err,
+                        color = LoginSurfaceWhite,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             Spacer(Modifier.height(20.dp))

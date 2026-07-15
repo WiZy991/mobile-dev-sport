@@ -7,6 +7,7 @@ use App\Entity\Notification;
 use App\Entity\StaffNotification;
 use App\Entity\StaffUser;
 use App\Entity\User;
+use App\Service\Notification\ClientNotificationService;
 use App\Service\Push\FcmPushSender;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -29,6 +30,7 @@ final class AccessAlarmNotifier
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly FcmPushSender $fcmPushSender,
+        private readonly ClientNotificationService $clientNotifications,
     ) {
     }
 
@@ -114,29 +116,14 @@ final class AccessAlarmNotifier
             $count
         );
 
-        $notification = (new Notification())
-            ->setUser($user)
-            ->setType(Notification::TYPE_ACCESS_ALARM)
-            ->setTitle($title)
-            ->setBody($body)
-            ->setReferenceId($referenceId);
-        $this->em->persist($notification);
-        $this->em->flush();
-
-        $userId = $user->getId();
-        if ($userId !== null) {
-            $this->fcmPushSender->sendToClientUserIds(
-                [$userId],
-                $title,
-                $body,
-                [
-                    'type' => Notification::TYPE_ACCESS_ALARM,
-                    'alarmType' => $alarm->getType(),
-                    'alarmId' => $referenceId ?? '',
-                    'peopleCount' => (string) $count,
-                ]
-            );
-        }
+        $this->clientNotifications->notify(
+            $user,
+            Notification::TYPE_ACCESS_ALARM,
+            $title,
+            $body,
+            $referenceId,
+            force: true,
+        );
     }
 
     /** Человекочитаемое название нарушения по типу тревоги. */

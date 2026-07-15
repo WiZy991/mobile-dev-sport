@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,7 +28,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.config.LegalDocumentType
-import com.fitnessclub.app.data.config.AppConfig
+import com.fitnessclub.app.data.config.AppDistribution
 import com.fitnessclub.app.data.local.AppLanguage
 import com.fitnessclub.app.data.local.ThemeMode
 import com.fitnessclub.app.ui.components.GeneralFeedbackDialog
@@ -50,14 +51,14 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val settingsState by viewModel.uiState.collectAsState()
-    var pushEnabled by remember { mutableStateOf(true) }
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
-    var emailEnabled by remember { mutableStateOf(true) }
-    var trainingReminders by remember { mutableStateOf(true) }
-    var promoNotifications by remember { mutableStateOf(false) }
-    var scheduleChanges by remember { mutableStateOf(true) }
+    val notificationSettings = settingsState.notificationSettings
+
+    LaunchedEffect(settingsState.notificationsError) {
+        settingsState.notificationsError?.let { snackbarHostState.showSnackbar(it) }
+    }
 
     DisposableEffect(Unit) {
         viewModel.refreshBiometricUi()
@@ -94,16 +95,18 @@ fun SettingsScreen(
                     icon = Icons.Default.Notifications,
                     title = "Push-уведомления",
                     subtitle = "Получать push-уведомления",
-                    checked = pushEnabled,
-                    onCheckedChange = { pushEnabled = it }
+                    checked = notificationSettings.pushEnabled,
+                    enabled = !settingsState.notificationsLoading && !settingsState.notificationsSaving,
+                    onCheckedChange = viewModel::setPushEnabled
                 )
                 
                 SwitchSettingItem(
                     icon = Icons.Default.Email,
                     title = "Email-уведомления",
                     subtitle = "Получать уведомления на почту",
-                    checked = emailEnabled,
-                    onCheckedChange = { emailEnabled = it }
+                    checked = notificationSettings.emailEnabled,
+                    enabled = !settingsState.notificationsLoading && !settingsState.notificationsSaving,
+                    onCheckedChange = viewModel::setEmailEnabled
                 )
                 
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -112,24 +115,27 @@ fun SettingsScreen(
                     icon = Icons.Default.FitnessCenter,
                     title = "Напоминания о тренировках",
                     subtitle = "За 1 час до начала",
-                    checked = trainingReminders,
-                    onCheckedChange = { trainingReminders = it }
+                    checked = notificationSettings.trainingReminders,
+                    enabled = !settingsState.notificationsLoading && !settingsState.notificationsSaving,
+                    onCheckedChange = viewModel::setTrainingReminders
                 )
                 
                 SwitchSettingItem(
                     icon = Icons.Default.Schedule,
                     title = "Изменения в расписании",
                     subtitle = "Уведомлять об изменениях",
-                    checked = scheduleChanges,
-                    onCheckedChange = { scheduleChanges = it }
+                    checked = notificationSettings.scheduleChanges,
+                    enabled = !settingsState.notificationsLoading && !settingsState.notificationsSaving,
+                    onCheckedChange = viewModel::setScheduleChanges
                 )
                 
                 SwitchSettingItem(
                     icon = Icons.Default.LocalOffer,
                     title = "Акции и предложения",
                     subtitle = "Специальные предложения клуба",
-                    checked = promoNotifications,
-                    onCheckedChange = { promoNotifications = it }
+                    checked = notificationSettings.promoNotifications,
+                    enabled = !settingsState.notificationsLoading && !settingsState.notificationsSaving,
+                    onCheckedChange = viewModel::setPromoNotifications
                 )
             }
             
@@ -201,7 +207,8 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Star,
                     title = "Оценить приложение",
-                    onClick = { uriHandler.openUri(AppConfig.PLAY_STORE_URL) }
+                    subtitle = AppDistribution.rateAppButtonLabel(context),
+                    onClick = { uriHandler.openUri(AppDistribution.storeListingUrl(context)) }
                 )
                 
                 ClickableSettingItem(
@@ -418,12 +425,16 @@ private fun SwitchSettingItem(
     title: String,
     subtitle: String? = null,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .then(
+                if (enabled) Modifier.clickable { onCheckedChange(!checked) }
+                else Modifier
+            )
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -455,7 +466,8 @@ private fun SwitchSettingItem(
         
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
         )
     }
 }

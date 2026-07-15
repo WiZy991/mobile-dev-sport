@@ -63,6 +63,33 @@
 
             <hr class="border-secondary my-3">
 
+            <div class="mb-2 text-primary small fw-semibold text-uppercase">Документы для покупки абонемента</div>
+            <p class="small text-secondary mb-3">
+                Эти ссылки показываются клиенту в приложении <strong>перед оплатой абонемента</strong>.
+                Укажите документы <strong>владельца клуба (ИП)</strong> — оферту и политику ПДн.
+                Не используйте здесь документы WorldCashFit (они уже принимаются при регистрации в приложении).
+            </p>
+            <div class="row g-2 mb-3">
+                <div class="col-12">
+                    <label class="form-label small">Договор с клиентами клуба (публичная оферта) *</label>
+                    <input type="url" name="offer_url" class="form-control form-control-sm" value="{{ club.offer_url }}" placeholder="https://worldcashfit.ru/client-agreement">
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Политика по обработке персональных данных клуба *</label>
+                    <input type="url" name="privacy_url" class="form-control form-control-sm" value="{{ club.privacy_url }}" placeholder="https://worldcashfit.ru/privacy/">
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Правила посещения клуба (необязательно)</label>
+                    <input type="url" name="visiting_rules_url" class="form-control form-control-sm" value="{{ club.visiting_rules_url }}" placeholder="https://example.ru/rules">
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Техника безопасности клуба (необязательно)</label>
+                    <input type="url" name="safety_rules_url" class="form-control form-control-sm" value="{{ club.safety_rules_url }}" placeholder="https://example.ru/safety">
+                </div>
+            </div>
+
+            <hr class="border-secondary my-3">
+
             <div class="mb-2 text-primary small fw-semibold text-uppercase">Модули CRM</div>
             <p class="small text-secondary mb-2">Отключённые модули скрываются из меню для всех сотрудников. Базовые разделы (клиенты, расписание, абонементы…) всегда доступны.</p>
             <div class="row g-2 mb-3">

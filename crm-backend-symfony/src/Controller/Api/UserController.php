@@ -7,6 +7,7 @@ use App\Entity\Sale;
 use App\Entity\User;
 use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\Api\UserAccountDeletionService;
+use App\Service\Notification\ClientNotificationService;
 use App\Service\CurrentUserResolver;
 use App\Service\MobileClientPayloadApplier;
 use App\Service\Reports\OccupancyService;
@@ -26,6 +27,7 @@ class UserController extends AbstractController
         private readonly MobileAuthTokenIssuer $mobileTokens,
         private readonly UserAccountDeletionService $accountDeletion,
         private readonly OccupancyService $occupancyService,
+        private readonly ClientNotificationService $clientNotifications,
     ) {}
 
     #[Route('/access-status', name: 'api_user_access_status', methods: ['GET'])]
@@ -168,19 +170,6 @@ class UserController extends AbstractController
         return $this->json($this->serializeUserProfile($user));
     }
 
-    #[Route('/account', name: 'api_user_account_delete', methods: ['DELETE'])]
-    public function deleteAccount(Request $request): JsonResponse
-    {
-        $user = $this->userResolver->resolve($request);
-        if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
-        }
-
-        $this->accountDeletion->deleteAccount($user);
-
-        return $this->json(['success' => true]);
-    }
-
     #[Route('/change-password', name: 'api_user_change_password', methods: ['POST'])]
     public function changePassword(Request $request): JsonResponse
     {
@@ -223,6 +212,46 @@ class UserController extends AbstractController
         $this->em->flush();
 
         return $this->json(['success' => true]);
+    }
+
+    #[Route('/account', name: 'api_user_account_delete', methods: ['DELETE'])]
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $this->accountDeletion->deleteAccount($user);
+
+        return $this->json(['success' => true]);
+    }
+
+    #[Route('/notification-settings', name: 'api_user_notification_settings_get', methods: ['GET'])]
+    public function notificationSettings(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        return $this->json(ClientNotificationService::serializeSettings($user));
+    }
+
+    #[Route('/notification-settings', name: 'api_user_notification_settings_update', methods: ['PUT'])]
+    public function updateNotificationSettings(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $this->clientNotifications->applySettings($user, $data);
+        $this->em->persist($user);
+        $this->em->flush();
+
+        return $this->json(ClientNotificationService::serializeSettings($user));
     }
 
     /** @return array<string, mixed> */

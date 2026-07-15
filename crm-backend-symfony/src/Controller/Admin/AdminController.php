@@ -30,6 +30,8 @@ use App\Service\Admin\SubscriptionPlanCatalog;
 use App\Service\Admin\SubscriptionPlanDeletionService;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
+use App\Service\Notification\PromoBroadcastNotifier;
+use App\Service\Notification\TrainingScheduleNotifier;
 use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Api\SubscriptionLifecycleService;
@@ -71,6 +73,8 @@ class AdminController extends AbstractController
         private readonly SubscriptionPlanDeletionService $planDeletionService,
         private readonly LeadIngestionService $leadIngestion,
         private readonly OnboardingQuestCatalog $onboardingQuestCatalog,
+        private readonly TrainingScheduleNotifier $trainingScheduleNotifier,
+        private readonly PromoBroadcastNotifier $promoBroadcastNotifier,
     ) {}
 
     private function buildMenu(): array
@@ -1124,6 +1128,8 @@ class AdminController extends AbstractController
             throw $this->createNotFoundException();
         }
 
+        $previousStartAt = $training->getStartAt();
+
         $name = trim((string) $request->request->get('name'));
         $trainerId = $request->request->get('trainer_id');
         $room = $request->request->get('room') ?: null;
@@ -1181,6 +1187,7 @@ class AdminController extends AbstractController
         }
 
         $this->em->flush();
+        $this->trainingScheduleNotifier->notifyTrainingUpdated($training, $previousStartAt);
         $this->addFlash('success', 'Тренировка обновлена (перенесена).');
 
         return $this->redirectToSchedulePreservingDate($request);
@@ -1280,6 +1287,7 @@ class AdminController extends AbstractController
     {
         $training = $this->em->getRepository(Training::class)->find($id);
         if ($training && $training->getCurrentParticipants() === 0) {
+            $this->trainingScheduleNotifier->notifyTrainingCancelled($training);
             $this->em->remove($training);
             $this->em->flush();
         }
@@ -1510,7 +1518,7 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
-            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle'];
+            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
                 $this->clubSettings->set($key, $value !== '' ? $value : null);
@@ -1561,6 +1569,10 @@ class AdminController extends AbstractController
                 'longitude' => $getSetting('longitude', '37.6173'),
                 'promo_home_title' => $getSetting('promo_home_title', 'СКИДКА 20%!'),
                 'promo_home_subtitle' => $getSetting('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
+                'offer_url' => $getSetting('offer_url', ''),
+                'privacy_url' => $getSetting('privacy_url', ''),
+                'visiting_rules_url' => $getSetting('visiting_rules_url', ''),
+                'safety_rules_url' => $getSetting('safety_rules_url', ''),
                 'perco_enabled' => $getSetting('perco_enabled', '0'),
                 'perco_base_url' => $getSetting('perco_base_url', ''),
                 'perco_login' => $getSetting('perco_login', ''),
@@ -1739,8 +1751,12 @@ class AdminController extends AbstractController
     {
         $promotion = $this->em->getRepository(Promotion::class)->find($id);
         if ($promotion) {
-            $promotion->setIsActive(!$promotion->isActive());
+            $wasActive = $promotion->isActive();
+            $promotion->setIsActive(!$wasActive);
             $this->em->flush();
+            if (!$wasActive && $promotion->isActive()) {
+                $this->promoBroadcastNotifier->notifyPromotionActivated($promotion);
+            }
         }
 
         return $this->redirectToRoute('admin_section', ['section' => 'promotions']);

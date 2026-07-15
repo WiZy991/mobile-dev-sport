@@ -56,8 +56,17 @@ final class SberIdProfileApplicator
             return;
         }
 
-        $other = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
-        if ($other !== null && $other->getId() !== $user->getId()) {
+        $other = $this->em->createQueryBuilder()
+            ->select('u')
+            ->from(User::class, 'u')
+            ->where('LOWER(u.email) = :email')
+            ->andWhere('u.id != :id')
+            ->setParameter('email', $email)
+            ->setParameter('id', $user->getId() ?? 0)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+        if ($other instanceof User) {
             return;
         }
 
@@ -237,8 +246,8 @@ final class SberIdProfileApplicator
     {
         foreach (['email', 'preferred_username'] as $k) {
             if (isset($merged[$k]) && is_string($merged[$k])) {
-                $e = trim($merged[$k]);
-                if ($e !== '') {
+                $e = mb_strtolower(trim($merged[$k]));
+                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
                     return $e;
                 }
             }

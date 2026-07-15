@@ -14,15 +14,18 @@ data class RegistrationVenueCard(
     val title: String,
     val addressLines: String,
     @DrawableRes val imageRes: Int,
+    /** Показывать на экране «Выберите зал» при регистрации. */
+    val openForRegistration: Boolean = true,
 )
 
 object RegistrationVenues {
-    val orderedCards: List<RegistrationVenueCard> = listOf(
+    private val allCards: List<RegistrationVenueCard> = listOf(
         RegistrationVenueCard(
             clubId = "1",
             title = "ТЦ Формат",
             addressLines = "ул. Центральная 18, 2 этаж",
             imageRes = R.drawable.registration_club_mall,
+            openForRegistration = false,
         ),
         RegistrationVenueCard(
             clubId = "2",
@@ -31,6 +34,8 @@ object RegistrationVenues {
             imageRes = R.drawable.registration_club_kupera,
         ),
     )
+
+    val orderedCards: List<RegistrationVenueCard> = allCards.filter { it.openForRegistration }
 
     fun toClubItem(card: RegistrationVenueCard): ClubItem = ClubItem(
         id = card.clubId,

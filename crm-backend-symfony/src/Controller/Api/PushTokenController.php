@@ -3,7 +3,9 @@
 namespace App\Controller\Api;
 
 use App\Entity\PushToken;
+use App\Entity\User;
 use App\Service\CurrentUserResolver;
+use App\Service\Notification\ClientNotificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,6 +18,7 @@ class PushTokenController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly CurrentUserResolver $userResolver,
+        private readonly ClientNotificationService $clientNotifications,
     ) {}
 
     #[Route('/push-token', name: 'api_user_push_token', methods: ['POST'])]
@@ -30,6 +33,14 @@ class PushTokenController extends AbstractController
             return $this->json(['error' => 'Token is required'], 400);
         }
 
+        $user = $this->userResolver->resolve($request);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+        if (!$user->isNotifyPushEnabled()) {
+            return $this->json(['error' => 'Push notifications disabled', 'code' => 'push_disabled'], 403);
+        }
+
         $repo = $this->em->getRepository(PushToken::class);
 
         /** @var PushToken|null $pushToken */
@@ -38,20 +49,12 @@ class PushTokenController extends AbstractController
         if (!$pushToken) {
             $pushToken = (new PushToken())
                 ->setToken($tokenValue)
-                ->setPlatform($platform);
-
-            $user = $this->userResolver->resolve($request);
-            if ($user) {
-                $pushToken->setUser($user);
-            }
-
+                ->setPlatform($platform)
+                ->setUser($user);
             $this->em->persist($pushToken);
         } else {
-            $user = $this->userResolver->resolve($request);
-            if ($user) {
-                $pushToken->setUser($user);
-            }
             $pushToken
+                ->setUser($user)
                 ->setPlatform($platform)
                 ->touch();
         }
@@ -64,5 +67,17 @@ class PushTokenController extends AbstractController
             'platform' => $pushToken->getPlatform(),
         ]);
     }
-}
 
+    #[Route('/push-token', name: 'api_user_push_token_delete', methods: ['DELETE'])]
+    public function unregister(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $this->clientNotifications->clearPushTokens($user);
+
+        return $this->json(['success' => true]);
+    }
+}

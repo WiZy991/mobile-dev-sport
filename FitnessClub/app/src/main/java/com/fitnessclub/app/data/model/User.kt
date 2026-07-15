@@ -51,6 +51,24 @@ data class LoginRequest(
     val password: String
 )
 
+data class LoginHintRequest(
+    @SerializedName("email")
+    val email: String,
+)
+
+data class LoginHintResponse(
+    @SerializedName("message")
+    val message: String,
+    @SerializedName("code")
+    val code: String,
+)
+
+/** Результат подсказки для экрана входа (с кодом от сервера). */
+data class LoginHintResult(
+    val message: String,
+    val code: String,
+)
+
 data class ChangePasswordRequest(
     @SerializedName("current_password")
     val currentPassword: String = "",

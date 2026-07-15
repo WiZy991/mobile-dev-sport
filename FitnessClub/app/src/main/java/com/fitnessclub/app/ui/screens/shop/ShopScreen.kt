@@ -21,11 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.fitnessclub.app.data.config.AppConfig
+import androidx.compose.ui.platform.LocalUriHandler
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.ui.screens.subscriptions.ClubPurchaseConsentDialog
-import com.fitnessclub.app.ui.screens.subscriptions.ClubLegalLinks
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPurchaseConfirmDialog
 import com.fitnessclub.app.ui.theme.*
 import kotlinx.coroutines.launch
@@ -63,6 +62,7 @@ fun ShopScreen(
     var purchaseError by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     
     LaunchedEffect(uiState.purchaseMessage, uiState.error) {
@@ -187,21 +187,16 @@ fun ShopScreen(
                 purchaseError = null
             },
             onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
-            onConfirm = {
-                showLegalConsentForPlan = plan
-            },
+            onConfirm = { showLegalConsentForPlan = plan },
         )
     }
 
     showLegalConsentForPlan?.let { plan ->
-        val links = uiState.clubLegalLinks ?: ClubLegalLinks(
-            clubName = "Ваш клуб",
-            offerUrl = AppConfig.TERMS_URL,
-            privacyUrl = AppConfig.PRIVACY_URL,
-        )
         ClubPurchaseConsentDialog(
-            legalLinks = links,
+            context = uiState.clubPurchaseContext,
             onDismiss = { showLegalConsentForPlan = null },
+            onOpenDocument = onOpenLegalDocument,
+            onOpenExternalUrl = { uriHandler.openUri(it) },
             onConfirm = {
                 purchaseError = null
                 showLegalConsentForPlan = null

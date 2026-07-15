@@ -56,7 +56,11 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -110,10 +114,14 @@ fun RegisterScreen(
     var typeMenuExpanded by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
-    // Открытый DropdownMenu держит popup-слой: первый тап снаружи часто только закрывает меню.
-    // При прокрутке формы закрываем выпадашки, чтобы кнопка «Зарегистрироваться» стабильно получала нажатия.
     LaunchedEffect(scrollState.value) {
         typeMenuExpanded = false
+    }
+
+    LaunchedEffect(uiState.showValidationErrors, uiState.validationSummary, uiState.formStep) {
+        if (uiState.validationSummary != null) {
+            scrollState.animateScrollTo(0)
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -166,7 +174,15 @@ fun RegisterScreen(
                     .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-                IconButton(onClick = onNavigateToLogin) {
+                IconButton(
+                    onClick = {
+                        if (uiState.formStep == RegisterFormStep.PERSONAL) {
+                            onNavigateToLogin()
+                        } else {
+                            viewModel.goToPreviousFormStep()
+                        }
+                    }
+                ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Назад",
@@ -174,312 +190,70 @@ fun RegisterScreen(
                     )
                 }
             }
+            RegisterStepIndicator(current = uiState.formStep)
             Text(
-                "РЕГИСТРАЦИЯ ПОЛЬЗОВАТЕЛЯ",
+                uiState.formStep.title.uppercase(),
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 20.dp),
+                    .padding(bottom = 12.dp),
                 textAlign = TextAlign.Center
             )
 
             SelectedClubSummary(
                 club = uiState.selectedClub,
                 clubsLoadError = uiState.clubsLoadError,
-                clubError = uiState.fieldErr(uiState.clubError),
+                clubError = uiState.fieldError(uiState.clubError),
                 onChangeClub = onChangeClub,
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
 
-            ExposedDropdownMenuBox(
-                expanded = typeMenuExpanded,
-                onExpandedChange = { typeMenuExpanded = it },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                TextField(
-                    value = uiState.registrationType.label,
-                    onValueChange = {},
-                    readOnly = true,
-                    textStyle = orangeRegisterInputTextStyle(),
-                    label = { Text("Тип регистрации", color = Color.White.copy(0.78f)) },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeMenuExpanded)
+            when (uiState.formStep) {
+                RegisterFormStep.PERSONAL -> RegisterPersonalStep(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    typeMenuExpanded = typeMenuExpanded,
+                    onTypeMenuExpandedChange = { typeMenuExpanded = it },
+                    birthPickerOpen = { birthPickerOpen = true },
+                    focusManager = focusManager,
+                )
+                RegisterFormStep.PASSPORT -> RegisterPassportStep(
+                    uiState = uiState,
+                    onOpenPassport = {
+                        viewModel.clearPassportError()
+                        onNavigateToPassport()
                     },
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth(),
-                    colors = orangeFieldColors()
                 )
-                DropdownMenu(
-                    expanded = typeMenuExpanded,
-                    onDismissRequest = { typeMenuExpanded = false },
-                    modifier = Modifier.exposedDropdownSize(matchTextFieldWidth = true)
+                RegisterFormStep.ACCOUNT -> RegisterAccountStep(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    uriHandler = uriHandler,
+                    passwordVisible = passwordVisible,
+                    onPasswordVisibleChange = { passwordVisible = it },
+                    confirmPasswordVisible = confirmPasswordVisible,
+                    onConfirmPasswordVisibleChange = { confirmPasswordVisible = it },
+                    focusManager = focusManager,
+                    onRegister = { viewModel.onPrimaryFormAction() },
+                )
+            }
+
+            uiState.validationSummary?.let { summary ->
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF5D2E00).copy(0.55f)),
+                    shape = RoundedCornerShape(12.dp),
                 ) {
-                    RegistrationTypeOption.entries.forEach { opt ->
-                        DropdownMenuItem(
-                            text = { Text(opt.label) },
-                            onClick = {
-                                viewModel.onRegistrationTypeChange(opt)
-                                typeMenuExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            OrangeOutlineField(
-                value = uiState.lastName,
-                onValueChange = viewModel::onLastNameChange,
-                label = "Фамилия",
-                error = uiState.fieldErr(uiState.lastNameError),
-                imeAction = ImeAction.Next,
-                onNext = { focusManager.moveFocus(FocusDirection.Down) }
-            )
-            OrangeOutlineField(
-                value = uiState.firstName,
-                onValueChange = viewModel::onFirstNameChange,
-                label = "Имя",
-                error = uiState.fieldErr(uiState.firstNameError),
-                imeAction = ImeAction.Next,
-                onNext = { focusManager.moveFocus(FocusDirection.Down) }
-            )
-            OrangeOutlineField(
-                value = uiState.middleName,
-                onValueChange = viewModel::onMiddleNameChange,
-                label = "Отчество",
-                error = null,
-                imeAction = ImeAction.Next,
-                onNext = { focusManager.moveFocus(FocusDirection.Down) }
-            )
-
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextField(
-                    value = uiState.birthDateDisplay,
-                    onValueChange = viewModel::onBirthDateChange,
-                    textStyle = orangeRegisterInputTextStyle(),
-                    label = { Text("Дата рождения", color = Color.White.copy(0.78f)) },
-                    placeholder = { Text("дд.мм.гггг", color = Color.White.copy(0.45f)) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal,
-                        imeAction = ImeAction.Next
-                    ),
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                    singleLine = true,
-                    colors = orangeFieldColors(),
-                    isError = uiState.fieldErr(uiState.birthDateError) != null,
-                    supportingText = uiState.fieldErr(uiState.birthDateError)
-                        ?.let { { Text(it, color = Color(0xFFFFE0B2)) } }
-                )
-                IconButton(onClick = { birthPickerOpen = true }) {
-                    Icon(Icons.Default.CalendarMonth, contentDescription = "Календарь", tint = Color.White)
-                }
-            }
-
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextField(
-                    value = uiState.phoneNationalDigits,
-                    onValueChange = viewModel::onPhoneChange,
-                    textStyle = orangeRegisterInputTextStyle(),
-                    label = { Text("Номер телефона", color = Color.White.copy(0.78f)) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    visualTransformation = remember { RussianPhoneVisualTransformation() },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Phone,
-                        imeAction = ImeAction.Next
-                    ),
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                    singleLine = true,
-                    colors = orangeFieldColors(),
-                    isError = uiState.fieldErr(uiState.phoneError) != null,
-                    supportingText = uiState.fieldErr(uiState.phoneError)
-                        ?.let { { Text(it, color = Color(0xFFFFE0B2)) } },
-                    placeholder = { Text("+7 (999) 123-45-67", color = Color.White.copy(0.45f)) }
-                )
-                Icon(Icons.Default.Keyboard, contentDescription = null, tint = Color.White.copy(0.7f))
-            }
-
-            OrangeOutlineField(
-                value = uiState.email,
-                onValueChange = viewModel::onEmailChange,
-                label = "E-mail",
-                error = uiState.fieldErr(uiState.emailError),
-                keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Next,
-                onNext = { focusManager.moveFocus(FocusDirection.Down) }
-            )
-
-            Text("Пол", color = Color.White.copy(0.85f), modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                GenderOption.entries.forEach { g ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { viewModel.onGenderChange(g) }
-                    ) {
-                        RadioButton(
-                            selected = uiState.gender == g,
-                            onClick = { viewModel.onGenderChange(g) },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = Color.White,
-                                unselectedColor = Color.White.copy(0.6f)
-                            )
-                        )
-                        Text(g.label, color = Color.White)
-                    }
-                }
-            }
-            uiState.fieldErr(uiState.genderError)?.let {
-                Text(it, color = Color.White.copy(0.95f), style = MaterialTheme.typography.bodySmall)
-            }
-
-            Spacer(Modifier.height(12.dp))
-            PassportCard(
-                summary = uiState.passportSummary,
-                error = uiState.fieldErr(uiState.passportError),
-                onClick = {
-                    viewModel.clearPassportError()
-                    onNavigateToPassport()
-                }
-            )
-
-            Spacer(Modifier.height(16.dp))
-            TextField(
-                value = uiState.promoCode,
-                onValueChange = viewModel::onPromoChange,
-                textStyle = orangeRegisterInputTextStyle(),
-                placeholder = { Text("ПРОМОКОД", color = Color.White.copy(0.55f)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(0.15f), RoundedCornerShape(28.dp)),
-                colors = orangeFieldColors(),
-                singleLine = true
-            )
-
-            Spacer(Modifier.height(12.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Получать рассылки", color = Color.White)
-                Switch(
-                    checked = uiState.newsletter,
-                    onCheckedChange = viewModel::onNewsletterChange,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = Color.White.copy(0.45f),
-                        uncheckedThumbColor = Color.White.copy(0.7f),
-                        uncheckedTrackColor = Color.White.copy(0.25f)
+                    Text(
+                        text = summary,
+                        color = Color(0xFFFFE0B2),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(14.dp),
                     )
-                )
-            }
-
-            OrangeOutlineField(
-                value = uiState.password,
-                onValueChange = viewModel::onPasswordChange,
-                label = "Пароль",
-                error = uiState.fieldErr(uiState.passwordError),
-                imeAction = ImeAction.Next,
-                onNext = { focusManager.moveFocus(FocusDirection.Down) },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailing = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
                 }
-            )
-            OrangeOutlineField(
-                value = uiState.confirmPassword,
-                onValueChange = viewModel::onConfirmPasswordChange,
-                label = "Подтвердите пароль",
-                error = uiState.fieldErr(uiState.confirmPasswordError),
-                imeAction = ImeAction.Done,
-                onDone = {
-                    focusManager.clearFocus()
-                    viewModel.register()
-                },
-                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailing = {
-                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                        Icon(
-                            if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
-                }
-            )
-
-            val legal = legalAnnotatedString()
-            ClickableText(
-                text = legal,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    color = Color.White.copy(0.85f),
-                    textAlign = TextAlign.Center
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                onClick = { offset ->
-                    legal.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
-                        runCatching { uriHandler.openUri(it.item) }
-                    }
-                }
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { viewModel.onAcceptedLegalTermsChange(!uiState.acceptedLegalTerms) }
-                    .padding(bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Switch(
-                    checked = uiState.acceptedLegalTerms,
-                    onCheckedChange = viewModel::onAcceptedLegalTermsChange,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = Color.White.copy(0.45f),
-                        uncheckedThumbColor = Color.White.copy(0.7f),
-                        uncheckedTrackColor = Color.White.copy(0.25f)
-                    )
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = "Я ознакомился и согласен с условиями",
-                    color = Color.White.copy(0.92f),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            uiState.fieldErr(uiState.legalTermsError)?.let {
-                Text(
-                    text = it,
-                    color = Color(0xFFFFE0B2),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
 
             Spacer(Modifier.height(24.dp))
@@ -491,11 +265,12 @@ fun RegisterScreen(
                     .navigationBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
+                val isLastStep = uiState.formStep == RegisterFormStep.ACCOUNT
                 Button(
                     onClick = {
                         typeMenuExpanded = false
                         focusManager.clearFocus()
-                        viewModel.register()
+                        viewModel.onPrimaryFormAction()
                     },
                     enabled = !uiState.isLoading,
                     modifier = Modifier
@@ -503,15 +278,23 @@ fun RegisterScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White.copy(0.25f),
-                        contentColor = Color.White,
-                        disabledContainerColor = Color.White.copy(0.12f)
+                        containerColor = if (uiState.validationSummary != null) {
+                            Color.White.copy(0.35f)
+                        } else {
+                            Color.White.copy(0.92f)
+                        },
+                        contentColor = Primary,
+                        disabledContainerColor = Color.White.copy(0.12f),
+                        disabledContentColor = Color.White.copy(0.7f),
                     )
                 ) {
                     if (uiState.isLoading) {
-                        CircularProgressIndicator(Modifier.size(24.dp), color = Color.White)
+                        CircularProgressIndicator(Modifier.size(24.dp), color = Primary)
                     } else {
-                        Text("ЗАРЕГИСТРИРОВАТЬСЯ", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isLastStep) "ЗАРЕГИСТРИРОВАТЬСЯ" else "ДАЛЕЕ",
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
 
@@ -555,9 +338,371 @@ private fun registerFormColorScheme(base: ColorScheme): ColorScheme =
         onErrorContainer = Color(0xFFFFE0B2)
     )
 
-/** Ошибки полей только после первой попытки регистрации — до этого форма без «подсветки». */
-private fun RegisterUiState.fieldErr(message: String?): String? =
-    if (submitAttempted) message else null
+@Composable
+private fun RegisterStepIndicator(current: RegisterFormStep) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RegisterFormStep.entries.forEach { step ->
+            val active = step.index <= current.index
+            Box(
+                modifier = Modifier
+                    .size(if (step == current) 10.dp else 8.dp)
+                    .background(
+                        if (active) Color.White else Color.White.copy(0.35f),
+                        CircleShape,
+                    ),
+            )
+            if (step != RegisterFormStep.LAST) {
+                Spacer(
+                    Modifier
+                        .width(28.dp)
+                        .height(2.dp)
+                        .background(Color.White.copy(if (step.index < current.index) 0.9f else 0.25f)),
+                )
+            }
+        }
+    }
+    Text(
+        text = "Шаг ${current.index} из ${RegisterFormStep.LAST.index}",
+        color = Color.White.copy(0.8f),
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        textAlign = TextAlign.Center,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RegisterPersonalStep(
+    uiState: RegisterUiState,
+    viewModel: RegisterViewModel,
+    typeMenuExpanded: Boolean,
+    onTypeMenuExpandedChange: (Boolean) -> Unit,
+    birthPickerOpen: () -> Unit,
+    focusManager: FocusManager,
+) {
+    Text(
+        "Укажите данные для аккаунта в клубе",
+        color = Color.White.copy(0.85f),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(bottom = 12.dp),
+    )
+    ExposedDropdownMenuBox(
+        expanded = typeMenuExpanded,
+        onExpandedChange = onTypeMenuExpandedChange,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        TextField(
+            value = uiState.registrationType.label,
+            onValueChange = {},
+            readOnly = true,
+            textStyle = orangeRegisterInputTextStyle(),
+            label = { Text("Тип регистрации", color = Color.White.copy(0.78f)) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeMenuExpanded)
+            },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            colors = orangeFieldColors(),
+        )
+        DropdownMenu(
+            expanded = typeMenuExpanded,
+            onDismissRequest = { onTypeMenuExpandedChange(false) },
+            modifier = Modifier.exposedDropdownSize(matchTextFieldWidth = true),
+        ) {
+            RegistrationTypeOption.entries.forEach { opt ->
+                DropdownMenuItem(
+                    text = { Text(opt.label) },
+                    onClick = {
+                        viewModel.onRegistrationTypeChange(opt)
+                        onTypeMenuExpandedChange(false)
+                    },
+                )
+            }
+        }
+    }
+
+    OrangeOutlineField(
+        value = uiState.lastName,
+        onValueChange = viewModel::onLastNameChange,
+        label = "Фамилия *",
+        error = uiState.fieldError(uiState.lastNameError),
+        imeAction = ImeAction.Next,
+        onNext = { focusManager.moveFocus(FocusDirection.Down) },
+    )
+    OrangeOutlineField(
+        value = uiState.firstName,
+        onValueChange = viewModel::onFirstNameChange,
+        label = "Имя *",
+        error = uiState.fieldError(uiState.firstNameError),
+        imeAction = ImeAction.Next,
+        onNext = { focusManager.moveFocus(FocusDirection.Down) },
+    )
+    OrangeOutlineField(
+        value = uiState.middleName,
+        onValueChange = viewModel::onMiddleNameChange,
+        label = "Отчество",
+        error = null,
+        imeAction = ImeAction.Next,
+        onNext = { focusManager.moveFocus(FocusDirection.Down) },
+    )
+
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        TextField(
+            value = uiState.birthDateDisplay,
+            onValueChange = viewModel::onBirthDateChange,
+            textStyle = orangeRegisterInputTextStyle(),
+            label = { Text("Дата рождения *", color = Color.White.copy(0.78f)) },
+            placeholder = { Text("дд.мм.гггг", color = Color.White.copy(0.45f)) },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+            singleLine = true,
+            colors = orangeFieldColors(),
+            isError = uiState.fieldError(uiState.birthDateError) != null,
+            supportingText = uiState.fieldError(uiState.birthDateError)
+                ?.let { { Text(it, color = Color(0xFFFFE0B2)) } },
+        )
+        IconButton(onClick = birthPickerOpen) {
+            Icon(Icons.Default.CalendarMonth, contentDescription = "Календарь", tint = Color.White)
+        }
+    }
+
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        TextField(
+            value = uiState.phoneNationalDigits,
+            onValueChange = viewModel::onPhoneChange,
+            textStyle = orangeRegisterInputTextStyle(),
+            label = { Text("Номер телефона *", color = Color.White.copy(0.78f)) },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            visualTransformation = remember { RussianPhoneVisualTransformation() },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+            singleLine = true,
+            colors = orangeFieldColors(),
+            isError = uiState.fieldError(uiState.phoneError) != null,
+            supportingText = uiState.fieldError(uiState.phoneError)
+                ?.let { { Text(it, color = Color(0xFFFFE0B2)) } },
+            placeholder = { Text("+7 (999) 123-45-67", color = Color.White.copy(0.45f)) },
+        )
+        Icon(Icons.Default.Keyboard, contentDescription = null, tint = Color.White.copy(0.7f))
+    }
+
+    OrangeOutlineField(
+        value = uiState.email,
+        onValueChange = viewModel::onEmailChange,
+        label = "E-mail *",
+        error = uiState.fieldError(uiState.emailError),
+        keyboardType = KeyboardType.Email,
+        imeAction = ImeAction.Done,
+        onDone = { focusManager.clearFocus() },
+    )
+
+    Text("Пол *", color = Color.White.copy(0.85f), modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GenderOption.entries.forEach { g ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { viewModel.onGenderChange(g) },
+            ) {
+                RadioButton(
+                    selected = uiState.gender == g,
+                    onClick = { viewModel.onGenderChange(g) },
+                    colors = RadioButtonDefaults.colors(
+                        selectedColor = Color.White,
+                        unselectedColor = Color.White.copy(0.6f),
+                    ),
+                )
+                Text(g.label, color = Color.White)
+            }
+        }
+    }
+    uiState.fieldError(uiState.genderError)?.let {
+        Text(it, color = Color(0xFFFFE0B2), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun RegisterPassportStep(
+    uiState: RegisterUiState,
+    onOpenPassport: () -> Unit,
+) {
+    Text(
+        "Для договора с клубом нужны паспортные данные. Все поля обязательны.",
+        color = Color.White.copy(0.85f),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(bottom = 16.dp),
+    )
+    PassportCard(
+        summary = uiState.passportSummary,
+        error = uiState.fieldError(uiState.passportError),
+        onClick = onOpenPassport,
+    )
+    Spacer(Modifier.height(16.dp))
+    Button(
+        onClick = onOpenPassport,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.White.copy(0.18f),
+            contentColor = Color.White,
+        ),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Text("Заполнить паспорт")
+    }
+}
+
+@Composable
+private fun RegisterAccountStep(
+    uiState: RegisterUiState,
+    viewModel: RegisterViewModel,
+    uriHandler: UriHandler,
+    passwordVisible: Boolean,
+    onPasswordVisibleChange: (Boolean) -> Unit,
+    confirmPasswordVisible: Boolean,
+    onConfirmPasswordVisibleChange: (Boolean) -> Unit,
+    focusManager: FocusManager,
+    onRegister: () -> Unit,
+) {
+    Text(
+        "Придумайте пароль для входа в приложение",
+        color = Color.White.copy(0.85f),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(bottom = 12.dp),
+    )
+    OrangeOutlineField(
+        value = uiState.password,
+        onValueChange = viewModel::onPasswordChange,
+        label = "Пароль *",
+        error = uiState.fieldError(uiState.passwordError),
+        imeAction = ImeAction.Next,
+        onNext = { focusManager.moveFocus(FocusDirection.Down) },
+        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailing = {
+            IconButton(onClick = { onPasswordVisibleChange(!passwordVisible) }) {
+                Icon(
+                    if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                    contentDescription = null,
+                    tint = Color.White,
+                )
+            }
+        },
+    )
+    OrangeOutlineField(
+        value = uiState.confirmPassword,
+        onValueChange = viewModel::onConfirmPasswordChange,
+        label = "Подтвердите пароль *",
+        error = uiState.fieldError(uiState.confirmPasswordError),
+        imeAction = ImeAction.Done,
+        onDone = {
+            focusManager.clearFocus()
+            onRegister()
+        },
+        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailing = {
+            IconButton(onClick = { onConfirmPasswordVisibleChange(!confirmPasswordVisible) }) {
+                Icon(
+                    if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                    contentDescription = null,
+                    tint = Color.White,
+                )
+            }
+        },
+    )
+
+    Spacer(Modifier.height(12.dp))
+    TextField(
+        value = uiState.promoCode,
+        onValueChange = viewModel::onPromoChange,
+        textStyle = orangeRegisterInputTextStyle(),
+        placeholder = { Text("Промокод (необязательно)", color = Color.White.copy(0.55f)) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(0.15f), RoundedCornerShape(28.dp)),
+        colors = orangeFieldColors(),
+        singleLine = true,
+    )
+
+    Spacer(Modifier.height(12.dp))
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Получать рассылки", color = Color.White)
+        Switch(
+            checked = uiState.newsletter,
+            onCheckedChange = viewModel::onNewsletterChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Color.White.copy(0.45f),
+                uncheckedThumbColor = Color.White.copy(0.7f),
+                uncheckedTrackColor = Color.White.copy(0.25f),
+            ),
+        )
+    }
+
+    val legal = legalAnnotatedString()
+    ClickableText(
+        text = legal,
+        style = MaterialTheme.typography.bodySmall.copy(
+            color = Color.White.copy(0.85f),
+            textAlign = TextAlign.Center,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        onClick = { offset ->
+            legal.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
+                runCatching { uriHandler.openUri(it.item) }
+            }
+        },
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { viewModel.onAcceptedLegalTermsChange(!uiState.acceptedLegalTerms) }
+            .padding(bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Switch(
+            checked = uiState.acceptedLegalTerms,
+            onCheckedChange = viewModel::onAcceptedLegalTermsChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Color.White.copy(0.45f),
+                uncheckedThumbColor = Color.White.copy(0.7f),
+                uncheckedTrackColor = Color.White.copy(0.25f),
+            ),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "Я согласен с условиями *",
+            color = Color.White.copy(0.92f),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
+        )
+    }
+    uiState.fieldError(uiState.legalTermsError)?.let {
+        Text(
+            text = it,
+            color = Color(0xFFFFE0B2),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
 
 private fun legalAnnotatedString(): AnnotatedString = buildAnnotatedString {
     append("Нажимая кнопку «Зарегистрироваться», я подтверждаю, что ознакомился и соглашаюсь с условиями ")

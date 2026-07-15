@@ -38,4 +38,7 @@ object AppConfig {
     
     /** Ссылка на страницу приложения в Google Play */
     const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=ru.worldcashfit.app"
+
+    /** Страница приложения в RuStore (откроет приложение RuStore, если установлено) */
+    const val RUSTORE_CATALOG_URL = "https://www.rustore.ru/catalog/app/ru.worldcashfit.app"
 }
