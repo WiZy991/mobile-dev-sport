@@ -74,6 +74,8 @@ final class AdminRouteSectionMapper
         'admin_franchise_save' => 'franchise',
         'admin_franchise_regenerate_token' => 'franchise',
         'admin_franchise_open_door' => 'franchise',
+        'admin_franchise_clear_gateway' => 'franchise',
+        'admin_franchise_delete' => 'franchise',
         'admin_platform_organizations' => 'platform',
         'admin_platform_organization_new' => 'platform',
     ];

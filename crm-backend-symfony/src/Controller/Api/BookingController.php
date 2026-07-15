@@ -24,16 +24,18 @@ class BookingController extends AbstractController
         private readonly CurrentUserResolver $userResolver,
         private readonly StaffEventNotifier $staffEventNotifier,
         private readonly ClientNotificationService $clientNotifications,
+        private readonly ClientNotificationScheduler $notificationScheduler,
     ) {}
 
     #[Route('/bookings', name: 'api_bookings_list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
         $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
 
-        $criteria = $user ? ['user' => $user] : [];
-
-        $bookings = $this->em->getRepository(Booking::class)->findBy($criteria, ['id' => 'DESC']);
+        $bookings = $this->em->getRepository(Booking::class)->findBy(['user' => $user], ['id' => 'DESC']);
 
         $data = array_map(self::serializeBooking(...), $bookings);
 
@@ -69,6 +71,19 @@ class BookingController extends AbstractController
         $this->em->persist($training);
         $this->em->flush();
 
+        if ($user instanceof User) {
+            $trainingName = $training->getName();
+            $when = $training->getStartAt()->format('d.m.Y H:i');
+            $this->clientNotifications->notify(
+                $user,
+                Notification::TYPE_BOOKING_CONFIRMED,
+                'Запись подтверждена',
+                sprintf('Вы записаны на «%s» (%s)', $trainingName, $when),
+                'booking-' . $booking->getId(),
+            );
+            $this->notificationScheduler->scheduleTrainingRemindersForBooking($booking);
+        }
+
         return $this->json(self::serializeBooking($booking));
     }
 
@@ -97,6 +112,18 @@ class BookingController extends AbstractController
         $this->em->persist($booking);
         $this->em->flush();
 
+        if ($user instanceof User) {
+            $trainingName = $training->getName();
+            $when = $training->getStartAt()->format('d.m.Y H:i');
+            $this->clientNotifications->notify(
+                $user,
+                Notification::TYPE_BOOKING_CONFIRMED,
+                'Лист ожидания',
+                sprintf('Вы в листе ожидания на «%s» (%s). Мы уведомим, если освободится место.', $trainingName, $when),
+                'booking-' . $booking->getId(),
+            );
+        }
+
         return $this->json(self::serializeBooking($booking));
     }
 
@@ -118,6 +145,10 @@ class BookingController extends AbstractController
         }
 
         $training = $booking->getTraining();
+        $bookingUser = $booking->getUser();
+        if ($bookingUser instanceof User) {
+            $this->notificationScheduler->cancelTrainingReminders($bookingUser, $training);
+        }
 
         if ($booking->getStatus() === 'confirmed') {
             $training->setCurrentParticipants(
@@ -154,6 +185,18 @@ class BookingController extends AbstractController
         $client = $booking->getClientName() ?: ($booking->getUser()?->getName() ?? 'Клиент');
         $trainingName = $training->getName();
         $when = $training->getStartAt()->format('d.m.Y H:i');
+
+        $bookingUser = $booking->getUser();
+        if ($bookingUser instanceof User) {
+            $this->clientNotifications->notify(
+                $bookingUser,
+                Notification::TYPE_BOOKING_CANCELLED,
+                'Запись отменена',
+                sprintf('Ваша запись на «%s» (%s) отменена.', $trainingName, $when),
+                'booking-' . $booking->getId(),
+            );
+        }
+
         $this->staffEventNotifier->notifyBySection(
             'bookings',
             StaffNotification::TYPE_BOOKING,
@@ -175,7 +218,7 @@ class BookingController extends AbstractController
 
         return [
             'id' => 'booking-' . $b->getId(),
-            'status' => $b->getStatus(),
+            'status' => self::normalizeBookingStatusForApi($b->getStatus()),
             'booked_at' => $b->getBookedAt()->format('Y-m-d\TH:i:s'),
             'training' => [
                 'id' => 'training-' . $t->getId(),
@@ -206,6 +249,11 @@ class BookingController extends AbstractController
                 'image_url' => null,
             ],
         ];
+    }
+
+    private static function normalizeBookingStatusForApi(string $status): string
+    {
+        return $status === 'waiting' ? 'waiting_list' : $status;
     }
 }
 

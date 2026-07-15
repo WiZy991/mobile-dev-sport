@@ -13,6 +13,7 @@ use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\CurrentUserResolver;
+use App\Service\Notification\ClientNotificationScheduler;
 use App\Service\Payment\SubscriptionPurchaseQuoteService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -34,6 +35,7 @@ class SubscriptionController extends AbstractController
         private readonly SubscriptionPlanCatalog $planCatalog,
         private readonly bool $requireSberVerificationBeforePurchase = false,
         private readonly bool $alfaAcquiringEnabled = false,
+        private readonly ClientNotificationScheduler $notificationScheduler,
     ) {}
 
     #[Route('', name: 'api_subscriptions_list', methods: ['GET'])]
@@ -165,6 +167,8 @@ class SubscriptionController extends AbstractController
         }
         $this->em->persist($sale);
         $this->em->flush();
+
+        $this->notificationScheduler->scheduleSubscriptionExpiryReminders($sub);
 
         $result = $this->serializeSubscription($sub);
         $result['final_price'] = $price;

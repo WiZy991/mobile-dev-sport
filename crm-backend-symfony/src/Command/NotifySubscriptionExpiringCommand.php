@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use App\Entity\Notification;
-use App\Entity\Subscription;
-use App\Service\Notification\ClientNotificationService;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -15,69 +11,16 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Создаёт in-app уведомления за 5–7 дней до окончания абонемента (ТЗ).
- * Запуск: php bin/console app:notify-subscription-expiring
- * В cron: ежедневно 0 9 * * *
+ * @deprecated Используйте ClientNotificationScheduler при покупке абонемента.
  */
-#[AsCommand(name: 'app:notify-subscription-expiring', description: 'Уведомления об окончании абонемента (за 5–7 дней)')]
+#[AsCommand(name: 'app:notify-subscription-expiring', description: '[Устарело] Напоминания планируются при активации абонемента')]
 final class NotifySubscriptionExpiringCommand extends Command
 {
-    public function __construct(
-        private readonly EntityManagerInterface $em,
-        private readonly ClientNotificationService $clientNotifications,
-    ) {
-        parent::__construct();
-    }
-
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $today = new \DateTimeImmutable('today');
-        $from = $today->modify('+5 days');
-        $to = $today->modify('+7 days');
-
-        $qb = $this->em->createQueryBuilder()
-            ->select('s')
-            ->from(Subscription::class, 's')
-            ->where('s.status = :status')
-            ->andWhere('s.endDate IS NOT NULL')
-            ->andWhere('s.endDate >= :from')
-            ->andWhere('s.endDate <= :to')
-            ->setParameter('status', 'active')
-            ->setParameter('from', $from)
-            ->setParameter('to', $to);
-
-        /** @var Subscription[] $subs */
-        $subs = $qb->getQuery()->getResult();
-        $created = 0;
-
-        foreach ($subs as $sub) {
-            $end = $sub->getEndDate();
-            if ($end === null) {
-                continue;
-            }
-            $ref = 'expiry-' . $sub->getId() . '-' . $end->format('Y-m-d');
-            $exists = $this->em->getRepository(Notification::class)->findOneBy(['referenceId' => $ref]);
-            if ($exists !== null) {
-                continue;
-            }
-
-            $daysLeft = (int) $today->diff($end)->format('%a');
-            $this->clientNotifications->notify(
-                $sub->getUser(),
-                Notification::TYPE_SUBSCRIPTION,
-                'Абонемент скоро закончится',
-                sprintf(
-                    'До окончания абонемента «%s» осталось %d дн. Оформите продление в приложении.',
-                    $sub->getPlan()->getName(),
-                    $daysLeft
-                ),
-                $ref,
-            );
-            ++$created;
-        }
-
-        $io->success(sprintf('Отправлено уведомлений: %d (проверено абонементов в окне 5–7 дней: %d)', $created, count($subs)));
+        $io->warning('Команда устарела: напоминания об окончании абонемента планируются при оплате (за 7 и 1 день).');
+        $io->note('Для ручной отправки наступивших: php bin/console app:process-scheduled-notifications');
 
         return Command::SUCCESS;
     }

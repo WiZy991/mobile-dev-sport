@@ -121,5 +121,12 @@ enum class BookingStatus {
     COMPLETED,
     
     @SerializedName("waiting_list")
-    WAITING_LIST
+    WAITING_LIST,
+
+    /** Статус в БД бэкенда до нормализации API. */
+    @SerializedName("waiting")
+    WAITING,
 }
+
+fun BookingStatus.isUpcoming(): Boolean =
+    this == BookingStatus.CONFIRMED || this == BookingStatus.WAITING_LIST || this == BookingStatus.WAITING

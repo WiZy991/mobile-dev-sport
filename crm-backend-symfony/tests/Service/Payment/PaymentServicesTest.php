@@ -11,7 +11,7 @@ use App\Entity\SubscriptionPlan;
 use App\Entity\User;
 use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Payment\AlfaOrderStatus;
-use App\Service\Payment\PaymentFulfillmentService;
+use App\Service\Notification\ClientNotificationScheduler;
 use App\Service\Payment\PaymentStatusSyncService;
 use App\Service\Payment\SubscriptionPurchaseQuoteService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -82,7 +82,10 @@ final class PaymentFulfillmentServiceTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::never())->method('persist');
 
-        $service = new PaymentFulfillmentService($em, new SubscriptionFreezePolicy());
+        $scheduler = $this->createMock(ClientNotificationScheduler::class);
+        $scheduler->expects(self::never())->method('scheduleSubscriptionExpiryReminders');
+
+        $service = new PaymentFulfillmentService($em, new SubscriptionFreezePolicy(), $scheduler);
         $sub = $service->fulfill($payment, 'CARD');
 
         self::assertSame($existingSub, $sub);

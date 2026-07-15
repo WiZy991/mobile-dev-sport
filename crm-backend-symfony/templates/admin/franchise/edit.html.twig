@@ -202,4 +202,22 @@
             </div>
         </div>
     </div>
+
+    <div class="content-card border-danger mt-3">
+        <div class="mb-2 text-danger small fw-semibold text-uppercase">Опасная зона</div>
+        <p class="small text-secondary mb-3">
+            Сброс шлюза удаляет токен и отключает ПК-агент клуба. Удаление клуба отвязывает клиентов и абонементы;
+            последний клуб в CRM удалить нельзя.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+            {% if club.gatewayToken %}
+                <form method="post" action="{{ path('admin_franchise_clear_gateway', {id: club.id}) }}" onsubmit="return confirm('Сбросить шлюз? Токен перестанет работать.');">
+                    <button type="submit" class="btn btn-sm btn-outline-warning">Сбросить шлюз</button>
+                </form>
+            {% endif %}
+            <form method="post" action="{{ path('admin_franchise_delete', {id: club.id}) }}" onsubmit="return confirm('Удалить клуб «{{ club.name|e('js') }}» безвозвратно?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Удалить клуб</button>
+            </form>
+        </div>
+    </div>
 {% endblock %}

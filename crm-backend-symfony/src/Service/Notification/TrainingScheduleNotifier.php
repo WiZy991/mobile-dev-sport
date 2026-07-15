@@ -15,6 +15,7 @@ final class TrainingScheduleNotifier
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly ClientNotificationService $clientNotifications,
+        private readonly ClientNotificationScheduler $notificationScheduler,
     ) {
     }
 
@@ -33,6 +34,7 @@ final class TrainingScheduleNotifier
         $referenceId = 'schedule-change-' . $training->getId() . '-' . $training->getStartAt()->format('YmdHi');
 
         $this->notifyBookedUsers($training, $title, $body, $referenceId);
+        $this->notificationScheduler->rescheduleTrainingReminders($training);
     }
 
     public function notifyTrainingCancelled(Training $training): void
@@ -46,6 +48,7 @@ final class TrainingScheduleNotifier
         $referenceId = 'schedule-cancel-' . $training->getId();
 
         $this->notifyBookedUsers($training, $title, $body, $referenceId);
+        $this->notificationScheduler->cancelAllTrainingReminders($training);
     }
 
     private function notifyBookedUsers(Training $training, string $title, string $body, string $referenceId): void

@@ -6,6 +6,7 @@ use App\Entity\AccessAlarm;
 use App\Entity\Club;
 use App\Entity\GatewayCommand;
 use App\Service\Admin\AdminMenuBuilder;
+use App\Service\Admin\ClubDeletionService;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,6 +29,7 @@ class AdminFranchiseController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly AdminMenuBuilder $adminMenuBuilder,
         private readonly OccupancyService $occupancy,
+        private readonly ClubDeletionService $clubDeletion,
     ) {
     }
 
@@ -175,6 +177,55 @@ class AdminFranchiseController extends AbstractController
         $this->addFlash('success', 'Команда «Открыть дверь» поставлена в очередь #' . $cmd->getId() . '. Шлюз клуба заберёт её при ближайшем опросе (≤ 30 сек).');
 
         return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
+    }
+
+    public function clearGateway(int $id, Request $request): Response
+    {
+        $club = $this->findClubOrFail($id);
+        if (!$request->isMethod('POST')) {
+            return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
+        }
+
+        $this->clubDeletion->clearGateway($club);
+        $this->addFlash('success', 'Шлюз сброшен: токен и heartbeat удалены, очередь команд очищена.');
+
+        return $this->redirectToRoute($request->request->get('redirect') === 'list'
+            ? 'admin_franchise_list'
+            : 'admin_franchise_edit',
+            ['id' => $club->getId()],
+        );
+    }
+
+    public function deleteClub(int $id, Request $request): Response
+    {
+        $club = $this->findClubOrFail($id);
+        if (!$request->isMethod('POST')) {
+            return $this->redirectToRoute('admin_franchise_list');
+        }
+
+        $deps = $this->clubDeletion->describeDependencies($club);
+        $name = $club->getName();
+
+        try {
+            $this->clubDeletion->deleteClub($club);
+        } catch (\RuntimeException $e) {
+            $this->addFlash('danger', $e->getMessage());
+
+            return $this->redirectToRoute('admin_franchise_list');
+        }
+
+        $this->addFlash(
+            'success',
+            sprintf(
+                'Клуб «%s» удалён. Отвязано клиентов: %d, абонементов: %d (активных: %d).',
+                $name,
+                $deps['users'],
+                $deps['subscriptions'],
+                $deps['active_subscriptions'],
+            ),
+        );
+
+        return $this->redirectToRoute('admin_franchise_list');
     }
 
     private function findClubOrFail(int $id): Club

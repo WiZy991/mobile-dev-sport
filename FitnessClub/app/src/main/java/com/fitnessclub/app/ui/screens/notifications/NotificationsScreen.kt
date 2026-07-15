@@ -82,6 +82,12 @@ fun NotificationsScreen(
         ) {
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (uiState.error != null) {
+                NotificationsErrorState(
+                    message = uiState.error!!,
+                    onRetry = { viewModel.loadNotifications() },
+                    modifier = Modifier.align(Alignment.Center),
+                )
             } else if (uiState.notifications.isEmpty()) {
                 EmptyNotificationsState(modifier = Modifier.align(Alignment.Center))
             } else {
@@ -97,6 +103,41 @@ fun NotificationsScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NotificationsErrorState(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            Icons.Default.CloudOff,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Не удалось загрузить",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onRetry) {
+            Text("Повторить")
         }
     }
 }

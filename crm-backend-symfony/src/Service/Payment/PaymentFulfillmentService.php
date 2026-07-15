@@ -7,6 +7,7 @@ use App\Entity\Payment;
 use App\Entity\Sale;
 use App\Entity\Subscription;
 use App\Service\Api\SubscriptionFreezePolicy;
+use App\Service\Notification\ClientNotificationScheduler;
 use Doctrine\ORM\EntityManagerInterface;
 
 class PaymentFulfillmentService
@@ -14,6 +15,7 @@ class PaymentFulfillmentService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SubscriptionFreezePolicy $freezePolicy,
+        private readonly ClientNotificationScheduler $notificationScheduler,
     ) {}
 
     public function fulfill(Payment $payment, ?string $paymentWay = null): Subscription
@@ -90,6 +92,8 @@ class PaymentFulfillmentService
 
         $this->em->persist($sale);
         $this->em->flush();
+
+        $this->notificationScheduler->scheduleSubscriptionExpiryReminders($sub);
 
         return $sub;
     }

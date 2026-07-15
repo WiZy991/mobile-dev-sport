@@ -248,7 +248,7 @@ private fun StatusChip(status: BookingStatus) {
             Success,
             "Подтверждено"
         )
-        BookingStatus.WAITING_LIST -> Triple(
+        BookingStatus.WAITING_LIST, BookingStatus.WAITING -> Triple(
             Warning.copy(alpha = 0.1f),
             Warning,
             "В ожидании"

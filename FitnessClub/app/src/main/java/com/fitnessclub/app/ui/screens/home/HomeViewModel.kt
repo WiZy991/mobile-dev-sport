@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.ClubPromotion
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.repository.NotificationRepository
 import com.fitnessclub.app.data.model.BookingStatus
 import com.fitnessclub.app.data.repository.AccessRepository
 import com.fitnessclub.app.data.repository.ClubRepository
@@ -31,7 +32,7 @@ data class HomeUiState(
             sortOrder = 100
         )
     ),
-    val unreadNotifications: Int = 3,
+    val unreadNotifications: Int = 0,
     val upcomingTrainings: List<UpcomingTraining> = emptyList(),
     val occupancyCurrent: Int? = null,
     val occupancyMax: Int? = null,
@@ -43,6 +44,7 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val api: FitnessApi,
+    private val notificationRepository: NotificationRepository,
     private val accessRepository: AccessRepository,
     private val clubRepository: ClubRepository,
 ) : ViewModel() {
@@ -56,13 +58,17 @@ class HomeViewModel @Inject constructor(
 
     fun loadUnreadCount() {
         viewModelScope.launch {
-            try {
-                val res = api.getNotifications()
-                if (res.isSuccessful) {
-                    val count = (res.body() ?: emptyList()).count { !it.isRead }
-                    _uiState.update { it.copy(unreadNotifications = count) }
+            notificationRepository.getNotifications().collect { result ->
+                when (result) {
+                    is ApiResult.Loading -> Unit
+                    is ApiResult.Success -> {
+                        val count = result.data.count { !it.isRead }
+                        _uiState.update { it.copy(unreadNotifications = count) }
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.update { it.copy(unreadNotifications = 0) }
+                    }
                 }
-            } catch (_: Exception) {
             }
         }
     }

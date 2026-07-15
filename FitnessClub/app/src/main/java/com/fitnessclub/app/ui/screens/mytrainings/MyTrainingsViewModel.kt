@@ -36,9 +36,7 @@ class MyTrainingsViewModel @Inject constructor(
                         val bookings = result.data
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
-                            upcomingBookings = bookings.filter { 
-                                it.status == BookingStatus.CONFIRMED || it.status == BookingStatus.WAITING_LIST 
-                            },
+                            upcomingBookings = bookings.filter { it.status.isUpcoming() },
                             pastBookings = bookings.filter { 
                                 it.status == BookingStatus.COMPLETED || it.status == BookingStatus.CANCELLED 
                             },

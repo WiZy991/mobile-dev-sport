@@ -53,6 +53,18 @@ admin_franchise_open_door:
   methods: [POST]
   requirements: { id: '\d+' }
 
+admin_franchise_clear_gateway:
+  path: /admin/franchise/{id}/clear-gateway
+  controller: App\Controller\Admin\AdminFranchiseController::clearGateway
+  methods: [POST]
+  requirements: { id: '\d+' }
+
+admin_franchise_delete:
+  path: /admin/franchise/{id}/delete
+  controller: App\Controller\Admin\AdminFranchiseController::deleteClub
+  methods: [POST]
+  requirements: { id: '\d+' }
+
 admin_section:
   path: /admin/{section}
   controller: App\Controller\Admin\AdminController::section
