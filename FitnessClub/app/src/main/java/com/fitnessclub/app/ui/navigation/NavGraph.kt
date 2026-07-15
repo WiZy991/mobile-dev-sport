@@ -33,7 +33,6 @@ import com.fitnessclub.app.ui.screens.personal.PersonalTrainingScreen
 import com.fitnessclub.app.ui.screens.profile.EditProfileScreen
 import com.fitnessclub.app.ui.screens.qrcode.QrCodeScreen
 import com.fitnessclub.app.ui.screens.referral.ReferralScreen
-import com.fitnessclub.app.ui.screens.lockers.LockerScreen
 import com.fitnessclub.app.ui.screens.settings.ChangePasswordScreen
 import com.fitnessclub.app.ui.screens.settings.SettingsScreen
 import com.fitnessclub.app.ui.screens.help.HelpScreen
@@ -439,13 +438,6 @@ fun NavGraph(
         // Personal Training
         composable(Screen.PersonalTraining.route) {
             PersonalTrainingScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-        
-        // Lockers
-        composable(Screen.Lockers.route) {
-            LockerScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

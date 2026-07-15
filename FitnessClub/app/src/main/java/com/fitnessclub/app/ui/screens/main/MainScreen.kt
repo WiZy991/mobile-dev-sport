@@ -169,7 +169,6 @@ fun MainScreen(
                     onNavigateToSubscriptionPlans = { navController.navigate(Screen.SubscriptionPlans.route) },
                     onNavigateToTrainers = { navController.navigate(Screen.Trainers.route) },
                     onNavigateToClubInfo = { navController.navigate(Screen.Clubs.route) },
-                    onNavigateToLockers = { navController.navigate(Screen.Lockers.route) },
                     onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
                     onNavigateToQrCode = { navController.navigate(Screen.QrCode.route) },
                     onNavigateToTrainingDetails = { trainingId ->

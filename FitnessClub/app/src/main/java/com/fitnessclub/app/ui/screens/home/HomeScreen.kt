@@ -42,7 +42,6 @@ fun HomeScreen(
     onNavigateToSubscriptionPlans: () -> Unit = onNavigateToShop,
     onNavigateToTrainers: () -> Unit,
     onNavigateToClubInfo: () -> Unit,
-    onNavigateToLockers: () -> Unit = {},
     onNavigateToNotifications: () -> Unit,
     onNavigateToQrCode: () -> Unit = {},
     onNavigateToTrainingDetails: (String) -> Unit = {},
@@ -142,7 +141,6 @@ fun HomeScreen(
                     onSchedule = onNavigateToSchedule,
                     onShop = onNavigateToShop,
                     onClubInfo = onNavigateToClubInfo,
-                    onLockers = onNavigateToLockers,
                     onTrainers = onNavigateToTrainers,
                     onTrainingDiary = onNavigateToTrainingDiary
                 )
@@ -281,7 +279,6 @@ private fun QuickMenuSection(
     onSchedule: () -> Unit,
     onShop: () -> Unit,
     onClubInfo: () -> Unit,
-    onLockers: () -> Unit,
     onTrainers: () -> Unit,
     onTrainingDiary: () -> Unit,
 ) {
@@ -326,13 +323,6 @@ private fun QuickMenuSection(
                 title = "Мы на карте",
                 subtitle = "Покажем кратчайший путь",
                 onClick = onClubInfo
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            QuickMenuItem(
-                icon = Icons.Default.LockOpen,
-                title = "Шкафчики",
-                subtitle = "Бронирование и QR-код для открытия",
-                onClick = onLockers
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             QuickMenuItem(
