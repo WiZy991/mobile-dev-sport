@@ -1,10 +1,12 @@
 package com.fitnessclub.app.ui.screens.legal
 
 import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
 import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -101,6 +104,7 @@ fun LegalPdfScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.White)
                 .padding(paddingValues),
         ) {
             when {
@@ -115,7 +119,7 @@ fun LegalPdfScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text(error!!, style = MaterialTheme.typography.bodyLarge)
+                        Text(error!!, style = MaterialTheme.typography.bodyLarge, color = Color(0xFF1A1A1A))
                         TextButton(onClick = onNavigateBack) {
                             Text("Назад")
                         }
@@ -138,7 +142,7 @@ fun LegalPdfScreen(
                     Text(
                         "Документ пуст",
                         modifier = Modifier.align(Alignment.Center),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color(0xFF666666),
                     )
                 }
             }
@@ -168,6 +172,7 @@ private fun PdfPageImage(
                                 page.height * scale,
                                 Bitmap.Config.ARGB_8888,
                             )
+                            bmp.eraseColor(AndroidColor.WHITE)
                             page.render(
                                 bmp,
                                 null,
@@ -203,6 +208,7 @@ private fun PdfPageImage(
                 Text(
                     "Не удалось загрузить страницу ${pageIndex + 1}",
                     style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF666666),
                 )
             }
         }

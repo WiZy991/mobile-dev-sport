@@ -1,5 +1,6 @@
 package com.fitnessclub.app.ui.screens.subscriptions
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,11 +10,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -43,6 +47,7 @@ import kotlinx.coroutines.flow.collectLatest
 @Composable
 fun PaymentPendingScreen(
     paymentId: Int,
+    onNavigateBack: () -> Unit,
     onPaymentSuccess: () -> Unit,
     onPaymentFailed: (String) -> Unit,
     viewModel: PaymentPendingViewModel = hiltViewModel(),
@@ -51,6 +56,17 @@ fun PaymentPendingScreen(
     var isFailed by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    val leaveScreen: () -> Unit = {
+        viewModel.cancelPolling()
+        onNavigateBack()
+    }
+
+    BackHandler(onBack = leaveScreen)
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.cancelPolling() }
+    }
 
     LaunchedEffect(paymentId) {
         viewModel.pollPaymentStatus(paymentId)
@@ -95,9 +111,15 @@ fun PaymentPendingScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Оплата") },
+                navigationIcon = {
+                    IconButton(onClick = leaveScreen) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             )
         }
@@ -130,6 +152,19 @@ fun PaymentPendingScreen(
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
                 )
+                if (!isFailed) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "Если вы закрыли страницу банка без оплаты — нажмите «Вернуться».",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(onClick = leaveScreen) {
+                        Text("Вернуться")
+                    }
+                }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.fitnessclub.app.ui.screens.legal
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,12 +33,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.model.LegalDocumentField
 import com.fitnessclub.app.ui.theme.Primary
+
+private val LegalDocumentTextColor = Color(0xFF1A1A1A)
+private val LegalDocumentMutedColor = Color(0xFF666666)
+private val LegalDocumentBackground = Color.White
+private val LegalDocumentCardBackground = Color(0xFFF5F5F5)
 
 /** Нативный экран правового документа (текст из API, без сайта). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,6 +80,7 @@ fun LegalDocumentScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(LegalDocumentBackground)
                 .padding(paddingValues),
         ) {
             when {
@@ -86,7 +94,7 @@ fun LegalDocumentScreen(
                             .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(uiState.error!!, style = MaterialTheme.typography.bodyLarge)
+                        Text(uiState.error!!, style = MaterialTheme.typography.bodyLarge, color = LegalDocumentTextColor)
                         TextButton(onClick = { viewModel.load(document) }) {
                             Text("Повторить")
                         }
@@ -102,7 +110,7 @@ fun LegalDocumentScreen(
                     Text(
                         "Документ пуст",
                         modifier = Modifier.align(Alignment.Center),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = LegalDocumentMutedColor,
                     )
                 }
             }
@@ -121,6 +129,7 @@ private fun TextDocumentContent(body: String) {
         Text(
             text = body,
             style = MaterialTheme.typography.bodyMedium,
+            color = LegalDocumentTextColor,
             lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
         )
     }
@@ -137,7 +146,7 @@ private fun RequisitesContent(fields: List<LegalDocumentField>) {
             Text(
                 "Индивидуальный предприниматель Мацкова Александра Сергеевна",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = LegalDocumentMutedColor,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
@@ -153,19 +162,20 @@ private fun RequisiteRow(field: LegalDocumentField) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            containerColor = LegalDocumentCardBackground,
         ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = field.label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = LegalDocumentMutedColor,
             )
             Text(
                 text = field.value,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
+                color = LegalDocumentTextColor,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }

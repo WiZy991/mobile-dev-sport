@@ -35,17 +35,28 @@ class PaymentPendingViewModel @Inject constructor(
     private var finished = false
     private var activePaymentId: Int? = null
 
+    fun cancelPolling() {
+        finished = true
+        pollJob?.cancel()
+        pollJob = null
+    }
+
     fun pollPaymentStatus(paymentId: Int) {
-        if (finished) return
+        finished = false
         activePaymentId = paymentId
         startPolling(paymentId)
     }
 
-    /** Перезапуск polling при возврате из банка / Custom Tabs / deep link. */
+    /** Одна проверка при возврате из банка / Custom Tabs — без перезапуска полного цикла. */
     fun resumePolling(paymentId: Int) {
         if (finished) return
         activePaymentId = paymentId
-        startPolling(paymentId)
+        viewModelScope.launch {
+            if (checkOnce(paymentId)) {
+                finished = true
+                pollJob?.cancel()
+            }
+        }
     }
 
     fun refreshPaymentStatus(paymentId: Int) {

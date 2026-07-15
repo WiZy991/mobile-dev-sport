@@ -262,6 +262,7 @@ fun NavGraph(
             val paymentId = backStackEntry.arguments?.getInt("paymentId") ?: 0
             PaymentPendingScreen(
                 paymentId = paymentId,
+                onNavigateBack = { navController.popBackStack() },
                 onPaymentSuccess = {
                     navController.navigate(Screen.Profile.route) {
                         popUpTo(Screen.SubscriptionPlans.route) { inclusive = true }
