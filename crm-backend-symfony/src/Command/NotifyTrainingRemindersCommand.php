@@ -18,7 +18,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Напоминания о тренировках за ~1 час до начала.
- * Cron: */15 * * * * php bin/console app:notify-training-reminders
+ * Cron (каждые 15 мин): * /15 * * * * php bin/console app:notify-training-reminders
  */
 #[AsCommand(name: 'app:notify-training-reminders', description: 'Push/email напоминания о тренировках за 1 час')]
 final class NotifyTrainingRemindersCommand extends Command
