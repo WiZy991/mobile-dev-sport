@@ -214,9 +214,6 @@ fun MainScreen(
                     onNavigateToSubscriptionPlans = {
                         navController.navigate(Screen.SubscriptionPlans.route)
                     },
-                    onNavigateToReferral = {
-                        navController.navigate(Screen.Referral.route)
-                    },
                     onNavigateToNotifications = {
                         navController.navigate(Screen.Notifications.route)
                     },

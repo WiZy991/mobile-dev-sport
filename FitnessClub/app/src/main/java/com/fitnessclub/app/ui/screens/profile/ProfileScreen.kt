@@ -31,7 +31,6 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onNavigateToQrCode: () -> Unit = {},
     onNavigateToSubscriptionPlans: () -> Unit = {},
-    onNavigateToReferral: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
@@ -42,6 +41,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showBonusComingSoonDialog by remember { mutableStateOf(false) }
     var freezeTarget by remember { mutableStateOf<Subscription?>(null) }
     var cancelTarget by remember { mutableStateOf<Subscription?>(null) }
     var showSubscriptionHistory by remember { mutableStateOf(false) }
@@ -110,7 +110,6 @@ fun ProfileScreen(
                         name = uiState.user?.name ?: "Загрузка...",
                         email = uiState.user?.email ?: "",
                         phone = uiState.user?.phone ?: "",
-                        bonusPoints = uiState.user?.bonusPoints ?: 0,
                         onEditClick = onNavigateToEditProfile
                     )
                 }
@@ -131,7 +130,7 @@ fun ProfileScreen(
                     QuickActionsRow(
                         onQrCodeClick = onNavigateToQrCode,
                         onBuySubscriptionClick = onNavigateToSubscriptionPlans,
-                        onReferralClick = onNavigateToReferral,
+                        onBonusesClick = { showBonusComingSoonDialog = true },
                         onNotificationsClick = onNavigateToNotifications
                     )
                 }
@@ -232,6 +231,29 @@ fun ProfileScreen(
         }
     }
     
+    // Bonus program coming soon
+    if (showBonusComingSoonDialog) {
+        AlertDialog(
+            onDismissRequest = { showBonusComingSoonDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = Warning,
+                )
+            },
+            title = { Text("Бонусная программа") },
+            text = {
+                Text("Бонусная программа в разработке. Следите за новостями в приложении.")
+            },
+            confirmButton = {
+                TextButton(onClick = { showBonusComingSoonDialog = false }) {
+                    Text("Понятно")
+                }
+            },
+        )
+    }
+
     // Logout confirmation dialog
     if (showLogoutDialog) {
         AlertDialog(
@@ -366,7 +388,7 @@ private fun GamificationCard(
 private fun QuickActionsRow(
     onQrCodeClick: () -> Unit,
     onBuySubscriptionClick: () -> Unit,
-    onReferralClick: () -> Unit,
+    onBonusesClick: () -> Unit,
     onNotificationsClick: () -> Unit
 ) {
     Row(
@@ -386,7 +408,7 @@ private fun QuickActionsRow(
         QuickActionButton(
             icon = Icons.Default.People,
             label = "Друзьям",
-            onClick = onReferralClick
+            onClick = onBonusesClick
         )
         QuickActionButton(
             icon = Icons.Default.Notifications,
@@ -432,7 +454,6 @@ private fun UserInfoCard(
     name: String,
     email: String,
     phone: String,
-    bonusPoints: Int,
     onEditClick: () -> Unit = {}
 ) {
     Card(
@@ -518,32 +539,6 @@ private fun UserInfoCard(
                     text = phone,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            HorizontalDivider()
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Bonus points
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = null,
-                    tint = Warning,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "$bonusPoints бонусов",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
                 )
             }
             }
