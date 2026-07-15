@@ -8,6 +8,7 @@ use App\Entity\StaffNotification;
 use App\Entity\Training;
 use App\Entity\User;
 use App\Service\CurrentUserResolver;
+use App\Service\Notification\ClientNotificationScheduler;
 use App\Service\Notification\ClientNotificationService;
 use App\Service\Staff\StaffEventNotifier;
 use Doctrine\ORM\EntityManagerInterface;
