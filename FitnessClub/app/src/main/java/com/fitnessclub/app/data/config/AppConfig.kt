@@ -2,11 +2,20 @@ package com.fitnessclub.app.data.config
 
 /**
  * Конфигурация приложения и внешние ссылки.
- * [SITE_URL] — публичный сайт (юридические страницы, помощь); смените при другом домене.
+ * [SITE_URL] — платформа WorldCashFit (помощь, API).
+ * Правовые документы клуба Доброзал — на [CLUB_SITE_URL].
  */
 object AppConfig {
-    /** Публичный сайт приложения (совпадает с доменом реферальных ссылок и т.п.) */
+    /** Публичный сайт платформы */
     const val SITE_URL = "https://worldcashfit.ru"
+
+    /** Сайт клуба Доброзал (правовые PDF) */
+    const val CLUB_SITE_URL = "https://dobrozal.ru"
+
+    const val DOBROZAL_DOC_URL = "$CLUB_SITE_URL/doc"
+    const val DOBROZAL_OFFER_URL = "$CLUB_SITE_URL/doc/offer"
+    const val DOBROZAL_PRIVACY_URL = "$CLUB_SITE_URL/doc/privacy"
+    const val DOBROZAL_CONSENT_URL = "$CLUB_SITE_URL/consent_user"
 
     /** Ссылка на страницу помощи (FAQ, инструкции) */
     const val HELP_URL = "${SITE_URL}/help"
@@ -14,26 +23,24 @@ object AppConfig {
     /** Ссылка на восстановление пароля */
     const val FORGOT_PASSWORD_URL = "${SITE_URL}/forgot-password"
 
-    /** Договор-оферта / пользовательское соглашение */
-    const val TERMS_URL = "${SITE_URL}/license_agreement/"
-    const val USER_AGREEMENT_URL = "${SITE_URL}/user_agreement/"
+    /** Договор-оферта / пользовательское соглашение (PDF на сайте клуба) */
+    const val TERMS_URL = DOBROZAL_OFFER_URL
+    const val USER_AGREEMENT_URL = DOBROZAL_OFFER_URL
 
     /** Политика конфиденциальности */
-    const val PRIVACY_URL = "${SITE_URL}/privacy/"
+    const val PRIVACY_URL = DOBROZAL_PRIVACY_URL
 
-    /** Договор с клиентом */
-    const val CLIENT_AGREEMENT_URL = "${SITE_URL}/client-agreement"
-
-    /** Договор с тренером */
-    const val TRAINER_AGREEMENT_URL = "${SITE_URL}/trainer-agreement"
+    /** Договор с клиентом и тренером — единая публичная оферта */
+    const val CLIENT_AGREEMENT_URL = DOBROZAL_OFFER_URL
+    const val TRAINER_AGREEMENT_URL = DOBROZAL_OFFER_URL
 
     /** Согласие на обработку персональных данных */
-    const val PERSONAL_DATA_CONSENT_URL = "${SITE_URL}/consent_user"
+    const val PERSONAL_DATA_CONSENT_URL = DOBROZAL_CONSENT_URL
 
     /** Все правовые документы */
-    const val LEGAL_INDEX_URL = "${SITE_URL}/legal"
+    const val LEGAL_INDEX_URL = DOBROZAL_DOC_URL
 
-    /** Реквизиты ИП (для онлайн-оплаты в приложении) */
+    /** Реквизиты ИП (экран в приложении) */
     const val REQUISITES_URL = "${SITE_URL}/requisites"
     
     /** Ссылка на страницу приложения в Google Play */

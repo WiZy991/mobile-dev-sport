@@ -32,7 +32,6 @@ fun ProfileScreen(
     onNavigateToQrCode: () -> Unit = {},
     onNavigateToSubscriptionPlans: () -> Unit = {},
     onNavigateToReferral: () -> Unit = {},
-    onNavigateToGuestPass: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
@@ -221,7 +220,6 @@ fun ProfileScreen(
                 
                 item {
                     MenuCard(
-                        onGuestPassClick = onNavigateToGuestPass,
                         onNotificationsClick = onNavigateToNotifications,
                         onSettingsClick = onNavigateToSettings,
                         onDocumentsClick = onNavigateToDocuments,
@@ -336,11 +334,11 @@ private fun GamificationCard(
                 }
             }
             if (achievements.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider()
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text("Достижения", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 achievements.take(4).forEach { ach ->
                     Row(
                         modifier = Modifier.padding(vertical = 4.dp),
@@ -778,7 +776,6 @@ private fun EmptySubscriptionsCard(onBuyClick: () -> Unit = {}) {
 
 @Composable
 private fun MenuCard(
-    onGuestPassClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onDocumentsClick: () -> Unit = {},
@@ -791,12 +788,6 @@ private fun MenuCard(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column {
-            MenuItem(
-                icon = Icons.Default.PersonAdd,
-                title = "Гостевой пропуск",
-                onClick = onGuestPassClick
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             MenuItem(
                 icon = Icons.Default.Notifications,
                 title = "Уведомления",

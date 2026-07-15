@@ -518,6 +518,8 @@ class RegisterViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(error = null)
     }
 
+    fun isCurrentStepValid(): Boolean = !validateStep(_uiState.value.formStep).hasError
+
     private data class FieldErrors(
         val lastNameError: String? = null,
         val firstNameError: String? = null,

@@ -3,11 +3,13 @@ package com.fitnessclub.app.ui.screens.subscriptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -23,7 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fitnessclub.app.data.config.ClubPurchaseDocuments
-import com.fitnessclub.app.data.config.LegalDocumentType
+import com.fitnessclub.app.data.config.LegalPdfAsset
+import com.fitnessclub.app.ui.theme.Primary
 
 data class ClubPurchaseContext(
     val clubName: String,
@@ -36,7 +39,7 @@ fun ClubPurchaseConsentDialog(
     context: ClubPurchaseContext,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    onOpenDocument: (LegalDocumentType) -> Unit,
+    onOpenPdf: (LegalPdfAsset) -> Unit,
     onOpenExternalUrl: (String) -> Unit = {},
 ) {
     Dialog(
@@ -71,7 +74,7 @@ fun ClubPurchaseConsentDialog(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
-                        text = "Нажимая «Согласен, приобрести абонемент», вы подтверждаете, что ознакомились с офертой клуба, правилами посещения, стоимостью, сроком действия и условиями абонемента.",
+                        text = "Нажимая «Согласен, приобрести абонемент», вы подтверждаете, что ознакомились с публичной офертой, политикой обработки персональных данных, согласием на обработку персональных данных, правилами посещения, стоимостью, сроком действия и условиями абонемента.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
@@ -79,12 +82,16 @@ fun ClubPurchaseConsentDialog(
                         style = MaterialTheme.typography.bodySmall,
                     )
                     ConsentLinkText(
-                        text = "оферта клуба",
-                        onClick = { onOpenDocument(ClubPurchaseDocuments.offer) },
+                        text = "публичная оферта",
+                        onClick = { onOpenPdf(ClubPurchaseDocuments.offer) },
                     )
                     ConsentLinkText(
-                        text = "политика персональных данных клуба",
-                        onClick = { onOpenDocument(ClubPurchaseDocuments.privacy) },
+                        text = "политика обработки персональных данных",
+                        onClick = { onOpenPdf(ClubPurchaseDocuments.privacy) },
+                    )
+                    ConsentLinkText(
+                        text = "согласие на обработку персональных данных",
+                        onClick = { onOpenPdf(ClubPurchaseDocuments.consent) },
                     )
                     context.visitingRulesUrl?.takeIf { it.isNotBlank() }?.let { url ->
                         ConsentLinkText(
@@ -107,7 +114,10 @@ fun ClubPurchaseConsentDialog(
                 ) {
                     Button(
                         onClick = onConfirm,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
                     ) {
                         Text(
                             text = "Согласен, приобрести абонемент",
@@ -116,7 +126,9 @@ fun ClubPurchaseConsentDialog(
                     }
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
                     ) {
                         Text("Отмена")
                     }

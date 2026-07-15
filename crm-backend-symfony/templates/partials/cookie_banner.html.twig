@@ -1,28 +1,43 @@
+{% set is_dobrozal = app.request is defined and ('dobrozal.ru' in app.request.host|lower) %}
 <div id="cookie-consent-banner" class="cookie-consent-banner" hidden>
     <div class="cookie-consent-content">
+        {% if is_dobrozal %}
+        <p>
+            Этот сайт использует куки-файлы для улучшения пользовательского опыта и сбора статистики.
+            Нажимая на кнопку «Согласен», а также оставаясь на сайте — Вы предоставляете
+            <a href="{{ path('legal_consent_user') }}" target="_blank" rel="noopener">согласие</a>
+            на использование файлов куки.
+            При несогласии — Вы можете покинуть сайт или самостоятельно изменить настройки работы с куки-файлами в используемом браузере.
+        </p>
+        <button id="cookie-consent-accept" type="button">СОГЛАСЕН</button>
+        {% else %}
         <p>
             Сайт использует cookie-файлы. Нажимая «Согласен» или продолжая пользоваться сайтом, вы соглашаетесь на использование cookie.
             <a href="{{ path('legal_consent_user') }}" target="_blank" rel="noopener">Подробнее</a>.
         </p>
         <button id="cookie-consent-accept" type="button">Согласен</button>
+        {% endif %}
     </div>
 </div>
 
 <script>
     (function () {
-        var consentKey = "wcf_cookie_consent_v1";
+        var isDobrozal = {{ is_dobrozal ? 'true' : 'false' }};
+        var consentKey = isDobrozal ? "dobrozal_cookie_consent_v1" : "wcf_cookie_consent_v1";
         var banner = document.getElementById("cookie-consent-banner");
         var acceptBtn = document.getElementById("cookie-consent-accept");
+        var metrikaId = {{ yandex_metrika_id|default(0)|json_encode|raw }};
         if (!banner || !acceptBtn) {
             return;
         }
 
         function hasConsent() {
             try {
-                return localStorage.getItem(consentKey) === "accepted";
-            } catch (e) {
-                return document.cookie.indexOf(consentKey + "=accepted") !== -1;
-            }
+                if (localStorage.getItem(consentKey) === "accepted") {
+                    return true;
+                }
+            } catch (e) {}
+            return document.cookie.indexOf(consentKey + "=accepted") !== -1;
         }
 
         function persistConsent() {
@@ -34,12 +49,36 @@
             document.cookie = consentKey + "=accepted; expires=" + expires.toUTCString() + "; path=/; SameSite=Lax";
         }
 
-        function emitConsentEvent() {
+        function loadYandexMetrika() {
+            if (!isDobrozal || !metrikaId || window.__ymLoaded) {
+                return;
+            }
+            window.__ymLoaded = true;
+            (function (m, e, t, r, i, k, a) {
+                m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments); };
+                m[i].l = 1 * new Date();
+                k = e.createElement(t);
+                a = e.getElementsByTagName(t)[0];
+                k.async = 1;
+                k.src = r;
+                a.parentNode.insertBefore(k, a);
+            })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+            window.ym(metrikaId, "init", {
+                clickmap: true,
+                trackLinks: true,
+                accurateTrackBounce: true,
+                webvisor: true
+            });
+        }
+
+        function onConsentGranted() {
+            document.dispatchEvent(new CustomEvent("dobrozal:cookie-consent-granted"));
             document.dispatchEvent(new CustomEvent("wcf:cookie-consent-granted"));
+            loadYandexMetrika();
         }
 
         if (hasConsent()) {
-            emitConsentEvent();
+            onConsentGranted();
             return;
         }
 
@@ -47,7 +86,7 @@
         acceptBtn.addEventListener("click", function () {
             persistConsent();
             banner.hidden = true;
-            emitConsentEvent();
+            onConsentGranted();
         });
     })();
 </script>

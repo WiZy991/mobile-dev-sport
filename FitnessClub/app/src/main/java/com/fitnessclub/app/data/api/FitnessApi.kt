@@ -546,7 +546,11 @@ data class ClubInfo(
     @com.google.gson.annotations.SerializedName("visiting_rules_url")
     val visitingRulesUrl: String? = null,
     @com.google.gson.annotations.SerializedName("safety_rules_url")
-    val safetyRulesUrl: String? = null
+    val safetyRulesUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("shop_config")
+    val shopConfig: com.fitnessclub.app.data.model.ClubShopConfig? = null,
+    @com.google.gson.annotations.SerializedName("network")
+    val network: com.fitnessclub.app.data.model.ClubNetworkInfo? = null,
 )
 
 data class ClubPromotion(

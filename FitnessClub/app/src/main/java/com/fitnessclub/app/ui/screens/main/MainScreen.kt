@@ -218,9 +218,6 @@ fun MainScreen(
                     onNavigateToReferral = {
                         navController.navigate(Screen.Referral.route)
                     },
-                    onNavigateToGuestPass = {
-                        navController.navigate(Screen.GuestPass.route)
-                    },
                     onNavigateToNotifications = {
                         navController.navigate(Screen.Notifications.route)
                     },

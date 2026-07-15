@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -23,7 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalUriHandler
 import com.fitnessclub.app.data.config.LegalDocumentType
+import com.fitnessclub.app.data.config.LegalLinks
+import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.ui.screens.legal.LegalPdfScreen
 import com.fitnessclub.app.ui.screens.subscriptions.ClubPurchaseConsentDialog
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPurchaseConfirmDialog
 import com.fitnessclub.app.ui.theme.*
@@ -43,7 +48,8 @@ data class ShopItem(
     val oldPrice: Double? = null,
     val category: ShopCategory,
     val isPromo: Boolean = false,
-    val promoText: String? = null
+    val promoText: String? = null,
+    val durationDays: Int? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,13 +59,15 @@ fun ShopScreen(
     onOpenPurchaseHistory: () -> Unit = {},
     onNavigateToPayment: (paymentId: Int) -> Unit = {},
     onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
+    onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
     viewModel: ShopViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var selectedCategory by remember { mutableStateOf(ShopCategory.SERVICES) }
+    val selectedCategory = uiState.selectedCategory
     var showPurchasePlan by remember { mutableStateOf<SubscriptionPlan?>(null) }
     var showLegalConsentForPlan by remember { mutableStateOf<SubscriptionPlan?>(null) }
     var purchaseError by remember { mutableStateOf<String?>(null) }
+    var pdfOverlay by remember { mutableStateOf<LegalPdfAsset?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -107,17 +115,19 @@ fun ShopScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             // Category tabs
-            ScrollableTabRow(
-                selectedTabIndex = ShopCategory.entries.indexOf(selectedCategory),
-                containerColor = MaterialTheme.colorScheme.surface,
-                edgePadding = 16.dp
-            ) {
-                ShopCategory.entries.forEach { category ->
-                    Tab(
-                        selected = selectedCategory == category,
-                        onClick = { selectedCategory = category },
-                        text = { Text(category.title) }
-                    )
+            if (uiState.visibleCategories.isNotEmpty()) {
+                ScrollableTabRow(
+                    selectedTabIndex = uiState.visibleCategories.indexOf(selectedCategory).coerceAtLeast(0),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    edgePadding = 16.dp
+                ) {
+                    uiState.visibleCategories.forEach { category ->
+                        Tab(
+                            selected = selectedCategory == category,
+                            onClick = { viewModel.selectCategory(category) },
+                            text = { Text(category.title) }
+                        )
+                    }
                 }
             }
             
@@ -149,7 +159,8 @@ fun ShopScreen(
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.background(MaterialTheme.colorScheme.background),
                 ) {
                     items(filteredItems) { item ->
                         ShopItemCard(
@@ -175,46 +186,62 @@ fun ShopScreen(
         }
     }
 
-    showPurchasePlan?.let { plan ->
-        SubscriptionPurchaseConfirmDialog(
-            plan = plan,
-            finalPrice = plan.price,
-            hasDiscount = false,
-            isLoading = uiState.isPurchasing,
-            error = purchaseError,
-            onDismiss = {
-                showPurchasePlan = null
-                purchaseError = null
-            },
-            onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
-            onConfirm = { showLegalConsentForPlan = plan },
-        )
+    if (pdfOverlay == null && showLegalConsentForPlan == null) {
+        showPurchasePlan?.let { plan ->
+            SubscriptionPurchaseConfirmDialog(
+                plan = plan,
+                finalPrice = plan.price,
+                hasDiscount = false,
+                isLoading = uiState.isPurchasing,
+                error = purchaseError,
+                onDismiss = {
+                    showPurchasePlan = null
+                    purchaseError = null
+                },
+                onOpenRequisites = {
+                    LegalLinks.open(LegalDocumentType.REQUISITES, onOpenLegalPdf, onOpenLegalDocument)
+                },
+                onConfirm = {
+                    showPurchasePlan = null
+                    showLegalConsentForPlan = plan
+                },
+            )
+        }
     }
 
-    showLegalConsentForPlan?.let { plan ->
-        ClubPurchaseConsentDialog(
-            context = uiState.clubPurchaseContext,
-            onDismiss = { showLegalConsentForPlan = null },
-            onOpenDocument = onOpenLegalDocument,
-            onOpenExternalUrl = { uriHandler.openUri(it) },
-            onConfirm = {
-                purchaseError = null
-                showLegalConsentForPlan = null
-                viewModel.purchaseSubscriptionPlan(
-                    plan = plan,
-                    onPaymentRequired = { paymentId, paymentUrl ->
-                        showPurchasePlan = null
-                        onNavigateToPayment(paymentId)
-                        openPaymentUrl(context, paymentUrl)
-                    },
-                    onVerificationRequired = { url, message ->
-                        showPurchasePlan = null
-                        scope.launch { snackbarHostState.showSnackbar(message) }
-                        openExternalUrl(context, url)
-                    },
-                    onError = { msg -> purchaseError = msg },
-                )
-            }
+    if (pdfOverlay == null) {
+        showLegalConsentForPlan?.let { plan ->
+            ClubPurchaseConsentDialog(
+                context = uiState.clubPurchaseContext,
+                onDismiss = { showLegalConsentForPlan = null },
+                onOpenPdf = { pdfOverlay = it },
+                onOpenExternalUrl = { openExternalUrl(context, it) },
+                onConfirm = {
+                    purchaseError = null
+                    showLegalConsentForPlan = null
+                    viewModel.purchaseSubscriptionPlan(
+                        plan = plan,
+                        onPaymentRequired = { paymentId, paymentUrl ->
+                            showPurchasePlan = null
+                            onNavigateToPayment(paymentId)
+                            openPaymentUrl(context, paymentUrl)
+                        },
+                        onVerificationRequired = { url, message ->
+                            showPurchasePlan = null
+                            scope.launch { snackbarHostState.showSnackbar(message) }
+                            openExternalUrl(context, url)
+                        },
+                        onError = { msg -> purchaseError = msg },
+                    )
+                }
+            )
+        }
+    }
+
+    pdfOverlay?.let { asset ->
+        LegalPdfScreen(
+            asset = asset,
+            onNavigateBack = { pdfOverlay = null },
         )
     }
 }
@@ -224,87 +251,161 @@ private fun ShopItemCard(
     item: ShopItem,
     onBuy: () -> Unit
 ) {
-    Card(
+    val isSubscription = item.category == ShopCategory.SUBSCRIPTIONS
+    val borderColor = when {
+        item.isPromo && isSubscription -> Primary
+        else -> MaterialTheme.colorScheme.outlineVariant
+    }
+
+    OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(
+            width = if (item.isPromo && isSubscription) 2.dp else 1.dp,
+            color = borderColor,
+        ),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        elevation = CardDefaults.outlinedCardElevation(
+            defaultElevation = if (item.isPromo && isSubscription) 4.dp else 1.dp,
+        ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
+        Column {
+            if (item.isPromo && isSubscription) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Primary, AccentOrange),
+                            ),
+                        )
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        text = "АКЦИЯ",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Bold,
                     )
-                    
-                    if (item.isPromo && item.promoText != null) {
-                        Text(
-                            text = item.promoText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Success,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-                
-                if (item.isPromo) {
-                    Surface(
-                        color = AccentOrange,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "АКЦИЯ",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
                 }
             }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = item.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    if (item.oldPrice != null) {
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "ЦЕНА: ${item.oldPrice.toInt()} руб.",
-                            style = MaterialTheme.typography.bodySmall,
-                            textDecoration = TextDecoration.LineThrough,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = item.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
                         )
-                        Text(
-                            text = "СКИДКА: ${(item.oldPrice - item.price).toInt()} руб.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Error
-                        )
+                        if (item.isPromo && item.promoText != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = item.promoText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Success,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
                     }
+
+                    if (item.isPromo && !isSubscription) {
+                        Surface(
+                            color = AccentOrange,
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(
+                                text = "АКЦИЯ",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
+
+                if (item.description.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = if (item.price == 0.0) "БЕСПЛАТНО" else "ИТОГО: ${item.price.toInt()} руб.",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (item.price == 0.0) Success else MaterialTheme.colorScheme.onSurface
+                        text = item.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                
-                OutlinedButton(onClick = onBuy) {
-                    Text(if (item.price == 0.0) "ПОЛУЧИТЬ" else "КУПИТЬ")
+
+                item.durationDays?.takeIf { it > 0 }?.let { days ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    AssistChip(
+                        onClick = { },
+                        enabled = false,
+                        label = { Text("$days дней") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        },
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (item.oldPrice != null) {
+                            Text(
+                                text = "${item.oldPrice.toInt()} ₽",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textDecoration = TextDecoration.LineThrough,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "−${(item.oldPrice - item.price).toInt()} ₽",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Success,
+                            )
+                        }
+                        Text(
+                            text = when {
+                                item.price == 0.0 -> "Бесплатно"
+                                else -> "${item.price.toInt()} ₽"
+                            },
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (item.price == 0.0) Success else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    if (isSubscription) {
+                        Button(
+                            onClick = onBuy,
+                            modifier = Modifier.padding(start = 12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (item.isPromo) Primary else MaterialTheme.colorScheme.primary,
+                            ),
+                        ) {
+                            Text("Купить")
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = onBuy,
+                            modifier = Modifier.padding(start = 12.dp),
+                        ) {
+                            Text(if (item.price == 0.0) "Получить" else "Купить")
+                        }
+                    }
                 }
             }
         }

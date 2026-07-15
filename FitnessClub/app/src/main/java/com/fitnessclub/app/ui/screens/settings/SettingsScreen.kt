@@ -28,6 +28,8 @@ import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.config.LegalDocumentType
+import com.fitnessclub.app.data.config.LegalLinks
+import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.data.config.AppDistribution
 import com.fitnessclub.app.data.local.AppLanguage
 import com.fitnessclub.app.data.local.ThemeMode
@@ -40,13 +42,12 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToNotificationSettings: () -> Unit = {},
     onNavigateToSecuritySettings: () -> Unit = {},
-    onNavigateToHelp: () -> Unit = {},
-    onNavigateToAbout: () -> Unit = {},
+    onNavigateToNetworkInfo: () -> Unit = {},
     onNavigateToChangePassword: () -> Unit = {},
     onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
+    onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -55,6 +56,9 @@ fun SettingsScreen(
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     val notificationSettings = settingsState.notificationSettings
+    val openLegal: (LegalDocumentType) -> Unit = { type ->
+        LegalLinks.open(type, onOpenLegalPdf, onOpenLegalDocument)
+    }
 
     LaunchedEffect(settingsState.notificationsError) {
         settingsState.notificationsError?.let { snackbarHostState.showSnackbar(it) }
@@ -192,30 +196,10 @@ fun SettingsScreen(
             // Support section
             SettingsSection(title = "Поддержка") {
                 ClickableSettingItem(
-                    icon = Icons.Default.Help,
-                    title = "Помощь",
-                    onClick = onNavigateToHelp
-                )
-                
-                ClickableSettingItem(
-                    icon = Icons.Default.Feedback,
-                    title = "Обратная связь",
-                    subtitle = "Оцените работу клуба без контакта",
-                    onClick = { showFeedbackDialog = true }
-                )
-                
-                ClickableSettingItem(
-                    icon = Icons.Default.Star,
-                    title = "Оценить приложение",
-                    subtitle = AppDistribution.rateAppButtonLabel(context),
-                    onClick = { uriHandler.openUri(AppDistribution.storeListingUrl(context)) }
-                )
-                
-                ClickableSettingItem(
                     icon = Icons.Default.Info,
-                    title = "О приложении",
-                    subtitle = "Версия ${BuildConfig.VERSION_NAME}",
-                    onClick = onNavigateToAbout
+                    title = "О сети и контакты",
+                    subtitle = "О Доброзал, обратная связь, оценка приложения",
+                    onClick = onNavigateToNetworkInfo
                 )
             }
             
@@ -225,37 +209,37 @@ fun SettingsScreen(
                     icon = Icons.Default.AccountBalance,
                     title = "Реквизиты",
                     subtitle = "ИП Мацкова Александра Сергеевна",
-                    onClick = { onOpenLegalDocument(LegalDocumentType.REQUISITES) }
+                    onClick = { openLegal(LegalDocumentType.REQUISITES) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Description,
                     title = "Договор-оферта",
-                    onClick = { onOpenLegalDocument(LegalDocumentType.TERMS) }
+                    onClick = { openLegal(LegalDocumentType.TERMS) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.PrivacyTip,
                     title = "Политика конфиденциальности",
-                    onClick = { onOpenLegalDocument(LegalDocumentType.PRIVACY) }
+                    onClick = { openLegal(LegalDocumentType.PRIVACY) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Article,
                     title = "Договор с клиентом",
-                    onClick = { onOpenLegalDocument(LegalDocumentType.CLIENT_AGREEMENT) }
+                    onClick = { openLegal(LegalDocumentType.CLIENT_AGREEMENT) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Article,
                     title = "Договор с тренером",
-                    onClick = { onOpenLegalDocument(LegalDocumentType.TRAINER_AGREEMENT) }
+                    onClick = { openLegal(LegalDocumentType.TRAINER_AGREEMENT) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Assignment,
                     title = "Согласие на обработку персональных данных",
-                    onClick = { onOpenLegalDocument(LegalDocumentType.PERSONAL_DATA_CONSENT) }
+                    onClick = { openLegal(LegalDocumentType.PERSONAL_DATA_CONSENT) }
                 )
             }
             

@@ -21,10 +21,43 @@ class LandingController extends AbstractController
     }
 
     #[Route('/', name: 'landing_page', methods: ['GET'])]
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        if ($this->isDobrozalHost($request)) {
+            return $this->renderDobrozalLanding();
+        }
+
         return $this->render('landing/index.html.twig', [
             'admin_url' => '/admin',
+        ]);
+    }
+
+    private function isDobrozalHost(Request $request): bool
+    {
+        $host = strtolower($request->getHost());
+        if (str_contains($host, 'dobrozal.ru')) {
+            return true;
+        }
+
+        return $request->query->getBoolean('dobrozal');
+    }
+
+    private function renderDobrozalLanding(): Response
+    {
+        $get = function (string $key, string $default): string {
+            return $this->clubSettings->get($key) ?? $default;
+        };
+
+        $clubName = $get('name', 'Доброзал');
+        if (trim($clubName) === 'FitnessClub') {
+            $clubName = 'Доброзал';
+        }
+
+        return $this->render('landing/dobrozal.html.twig', [
+            'club_name' => $clubName,
+            'club_phone' => $get('contact_phone', '') ?: $get('phone', '+7 (495) 123-45-67'),
+            'club_email' => $get('contact_email', '') ?: $get('email', 'info@fitnessclub.ru'),
+            'club_address' => $get('address', ''),
         ]);
     }
 

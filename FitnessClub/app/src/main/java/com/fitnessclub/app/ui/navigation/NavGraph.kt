@@ -38,8 +38,11 @@ import com.fitnessclub.app.ui.screens.settings.ChangePasswordScreen
 import com.fitnessclub.app.ui.screens.settings.SettingsScreen
 import com.fitnessclub.app.ui.screens.help.HelpScreen
 import com.fitnessclub.app.ui.screens.about.AboutScreen
+import com.fitnessclub.app.ui.screens.networkinfo.NetworkInfoScreen
 import com.fitnessclub.app.ui.screens.legal.LegalDocumentScreen
+import com.fitnessclub.app.ui.screens.legal.LegalPdfScreen
 import com.fitnessclub.app.data.config.LegalDocumentType
+import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.ui.screens.shop.ShopScreen
 import com.fitnessclub.app.ui.screens.subscriptions.PaymentPendingScreen
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPlansScreen
@@ -57,6 +60,10 @@ fun NavGraph(
 
     LaunchedEffect(isLoggedIn) {
         if (!isLoggedIn) return@LaunchedEffect
+        navController.navigate(Screen.Home.route) {
+            popUpTo(navController.graph.id) { inclusive = true }
+            launchSingleTop = true
+        }
         PaymentDeepLinkBus.events.collect { uri ->
             val paymentId = uri.getQueryParameter("payment_id")?.toIntOrNull()
             if (paymentId != null && paymentId > 0) {
@@ -67,6 +74,10 @@ fun NavGraph(
         }
     }
     
+    val openLegalPdf: (LegalPdfAsset) -> Unit = { asset ->
+        navController.navigate(Screen.LegalPdf.createRoute(asset))
+    }
+
     NavHost(
         navController = navController,
         startDestination = startDestination
@@ -90,9 +101,11 @@ fun NavGraph(
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
                 },
+                onOpenLegalPdf = openLegalPdf,
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                        popUpTo(navController.graph.id) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -136,7 +149,8 @@ fun NavGraph(
                     },
                     onRequestSberRegistration = {
                         navController.navigate(Screen.Login.createRoute(startSber = true)) {
-                            popUpTo(Screen.Register.route) { inclusive = true }
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
                         }
                     },
                 )
@@ -154,9 +168,11 @@ fun NavGraph(
                     onNavigateToPassport = {
                         navController.navigate(RegisterRoutes.PASSPORT)
                     },
+                    onOpenLegalPdf = openLegalPdf,
                     onRegisterSuccess = {
                         navController.navigate(Screen.Home.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
                         }
                     },
                     onChangeClub = {
@@ -233,6 +249,7 @@ fun NavGraph(
                 onOpenLegalDocument = { type ->
                     navController.navigate(Screen.LegalDocument.createRoute(type))
                 },
+                onOpenLegalPdf = openLegalPdf,
             )
         }
 
@@ -292,14 +309,14 @@ fun NavGraph(
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToHelp = { navController.navigate(Screen.Help.route) },
-                onNavigateToAbout = { navController.navigate(Screen.About.route) },
+                onNavigateToNetworkInfo = { navController.navigate(Screen.NetworkInfo.route) },
                 onNavigateToChangePassword = {
                     navController.navigate(Screen.ChangePassword.route)
                 },
                 onOpenLegalDocument = { type ->
                     navController.navigate(Screen.LegalDocument.createRoute(type))
                 },
+                onOpenLegalPdf = openLegalPdf,
             )
         }
 
@@ -325,10 +342,32 @@ fun NavGraph(
                 )
             }
         }
+
+        composable(
+            route = Screen.LegalPdf.route,
+            arguments = listOf(
+                navArgument(NavArgs.LEGAL_PDF) { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val pdfAsset = backStackEntry.arguments
+                ?.getString(NavArgs.LEGAL_PDF)
+                ?.let { LegalPdfAsset.fromAnnotation(it) }
+            if (pdfAsset != null) {
+                LegalPdfScreen(
+                    asset = pdfAsset,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
+        }
         
         // Help & About
         composable(Screen.Help.route) {
             HelpScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.NetworkInfo.route) {
+            NetworkInfoScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
         }
         composable(Screen.About.route) {
             AboutScreen(onNavigateBack = { navController.popBackStack() })
@@ -345,6 +384,7 @@ fun NavGraph(
                 onOpenLegalDocument = { type ->
                     navController.navigate(Screen.LegalDocument.createRoute(type))
                 },
+                onOpenLegalPdf = openLegalPdf,
             )
         }
         

@@ -2,6 +2,7 @@ package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.local.AuthFlowStore
 import com.fitnessclub.app.data.local.TokenManager
 import com.fitnessclub.app.data.model.ChangePasswordRequest
 import com.fitnessclub.app.data.model.LoginHintRequest
@@ -29,6 +30,7 @@ private data class ApiJsonError(
 class AuthRepository @Inject constructor(
     private val api: FitnessApi,
     private val tokenManager: TokenManager,
+    private val authFlowStore: AuthFlowStore,
     private val gson: Gson,
 ) {
 
@@ -79,6 +81,7 @@ class AuthRepository @Inject constructor(
                 val authResponse = response.body()!!
                 tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
                 tokenManager.saveUser(authResponse.user)
+                onAuthenticated()
                 emit(ApiResult.Success(authResponse.user))
             } else {
                 emit(ApiResult.Error(authErrorMessage(response, "Не удалось завершить вход через Сбер ID"), response.code()))
@@ -96,6 +99,7 @@ class AuthRepository @Inject constructor(
                 val authResponse = response.body()!!
                 tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
                 tokenManager.saveUser(authResponse.user)
+                onAuthenticated()
                 emit(ApiResult.Success(authResponse.user))
             } else {
                 val auth = parseAuthError(response, "Ошибка входа")
@@ -145,6 +149,7 @@ class AuthRepository @Inject constructor(
                 val authResponse = response.body()!!
                 tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
                 tokenManager.saveUser(authResponse.user)
+                onAuthenticated()
                 emit(ApiResult.Success(authResponse.user))
             } else {
                 emit(ApiResult.Error(authErrorMessage(response, "Ошибка регистрации"), response.code()))
@@ -195,6 +200,8 @@ class AuthRepository @Inject constructor(
     }
     
     fun isLoggedIn(): Flow<Boolean> = tokenManager.isLoggedIn()
+
+    fun hasCompletedRegistration(): Flow<Boolean> = authFlowStore.hasCompletedRegistration
     
     fun getCurrentUser(): Flow<User?> = tokenManager.getUser()
     
@@ -291,6 +298,11 @@ class AuthRepository @Inject constructor(
             "Введите пароль. Если аккаунта ещё нет — пройдите регистрацию."
         }
         else -> message.ifBlank { loginPasswordRequiredMessage() }
+    }
+
+    private suspend fun onAuthenticated() {
+        authFlowStore.markRegistrationCompleted()
+        authFlowStore.clearPendingSberVerifier()
     }
 }
 

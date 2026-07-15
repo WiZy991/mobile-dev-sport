@@ -1,5 +1,7 @@
 twig:
     file_name_pattern: '*.twig'
+    globals:
+        yandex_metrika_id: '%env(int:default:0:YANDEX_METRIKA_ID)%'
 
 when@test:
     twig:

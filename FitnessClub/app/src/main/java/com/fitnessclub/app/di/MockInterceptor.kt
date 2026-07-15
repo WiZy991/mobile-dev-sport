@@ -711,7 +711,7 @@ class MockInterceptor : Interceptor {
     
     private fun mockClubInfoResponse(): String = """
     {
-        "name": "FitnessClub",
+        "name": "Доброзал",
         "address": "г. Москва, ул. Примерная, д. 1",
         "phone": "+7 (495) 123-45-67",
         "email": "info@fitnessclub.ru",
@@ -720,7 +720,19 @@ class MockInterceptor : Interceptor {
         "latitude": 55.7558,
         "longitude": 37.6173,
         "promo_title": "СКИДКА 20%!",
-        "promo_subtitle": "на все карты 12 и 6 месяцев"
+        "promo_subtitle": "на все карты 12 и 6 месяцев",
+        "shop_config": {
+            "tab_order": ["subscriptions", "services", "goods"],
+            "default_tab": "subscriptions",
+            "hide_empty_tabs": true,
+            "counts": { "services": 0, "goods": 0, "subscriptions": 3 }
+        },
+        "network": {
+            "about": "Сеть фитнес-клубов Доброзал",
+            "social_vk": null,
+            "social_telegram": null,
+            "website": null
+        }
     }
     """.trimIndent()
 

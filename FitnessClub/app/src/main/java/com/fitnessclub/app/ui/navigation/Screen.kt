@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.navigation
 
 import com.fitnessclub.app.data.config.LegalDocumentType
+import com.fitnessclub.app.data.config.LegalPdfAsset
 
 sealed class Screen(val route: String) {
     // Auth
@@ -39,9 +40,14 @@ sealed class Screen(val route: String) {
     data object ChangePassword : Screen("change_password")
     data object Help : Screen("help")
     data object About : Screen("about")
+    data object NetworkInfo : Screen("network_info")
 
     data object LegalDocument : Screen("legal/{legalDoc}") {
         fun createRoute(type: LegalDocumentType) = "legal/${type.name}"
+    }
+
+    data object LegalPdf : Screen("legal_pdf/{pdfAsset}") {
+        fun createRoute(asset: LegalPdfAsset) = "legal_pdf/${asset.name}"
     }
     
     // Club & Trainers
@@ -69,4 +75,5 @@ object NavArgs {
     const val CLUB_ID = "clubId"
     const val TRAINER_ID = "trainerId"
     const val LEGAL_DOC = "legalDoc"
+    const val LEGAL_PDF = "pdfAsset"
 }

@@ -73,6 +73,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
@@ -92,7 +93,8 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.runtime.collectAsState
 import com.fitnessclub.app.R
 import com.fitnessclub.app.data.api.ClubItem
-import com.fitnessclub.app.data.config.AppConfig
+import com.fitnessclub.app.data.config.LegalPdfAsset
+import com.fitnessclub.app.ui.components.BrandHeader
 import com.fitnessclub.app.ui.theme.Primary
 import com.fitnessclub.app.ui.theme.PrimaryVariant
 
@@ -102,6 +104,7 @@ fun RegisterScreen(
     viewModel: RegisterViewModel,
     onNavigateToLogin: () -> Unit,
     onNavigateToPassport: () -> Unit,
+    onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
     onRegisterSuccess: () -> Unit,
     onChangeClub: () -> Unit,
 ) {
@@ -191,14 +194,21 @@ fun RegisterScreen(
                 }
             }
             RegisterStepIndicator(current = uiState.formStep)
-            Text(
-                uiState.formStep.title.uppercase(),
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
+            BrandHeader(
+                clubName = uiState.selectedClub?.name ?: "Доброзал",
+                subtitle = uiState.formStep.title,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
+            )
+            Text(
+                uiState.formStep.title.uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(0.85f),
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
                 textAlign = TextAlign.Center
             )
 
@@ -237,6 +247,7 @@ fun RegisterScreen(
                     onConfirmPasswordVisibleChange = { confirmPasswordVisible = it },
                     focusManager = focusManager,
                     onRegister = { viewModel.onPrimaryFormAction() },
+                    onOpenLegalPdf = onOpenLegalPdf,
                 )
             }
 
@@ -272,7 +283,7 @@ fun RegisterScreen(
                         focusManager.clearFocus()
                         viewModel.onPrimaryFormAction()
                     },
-                    enabled = !uiState.isLoading,
+                    enabled = !uiState.isLoading && viewModel.isCurrentStepValid(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -573,6 +584,7 @@ private fun RegisterAccountStep(
     onConfirmPasswordVisibleChange: (Boolean) -> Unit,
     focusManager: FocusManager,
     onRegister: () -> Unit,
+    onOpenLegalPdf: (LegalPdfAsset) -> Unit,
 ) {
     Text(
         "Придумайте пароль для входа в приложение",
@@ -663,8 +675,8 @@ private fun RegisterAccountStep(
             .fillMaxWidth()
             .padding(vertical = 16.dp),
         onClick = { offset ->
-            legal.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
-                runCatching { uriHandler.openUri(it.item) }
+            legal.getStringAnnotations("PDF", offset, offset).firstOrNull()?.let { tag ->
+                LegalPdfAsset.fromAnnotation(tag.item)?.let(onOpenLegalPdf)
             }
         },
     )
@@ -706,13 +718,13 @@ private fun RegisterAccountStep(
 
 private fun legalAnnotatedString(): AnnotatedString = buildAnnotatedString {
     append("Нажимая кнопку «Зарегистрироваться», я подтверждаю, что ознакомился и соглашаюсь с условиями ")
-    pushStringAnnotation("URL", AppConfig.USER_AGREEMENT_URL)
+    pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
         append("Пользовательского соглашения")
     }
     pop()
     append(", а также подтверждаю ознакомление с ")
-    pushStringAnnotation("URL", AppConfig.PRIVACY_URL)
+    pushStringAnnotation("PDF", LegalPdfAsset.PRIVACY_POLICY.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
         append("Политикой по обработке персональных данных")
     }

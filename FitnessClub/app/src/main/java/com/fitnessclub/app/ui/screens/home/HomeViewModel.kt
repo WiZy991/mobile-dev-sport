@@ -2,20 +2,23 @@ package com.fitnessclub.app.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.ClubPromotion
+import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.model.BookingStatus
+import com.fitnessclub.app.data.repository.AccessRepository
+import com.fitnessclub.app.data.repository.ClubRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import com.fitnessclub.app.data.api.FitnessApi
-import com.fitnessclub.app.data.model.BookingStatus
-import com.fitnessclub.app.data.repository.AccessRepository
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class HomeUiState(
     val isLoading: Boolean = false,
+    val clubBrandName: String = "Доброзал",
     val promotions: List<ClubPromotion> = listOf(
         ClubPromotion(
             id = "default",
@@ -41,15 +44,16 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val api: FitnessApi,
     private val accessRepository: AccessRepository,
+    private val clubRepository: ClubRepository,
 ) : ViewModel() {
-    
+
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-    
+
     init {
         loadData()
     }
-    
+
     fun loadUnreadCount() {
         viewModelScope.launch {
             try {
@@ -58,10 +62,11 @@ class HomeViewModel @Inject constructor(
                     val count = (res.body() ?: emptyList()).count { !it.isRead }
                     _uiState.update { it.copy(unreadNotifications = count) }
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
-    
+
     fun loadOccupancy() {
         viewModelScope.launch {
             try {
@@ -73,19 +78,21 @@ class HomeViewModel @Inject constructor(
                                 occupancyCurrent = occ.current,
                                 occupancyMax = occ.maxCapacity,
                                 occupancyPercentage = occ.percentage,
-                                occupancyStatus = occ.status
+                                occupancyStatus = occ.status,
                             )
                         }
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
-    
+
     private fun loadData() {
         viewModelScope.launch {
             loadOccupancy()
             loadUnreadCount()
+            loadClubBrandName()
             accessRepository.refreshAccessStatus()
             _uiState.update { it.copy(isInsideGym = accessRepository.accessStatus.value.isInside) }
             try {
@@ -123,12 +130,27 @@ class HomeViewModel @Inject constructor(
                                 name = t.name,
                                 time = time,
                                 trainer = t.trainer.name,
-                                room = t.room
+                                room = t.room,
                             )
                         }
                     _uiState.update { it.copy(upcomingTrainings = upcoming) }
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private suspend fun loadClubBrandName() {
+        try {
+            when (val result = clubRepository.getClubInfo()) {
+                is ApiResult.Success -> {
+                    _uiState.update {
+                        it.copy(clubBrandName = result.data.name.ifBlank { "Доброзал" })
+                    }
+                }
+                else -> Unit
+            }
+        } catch (_: Exception) {
         }
     }
 
@@ -137,6 +159,9 @@ class HomeViewModel @Inject constructor(
             val clubRes = api.getClubInfo()
             if (clubRes.isSuccessful) {
                 clubRes.body()?.let { c ->
+                    _uiState.update {
+                        it.copy(clubBrandName = c.name.ifBlank { "Доброзал" })
+                    }
                     val title = c.promoTitle?.takeIf { it.isNotBlank() } ?: return
                     val subtitle = c.promoSubtitle?.takeIf { it.isNotBlank() }
                     _uiState.update {
@@ -150,9 +175,9 @@ class HomeViewModel @Inject constructor(
                                     actionType = "shop",
                                     bgFrom = "#F97316",
                                     bgTo = "#3B82F6",
-                                    sortOrder = 100
+                                    sortOrder = 100,
                                 )
-                            )
+                            ),
                         )
                     }
                 }

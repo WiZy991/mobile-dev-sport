@@ -5,8 +5,8 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,7 +18,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -27,7 +26,10 @@ import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalUriHandler
 import com.fitnessclub.app.data.config.LegalDocumentType
+import com.fitnessclub.app.data.config.LegalLinks
+import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.ui.screens.legal.LegalPdfScreen
 import com.fitnessclub.app.ui.theme.AccentOrange
 import com.fitnessclub.app.ui.theme.AppShapes
 import com.fitnessclub.app.ui.theme.Error
@@ -42,12 +44,14 @@ fun SubscriptionPlansScreen(
     onNavigateToPayment: (paymentId: Int) -> Unit = {},
     onPurchaseSuccess: () -> Unit = {},
     onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
+    onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
     viewModel: SubscriptionPlansViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showPromoDialog by remember { mutableStateOf(false) }
     var showPurchaseDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
     var showLegalConsentDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
+    var pdfOverlay by remember { mutableStateOf<LegalPdfAsset?>(null) }
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -109,7 +113,8 @@ fun SubscriptionPlansScreen(
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.background(MaterialTheme.colorScheme.background),
                 ) {
                     // Applied promo code
                     if (uiState.appliedPromoCode != null) {
@@ -170,7 +175,9 @@ fun SubscriptionPlansScreen(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 TextButton(
-                                    onClick = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
+                                    onClick = {
+                                        LegalLinks.open(LegalDocumentType.REQUISITES, onOpenLegalPdf, onOpenLegalDocument)
+                                    },
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Text("Реквизиты")
@@ -197,48 +204,64 @@ fun SubscriptionPlansScreen(
     
     // Purchase dialog
     var purchaseError by remember { mutableStateOf<String?>(null) }
-    showPurchaseDialog?.let { plan ->
-        val discountedPrice = viewModel.discountedPrice(plan)
-        SubscriptionPurchaseConfirmDialog(
-            plan = plan,
-            finalPrice = discountedPrice,
-            hasDiscount = uiState.appliedPromoCode != null && discountedPrice < plan.price,
-            isLoading = uiState.isLoading,
-            error = purchaseError,
-            onDismiss = { showPurchaseDialog = null; purchaseError = null },
-            onOpenRequisites = { onOpenLegalDocument(LegalDocumentType.REQUISITES) },
-            onConfirm = { showLegalConsentDialog = plan }
-        )
+    if (pdfOverlay == null && showLegalConsentDialog == null) {
+        showPurchaseDialog?.let { plan ->
+            val discountedPrice = viewModel.discountedPrice(plan)
+            SubscriptionPurchaseConfirmDialog(
+                plan = plan,
+                finalPrice = discountedPrice,
+                hasDiscount = uiState.appliedPromoCode != null && discountedPrice < plan.price,
+                isLoading = uiState.isLoading,
+                error = purchaseError,
+                onDismiss = { showPurchaseDialog = null; purchaseError = null },
+                onOpenRequisites = {
+                    LegalLinks.open(LegalDocumentType.REQUISITES, onOpenLegalPdf, onOpenLegalDocument)
+                },
+                onConfirm = {
+                    showPurchaseDialog = null
+                    showLegalConsentDialog = plan
+                },
+            )
+        }
     }
 
-    showLegalConsentDialog?.let { plan ->
-        ClubPurchaseConsentDialog(
-            context = uiState.clubPurchaseContext,
-            onDismiss = { showLegalConsentDialog = null },
-            onOpenDocument = onOpenLegalDocument,
-            onOpenExternalUrl = { uriHandler.openUri(it) },
-            onConfirm = {
-                purchaseError = null
-                showLegalConsentDialog = null
-                viewModel.purchasePlan(
-                    plan = plan,
-                    onPaymentRequired = { paymentId, paymentUrl ->
-                        showPurchaseDialog = null
-                        onNavigateToPayment(paymentId)
-                        openPaymentUrl(context, paymentUrl)
-                    },
-                    onVerificationRequired = { url, message ->
-                        showPurchaseDialog = null
-                        scope.launch {
-                            snackbarHostState.showSnackbar(message)
+    if (pdfOverlay == null) {
+        showLegalConsentDialog?.let { plan ->
+            ClubPurchaseConsentDialog(
+                context = uiState.clubPurchaseContext,
+                onDismiss = { showLegalConsentDialog = null },
+                onOpenPdf = { pdfOverlay = it },
+                onOpenExternalUrl = { openExternalUrl(context, it) },
+                onConfirm = {
+                    purchaseError = null
+                    showLegalConsentDialog = null
+                    viewModel.purchasePlan(
+                        plan = plan,
+                        onPaymentRequired = { paymentId, paymentUrl ->
+                            showPurchaseDialog = null
+                            onNavigateToPayment(paymentId)
+                            openPaymentUrl(context, paymentUrl)
+                        },
+                        onVerificationRequired = { url, message ->
+                            showPurchaseDialog = null
+                            scope.launch {
+                                snackbarHostState.showSnackbar(message)
+                            }
+                            openExternalUrl(context, url)
+                        },
+                        onError = { msg ->
+                            purchaseError = msg
                         }
-                        openExternalUrl(context, url)
-                    },
-                    onError = { msg ->
-                        purchaseError = msg
-                    }
-                )
-            }
+                    )
+                }
+            )
+        }
+    }
+
+    pdfOverlay?.let { asset ->
+        LegalPdfScreen(
+            asset = asset,
+            onNavigateBack = { pdfOverlay = null },
         )
     }
 }
@@ -321,19 +344,18 @@ private fun SubscriptionPlanCard(
     onPurchase: () -> Unit
 ) {
     val isPopular = plan.isPopular
-    
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (isPopular) {
-                    Modifier.border(2.dp, Primary, RoundedCornerShape(16.dp))
-                } else Modifier
-            ),
-        shape = RoundedCornerShape(16.dp)
+    val borderColor = if (isPopular) Primary else MaterialTheme.colorScheme.outlineVariant
+
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(if (isPopular) 2.dp else 1.dp, borderColor),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        elevation = CardDefaults.outlinedCardElevation(defaultElevation = if (isPopular) 4.dp else 1.dp),
     ) {
         Column {
-            // Popular badge
             if (isPopular) {
                 Box(
                     modifier = Modifier
@@ -354,112 +376,109 @@ private fun SubscriptionPlanCard(
                     )
                 }
             }
-            
-            Column(modifier = Modifier.padding(20.dp)) {
+
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = plan.safeName,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Text(
-                    text = plan.safeDescription,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Features
+
+                if (plan.safeDescription.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = plan.safeDescription,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
                 plan.safeFeatures.forEach { feature ->
                     Row(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.padding(top = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             Icons.Default.Check,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = Success
+                            modifier = Modifier.size(18.dp),
+                            tint = Success,
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(feature, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Duration and visits
-                Row {
-                    if (plan.safeDurationDays > 0) {
-                        AssistChip(
-                            onClick = { },
-                            enabled = false,
-                            label = { Text("${plan.safeDurationDays} дней") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.CalendarMonth,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-                    plan.visitsCount?.let { visits ->
-                        AssistChip(
-                            onClick = { },
-                            enabled = false,
-                            label = { Text("$visits посещений") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.ConfirmationNumber,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        )
+
+                if (plan.safeDurationDays > 0 || plan.visitsCount != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (plan.safeDurationDays > 0) {
+                            AssistChip(
+                                onClick = { },
+                                enabled = false,
+                                label = { Text("${plan.safeDurationDays} дней") },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                },
+                            )
+                        }
+                        plan.visitsCount?.let { visits ->
+                            AssistChip(
+                                onClick = { },
+                                enabled = false,
+                                label = { Text("$visits посещений") },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.ConfirmationNumber,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Price
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         if (finalPrice != null) {
                             Text(
                                 text = "${plan.price.toInt()} ₽",
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.bodyMedium,
                                 textDecoration = TextDecoration.LineThrough,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
                                 text = "${finalPrice.toInt()} ₽",
-                                style = MaterialTheme.typography.headlineMedium,
+                                style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Success
+                                color = Success,
                             )
                         } else {
                             Text(
                                 text = "${plan.price.toInt()} ₽",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                     }
-                    
+
                     Button(
                         onClick = onPurchase,
+                        modifier = Modifier.padding(start = 12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isPopular) Primary else MaterialTheme.colorScheme.primary
-                        )
+                            containerColor = if (isPopular) Primary else MaterialTheme.colorScheme.primary,
+                        ),
                     ) {
                         Text("Купить")
                     }

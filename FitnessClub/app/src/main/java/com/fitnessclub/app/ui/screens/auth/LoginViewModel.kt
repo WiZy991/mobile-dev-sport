@@ -6,12 +6,14 @@ import android.net.Uri
 import androidx.fragment.app.FragmentActivity
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.auth.SberPkce
+import com.fitnessclub.app.data.local.AuthFlowStore
 import com.fitnessclub.app.data.local.BiometricLoginCoordinator
 import com.fitnessclub.app.data.local.BiometricLoginStore
 import com.fitnessclub.app.data.local.TokenManager
 import com.fitnessclub.app.data.model.LoginHintResult
 import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
+import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.loginPasswordRequiredMessage
 import com.fitnessclub.app.data.repository.passwordNotSetHintMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,17 +29,42 @@ import javax.inject.Inject
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val clubRepository: ClubRepository,
+    private val authFlowStore: AuthFlowStore,
     private val biometricLoginStore: BiometricLoginStore,
     private val tokenManager: TokenManager,
 ) : ViewModel() {
     private val sberRedirectUri = "https://worldcashfit.ru/api/v1/auth/sber/callback"
     private var sberCodeVerifier: String? = null
+    private var welcomeAfterSberLogin = false
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
     init {
         refreshBiometricOffer()
+        loadClubBrandName()
+        viewModelScope.launch {
+            authFlowStore.hasCompletedRegistration.collect { completed ->
+                _uiState.value = _uiState.value.copy(hasCompletedRegistration = completed)
+            }
+        }
+    }
+
+    fun setWelcomeAfterSberLogin(enabled: Boolean) {
+        welcomeAfterSberLogin = enabled
+    }
+
+    private fun loadClubBrandName() {
+        viewModelScope.launch {
+            when (val result = clubRepository.getClubInfo()) {
+                is ApiResult.Success -> {
+                    val name = result.data.name.ifBlank { "Доброзал" }
+                    _uiState.value = _uiState.value.copy(clubBrandName = name)
+                }
+                else -> Unit
+            }
+        }
     }
 
     fun refreshBiometricOffer() {
@@ -113,6 +140,7 @@ class LoginViewModel @Inject constructor(
             email = email.trim(),
             emailError = null,
             validationSummary = null,
+            loginHintCode = null,
         )
     }
 
@@ -121,6 +149,7 @@ class LoginViewModel @Inject constructor(
             password = password,
             passwordError = null,
             validationSummary = null,
+            loginHintCode = null,
         )
     }
 
@@ -270,6 +299,7 @@ class LoginViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     validationSummary = hint.message,
+                    loginHintCode = "password_not_set",
                     passwordError = null,
                     showValidationAttempted = true,
                     error = null,
@@ -278,8 +308,9 @@ class LoginViewModel @Inject constructor(
             "email_unknown" -> {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    validationSummary = hint.message,
-                    passwordError = loginPasswordRequiredMessage(),
+                    validationSummary = "Аккаунт не найден. Зарегистрируйтесь.",
+                    loginHintCode = "email_unknown",
+                    passwordError = null,
                     showValidationAttempted = true,
                     error = null,
                 )
@@ -288,6 +319,7 @@ class LoginViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     validationSummary = null,
+                    loginHintCode = hint.code.takeIf { it.isNotBlank() },
                     passwordError = loginPasswordRequiredMessage(),
                     showValidationAttempted = true,
                     error = null,
@@ -310,6 +342,7 @@ class LoginViewModel @Inject constructor(
                     }
                     is ApiResult.Success -> {
                         sberCodeVerifier = verifier
+                        authFlowStore.savePendingSberVerifier(verifier)
                         _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                         _events.emit(LoginEvent.OpenExternalUrl(result.data))
                     }
@@ -334,8 +367,7 @@ class LoginViewModel @Inject constructor(
 
         val code = uri.getQueryParameter("code")
         val state = uri.getQueryParameter("state")
-        val verifier = sberCodeVerifier
-        if (code.isNullOrBlank() || state.isNullOrBlank() || verifier.isNullOrBlank()) {
+        if (code.isNullOrBlank() || state.isNullOrBlank()) {
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 error = "Не удалось завершить вход через Сбер ID. Попробуйте ещё раз.",
@@ -344,6 +376,18 @@ class LoginViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            var verifier = sberCodeVerifier
+            if (verifier.isNullOrBlank()) {
+                verifier = authFlowStore.peekPendingSberVerifier()
+            }
+            if (verifier.isNullOrBlank()) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Сессия Сбер ID истекла. Нажмите «Войти через Сбер ID» ещё раз.",
+                )
+                return@launch
+            }
+
             authRepository.loginWithSberCode(
                 code = code,
                 codeVerifier = verifier,
@@ -356,12 +400,20 @@ class LoginViewModel @Inject constructor(
                     }
                     is ApiResult.Success -> {
                         sberCodeVerifier = null
+                        authFlowStore.clearPendingSberVerifier()
+                        val welcome = if (welcomeAfterSberLogin) {
+                            welcomeAfterSberLogin = false
+                            "Аккаунт создан, добро пожаловать!"
+                        } else {
+                            null
+                        }
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
+                            hasCompletedRegistration = true,
                             biometricLoginConfigured = biometricLoginStore.shouldShowBiometricLoginButton(),
                             biometricHardwareReady = biometricLoginStore.canUseDeviceBiometric(),
                         )
-                        _events.emit(LoginEvent.Success(result.data))
+                        _events.emit(LoginEvent.Success(result.data, welcomeMessage = welcome))
                     }
                     is ApiResult.Error -> {
                         _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
@@ -402,22 +454,22 @@ data class LoginUiState(
     val password: String = "",
     val emailError: String? = null,
     val passwordError: String? = null,
-    /** Сообщение над кнопкой после неудачной попытки входа. */
     val validationSummary: String? = null,
+    val loginHintCode: String? = null,
     val showValidationAttempted: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
-    /** В настройках сохранён вход по отпечатку (есть зашифрованный refresh). */
+    val clubBrandName: String = "Доброзал",
+    val hasCompletedRegistration: Boolean = false,
     val biometricLoginConfigured: Boolean = false,
-    /** Устройство сообщает, что можно показать BiometricPrompt. */
     val biometricHardwareReady: Boolean = false,
 )
 
 sealed class LoginEvent {
     data class Success(
         val user: User,
-        /** Если отпечаток уже был включён — заново зашифровать refresh после входа по паролю. */
         val refreshToReEncryptForBiometric: String? = null,
+        val welcomeMessage: String? = null,
     ) : LoginEvent()
     data class OpenExternalUrl(val url: String) : LoginEvent()
 }

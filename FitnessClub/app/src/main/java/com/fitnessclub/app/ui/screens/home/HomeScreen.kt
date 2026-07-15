@@ -25,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.data.api.ClubPromotion
 import coil.compose.AsyncImage
 import com.fitnessclub.app.ui.components.OccupancyCard
+import com.fitnessclub.app.ui.components.BrandHeader
 import com.fitnessclub.app.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -50,10 +51,12 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Text(
-                        "Доброзал",
-                        fontWeight = FontWeight.Bold
+                title = {
+                    BrandHeader(
+                        clubName = uiState.clubBrandName,
+                        showLogo = true,
+                        textColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 },
                 navigationIcon = {

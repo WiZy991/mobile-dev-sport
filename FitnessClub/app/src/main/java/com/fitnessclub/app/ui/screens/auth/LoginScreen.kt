@@ -74,7 +74,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.fragment.app.FragmentActivity
 import com.fitnessclub.app.data.auth.SberAuthDeepLinkBus
-import com.fitnessclub.app.data.config.AppConfig
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import com.fitnessclub.app.data.config.LegalPdfAsset
+import com.fitnessclub.app.ui.components.BrandHeader
 
 /** Фон входа в духе макета (терракота). */
 private val LoginBackground = Color(0xFFD35400)
@@ -86,6 +89,7 @@ fun LoginScreen(
     viewModel: LoginViewModel,
     startWithSber: Boolean = false,
     onNavigateToRegister: () -> Unit,
+    onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
     onLoginSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -94,11 +98,16 @@ fun LoginScreen(
     val activity = context as? FragmentActivity
     val focusManager = LocalFocusManager.current
     var passwordVisible by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var sberLaunchConsumed by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is LoginEvent.Success -> {
+                    event.welcomeMessage?.let { msg ->
+                        snackbarHostState.showSnackbar(msg)
+                    }
                     val rt = event.refreshToReEncryptForBiometric
                     if (!rt.isNullOrBlank() && activity != null) {
                         viewModel.reEncryptBiometricAfterPasswordLogin(activity, rt) {
@@ -131,7 +140,9 @@ fun LoginScreen(
     }
 
     LaunchedEffect(startWithSber) {
-        if (startWithSber) {
+        if (startWithSber && !sberLaunchConsumed) {
+            sberLaunchConsumed = true
+            viewModel.setWelcomeAfterSberLogin(true)
             viewModel.loginWithSberId()
         }
     }
@@ -158,25 +169,21 @@ fun LoginScreen(
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Доброзал",
-                color = LoginSurfaceWhite,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                fontSize = 32.sp
+            BrandHeader(
+                clubName = uiState.clubBrandName,
+                subtitle = if (uiState.hasCompletedRegistration) {
+                    "Вход в аккаунт"
+                } else {
+                    "Вход или регистрация"
+                },
             )
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(16.dp))
             Text(
-                text = "Вход в аккаунт",
-                color = LoginSurfaceWhite,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "Войдите по email и паролю или через Сбер ID.",
+                text = if (uiState.hasCompletedRegistration) {
+                    "Войдите через Сбер ID или по email и паролю."
+                } else {
+                    "Войдите по email и паролю или через Сбер ID."
+                },
                 color = LoginSurfaceWhite.copy(0.92f),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
@@ -232,17 +239,44 @@ fun LoginScreen(
             )
             uiState.validationSummary?.let { summary ->
                 Spacer(Modifier.height(12.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF5D2E00).copy(0.55f)),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text(
-                        text = summary,
-                        color = Color(0xFFFFE0B2),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(14.dp),
-                    )
+                if (uiState.loginHintCode == "password_not_set") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = LoginSurfaceWhite),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                text = summary,
+                                color = LoginBackground,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Button(
+                                onClick = { viewModel.loginWithSberId() },
+                                enabled = !uiState.isLoading,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SberButtonGreen,
+                                    contentColor = LoginSurfaceWhite,
+                                ),
+                            ) {
+                                Text("Войти через Сбер ID", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF5D2E00).copy(0.55f)),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(
+                            text = summary,
+                            color = Color(0xFFFFE0B2),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -277,34 +311,23 @@ fun LoginScreen(
 
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Регистрация",
-                color = LoginSurfaceWhite,
-                style = MaterialTheme.typography.titleSmall,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier
-                    .clickable(onClick = onNavigateToRegister)
-                    .padding(vertical = 8.dp)
+                text = "или",
+                color = LoginSurfaceWhite.copy(0.85f),
+                style = MaterialTheme.typography.bodyMedium,
             )
+            Spacer(Modifier.height(16.dp))
 
             uiState.error?.let { err ->
                 if (uiState.validationSummary == null) {
-                    Spacer(Modifier.height(8.dp))
                     Text(
                         text = err,
                         color = LoginSurfaceWhite,
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center
                     )
+                    Spacer(Modifier.height(8.dp))
                 }
             }
-
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = "или",
-                color = LoginSurfaceWhite.copy(0.85f),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Spacer(Modifier.height(16.dp))
 
             val legal = loginLegalAnnotatedString()
             ClickableText(
@@ -315,8 +338,8 @@ fun LoginScreen(
                 ),
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { offset ->
-                    legal.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
-                        runCatching { uriHandler.openUri(it.item) }
+                    legal.getStringAnnotations("PDF", offset, offset).firstOrNull()?.let { tag ->
+                        LegalPdfAsset.fromAnnotation(tag.item)?.let(onOpenLegalPdf)
                     }
                 }
             )
@@ -355,8 +378,36 @@ fun LoginScreen(
                 onClick = { viewModel.onBiometricLoginClick(it) },
             )
 
+            if (!uiState.hasCompletedRegistration) {
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = "Впервые в Доброзал?",
+                    color = LoginSurfaceWhite.copy(0.88f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Зарегистрироваться",
+                    color = LoginSurfaceWhite,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .clickable(onClick = onNavigateToRegister)
+                        .padding(vertical = 8.dp),
+                    textAlign = TextAlign.Center,
+                )
+            }
+
             Spacer(Modifier.height(24.dp))
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp),
+        )
     }
 }
 
@@ -469,13 +520,13 @@ private fun LoginCredentialField(
 
 private fun loginLegalAnnotatedString(): AnnotatedString = buildAnnotatedString {
     append("Продолжая, вы принимаете ")
-    pushStringAnnotation("URL", AppConfig.TERMS_URL)
+    pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
         append("Правила использования")
     }
     pop()
     append(", ")
-    pushStringAnnotation("URL", AppConfig.PRIVACY_URL)
+    pushStringAnnotation("PDF", LegalPdfAsset.PRIVACY_POLICY.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
         append("Политику конфиденциальности")
     }

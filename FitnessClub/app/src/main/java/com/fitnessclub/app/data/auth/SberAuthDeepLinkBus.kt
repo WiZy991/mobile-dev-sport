@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 object SberAuthDeepLinkBus {
-    private val _events = MutableSharedFlow<Uri>(extraBufferCapacity = 1)
+    private val _events = MutableSharedFlow<Uri>(replay = 1, extraBufferCapacity = 1)
     val events = _events.asSharedFlow()
 
     fun publish(uri: Uri) {

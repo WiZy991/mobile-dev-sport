@@ -1,0 +1,25 @@
+{% extends 'legal/dobrozal_base.html.twig' %}
+
+{% block title %}Доброзал — сеть фитнес-клубов{% endblock %}
+
+{% block body %}
+    <h1>Доброзал</h1>
+    <p style="color: var(--muted); font-size: 1.05rem; max-width: 640px;">
+        Сеть спортзалов самообслуживания. Расписание, абонементы и сервисы — в мобильном приложении.
+    </p>
+
+    {% if club_phone is defined and club_phone %}
+        <p><strong>Телефон:</strong> <a href="tel:{{ club_phone|replace({' ': '', '(': '', ')': '', '-': ''}) }}">{{ club_phone }}</a></p>
+    {% endif %}
+    {% if club_email is defined and club_email %}
+        <p><strong>Email:</strong> <a href="mailto:{{ club_email }}">{{ club_email }}</a></p>
+    {% endif %}
+    {% if club_address is defined and club_address %}
+        <p><strong>Адрес:</strong> {{ club_address }}</p>
+    {% endif %}
+
+    <div style="margin-top: 2rem;">
+        <a class="btn" href="{{ path('legal_dobrozal_doc') }}">Правовые документы</a>
+        <a class="btn btn-outline" href="{{ path('legal_dobrozal_offer_pdf') }}" target="_blank" rel="noopener">Публичная оферта (PDF)</a>
+    </div>
+{% endblock %}

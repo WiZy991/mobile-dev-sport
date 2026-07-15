@@ -24,7 +24,8 @@ fun AboutScreen(
 ) {
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
-    val rateLabel = AppDistribution.rateAppButtonLabel(context)
+    val storeRatingOptions = AppDistribution.storeRatingOptions(context)
+    val storeRatingHint = AppDistribution.storeRatingHint(context)
     
     Scaffold(
         topBar = {
@@ -69,11 +70,33 @@ fun AboutScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = { uriHandler.openUri(AppDistribution.storeListingUrl(context)) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(rateLabel)
+            storeRatingHint?.let { hint ->
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            storeRatingOptions.forEach { option ->
+                val isPrimary = storeRatingOptions.size == 1
+                if (isPrimary) {
+                    Button(
+                        onClick = { uriHandler.openUri(option.url) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(option.label)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { uriHandler.openUri(option.url) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(option.label)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         }
     }

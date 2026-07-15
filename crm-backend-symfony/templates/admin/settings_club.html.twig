@@ -72,11 +72,11 @@
             <div class="row g-2 mb-3">
                 <div class="col-12">
                     <label class="form-label small">Договор с клиентами клуба (публичная оферта) *</label>
-                    <input type="url" name="offer_url" class="form-control form-control-sm" value="{{ club.offer_url }}" placeholder="https://worldcashfit.ru/client-agreement">
+                    <input type="url" name="offer_url" class="form-control form-control-sm" value="{{ club.offer_url }}" placeholder="https://dobrozal.ru/doc/offer">
                 </div>
                 <div class="col-12">
                     <label class="form-label small">Политика по обработке персональных данных клуба *</label>
-                    <input type="url" name="privacy_url" class="form-control form-control-sm" value="{{ club.privacy_url }}" placeholder="https://worldcashfit.ru/privacy/">
+                    <input type="url" name="privacy_url" class="form-control form-control-sm" value="{{ club.privacy_url }}" placeholder="https://dobrozal.ru/doc/privacy">
                 </div>
                 <div class="col-12">
                     <label class="form-label small">Правила посещения клуба (необязательно)</label>
@@ -85,6 +85,63 @@
                 <div class="col-12">
                     <label class="form-label small">Техника безопасности клуба (необязательно)</label>
                     <input type="url" name="safety_rules_url" class="form-control form-control-sm" value="{{ club.safety_rules_url }}" placeholder="https://example.ru/safety">
+                </div>
+            </div>
+
+            <hr class="border-secondary my-3">
+
+            <div class="mb-2 text-primary small fw-semibold text-uppercase">Магазин в приложении</div>
+            <p class="small text-secondary mb-3">Порядок вкладок и вкладка по умолчанию в разделе «Магазин» мобильного приложения.</p>
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label small">Порядок вкладок (JSON)</label>
+                    <input type="text" name="shop_tab_order" class="form-control form-control-sm" value="{{ club.shop_tab_order }}" placeholder='["subscriptions","services","goods"]'>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Вкладка по умолчанию</label>
+                    <select name="shop_default_tab" class="form-select form-select-sm">
+                        <option value="subscriptions" {{ club.shop_default_tab == 'subscriptions' ? 'selected' : '' }}>Абонементы</option>
+                        <option value="services" {{ club.shop_default_tab == 'services' ? 'selected' : '' }}>Услуги</option>
+                        <option value="goods" {{ club.shop_default_tab == 'goods' ? 'selected' : '' }}>Товары</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Скрывать пустые вкладки</label>
+                    <select name="hide_empty_shop_tabs" class="form-select form-select-sm">
+                        <option value="1" {{ club.hide_empty_shop_tabs != '0' ? 'selected' : '' }}>Да</option>
+                        <option value="0" {{ club.hide_empty_shop_tabs == '0' ? 'selected' : '' }}>Нет</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr class="border-secondary my-3">
+
+            <div class="mb-2 text-primary small fw-semibold text-uppercase">О сети / контакты (приложение)</div>
+            <p class="small text-secondary mb-3">Текст и ссылки для единого экрана «О сети и контакты» в настройках приложения. Телефон и email клуба выше используются, если поля ниже пустые.</p>
+            <div class="row g-2 mb-3">
+                <div class="col-12">
+                    <label class="form-label small">О сети Доброзал</label>
+                    <textarea name="network_about" class="form-control form-control-sm" rows="3" placeholder="Кратко о сети клубов…">{{ club.network_about }}</textarea>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Телефон сети (переопределение)</label>
+                    <input type="text" name="contact_phone" class="form-control form-control-sm" value="{{ club.contact_phone }}" placeholder="+7 (495) …">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Email сети (переопределение)</label>
+                    <input type="email" name="contact_email" class="form-control form-control-sm" value="{{ club.contact_email }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Сайт</label>
+                    <input type="url" name="contact_website" class="form-control form-control-sm" value="{{ club.contact_website }}" placeholder="https://…">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">ВКонтакте</label>
+                    <input type="url" name="social_vk" class="form-control form-control-sm" value="{{ club.social_vk }}" placeholder="https://vk.com/…">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Telegram</label>
+                    <input type="url" name="social_telegram" class="form-control form-control-sm" value="{{ club.social_telegram }}" placeholder="https://t.me/…">
                 </div>
             </div>
 

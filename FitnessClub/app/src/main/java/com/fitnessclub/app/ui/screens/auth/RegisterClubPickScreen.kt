@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.data.api.ClubItem
 import com.fitnessclub.app.data.catalog.LocalSubscriptionCatalog
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.ui.components.BrandHeader
 import com.fitnessclub.app.ui.theme.Primary
 import com.fitnessclub.app.ui.theme.PrimaryVariant
 import java.text.NumberFormat
@@ -105,15 +106,12 @@ fun RegisterClubPickScreen(
                     )
                 }
             }
-            Text(
-                text = "Выберите зал",
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
+            BrandHeader(
+                clubName = "Доброзал",
+                subtitle = "Выберите зал",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp),
-                textAlign = TextAlign.Center,
             )
             Text(
                 text = "Клуб привяжется к вашему аккаунту",

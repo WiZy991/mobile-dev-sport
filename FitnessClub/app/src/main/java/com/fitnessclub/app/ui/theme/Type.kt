@@ -78,7 +78,7 @@ val Typography = Typography(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
-        lineHeight = 24.sp,
+        lineHeight = 22.sp,
         letterSpacing = 0.5.sp,
         lineBreak = LineBreak.Paragraph
     ),
@@ -86,7 +86,7 @@ val Typography = Typography(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 20.sp,
+        lineHeight = 18.sp,
         letterSpacing = 0.25.sp,
         lineBreak = LineBreak.Paragraph
     ),

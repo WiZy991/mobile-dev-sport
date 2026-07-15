@@ -4,7 +4,9 @@ namespace App\Controller\Api;
 
 use App\Entity\AccessLog;
 use App\Entity\Club;
+use App\Entity\Product;
 use App\Entity\Promotion;
+use App\Entity\SubscriptionPlan;
 use App\Service\Admin\ClubSettingsStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -72,13 +74,13 @@ class ClubController extends AbstractController
     private function legalUrlsFromSettings(): array
     {
         $offer = $this->normalizeClubOfferUrl(trim((string) ($this->clubSettings->get('offer_url') ?? '')));
-        $privacy = trim((string) ($this->clubSettings->get('privacy_url') ?? ''));
+        $privacy = $this->normalizeClubPrivacyUrl(trim((string) ($this->clubSettings->get('privacy_url') ?? '')));
         $visiting = trim((string) ($this->clubSettings->get('visiting_rules_url') ?? ''));
         $safety = trim((string) ($this->clubSettings->get('safety_rules_url') ?? ''));
 
         return [
-            'offer_url' => $offer !== '' ? $offer : null,
-            'privacy_url' => $privacy !== '' ? $privacy : null,
+            'offer_url' => $offer !== '' ? $offer : 'https://dobrozal.ru/doc/offer',
+            'privacy_url' => $privacy !== '' ? $privacy : 'https://dobrozal.ru/doc/privacy',
             'visiting_rules_url' => $visiting !== '' ? $visiting : null,
             'safety_rules_url' => $safety !== '' ? $safety : null,
         ];
@@ -93,8 +95,26 @@ class ClubController extends AbstractController
             return '';
         }
         $lower = strtolower($url);
-        if (str_contains($lower, 'license_agreement') || str_contains($lower, 'user_agreement')) {
-            return 'https://worldcashfit.ru/client-agreement';
+        if (
+            str_contains($lower, 'license_agreement')
+            || str_contains($lower, 'user_agreement')
+            || str_contains($lower, 'worldcashfit.ru/client-agreement')
+            || str_contains($lower, 'worldcashfit.ru/trainer-agreement')
+        ) {
+            return 'https://dobrozal.ru/doc/offer';
+        }
+
+        return $url;
+    }
+
+    private function normalizeClubPrivacyUrl(string $url): string
+    {
+        if ($url === '') {
+            return '';
+        }
+        $lower = strtolower($url);
+        if (str_contains($lower, 'worldcashfit.ru/privacy')) {
+            return 'https://dobrozal.ru/doc/privacy';
         }
 
         return $url;
@@ -204,19 +224,90 @@ class ClubController extends AbstractController
             $clubName = 'Доброзал';
         }
 
+        $contactPhone = trim($get('contact_phone', ''));
+        $contactEmail = trim($get('contact_email', ''));
+
         return $this->json([
             'name' => $clubName,
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
-            'phone' => $get('phone', '+7 (495) 123-45-67'),
-            'email' => $get('email', 'info@fitnessclub.ru'),
+            'phone' => $contactPhone !== '' ? $contactPhone : $get('phone', '+7 (495) 123-45-67'),
+            'email' => $contactEmail !== '' ? $contactEmail : $get('email', 'info@fitnessclub.ru'),
             'working_hours' => $get('working_hours', 'Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00'),
             'amenities' => $amenities,
             'latitude' => (float) $get('latitude', '55.7558'),
             'longitude' => (float) $get('longitude', '37.6173'),
             'promo_title' => $get('promo_home_title', 'СКИДКА 20%!'),
             'promo_subtitle' => $get('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
+            'shop_config' => $this->shopConfigForApi(),
+            'network' => [
+                'about' => $get('network_about', '') ?: null,
+                'social_vk' => $get('social_vk', '') ?: null,
+                'social_telegram' => $get('social_telegram', '') ?: null,
+                'website' => $get('contact_website', '') ?: null,
+            ],
             ...$this->legalUrlsFromSettings(),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function shopConfigForApi(): array
+    {
+        $tabOrderRaw = trim((string) ($this->clubSettings->get('shop_tab_order') ?? ''));
+        $tabOrder = ['subscriptions', 'services', 'goods'];
+        if ($tabOrderRaw !== '') {
+            $decoded = json_decode($tabOrderRaw, true);
+            if (\is_array($decoded)) {
+                $tabOrder = array_values(array_filter(
+                    array_map('strval', $decoded),
+                    static fn (string $k) => \in_array($k, ['subscriptions', 'services', 'goods'], true),
+                ));
+                if ($tabOrder === []) {
+                    $tabOrder = ['subscriptions', 'services', 'goods'];
+                }
+            }
+        }
+
+        $defaultTab = trim((string) ($this->clubSettings->get('shop_default_tab') ?? 'subscriptions'));
+        if (!\in_array($defaultTab, ['subscriptions', 'services', 'goods'], true)) {
+            $defaultTab = 'subscriptions';
+        }
+
+        $hideEmpty = ($this->clubSettings->get('hide_empty_shop_tabs') ?? '1') !== '0';
+
+        $servicesCount = (int) $this->em->createQueryBuilder()
+            ->select('COUNT(p.id)')
+            ->from(Product::class, 'p')
+            ->where('p.isActive = :active')
+            ->andWhere('p.category = :cat')
+            ->setParameter('active', true)
+            ->setParameter('cat', 'service')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        $goodsCount = (int) $this->em->createQueryBuilder()
+            ->select('COUNT(p.id)')
+            ->from(Product::class, 'p')
+            ->where('p.isActive = :active')
+            ->andWhere('p.category = :cat')
+            ->setParameter('active', true)
+            ->setParameter('cat', 'goods')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        $subscriptionsCount = \count($this->em->getRepository(SubscriptionPlan::class)->findAll());
+
+        return [
+            'tab_order' => $tabOrder,
+            'default_tab' => $defaultTab,
+            'hide_empty_tabs' => $hideEmpty,
+            'counts' => [
+                'services' => $servicesCount,
+                'goods' => $goodsCount,
+                'subscriptions' => $subscriptionsCount,
+            ],
+        ];
     }
 
     #[Route('/promotions', name: 'api_club_promotions', methods: ['GET'])]

@@ -32,12 +32,12 @@ class LegalController extends AbstractController
         'client-agreement' => [
             'title' => 'Договор с клиентом',
             'content' => 'legal/content/client-agreement.html.twig',
-            'download' => 'client-agreement.docx',
+            'download' => 'dobrozal_offer.pdf',
         ],
         'trainer-agreement' => [
             'title' => 'Договор с тренером',
             'content' => 'legal/content/trainer-agreement.html.twig',
-            'download' => 'trainer-agreement.docx',
+            'download' => 'dobrozal_offer.pdf',
         ],
         'personal-data-consent' => [
             'title' => 'Согласие на обработку персональных данных',
@@ -78,26 +78,45 @@ class LegalController extends AbstractController
     #[Route('/client-agreement', name: 'legal_client_agreement', methods: ['GET'])]
     public function clientAgreement(): Response
     {
-        return $this->renderDocument('client-agreement');
+        return $this->servePublicLegalPdf('dobrozal_offer.pdf', 'dobrozal_offer.pdf');
     }
 
     #[Route('/trainer-agreement', name: 'legal_trainer_agreement', methods: ['GET'])]
     public function trainerAgreement(): Response
     {
-        return $this->renderDocument('trainer-agreement');
+        return $this->servePublicLegalPdf('dobrozal_offer.pdf', 'dobrozal_offer.pdf');
     }
 
     #[Route('/personal-data-consent', name: 'legal_personal_data_consent', methods: ['GET'])]
     public function personalDataConsent(): Response
     {
-        return $this->renderDocument('personal-data-consent');
+        return $this->servePublicLegalPdf('consent_user.pdf', 'consent_user.pdf');
     }
 
     #[Route('/consent_user', name: 'legal_consent_user', methods: ['GET'])]
     #[Route('/consent_user/', name: 'legal_consent_user_slash', methods: ['GET'])]
     public function consentUser(): Response
     {
-        return $this->renderDocument('personal-data-consent');
+        return $this->servePublicLegalPdf('consent_user.pdf', 'consent_user.pdf');
+    }
+
+    #[Route('/doc', name: 'legal_dobrozal_doc', methods: ['GET'])]
+    #[Route('/doc/', name: 'legal_dobrozal_doc_slash', methods: ['GET'])]
+    public function dobrozalDocuments(): Response
+    {
+        return $this->render('legal/dobrozal_doc.html.twig');
+    }
+
+    #[Route('/doc/offer', name: 'legal_dobrozal_offer_pdf', methods: ['GET'])]
+    public function dobrozalOfferPdf(): Response
+    {
+        return $this->servePublicLegalPdf('dobrozal_offer.pdf', 'dobrozal_offer.pdf');
+    }
+
+    #[Route('/doc/privacy', name: 'legal_dobrozal_privacy_pdf', methods: ['GET'])]
+    public function dobrozalPrivacyPdf(): Response
+    {
+        return $this->servePublicLegalPdf('dobrozal_privacy.pdf', 'dobrozal_privacy.pdf');
     }
 
     #[Route('/requisites', name: 'legal_requisites', methods: ['GET'])]
@@ -206,5 +225,18 @@ class LegalController extends AbstractController
         $filename = $this->resolveDownloadFilename($slug);
 
         return str_ends_with(strtolower($filename), '.pdf') ? 'Открыть PDF' : 'Скачать DOCX';
+    }
+
+    private function servePublicLegalPdf(string $filename, string $downloadName): Response
+    {
+        $path = $this->getParameter('kernel.project_dir') . '/public/legal/' . $filename;
+        if (!is_file($path)) {
+            throw $this->createNotFoundException('Файл документа не найден.');
+        }
+
+        $response = new BinaryFileResponse($path);
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE, $downloadName);
+
+        return $response;
     }
 }

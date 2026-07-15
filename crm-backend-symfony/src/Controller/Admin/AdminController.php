@@ -1518,7 +1518,7 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
-            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url'];
+            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'contact_website', 'social_vk', 'social_telegram'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
                 $this->clubSettings->set($key, $value !== '' ? $value : null);
@@ -1573,6 +1573,15 @@ class AdminController extends AbstractController
                 'privacy_url' => $getSetting('privacy_url', ''),
                 'visiting_rules_url' => $getSetting('visiting_rules_url', ''),
                 'safety_rules_url' => $getSetting('safety_rules_url', ''),
+                'shop_tab_order' => $getSetting('shop_tab_order', '["subscriptions","services","goods"]'),
+                'shop_default_tab' => $getSetting('shop_default_tab', 'subscriptions'),
+                'hide_empty_shop_tabs' => $getSetting('hide_empty_shop_tabs', '1'),
+                'network_about' => $getSetting('network_about', ''),
+                'contact_phone' => $getSetting('contact_phone', ''),
+                'contact_email' => $getSetting('contact_email', ''),
+                'contact_website' => $getSetting('contact_website', ''),
+                'social_vk' => $getSetting('social_vk', ''),
+                'social_telegram' => $getSetting('social_telegram', ''),
                 'perco_enabled' => $getSetting('perco_enabled', '0'),
                 'perco_base_url' => $getSetting('perco_base_url', ''),
                 'perco_login' => $getSetting('perco_login', ''),
