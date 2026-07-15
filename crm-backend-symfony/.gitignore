@@ -6,9 +6,14 @@
 /-d
 
 ###> symfony/framework-bundle ###
+/.env
 /.env.local
+/.env.dev
+/.env.local-backup
 /.env.local.php
 /.env.*.local
+!/.env.example
+!/.env.local.example
 /config/secrets/prod/prod.decrypt.private.php
 /public/bundles/
 /var/

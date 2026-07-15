@@ -133,3 +133,22 @@ API будет доступен, например, по `http://127.0.0.1:8000/a
 4. Тест QR-входа и тест тревоги проходят на стенде.
 5. После этого остаются только сеть/питание/IP/логин камеры, линия Tripwire и калибровка порогов.
 
+### Деплой на сервер (`git pull`)
+
+Файл `.env` **не хранится в git** — на проде он свой (пароли, БД, ключи). Шаблон: `.env.example`.
+
+```bash
+cd ~/mobile-dev-sport
+git pull
+# .env на сервере не трогается
+docker compose -f crm-backend-symfony/compose.yaml up -d --build
+```
+
+Если `git pull` всё ещё ругается на старый `.env` (до обновления репозитория):
+
+```bash
+git stash push -m "prod-env" -- crm-backend-symfony/.env
+git pull
+git stash pop
+```
+
