@@ -11,6 +11,7 @@ use App\Entity\Subscription;
 use App\Entity\Training;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Планирует отложенные уведомления в момент события (запись, покупка, смена расписания).
@@ -26,6 +27,7 @@ final class ClientNotificationScheduler
 
     public function __construct(
         private readonly EntityManagerInterface $em,
+        #[Autowire(lazy: true)]
         private readonly ScheduledNotificationProcessor $processor,
     ) {
     }

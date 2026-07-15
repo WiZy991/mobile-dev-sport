@@ -10,6 +10,7 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Периодически (не чаще раза в 30 с) обрабатывает отложенные уведомления
@@ -22,6 +23,7 @@ final class ScheduledNotificationRequestSubscriber implements EventSubscriberInt
 
     public function __construct(
         private readonly ScheduledNotificationProcessor $processor,
+        #[Autowire(service: 'cache.app')]
         private readonly CacheInterface $cache,
     ) {
     }
@@ -46,7 +48,11 @@ final class ScheduledNotificationRequestSubscriber implements EventSubscriberInt
 
         $this->cache->get(self::CACHE_KEY, function (ItemInterface $item) {
             $item->expiresAfter(self::THROTTLE_SECONDS);
-            $this->processor->processDue();
+            try {
+                $this->processor->processDue();
+            } catch (\Throwable) {
+                // Таблица ещё не мигрирована или временный сбой — не роняем весь сайт.
+            }
 
             return time();
         });

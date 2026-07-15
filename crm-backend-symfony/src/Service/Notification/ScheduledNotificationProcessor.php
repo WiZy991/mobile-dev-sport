@@ -21,6 +21,15 @@ final class ScheduledNotificationProcessor
 
     public function processDue(int $limit = 40): int
     {
+        try {
+            return $this->doProcessDue($limit);
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    private function doProcessDue(int $limit): int
+    {
         $now = new \DateTimeImmutable();
 
         /** @var list<ScheduledClientNotification> $due */

@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Migrations;
+namespace DoctrineMigrations;
 
+use App\Migration\MigrationHelpers;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 final class Version20260715120000 extends AbstractMigration
 {
+    use MigrationHelpers;
+
     public function getDescription(): string
     {
         return 'Отложенные клиентские уведомления (без cron): напоминания о тренировках и абонементах';
@@ -16,7 +20,11 @@ final class Version20260715120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        if ($this->connection->getDatabasePlatform()->getName() === 'postgresql') {
+        if ($this->tableExists('scheduled_client_notifications')) {
+            return;
+        }
+
+        if ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
             $this->addSql(<<<'SQL'
                 CREATE TABLE scheduled_client_notifications (
                     id SERIAL NOT NULL,
