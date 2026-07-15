@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.Booking
 import com.fitnessclub.app.data.model.BookingStatus
+import com.fitnessclub.app.data.model.isUpcoming
 import com.fitnessclub.app.data.repository.TrainingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
