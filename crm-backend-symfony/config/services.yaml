@@ -39,6 +39,9 @@ parameters:
     smtp_user_default: ''
     smtp_password_default: ''
     smtp_encryption_default: 'tls'
+    yandex_metrika_id_default: 0
+    sber_id_redirect_uri_default: ''
+    access_gate_token_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -79,7 +82,7 @@ services:
 
     App\Controller\Admin\AdminSberIdController:
         bind:
-            $sberRedirectUri: '%env(SBER_ID_REDIRECT_URI)%'
+            $sberRedirectUri: '%env(default:sber_id_redirect_uri_default:SBER_ID_REDIRECT_URI)%'
 
     App\Service\Api\SberMobileOAuthStateService:
         arguments:
@@ -134,7 +137,7 @@ services:
 
     App\Controller\Api\AccessController:
         bind:
-            $accessGateToken: '%env(ACCESS_GATE_TOKEN)%'
+            $accessGateToken: '%env(default:access_gate_token_default:ACCESS_GATE_TOKEN)%'
             $percoOpenFromCrm: '%env(PERCO_OPEN_FROM_CRM)%'
 
     App\Service\Integration\PercoWebClient:
