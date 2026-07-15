@@ -140,9 +140,11 @@ API будет доступен, например, по `http://127.0.0.1:8000/a
 ```bash
 cd ~/mobile-dev-sport
 git pull
-# .env на сервере не трогается
-docker compose -f crm-backend-symfony/compose.yaml up -d --build
+cd crm-backend-symfony
+docker compose up -d --build
 ```
+
+Убедитесь, что в `crm-backend-symfony/.env` задан `APP_SECRET` (раньше он мог быть в `.env.dev`).
 
 Если `git pull` всё ещё ругается на старый `.env` (до обновления репозитория):
 

@@ -10,6 +10,9 @@
 /.env.local
 /.env.dev
 /.env.local-backup
+/.env.backup.*
+/.env.prod.backup
+/.env.server-backup
 /.env.local.php
 /.env.*.local
 !/.env.example

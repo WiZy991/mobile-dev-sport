@@ -8,7 +8,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-      - .env.dev
     # С compose.https.yaml порт 80/443 открывает только nginx. Здесь только отладочный 8000 на хосте.
     ports:
       - "8000:8000"
