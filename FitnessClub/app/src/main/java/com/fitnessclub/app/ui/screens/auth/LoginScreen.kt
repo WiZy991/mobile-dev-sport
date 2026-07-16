@@ -371,27 +371,29 @@ fun LoginScreen(
                 onClick = { viewModel.onBiometricLoginClick(it) },
             )
 
-            if (!uiState.hasCompletedRegistration) {
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    text = "Впервые в Доброзал?",
-                    color = LoginSurfaceWhite.copy(0.88f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "Зарегистрироваться",
-                    color = LoginSurfaceWhite,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier
-                        .clickable(onClick = onNavigateToRegister)
-                        .padding(vertical = 8.dp),
-                    textAlign = TextAlign.Center,
-                )
-            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = if (uiState.hasCompletedRegistration) {
+                    "Нужен другой аккаунт?"
+                } else {
+                    "Впервые в Доброзал?"
+                },
+                color = LoginSurfaceWhite.copy(0.88f),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Зарегистрироваться",
+                color = LoginSurfaceWhite,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier
+                    .clickable(onClick = onNavigateToRegister)
+                    .padding(vertical = 8.dp),
+                textAlign = TextAlign.Center,
+            )
 
             Spacer(Modifier.height(24.dp))
         }
