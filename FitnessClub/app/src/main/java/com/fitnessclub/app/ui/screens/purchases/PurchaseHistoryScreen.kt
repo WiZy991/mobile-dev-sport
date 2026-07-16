@@ -139,6 +139,24 @@ private fun PurchaseItemCard(purchase: PurchaseItem) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            if (!purchase.clubName.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = Primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = purchase.clubName,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = Primary
+                    )
+                }
+            }
         }
     }
 }

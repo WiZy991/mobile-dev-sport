@@ -39,6 +39,9 @@ data class Subscription(
     @SerializedName("price")
     val price: Double,
     
+    @SerializedName("club_name")
+    val clubName: String? = null,
+    
     @SerializedName("description")
     val description: String? = null
 ) {

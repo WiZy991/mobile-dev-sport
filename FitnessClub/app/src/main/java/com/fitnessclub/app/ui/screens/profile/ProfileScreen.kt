@@ -600,6 +600,25 @@ private fun SubscriptionCard(
                 
                 SubscriptionStatusChip(status = subscription.status)
             }
+
+            if (!subscription.clubName.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = subscription.clubName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
             
             Spacer(modifier = Modifier.height(12.dp))
             
