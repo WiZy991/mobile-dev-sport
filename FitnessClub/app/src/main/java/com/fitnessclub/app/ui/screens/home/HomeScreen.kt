@@ -292,7 +292,7 @@ private fun QuickMenuSection(
         Column(modifier = Modifier.padding(8.dp)) {
             QuickMenuItem(
                 icon = Icons.Default.QrCode2,
-                title = if (isInsideGym) "Выход из зала" else "Вход в зал",
+                title = if (isInsideGym) "Выход из зала" else "Вход/выход в зал",
                 subtitle = if (isInsideGym) "Показать QR-код для выхода" else "Показать QR-код для прохода",
                 onClick = onQrCode
             )

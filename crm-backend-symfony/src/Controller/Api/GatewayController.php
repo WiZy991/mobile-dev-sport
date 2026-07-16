@@ -11,6 +11,7 @@ use App\Entity\StaffNotification;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\SubscriptionGateResolver;
+use App\Service\Reports\OccupancyService;
 use App\Service\Security\AccessAlarmNotifier;
 use App\Service\Staff\StaffEventNotifier;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,6 +28,8 @@ use Symfony\Component\Routing\Annotation\Route;
  * Архитектура:
  *  1. Шлюз получает QR (с приложения / считывателя) → POST /api/v1/gateway/access/entry (вход)
  *     или POST /api/v1/gateway/access/exit (выход тем же форматом FITNESSCLUB:ENTRY:… что и на входе).
+ *     Если клиент уже в зале (последнее granted-событие сегодня — entry), повторный вызов /entry
+ *     автоматически фиксируется как exit без списания посещения (один турникет на вход/выход).
  *     На входе CRM валидирует QR, проверяет абонемент, пишет AccessLog, возвращает open_device — параметры
  *     команды для локального PERCo. Шлюз сам шлёт команду в LAN PERCo-Web (см. perco_client.py).
  *     На выходе — только фиксация события выхода в журнале (без проверки абонемента), ответ access_granted: true.
@@ -53,6 +56,7 @@ class GatewayController extends AbstractController
         private readonly SubscriptionGateResolver $subscriptionGateResolver,
         private readonly AccessAlarmNotifier $accessAlarmNotifier,
         private readonly StaffEventNotifier $staffEventNotifier,
+        private readonly OccupancyService $occupancyService,
     ) {
     }
 
@@ -122,6 +126,27 @@ class GatewayController extends AbstractController
             return $this->denied($log, 'user_blocked', 403);
         }
 
+        // Один турникет / один скан: если клиент уже в зале — это выход, не второе посещение.
+        if ($this->occupancyService->isUserCurrentlyInside($user, $club)) {
+            $log->setEventType('exit')
+                ->setResult('granted')
+                ->setReason('ok');
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($this->grantedPayload($club, [
+                'access_granted' => true,
+                'reason' => 'ok',
+                'passage' => 'exit',
+                'success' => true,
+                'user' => [
+                    'id' => 'user-' . $user->getId(),
+                    'name' => $user->getName(),
+                    'phone' => $user->getPhone(),
+                ],
+            ]));
+        }
+
         [$activeSub, $deny] = $this->subscriptionGateResolver->resolveForEntry($user, $club);
         if (!$activeSub) {
             $reason = $deny === 'wrong_club' ? 'subscription_wrong_club' : 'no_active_subscription';
@@ -142,6 +167,7 @@ class GatewayController extends AbstractController
         return $this->json($this->grantedPayload($club, [
             'access_granted' => true,
             'reason' => 'ok',
+            'passage' => 'entry',
             'user' => [
                 'id' => 'user-' . $user->getId(),
                 'name' => $user->getName(),

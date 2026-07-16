@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Integration\SubscriptionGateResolver;
+use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,6 +23,7 @@ class AccessController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly PercoWebClient $percoWebClient,
         private readonly SubscriptionGateResolver $subscriptionGateResolver,
+        private readonly OccupancyService $occupancyService,
         private readonly string $accessGateToken = '',
         private readonly string $percoOpenFromCrm = '1',
     ) {}
@@ -128,6 +130,32 @@ class AccessController extends AbstractController
             return $this->json($response, 403);
         }
 
+        // Повторный скан при статусе «уже в зале» = выход (без нового посещения).
+        if ($this->occupancyService->isUserCurrentlyInside($user, $gateClub)) {
+            $log->setEventType('exit')
+                ->setResult('granted')
+                ->setReason('ok');
+            $this->em->persist($log);
+            $this->em->flush();
+
+            $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
+
+            return $this->json($this->mergeEntrySuccess(
+                [
+                    'access_granted' => true,
+                    'reason' => 'ok',
+                    'passage' => 'exit',
+                    'success' => true,
+                    'user' => [
+                        'id' => 'user-' . $user->getId(),
+                        'name' => $user->getName(),
+                        'phone' => $user->getPhone(),
+                    ],
+                ],
+                $percoUnlock,
+            ));
+        }
+
         // Проверяем наличие активного абонемента (календарь + клуб при известном контексте клуба)
         [$activeSub, $deny] = $this->subscriptionGateResolver->resolveForEntry($user, $gateClub);
 
@@ -164,6 +192,7 @@ class AccessController extends AbstractController
             [
                 'access_granted' => true,
                 'reason' => 'ok',
+                'passage' => 'entry',
                 'user' => [
                     'id' => 'user-' . $user->getId(),
                     'name' => $user->getName(),
