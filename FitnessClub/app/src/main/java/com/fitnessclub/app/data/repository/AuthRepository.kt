@@ -3,6 +3,7 @@ package com.fitnessclub.app.data.repository
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.local.AuthFlowStore
+import com.fitnessclub.app.data.local.BiometricLoginStore
 import com.fitnessclub.app.data.local.TokenManager
 import com.fitnessclub.app.data.model.ChangePasswordRequest
 import com.fitnessclub.app.data.model.LoginHintRequest
@@ -15,6 +16,7 @@ import com.fitnessclub.app.data.model.SberLoginRequest
 import com.fitnessclub.app.data.model.User
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import retrofit2.Response
 import javax.inject.Inject
@@ -31,6 +33,7 @@ class AuthRepository @Inject constructor(
     private val api: FitnessApi,
     private val tokenManager: TokenManager,
     private val authFlowStore: AuthFlowStore,
+    private val biometricLoginStore: BiometricLoginStore,
     private val gson: Gson,
 ) {
 
@@ -160,10 +163,16 @@ class AuthRepository @Inject constructor(
     }
     
     suspend fun logout() {
-        try {
-            api.logout()
-        } catch (_: Exception) {
-            // Ignore logout errors
+        // Если включён вход по отпечатку, НЕ отзываем сессию на сервере: биовход хранит
+        // refresh-токен и должен работать после «Выйти». Иначе refresh обнуляется и
+        // при входе по отпечатку сервер отвечает «Недействительный refresh-токен».
+        val keepServerSessionForBiometric = biometricLoginStore.hasStoredCredential()
+        if (!keepServerSessionForBiometric) {
+            try {
+                api.logout()
+            } catch (_: Exception) {
+                // Ignore logout errors
+            }
         }
         // Не трогаем BiometricLoginStore: иначе после «Выйти» пропадает вход по отпечатку,
         // хотя пользователь явно включил его в настройках. Отключение — только из настроек.
@@ -211,6 +220,35 @@ class AuthRepository @Inject constructor(
         val user = profileRes?.takeIf { it.isSuccessful }?.body() ?: return null
         tokenManager.saveUser(user)
         return user
+    }
+
+    /** Обновление профиля (PUT /user/profile). Возвращает актуального пользователя и кэширует его. */
+    suspend fun updateProfile(
+        name: String,
+        email: String,
+        phone: String,
+        dateOfBirth: String?,
+    ): ApiResult<User> {
+        val current = tokenManager.getUser().first()
+            ?: return ApiResult.Error("Профиль не загружен")
+        val payload = current.copy(
+            name = name.trim(),
+            email = email.trim(),
+            phone = phone.trim(),
+            dateOfBirth = dateOfBirth?.trim()?.takeIf { it.isNotEmpty() },
+        )
+        return try {
+            val response = api.updateProfile(payload)
+            if (response.isSuccessful && response.body() != null) {
+                val updated = response.body()!!
+                tokenManager.saveUser(updated)
+                ApiResult.Success(updated)
+            } else {
+                ApiResult.Error(authErrorMessage(response, "Не удалось сохранить профиль"), response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+        }
     }
     
     suspend fun getAccessToken(): String? = tokenManager.getAccessToken()

@@ -108,14 +108,7 @@ fun LoginScreen(
                     event.welcomeMessage?.let { msg ->
                         snackbarHostState.showSnackbar(msg)
                     }
-                    val rt = event.refreshToReEncryptForBiometric
-                    if (!rt.isNullOrBlank() && activity != null) {
-                        viewModel.reEncryptBiometricAfterPasswordLogin(activity, rt) {
-                            onLoginSuccess()
-                        }
-                    } else {
-                        onLoginSuccess()
-                    }
+                    onLoginSuccess()
                 }
                 is LoginEvent.OpenExternalUrl -> {
                     runCatching {

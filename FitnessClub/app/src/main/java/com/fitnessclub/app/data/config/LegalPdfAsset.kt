@@ -16,6 +16,11 @@ enum class LegalPdfAsset(
         cacheFileName = "privacy_policy.pdf",
         title = "Политика конфиденциальности",
     ),
+    DOBROZAL_PRIVACY(
+        assetPath = "legal/dobrozal_privacy.pdf",
+        cacheFileName = "dobrozal_privacy.pdf",
+        title = "Политика обработки и защиты персональных данных Клуба",
+    ),
     CONSENT_USER(
         assetPath = "legal/consent_user.pdf",
         cacheFileName = "consent_user.pdf",

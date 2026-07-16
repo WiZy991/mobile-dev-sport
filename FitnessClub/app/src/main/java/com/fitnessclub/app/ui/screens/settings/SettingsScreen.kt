@@ -232,7 +232,7 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.VerifiedUser,
                     title = "Политика обработки и защиты персональных данных Клуба",
-                    onClick = { onOpenLegalPdf(LegalPdfAsset.PRIVACY_POLICY) }
+                    onClick = { onOpenLegalPdf(LegalPdfAsset.DOBROZAL_PRIVACY) }
                 )
             }
             
