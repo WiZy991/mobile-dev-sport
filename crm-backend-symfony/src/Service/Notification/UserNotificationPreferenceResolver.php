@@ -13,9 +13,15 @@ final class UserNotificationPreferenceResolver
     {
         return match ($type) {
             Notification::TYPE_TRAINING_REMINDER => $user->isNotifyTrainingReminders(),
+            Notification::TYPE_SPOT_FREED => $user->isNotifyTrainingReminders(),
             Notification::TYPE_SCHEDULE_CHANGE => $user->isNotifyScheduleChanges(),
             Notification::TYPE_PROMO => $user->isNotifyPromo(),
-            Notification::TYPE_SPOT_FREED => $user->isNotifyTrainingReminders(),
+            // Окончание абонемента, подтверждение/отмена записи, бонусы — при включённых push/email.
+            Notification::TYPE_SUBSCRIPTION,
+            Notification::TYPE_BOOKING_CONFIRMED,
+            Notification::TYPE_BOOKING_CANCELLED,
+            Notification::TYPE_BONUS,
+            Notification::TYPE_SYSTEM => true,
             default => true,
         };
     }

@@ -22,6 +22,11 @@ parameters:
     fcm_server_key_default: ''
     fcm_credentials_default: ''
     fcm_project_id_default: ''
+    apns_key_id_default: ''
+    apns_team_id_default: ''
+    apns_bundle_id_default: 'co.worldcashbox.WorldFintess'
+    apns_auth_key_default: ''
+    apns_production_default: '1'
     alfa_acquiring_app_bridge_default: 'worldfitness://payment/callback'
     alfa_acquiring_session_timeout_default: 1200
     alfa_acquiring_fiscalization_default: false
@@ -144,11 +149,20 @@ services:
         bind:
             $percoOpenFromCrm: '%env(PERCO_OPEN_FROM_CRM)%'
 
+    App\Service\Push\ApnsPushSender:
+        arguments:
+            $keyId: '%env(default:apns_key_id_default:APNS_KEY_ID)%'
+            $teamId: '%env(default:apns_team_id_default:APNS_TEAM_ID)%'
+            $bundleId: '%env(default:apns_bundle_id_default:APNS_BUNDLE_ID)%'
+            $authKey: '%env(default:apns_auth_key_default:APNS_AUTH_KEY)%'
+            $production: '%env(bool:default:apns_production_default:APNS_PRODUCTION)%'
+
     App\Service\Push\FcmPushSender:
         arguments:
             $serverKey: '%env(default:fcm_server_key_default:FCM_SERVER_KEY)%'
             $credentials: '%env(default:fcm_credentials_default:FCM_CREDENTIALS_JSON)%'
             $projectId: '%env(default:fcm_project_id_default:FCM_PROJECT_ID)%'
+            $apnsPushSender: '@App\Service\Push\ApnsPushSender'
 
     App\Service\Tenant\OrganizationResolver:
         arguments:

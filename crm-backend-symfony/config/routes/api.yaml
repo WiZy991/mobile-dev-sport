@@ -13,6 +13,11 @@ api_auth_login:
   controller: App\Controller\Api\AuthController::login
   methods: [POST]
 
+api_auth_login_hint:
+  path: /api/v1/auth/login-hint
+  controller: App\Controller\Api\AuthController::loginHint
+  methods: [POST]
+
 api_auth_register:
   path: /api/v1/auth/register
   controller: App\Controller\Api\AuthController::register

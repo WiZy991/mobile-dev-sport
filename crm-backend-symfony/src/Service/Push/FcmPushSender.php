@@ -27,6 +27,7 @@ final class FcmPushSender
         private readonly ?string $serverKey = null,
         private readonly ?string $credentials = null,
         private readonly ?string $projectId = null,
+        private readonly ?ApnsPushSender $apnsPushSender = null,
     ) {
     }
 
@@ -71,6 +72,16 @@ final class FcmPushSender
                     ],
                     'data' => $stringData,
                     'android' => ['priority' => 'high'],
+                    'apns' => [
+                        'headers' => [
+                            'apns-priority' => '10',
+                        ],
+                        'payload' => [
+                            'aps' => [
+                                'sound' => 'default',
+                            ],
+                        ],
+                    ],
                 ],
             ];
             $this->postJson($url, $message, ['Authorization: Bearer ' . $accessToken]);
@@ -108,15 +119,31 @@ final class FcmPushSender
             return;
         }
         $rows = $this->em->createQueryBuilder()
-            ->select('p.token')
+            ->select('p.token', 'p.platform')
             ->from(PushToken::class, 'p')
             ->where('p.user IN (:ids)')
             ->setParameter('ids', $userIds)
             ->getQuery()
-            ->getScalarResult();
+            ->getArrayResult();
 
-        $tokens = array_map(static fn (array $row) => (string) $row['token'], $rows);
-        $this->sendToTokens($tokens, $title, $body, $data);
+        $fcmTokens = [];
+        $apnsTokens = [];
+        foreach ($rows as $row) {
+            $token = (string) ($row['token'] ?? '');
+            if ($token === '') {
+                continue;
+            }
+            $platform = strtolower((string) ($row['platform'] ?? 'android'));
+            // Нативный APNs device token — 64 hex-символа; FCM registration token длиннее.
+            if ($platform === 'ios' && preg_match('/^[0-9a-fA-F]{64}$/', $token)) {
+                $apnsTokens[] = $token;
+            } else {
+                $fcmTokens[] = $token;
+            }
+        }
+
+        $this->sendToTokens($fcmTokens, $title, $body, $data);
+        $this->apnsPushSender?->sendToTokens($apnsTokens, $title, $body, $data);
     }
 
     /** @return array<string, mixed>|null */
