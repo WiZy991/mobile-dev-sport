@@ -204,6 +204,14 @@ class AuthRepository @Inject constructor(
     fun hasCompletedRegistration(): Flow<Boolean> = authFlowStore.hasCompletedRegistration
     
     fun getCurrentUser(): Flow<User?> = tokenManager.getUser()
+
+    /** Подтягивает свежий профиль с сервера и обновляет кэш (например, club_name). */
+    suspend fun refreshCurrentUser(): User? {
+        val profileRes = runCatching { api.getProfile() }.getOrNull()
+        val user = profileRes?.takeIf { it.isSuccessful }?.body() ?: return null
+        tokenManager.saveUser(user)
+        return user
+    }
     
     suspend fun getAccessToken(): String? = tokenManager.getAccessToken()
 

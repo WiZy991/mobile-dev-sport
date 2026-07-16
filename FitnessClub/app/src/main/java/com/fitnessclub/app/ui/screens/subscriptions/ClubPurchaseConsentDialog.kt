@@ -2,6 +2,7 @@ package com.fitnessclub.app.ui.screens.subscriptions
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -13,8 +14,14 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -42,6 +49,8 @@ fun ClubPurchaseConsentDialog(
     onOpenPdf: (LegalPdfAsset) -> Unit,
     onOpenExternalUrl: (String) -> Unit = {},
 ) {
+    var safetyBriefed by remember { mutableStateOf(false) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -74,35 +83,48 @@ fun ClubPurchaseConsentDialog(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
-                        text = "Нажимая «Согласен, приобрести абонемент», вы подтверждаете, что ознакомились с публичной офертой, политикой обработки персональных данных, согласием на обработку персональных данных, правилами посещения, стоимостью, сроком действия и условиями абонемента.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Text(
-                        text = "Договор заключается напрямую между вами и клубом.",
+                        text = "Нажимая «Согласен, приобрести абонемент», Вы подтверждаете, что ознакомились с тарифом и условиями приобретения абонемента, согласны с условиями нижеуказанных документов, а также прочитали Правила техники безопасности в Клубе и Правила использования тренажёров.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     ConsentLinkText(
-                        text = "публичная оферта",
+                        text = "Публичная оферта",
                         onClick = { onOpenPdf(ClubPurchaseDocuments.offer) },
                     )
                     ConsentLinkText(
-                        text = "политика обработки персональных данных",
+                        text = "Политика обработки и защиты персональных данных Клуба",
                         onClick = { onOpenPdf(ClubPurchaseDocuments.privacy) },
-                    )
-                    ConsentLinkText(
-                        text = "согласие на обработку персональных данных",
-                        onClick = { onOpenPdf(ClubPurchaseDocuments.consent) },
                     )
                     context.visitingRulesUrl?.takeIf { it.isNotBlank() }?.let { url ->
                         ConsentLinkText(
-                            text = "правила посещения",
+                            text = "Правила посещения",
                             onClick = { onOpenExternalUrl(url) },
                         )
                     }
                     context.safetyRulesUrl?.takeIf { it.isNotBlank() }?.let { url ->
                         ConsentLinkText(
-                            text = "техника безопасности",
+                            text = "Правила техники безопасности",
                             onClick = { onOpenExternalUrl(url) },
+                        )
+                    }
+                    Text(
+                        text = "Приобретая абонемент, Вы заключаете договор напрямую с Клубом.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Switch(
+                            checked = safetyBriefed,
+                            onCheckedChange = { safetyBriefed = it },
+                        )
+                        Text(
+                            text = "Я проинструктирован по технике безопасности в Клубе",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -114,6 +136,7 @@ fun ClubPurchaseConsentDialog(
                 ) {
                     Button(
                         onClick = onConfirm,
+                        enabled = safetyBriefed,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp),

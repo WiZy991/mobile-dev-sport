@@ -45,6 +45,9 @@ class ProfileViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(user = user)
             }
         }
+        viewModelScope.launch {
+            runCatching { authRepository.refreshCurrentUser() }
+        }
     }
     
     private fun loadSubscriptions() {

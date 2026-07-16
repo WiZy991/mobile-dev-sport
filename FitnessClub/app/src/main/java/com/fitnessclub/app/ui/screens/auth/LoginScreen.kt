@@ -519,18 +519,17 @@ private fun LoginCredentialField(
 }
 
 private fun loginLegalAnnotatedString(): AnnotatedString = buildAnnotatedString {
-    append("Продолжая, вы принимаете ")
+    append("Продолжая использовать приложение, Вы принимаете условия ")
     pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Правила использования")
+        append("Пользовательского соглашения")
     }
     pop()
-    append(", ")
+    append(" и подтверждаете ознакомление с ")
     pushStringAnnotation("PDF", LegalPdfAsset.PRIVACY_POLICY.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Политику конфиденциальности")
+        append("Политикой конфиденциальности")
     }
     pop()
-    append(" и соглашаетесь на обработку персональных данных")
 }
 

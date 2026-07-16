@@ -14,7 +14,7 @@ enum class LegalPdfAsset(
     PRIVACY_POLICY(
         assetPath = "legal/privacy_policy.pdf",
         cacheFileName = "privacy_policy.pdf",
-        title = "Политика обработки персональных данных",
+        title = "Политика конфиденциальности",
     ),
     CONSENT_USER(
         assetPath = "legal/consent_user.pdf",

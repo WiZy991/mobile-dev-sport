@@ -21,6 +21,9 @@ data class User(
     @SerializedName("bonus_points")
     val bonusPoints: Int = 0,
 
+    @SerializedName("club_name")
+    val clubName: String? = null,
+
     /** none | pending | verified | rejected — после Сбер ID для покупки абонемента */
     @SerializedName("passport_verification_status")
     val passportVerificationStatus: String? = null,

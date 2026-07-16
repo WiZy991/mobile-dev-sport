@@ -4,5 +4,4 @@ package com.fitnessclub.app.data.config
 object ClubPurchaseDocuments {
     val offer = LegalPdfAsset.DOBROZAL_OFFER
     val privacy = LegalPdfAsset.PRIVACY_POLICY
-    val consent = LegalPdfAsset.CONSENT_USER
 }

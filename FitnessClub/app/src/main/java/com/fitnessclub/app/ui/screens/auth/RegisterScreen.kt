@@ -646,23 +646,6 @@ private fun RegisterAccountStep(
     )
 
     Spacer(Modifier.height(12.dp))
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Получать рассылки", color = Color.White)
-        Switch(
-            checked = uiState.newsletter,
-            onCheckedChange = viewModel::onNewsletterChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color.White.copy(0.45f),
-                uncheckedThumbColor = Color.White.copy(0.7f),
-                uncheckedTrackColor = Color.White.copy(0.25f),
-            ),
-        )
-    }
 
     val legal = legalAnnotatedString()
     ClickableText(
@@ -680,53 +663,19 @@ private fun RegisterAccountStep(
             }
         },
     )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { viewModel.onAcceptedLegalTermsChange(!uiState.acceptedLegalTerms) }
-            .padding(bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Switch(
-            checked = uiState.acceptedLegalTerms,
-            onCheckedChange = viewModel::onAcceptedLegalTermsChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color.White.copy(0.45f),
-                uncheckedThumbColor = Color.White.copy(0.7f),
-                uncheckedTrackColor = Color.White.copy(0.25f),
-            ),
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = "Я согласен с условиями *",
-            color = Color.White.copy(0.92f),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f),
-        )
-    }
-    uiState.fieldError(uiState.legalTermsError)?.let {
-        Text(
-            text = it,
-            color = Color(0xFFFFE0B2),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
 }
 
 private fun legalAnnotatedString(): AnnotatedString = buildAnnotatedString {
-    append("Нажимая кнопку «Зарегистрироваться», я подтверждаю, что ознакомился и соглашаюсь с условиями ")
+    append("Нажимая кнопку «Зарегистрироваться», я подтверждаю, что ознакомился с ")
+    pushStringAnnotation("PDF", LegalPdfAsset.PRIVACY_POLICY.name)
+    withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
+        append("Политикой конфиденциальности")
+    }
+    pop()
+    append(" и принимаю условия ")
     pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
         append("Пользовательского соглашения")
-    }
-    pop()
-    append(", а также подтверждаю ознакомление с ")
-    pushStringAnnotation("PDF", LegalPdfAsset.PRIVACY_POLICY.name)
-    withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Политикой по обработке персональных данных")
     }
     pop()
     append(".")
