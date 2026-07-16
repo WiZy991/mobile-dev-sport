@@ -107,11 +107,32 @@ fun ProfileScreen(
             ) {
                 // User info card
                 item {
+                    if (!uiState.user?.clubName.isNullOrBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FitnessCenter,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = uiState.user?.clubName ?: "",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                     UserInfoCard(
                         name = uiState.user?.name ?: "Загрузка...",
                         email = uiState.user?.email ?: "",
                         phone = uiState.user?.phone ?: "",
-                        clubName = uiState.user?.clubName,
                         onEditClick = onNavigateToEditProfile
                     )
                 }
@@ -456,7 +477,6 @@ private fun UserInfoCard(
     name: String,
     email: String,
     phone: String,
-    clubName: String? = null,
     onEditClick: () -> Unit = {}
 ) {
     Card(
@@ -489,29 +509,6 @@ private fun UserInfoCard(
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                if (!clubName.isNullOrBlank()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FitnessCenter,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = clubName,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
                 Text(
                     text = name,
                     style = MaterialTheme.typography.titleMedium,

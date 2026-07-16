@@ -204,7 +204,7 @@ private fun TrainingDetailsContent(
             DetailRow(
                 icon = Icons.Default.Room,
                 title = "Зал",
-                value = training.room
+                value = training.room ?: "—"
             )
             
             // Intensity
@@ -454,19 +454,21 @@ private fun TrainerCard(training: Training) {
     }
 }
 
-private fun getIntensityText(intensity: Intensity): String {
+private fun getIntensityText(intensity: Intensity?): String {
     return when (intensity) {
         Intensity.LOW -> "Низкая"
         Intensity.MEDIUM -> "Средняя"
         Intensity.HIGH -> "Высокая"
+        null -> "—"
     }
 }
 
-private fun getIntensityColor(intensity: Intensity): Color {
+private fun getIntensityColor(intensity: Intensity?): Color {
     return when (intensity) {
         Intensity.LOW -> AccentGreen
         Intensity.MEDIUM -> Warning
         Intensity.HIGH -> Error
+        null -> Warning
     }
 }
 
