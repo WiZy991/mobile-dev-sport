@@ -62,6 +62,7 @@ final class MobileAuthTokenIssuer
             'is_verified' => $user->isVerified(),
             'sber_id' => $user->getSberId(),
             'club_id' => $user->getClub()?->getId(),
+            'club_name' => $user->getClub()?->getName(),
         ];
     }
 }

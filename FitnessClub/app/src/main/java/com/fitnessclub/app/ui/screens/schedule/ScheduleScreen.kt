@@ -311,21 +311,23 @@ fun TrainingCard(
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Room,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = training.room,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (!training.room.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Room,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = training.room,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             
@@ -418,11 +420,12 @@ private fun EmptyState() {
     }
 }
 
-private fun getIntensityColor(intensity: Intensity): Color {
+private fun getIntensityColor(intensity: Intensity?): Color {
     return when (intensity) {
         Intensity.LOW -> AccentGreen
         Intensity.MEDIUM -> Warning
         Intensity.HIGH -> Error
+        null -> Warning
     }
 }
 

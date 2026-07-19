@@ -464,7 +464,7 @@ private fun UpcomingTrainingCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = training.room,
+                text = training.room ?: "",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -477,5 +477,5 @@ data class UpcomingTraining(
     val name: String,
     val time: String,
     val trainer: String,
-    val room: String
+    val room: String?
 )

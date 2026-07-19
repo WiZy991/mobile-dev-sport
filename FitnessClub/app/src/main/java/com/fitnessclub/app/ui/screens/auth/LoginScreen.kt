@@ -108,14 +108,7 @@ fun LoginScreen(
                     event.welcomeMessage?.let { msg ->
                         snackbarHostState.showSnackbar(msg)
                     }
-                    val rt = event.refreshToReEncryptForBiometric
-                    if (!rt.isNullOrBlank() && activity != null) {
-                        viewModel.reEncryptBiometricAfterPasswordLogin(activity, rt) {
-                            onLoginSuccess()
-                        }
-                    } else {
-                        onLoginSuccess()
-                    }
+                    onLoginSuccess()
                 }
                 is LoginEvent.OpenExternalUrl -> {
                     runCatching {
@@ -378,27 +371,29 @@ fun LoginScreen(
                 onClick = { viewModel.onBiometricLoginClick(it) },
             )
 
-            if (!uiState.hasCompletedRegistration) {
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    text = "Впервые в Доброзал?",
-                    color = LoginSurfaceWhite.copy(0.88f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "Зарегистрироваться",
-                    color = LoginSurfaceWhite,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier
-                        .clickable(onClick = onNavigateToRegister)
-                        .padding(vertical = 8.dp),
-                    textAlign = TextAlign.Center,
-                )
-            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = if (uiState.hasCompletedRegistration) {
+                    "Нужен другой аккаунт?"
+                } else {
+                    "Впервые в Доброзал?"
+                },
+                color = LoginSurfaceWhite.copy(0.88f),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Зарегистрироваться",
+                color = LoginSurfaceWhite,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier
+                    .clickable(onClick = onNavigateToRegister)
+                    .padding(vertical = 8.dp),
+                textAlign = TextAlign.Center,
+            )
 
             Spacer(Modifier.height(24.dp))
         }
@@ -519,18 +514,17 @@ private fun LoginCredentialField(
 }
 
 private fun loginLegalAnnotatedString(): AnnotatedString = buildAnnotatedString {
-    append("Продолжая, вы принимаете ")
+    append("Продолжая использовать приложение, Вы принимаете условия ")
     pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Правила использования")
+        append("Пользовательского соглашения")
     }
     pop()
-    append(", ")
+    append(" и подтверждаете ознакомление с ")
     pushStringAnnotation("PDF", LegalPdfAsset.PRIVACY_POLICY.name)
     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Политику конфиденциальности")
+        append("Политикой конфиденциальности")
     }
     pop()
-    append(" и соглашаетесь на обработку персональных данных")
 }
 

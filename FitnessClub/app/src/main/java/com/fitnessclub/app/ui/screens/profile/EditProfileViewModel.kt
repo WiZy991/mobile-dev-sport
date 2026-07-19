@@ -2,6 +2,7 @@ package com.fitnessclub.app.ui.screens.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +49,7 @@ class EditProfileViewModel @Inject constructor(
                         name = user.name,
                         email = user.email,
                         phone = user.phone,
+                        birthday = user.dateOfBirth ?: "",
                         avatarUrl = user.avatarUrl
                     )
                 }
@@ -99,16 +101,44 @@ class EditProfileViewModel @Inject constructor(
             }
             
             _uiState.update { it.copy(isSaving = true, error = null) }
-            
-            // Mock save
-            kotlinx.coroutines.delay(1000)
-            
-            _uiState.update {
-                it.copy(
-                    isSaving = false,
-                    saveSuccess = true
-                )
+
+            when (val result = authRepository.updateProfile(
+                name = state.name,
+                email = state.email,
+                phone = state.phone,
+                dateOfBirth = normalizeBirthday(state.birthday),
+            )) {
+                is ApiResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            saveSuccess = true,
+                        )
+                    }
+                }
+                is ApiResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            error = result.message,
+                        )
+                    }
+                }
+                ApiResult.Loading -> Unit
             }
         }
+    }
+
+    /** Приводит дату рождения к формату yyyy-MM-dd (принимает также ДД.ММ.ГГГГ). */
+    private fun normalizeBirthday(input: String): String? {
+        val t = input.trim()
+        if (t.isEmpty()) return null
+        if (Regex("""\d{4}-\d{2}-\d{2}""").matches(t)) return t
+        val m = Regex("""(\d{1,2})[./](\d{1,2})[./](\d{4})""").matchEntire(t)
+        if (m != null) {
+            val (d, mo, y) = m.destructured
+            return "%04d-%02d-%02d".format(y.toInt(), mo.toInt(), d.toInt())
+        }
+        return t
     }
 }

@@ -9,7 +9,6 @@ import com.fitnessclub.app.data.auth.SberPkce
 import com.fitnessclub.app.data.local.AuthFlowStore
 import com.fitnessclub.app.data.local.BiometricLoginCoordinator
 import com.fitnessclub.app.data.local.BiometricLoginStore
-import com.fitnessclub.app.data.local.TokenManager
 import com.fitnessclub.app.data.model.LoginHintResult
 import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
@@ -32,7 +31,6 @@ class LoginViewModel @Inject constructor(
     private val clubRepository: ClubRepository,
     private val authFlowStore: AuthFlowStore,
     private val biometricLoginStore: BiometricLoginStore,
-    private val tokenManager: TokenManager,
 ) : ViewModel() {
     private val sberRedirectUri = "https://worldcashfit.ru/api/v1/auth/sber/callback"
     private var sberCodeVerifier: String? = null
@@ -210,17 +208,12 @@ class LoginViewModel @Inject constructor(
                         )
                     }
                     is ApiResult.Success -> {
-                        val rebindRefresh = if (biometricLoginStore.hasStoredCredential()) {
-                            tokenManager.getRefreshToken()?.trim()?.takeIf { it.isNotEmpty() }
-                        } else {
-                            null
-                        }
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             biometricLoginConfigured = biometricLoginStore.shouldShowBiometricLoginButton(),
                             biometricHardwareReady = biometricLoginStore.canUseDeviceBiometric(),
                         )
-                        _events.emit(LoginEvent.Success(result.data, rebindRefresh))
+                        _events.emit(LoginEvent.Success(result.data))
                     }
                     is ApiResult.Error -> {
                         val hint = when (result.authCode) {
@@ -426,24 +419,6 @@ class LoginViewModel @Inject constructor(
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
-
-    /**
-     * После входа по паролю сервер мог выдать другой refresh, чем в SecureStore.
-     * Один раз перешифровываем актуальный refresh тем же сценарием, что в настройках.
-     */
-    fun reEncryptBiometricAfterPasswordLogin(
-        activity: FragmentActivity,
-        refreshToken: String?,
-        onFinished: () -> Unit,
-    ) {
-        if (refreshToken.isNullOrBlank()) {
-            onFinished()
-            return
-        }
-        BiometricLoginCoordinator.startEncryptPrompt(activity, biometricLoginStore, refreshToken) { _, _ ->
-            onFinished()
-        }
-    }
 }
 
 data class LoginUiState(
@@ -468,7 +443,6 @@ data class LoginUiState(
 sealed class LoginEvent {
     data class Success(
         val user: User,
-        val refreshToReEncryptForBiometric: String? = null,
         val welcomeMessage: String? = null,
     ) : LoginEvent()
     data class OpenExternalUrl(val url: String) : LoginEvent()

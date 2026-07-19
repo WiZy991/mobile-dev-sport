@@ -34,13 +34,13 @@ data class Training(
     val currentParticipants: Int,
     
     @SerializedName("room")
-    val room: String,
+    val room: String? = null,
     
     @SerializedName("is_booked")
     val isBooked: Boolean = false,
     
     @SerializedName("intensity")
-    val intensity: Intensity = Intensity.MEDIUM,
+    val intensity: Intensity? = null,
     
     @SerializedName("image_url")
     val imageUrl: String? = null

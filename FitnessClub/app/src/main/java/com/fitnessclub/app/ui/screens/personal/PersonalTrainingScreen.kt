@@ -32,7 +32,7 @@ data class TimeSlot(
     val time: String,
     val trainerName: String,
     val trainingType: String,
-    val room: String,
+    val room: String?,
     val isAvailable: Boolean = true
 )
 
@@ -291,7 +291,9 @@ fun PersonalTrainingScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Время: ${slot.time}")
                     Text("Тренер: ${slot.trainerName}")
-                    Text("Зал: ${slot.room}")
+                    if (!slot.room.isNullOrBlank()) {
+                        Text("Зал: ${slot.room}")
+                    }
                 }
             },
             confirmButton = {
@@ -420,7 +422,7 @@ private fun TimeSlotItem(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    text = slot.room,
+                    text = slot.room ?: "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

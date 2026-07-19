@@ -115,6 +115,8 @@ class UserController extends AbstractController
                 'total' => $s->getTotal(),
                 'payment_method' => $s->getPaymentMethod(),
                 'created_at' => $s->getCreatedAt()->format('Y-m-d\TH:i:s'),
+                'club_name' => $s->getSubscription()?->getClub()?->getName()
+                    ?? $s->getUser()?->getClub()?->getName(),
             ];
         }, $sales);
 

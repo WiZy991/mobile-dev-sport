@@ -75,8 +75,8 @@ data class RegisterUiState(
     val gender: GenderOption? = null,
     val passport: PassportDraft = PassportDraft(),
     val promoCode: String = "",
-    val newsletter: Boolean = true,
-    val acceptedLegalTerms: Boolean = false,
+    val newsletter: Boolean = false,
+    val acceptedLegalTerms: Boolean = true,
     val password: String = "",
     val confirmPassword: String = "",
     /** Опросник «Откуда узнали о нас»: выбранный ключ варианта (см. ReferralSourceOptions). */
@@ -621,9 +621,6 @@ class RegisterViewModel @Inject constructor(
                 }
                 if (state.confirmPassword != state.password) {
                     errors = errors.copy(confirmPasswordError = "Пароли не совпадают")
-                }
-                if (!state.acceptedLegalTerms) {
-                    errors = errors.copy(legalTermsError = "Подтвердите согласие с условиями")
                 }
             }
         }

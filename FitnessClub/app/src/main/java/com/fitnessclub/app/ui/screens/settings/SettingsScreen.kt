@@ -208,38 +208,31 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.AccountBalance,
                     title = "Реквизиты",
-                    subtitle = "ИП Мацкова Александра Сергеевна",
                     onClick = { openLegal(LegalDocumentType.REQUISITES) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Description,
-                    title = "Договор-оферта",
-                    onClick = { openLegal(LegalDocumentType.TERMS) }
+                    title = "Пользовательское соглашение",
+                    onClick = { onOpenLegalPdf(LegalPdfAsset.USER_AGREEMENT) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.PrivacyTip,
                     title = "Политика конфиденциальности",
-                    onClick = { openLegal(LegalDocumentType.PRIVACY) }
+                    onClick = { onOpenLegalPdf(LegalPdfAsset.PRIVACY_POLICY) }
                 )
 
                 ClickableSettingItem(
                     icon = Icons.Default.Article,
-                    title = "Договор с клиентом",
-                    onClick = { openLegal(LegalDocumentType.CLIENT_AGREEMENT) }
+                    title = "Договор с Клубом",
+                    onClick = { onOpenLegalPdf(LegalPdfAsset.DOBROZAL_OFFER) }
                 )
 
                 ClickableSettingItem(
-                    icon = Icons.Default.Article,
-                    title = "Договор с тренером",
-                    onClick = { openLegal(LegalDocumentType.TRAINER_AGREEMENT) }
-                )
-
-                ClickableSettingItem(
-                    icon = Icons.Default.Assignment,
-                    title = "Согласие на обработку персональных данных",
-                    onClick = { openLegal(LegalDocumentType.PERSONAL_DATA_CONSENT) }
+                    icon = Icons.Default.VerifiedUser,
+                    title = "Политика обработки и защиты персональных данных Клуба",
+                    onClick = { onOpenLegalPdf(LegalPdfAsset.DOBROZAL_PRIVACY) }
                 )
             }
             

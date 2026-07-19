@@ -300,7 +300,9 @@ data class PurchaseItem(
     @com.google.gson.annotations.SerializedName("payment_method")
     val paymentMethod: String,
     @com.google.gson.annotations.SerializedName("created_at")
-    val createdAt: String
+    val createdAt: String,
+    @com.google.gson.annotations.SerializedName("club_name")
+    val clubName: String? = null
 )
 
 data class UserStats(
