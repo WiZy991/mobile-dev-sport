@@ -149,8 +149,19 @@ final class ApnsPushSender
             ],
             CURLOPT_POSTFIELDS => $payload,
         ]);
-        curl_exec($ch);
+        $response = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        if ($httpCode !== 200) {
+            error_log(sprintf(
+                'APNs push failed HTTP %d (production=%s, topic=%s): %s',
+                $httpCode,
+                $this->production ? '1' : '0',
+                $bundleId,
+                is_string($response) ? $response : '',
+            ));
+        }
     }
 
     private function b64(string $value): string
