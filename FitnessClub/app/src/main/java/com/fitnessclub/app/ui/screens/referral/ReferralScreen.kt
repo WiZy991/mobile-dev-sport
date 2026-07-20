@@ -225,6 +225,7 @@ fun ReferralScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
+            if (uiState.statsAvailable) {
             // Statistics
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -264,7 +265,7 @@ fun ReferralScreen(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
-            
+            }
             // How it works
             Card(
                 modifier = Modifier.fillMaxWidth(),

@@ -13,6 +13,7 @@ object BiometricLoginCoordinator {
         activity: FragmentActivity,
         store: BiometricLoginStore,
         refreshToken: String,
+        userId: String? = null,
         onDone: (success: Boolean, errorMessage: String?) -> Unit,
     ) {
         val cipher = try {
@@ -34,7 +35,7 @@ object BiometricLoginCoordinator {
                             return
                         }
                         val enc = c.doFinal(refreshToken.toByteArray(Charsets.UTF_8))
-                        store.persistEncryptedPayload(c.iv, enc)
+                        store.persistEncryptedPayload(c.iv, enc, userId)
                         onDone(true, null)
                     } catch (e: Exception) {
                         store.clear()

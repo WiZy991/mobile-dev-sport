@@ -94,7 +94,7 @@ fun TrainerDetailsScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = t.name.split(" ").mapNotNull { it.firstOrNull()?.uppercase() }
+                            text = (t.name.orEmpty()).split(" ").mapNotNull { it.firstOrNull()?.uppercase() }
                                 .take(2).joinToString(""),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
@@ -103,7 +103,7 @@ fun TrainerDetailsScreen(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = t.name,
+                        text = t.name.orEmpty().ifBlank { "Тренер" },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )

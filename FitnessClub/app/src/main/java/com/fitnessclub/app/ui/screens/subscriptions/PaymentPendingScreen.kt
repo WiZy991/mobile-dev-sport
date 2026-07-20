@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
 import com.fitnessclub.app.ui.theme.Error
 import com.fitnessclub.app.ui.theme.Primary
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,17 +51,30 @@ fun PaymentPendingScreen(
     paymentId: Int,
     onNavigateBack: () -> Unit,
     onPaymentSuccess: () -> Unit,
-    onPaymentFailed: (String) -> Unit,
     viewModel: PaymentPendingViewModel = hiltViewModel(),
 ) {
     var statusMessage by remember { mutableStateOf("Ожидаем подтверждение оплаты…") }
     var isFailed by remember { mutableStateOf(false) }
+    var leaving by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val leaveScreen: () -> Unit = {
-        viewModel.cancelPolling()
-        onNavigateBack()
+        if (isFailed) {
+            onNavigateBack()
+        } else if (!leaving) {
+            leaving = true
+            scope.launch {
+                val handled = viewModel.leaveAndCheckOnce(paymentId)
+                // Success/Failed обработает collectLatest; если статус ещё pending — уходим.
+                if (!handled) {
+                    onNavigateBack()
+                } else {
+                    leaving = false
+                }
+            }
+        }
     }
 
     BackHandler(onBack = leaveScreen)
@@ -100,8 +115,8 @@ fun PaymentPendingScreen(
                 }
                 is PaymentPendingEvent.Failed -> {
                     isFailed = true
+                    leaving = false
                     statusMessage = event.message
-                    onPaymentFailed(event.message)
                 }
             }
         }
@@ -152,8 +167,8 @@ fun PaymentPendingScreen(
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
                 )
+                Spacer(modifier = Modifier.height(20.dp))
                 if (!isFailed) {
-                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
                         text = "Если вы закрыли страницу банка без оплаты — нажмите «Вернуться».",
                         style = MaterialTheme.typography.bodySmall,
@@ -161,9 +176,9 @@ fun PaymentPendingScreen(
                         textAlign = TextAlign.Center,
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedButton(onClick = leaveScreen) {
-                        Text("Вернуться")
-                    }
+                }
+                OutlinedButton(onClick = leaveScreen, enabled = !leaving || isFailed) {
+                    Text(if (isFailed) "Закрыть" else "Вернуться")
                 }
             }
         }

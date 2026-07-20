@@ -349,6 +349,10 @@ class AuthRepository @Inject constructor(
     private suspend fun onAuthenticated() {
         authFlowStore.markRegistrationCompleted()
         authFlowStore.clearPendingSberVerifier()
+        val user = tokenManager.getUser().first()
+        if (user != null) {
+            biometricLoginStore.onAuthenticated(user.id)
+        }
     }
 }
 

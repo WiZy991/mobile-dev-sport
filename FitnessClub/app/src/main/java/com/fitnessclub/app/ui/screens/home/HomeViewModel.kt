@@ -122,20 +122,20 @@ class HomeViewModel @Inject constructor(
                 if (bookRes.isSuccessful) {
                     val upcoming = (bookRes.body() ?: emptyList())
                         .filter { it.status != BookingStatus.CANCELLED }
-                        .sortedBy { it.training.startTime }
+                        .sortedBy { it.training.safeStartTime }
                         .take(8)
                         .map { b ->
                             val t = b.training
                             val time = try {
-                                t.startTime.substring(11, 16)
+                                t.safeStartTime.substring(11, 16)
                             } catch (_: Exception) {
                                 "—"
                             }
                             UpcomingTraining(
-                                id = t.id,
-                                name = t.name,
+                                id = t.safeId,
+                                name = t.safeName,
                                 time = time,
-                                trainer = t.trainer.name,
+                                trainer = t.safeTrainerName,
                                 room = t.room,
                             )
                         }

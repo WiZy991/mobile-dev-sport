@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.data.model.Booking
@@ -45,13 +46,35 @@ fun MyTrainingsScreen(
         )
         
         Box(modifier = Modifier.fillMaxSize()) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else if (uiState.upcomingBookings.isEmpty() && uiState.pastBookings.isEmpty()) {
-                EmptyBookingsState()
-            } else {
+            when {
+                uiState.isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                uiState.error != null -> {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = uiState.error ?: "Ошибка загрузки",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { viewModel.refresh() }) {
+                            Text("Повторить")
+                        }
+                    }
+                }
+                uiState.upcomingBookings.isEmpty() && uiState.pastBookings.isEmpty() -> {
+                    EmptyBookingsState()
+                }
+                else -> {
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -69,7 +92,7 @@ fun MyTrainingsScreen(
                         items(uiState.upcomingBookings) { booking ->
                             BookingCard(
                                 booking = booking,
-                                onClick = { onTrainingClick(booking.training.id) },
+                                onClick = { onTrainingClick(booking.training.safeId) },
                                 onCancelClick = { showCancelDialog = booking.id }
                             )
                         }
@@ -88,11 +111,12 @@ fun MyTrainingsScreen(
                         items(uiState.pastBookings) { booking ->
                             BookingCard(
                                 booking = booking,
-                                onClick = { onTrainingClick(booking.training.id) },
+                                onClick = { onTrainingClick(booking.training.safeId) },
                                 onCancelClick = null
                             )
                         }
                     }
+                }
                 }
             }
         }
@@ -149,7 +173,7 @@ private fun BookingCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = training.name,
+                    text = training.safeName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -173,7 +197,7 @@ private fun BookingCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = formatDateTime(training.startTime),
+                    text = formatDateTime(training.safeStartTime),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -192,7 +216,7 @@ private fun BookingCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = training.trainer.name,
+                    text = training.safeTrainerName,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

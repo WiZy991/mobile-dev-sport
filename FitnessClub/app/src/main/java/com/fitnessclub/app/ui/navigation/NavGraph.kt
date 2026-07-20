@@ -274,12 +274,9 @@ fun NavGraph(
                 onNavigateBack = { navController.popBackStack() },
                 onPaymentSuccess = {
                     navController.navigate(Screen.Profile.route) {
-                        popUpTo(Screen.SubscriptionPlans.route) { inclusive = true }
+                        popUpTo(Screen.Home.route) { inclusive = false }
                         launchSingleTop = true
                     }
-                },
-                onPaymentFailed = { _ ->
-                    navController.popBackStack()
                 },
             )
         }

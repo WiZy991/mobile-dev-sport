@@ -24,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.LaunchedEffect
 import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.push.PushTokenRegistrar
+import com.fitnessclub.app.push.RequestNotificationPermission
 import com.fitnessclub.app.ui.navigation.NavGraph
 import com.fitnessclub.app.ui.theme.FitnessClubTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -71,6 +72,8 @@ class MainActivity : FragmentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val isLoggedIn by authRepository.isLoggedIn().collectAsState(initial = false)
+
+                    RequestNotificationPermission(enabled = isLoggedIn)
 
                     LaunchedEffect(isLoggedIn) {
                         if (isLoggedIn) {

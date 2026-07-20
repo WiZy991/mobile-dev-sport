@@ -89,7 +89,7 @@ fun ScheduleScreen(
                     items(uiState.trainings) { training ->
                         TrainingCard(
                             training = training,
-                            onClick = { onTrainingClick(training.id) }
+                            onClick = { onTrainingClick(training.safeId) }
                         )
                     }
                 }
@@ -240,12 +240,12 @@ fun TrainingCard(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = formatHm(training.startTime),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                    Text(
+                        text = formatHm(training.safeStartTime),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 Text(
                     text = "${training.durationMinutes} мин",
                     style = MaterialTheme.typography.bodySmall,
@@ -276,6 +276,7 @@ fun TrainingCard(
                     TrainingType.EXTRA -> "Допуслуга"
                     TrainingType.GROUP -> "Групповая"
                     TrainingType.PERSONAL -> "Персональная"
+                    null -> "Тренировка"
                 }
                 Text(
                     text = typeLabel,
@@ -283,7 +284,7 @@ fun TrainingCard(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = training.name,
+                    text = training.safeName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -303,7 +304,7 @@ fun TrainingCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = training.trainer.name,
+                        text = training.safeTrainerName,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

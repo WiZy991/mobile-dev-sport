@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "REPLACE-with-your-firebase-project-id",
-    "storage_bucket": "REPLACE-with-your-firebase-project-id.appspot.com"
+    "project_number": "102101599217",
+    "project_id": "dobrozal",
+    "storage_bucket": "dobrozal.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "mobilesdk_app_id": "1:102101599217:android:7c5885caf1132142443a50",
         "android_client_info": {
           "package_name": "ru.worldcashfit.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "REPLACE_WITH_REAL_ANDROID_API_KEY"
+          "current_key": "AIzaSyDqxBD6Ya2f96Rjh8ybnr_Bg77GfRcI9ew"
         }
       ],
       "services": {

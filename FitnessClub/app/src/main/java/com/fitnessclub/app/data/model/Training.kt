@@ -4,34 +4,34 @@ import com.google.gson.annotations.SerializedName
 
 data class Training(
     @SerializedName("id")
-    val id: String,
+    val id: String? = null,
     
     @SerializedName("name")
-    val name: String,
+    val name: String? = null,
     
     @SerializedName("description")
     val description: String? = null,
     
     @SerializedName("type")
-    val type: TrainingType,
+    val type: TrainingType? = null,
     
     @SerializedName("trainer")
-    val trainer: Trainer,
+    val trainer: Trainer? = null,
     
     @SerializedName("start_time")
-    val startTime: String,
+    val startTime: String? = null,
     
     @SerializedName("end_time")
-    val endTime: String,
+    val endTime: String? = null,
     
     @SerializedName("duration_minutes")
-    val durationMinutes: Int,
+    val durationMinutes: Int = 0,
     
     @SerializedName("max_participants")
-    val maxParticipants: Int,
+    val maxParticipants: Int = 0,
     
     @SerializedName("current_participants")
-    val currentParticipants: Int,
+    val currentParticipants: Int = 0,
     
     @SerializedName("room")
     val room: String? = null,
@@ -45,6 +45,12 @@ data class Training(
     @SerializedName("image_url")
     val imageUrl: String? = null
 ) {
+    val safeId: String get() = id.orEmpty()
+    val safeName: String get() = name.orEmpty()
+    val safeStartTime: String get() = startTime.orEmpty()
+    val safeEndTime: String get() = endTime.orEmpty()
+    val safeTrainerName: String get() = trainer?.name.orEmpty().ifBlank { "Без тренера" }
+
     val spotsLeft: Int
         get() = maxParticipants - currentParticipants
     
@@ -80,7 +86,7 @@ data class Trainer(
     val id: String? = null,
     
     @SerializedName("name")
-    val name: String,
+    val name: String? = null,
     
     @SerializedName("photo_url")
     val photoUrl: String? = null,

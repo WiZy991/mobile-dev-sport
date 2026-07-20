@@ -31,6 +31,25 @@ class BiometricLoginStore @Inject constructor(
         return prefs.getBoolean(KEY_ENABLED, false) && !ct.isNullOrBlank() && !iv.isNullOrBlank()
     }
 
+    fun storedUserId(): String? = prefs.getString(KEY_USER_ID, null)?.takeIf { it.isNotBlank() }
+
+    /**
+     * После логина: сбрасываем биометрию только если вошёл другой пользователь.
+     * Тот же аккаунт (в т.ч. через Сбер ID) — отпечаток сохраняем.
+     */
+    fun onAuthenticated(userId: String) {
+        if (!hasStoredCredential()) return
+        val stored = storedUserId()
+        if (stored != null && stored != userId) {
+            clear()
+            return
+        }
+        // Старые установки без userId — привязываем к текущему пользователю.
+        if (stored == null) {
+            prefs.edit().putString(KEY_USER_ID, userId).apply()
+        }
+    }
+
     fun canUseDeviceBiometric(): Boolean {
         val bm = BiometricManager.from(context)
         val checks = intArrayOf(
@@ -68,12 +87,15 @@ class BiometricLoginStore @Inject constructor(
         }
     }
 
-    fun persistEncryptedPayload(iv: ByteArray, ciphertext: ByteArray) {
-        prefs.edit()
+    fun persistEncryptedPayload(iv: ByteArray, ciphertext: ByteArray, userId: String? = null) {
+        val editor = prefs.edit()
             .putString(KEY_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
             .putString(KEY_CT, Base64.encodeToString(ciphertext, Base64.NO_WRAP))
             .putBoolean(KEY_ENABLED, true)
-            .apply()
+        if (!userId.isNullOrBlank()) {
+            editor.putString(KEY_USER_ID, userId)
+        }
+        editor.apply()
     }
 
     fun loadCipherTextBytes(): ByteArray {
@@ -145,6 +167,7 @@ class BiometricLoginStore @Inject constructor(
         private const val KEY_CT = "cipher_text_b64"
         private const val KEY_IV = "iv_b64"
         private const val KEY_ENABLED = "has_bundle"
+        private const val KEY_USER_ID = "user_id"
         private const val KEYSTORE_ALIAS = "fitness_club_biometric_rt"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"

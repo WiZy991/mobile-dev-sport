@@ -58,7 +58,7 @@ class TrainingDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isBooking = true)
             
-            trainingRepository.bookTraining(training.id).collect { result ->
+            trainingRepository.bookTraining(training.safeId).collect { result ->
                 when (result) {
                     is ApiResult.Success -> {
                         _uiState.value = _uiState.value.copy(
@@ -86,7 +86,7 @@ class TrainingDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isBooking = true)
             
-            trainingRepository.joinWaitingList(training.id).collect { result ->
+            trainingRepository.joinWaitingList(training.safeId).collect { result ->
                 when (result) {
                     is ApiResult.Success -> {
                         _uiState.value = _uiState.value.copy(isBooking = false)
