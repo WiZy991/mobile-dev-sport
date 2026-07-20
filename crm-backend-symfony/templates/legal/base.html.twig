@@ -103,7 +103,157 @@
             background: #fff;
             border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 1.5rem 1.25rem;
+            padding: 1.75rem 1.35rem 2rem;
+        }
+
+        .content h2,
+        .doc-section-title {
+            font-size: 1.2rem;
+            margin: 0 0 0.35rem;
+            line-height: 1.35;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .doc-rule {
+            height: 3px;
+            width: 72px;
+            background: var(--primary);
+            border-radius: 2px;
+            margin: 0 0 1.15rem;
+        }
+
+        .doc-cover {
+            margin-bottom: 2rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .doc-subtitle {
+            margin: 0 0 0.85rem;
+            font-size: 1.05rem;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .doc-city {
+            margin: 1rem 0 0;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .doc-meta {
+            margin: 0;
+            display: grid;
+            grid-template-columns: minmax(9rem, 12rem) 1fr;
+            gap: 0.55rem 1rem;
+        }
+
+        .doc-meta dt {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+
+        .doc-meta dd {
+            margin: 0;
+            font-size: 0.95rem;
+        }
+
+        .doc-toc {
+            margin-bottom: 2rem;
+        }
+
+        .doc-toc ol {
+            margin: 0;
+            padding-left: 1.25rem;
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .doc-toc a {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .doc-toc a:hover {
+            color: var(--primary);
+        }
+
+        .doc-section {
+            margin: 2rem 0 0;
+            padding-top: 0.25rem;
+        }
+
+        .doc-subheading {
+            font-size: 1.02rem;
+            font-weight: 750;
+            margin: 1.35rem 0 0.65rem;
+            line-height: 1.35;
+        }
+
+        .doc-p {
+            margin: 0 0 0.9em;
+            text-align: justify;
+            text-indent: 1.5em; /* красная строка */
+            hyphens: auto;
+        }
+
+        .doc-clause {
+            margin: 0 0 0.9em;
+            text-align: justify;
+            text-indent: 1.5em;
+            hyphens: auto;
+        }
+
+        .doc-clause .doc-num,
+        .doc-subheading .doc-num {
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .doc-num {
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        /* Сноски / термины — как боковые пояснения в PDF */
+        .doc-footnotes {
+            margin: 1rem 0 0;
+            padding: 0;
+        }
+
+        .doc-footnotes dt {
+            margin: 1rem 0 0.35rem;
+            padding-left: 0.85rem;
+            border-left: 3px solid var(--primary);
+            font-weight: 800;
+            font-size: 0.98rem;
+            color: var(--text);
+        }
+
+        .doc-footnotes dt:first-child {
+            margin-top: 0.35rem;
+        }
+
+        .doc-footnotes dd {
+            margin: 0 0 0.35rem;
+            padding-left: 0.85rem;
+            border-left: 3px solid rgba(255, 91, 46, 0.22);
+            color: var(--text);
+            text-align: justify;
+            font-size: 0.95rem;
+        }
+
+        .doc-list-bullets {
+            margin: 0.35rem 0 1rem;
+            padding-left: 1.6rem;
+            list-style: disc;
+        }
+
+        .doc-list-bullets li {
+            margin: 0.3rem 0;
+            text-align: justify;
         }
 
         .content p {

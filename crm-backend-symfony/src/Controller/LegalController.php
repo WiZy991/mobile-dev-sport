@@ -54,6 +54,18 @@ class LegalController extends AbstractController
     #[Route('/privacy/', name: 'legal_privacy_slash', methods: ['GET'])]
     public function privacy(): Response
     {
+        // Google Play требует HTML-страницу (text/html), а не прямой PDF.
+        return $this->render('legal/page.html.twig', [
+            'title' => 'Политика обработки и защиты персональных данных',
+            'download_url' => $this->generateUrl('legal_privacy_pdf'),
+            'download_label' => 'Открыть PDF',
+            'content_template' => 'legal/content/privacy-policy-worldcashfit.html.twig',
+        ]);
+    }
+
+    #[Route('/privacy.pdf', name: 'legal_privacy_pdf', methods: ['GET'])]
+    public function privacyPdf(): Response
+    {
         return $this->servePublicLegalPdf('privacy.pdf', 'privacy.pdf');
     }
 
