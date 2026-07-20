@@ -10,40 +10,22 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class LegalController extends AbstractController
 {
-    private const DOCUMENTS = [
+    /** Документы, показываемые в индексе /legal и в навигации. */
+    private const INDEX_DOCUMENTS = [
         'license_agreement' => [
-            'title' => 'Договор-оферта на использование WorldCashFit',
-            'content' => 'legal/content/offer.html.twig',
-            'download' => 'license_agreement.pdf',
-            'fallback_download' => 'offer.docx',
+            'title' => 'Договор-оферта для Клуба',
+            'route' => 'legal_license_agreement',
+            'pdf' => 'license_agreement.pdf',
         ],
         'user_agreement' => [
-            'title' => 'Пользовательское соглашение',
-            'content' => 'legal/content/offer.html.twig',
-            'download' => 'user_agreement.pdf',
-            'fallback_download' => 'offer.docx',
+            'title' => 'Пользовательское соглашение мобильного приложения',
+            'route' => 'legal_user_agreement',
+            'pdf' => 'user_agreement.pdf',
         ],
         'privacy' => [
             'title' => 'Политика по обработке персональных данных',
-            'content' => 'legal/content/privacy-policy.html.twig',
-            'download' => 'privacy.pdf',
-            'fallback_download' => 'privacy-policy.docx',
-        ],
-        'client-agreement' => [
-            'title' => 'Договор с клиентом',
-            'content' => 'legal/content/client-agreement.html.twig',
-            'download' => 'dobrozal_offer.pdf',
-        ],
-        'trainer-agreement' => [
-            'title' => 'Договор с тренером',
-            'content' => 'legal/content/trainer-agreement.html.twig',
-            'download' => 'dobrozal_offer.pdf',
-        ],
-        'personal-data-consent' => [
-            'title' => 'Согласие на обработку персональных данных',
-            'content' => 'legal/content/personal-data-consent.html.twig',
-            'download' => 'consent_user.pdf',
-            'fallback_download' => 'personal-data-consent.docx',
+            'route' => 'legal_privacy',
+            'pdf' => 'privacy.pdf',
         ],
     ];
 
@@ -59,38 +41,39 @@ class LegalController extends AbstractController
     #[Route('/terms', name: 'legal_terms', methods: ['GET'])]
     public function licenseAgreement(): Response
     {
-        return $this->renderDocument('license_agreement');
+        return $this->servePublicLegalPdf('license_agreement.pdf', 'license_agreement.pdf');
     }
 
     #[Route('/user_agreement/', name: 'legal_user_agreement', methods: ['GET'])]
     public function userAgreement(): Response
     {
-        return $this->renderDocument('user_agreement');
+        return $this->servePublicLegalPdf('user_agreement.pdf', 'user_agreement.pdf');
     }
 
     #[Route('/privacy', name: 'legal_privacy', methods: ['GET'])]
     #[Route('/privacy/', name: 'legal_privacy_slash', methods: ['GET'])]
     public function privacy(): Response
     {
-        return $this->renderDocument('privacy');
+        return $this->servePublicLegalPdf('privacy.pdf', 'privacy.pdf');
     }
 
     #[Route('/client-agreement', name: 'legal_client_agreement', methods: ['GET'])]
     public function clientAgreement(): Response
     {
-        return $this->servePublicLegalPdf('dobrozal_offer.pdf', 'dobrozal_offer.pdf');
+        return $this->redirectToRoute('legal_index', [], Response::HTTP_MOVED_PERMANENTLY);
     }
 
     #[Route('/trainer-agreement', name: 'legal_trainer_agreement', methods: ['GET'])]
     public function trainerAgreement(): Response
     {
-        return $this->servePublicLegalPdf('dobrozal_offer.pdf', 'dobrozal_offer.pdf');
+        return $this->redirectToRoute('legal_index', [], Response::HTTP_MOVED_PERMANENTLY);
     }
 
+    /** Старый URL согласия — перенаправляем на consent_user (ООО Ворлдкэшбокс). */
     #[Route('/personal-data-consent', name: 'legal_personal_data_consent', methods: ['GET'])]
     public function personalDataConsent(): Response
     {
-        return $this->servePublicLegalPdf('consent_user.pdf', 'consent_user.pdf');
+        return $this->redirectToRoute('legal_consent_user', [], Response::HTTP_MOVED_PERMANENTLY);
     }
 
     #[Route('/consent_user', name: 'legal_consent_user', methods: ['GET'])]
@@ -98,6 +81,14 @@ class LegalController extends AbstractController
     public function consentUser(): Response
     {
         return $this->servePublicLegalPdf('consent_user.pdf', 'consent_user.pdf');
+    }
+
+    /** Согласие на обработку ПДн для формы заявки на демо. */
+    #[Route('/consent-personal-data', name: 'legal_consent_personal_data', methods: ['GET'])]
+    #[Route('/consent-personal-data/', name: 'legal_consent_personal_data_slash', methods: ['GET'])]
+    public function consentPersonalData(): Response
+    {
+        return $this->servePublicLegalPdf('consent-personal-data.pdf', 'consent-personal-data.pdf');
     }
 
     #[Route('/doc', name: 'legal_dobrozal_doc', methods: ['GET'])]
@@ -128,44 +119,13 @@ class LegalController extends AbstractController
     #[Route('/legal/{slug}/download', name: 'legal_download', methods: ['GET'])]
     public function download(string $slug): Response
     {
-        if (!isset(self::DOCUMENTS[$slug])) {
+        if (!isset(self::INDEX_DOCUMENTS[$slug])) {
             throw $this->createNotFoundException('Документ не найден.');
         }
 
-        $filename = $this->resolveDownloadFilename($slug);
-        $path = $this->getParameter('kernel.project_dir') . '/public/legal/' . $filename;
+        $filename = self::INDEX_DOCUMENTS[$slug]['pdf'];
 
-        if (!is_file($path)) {
-            throw $this->createNotFoundException('Файл документа не найден.');
-        }
-
-        $response = new BinaryFileResponse($path);
-        $disposition = str_ends_with(strtolower($filename), '.pdf')
-            ? ResponseHeaderBag::DISPOSITION_INLINE
-            : ResponseHeaderBag::DISPOSITION_ATTACHMENT;
-        $response->setContentDisposition(
-            $disposition,
-            $filename
-        );
-
-        return $response;
-    }
-
-    private function renderDocument(string $slug): Response
-    {
-        if (!isset(self::DOCUMENTS[$slug])) {
-            throw $this->createNotFoundException('Документ не найден.');
-        }
-
-        $doc = self::DOCUMENTS[$slug];
-
-        return $this->render('legal/page.html.twig', [
-            'title' => $doc['title'],
-            'content_template' => $doc['content'],
-            'download_url' => $this->generateUrl('legal_download', ['slug' => $slug]),
-            'download_label' => $this->downloadLabel($slug),
-            'documents' => $this->documentsForIndex(),
-        ]);
+        return $this->servePublicLegalPdf($filename, $filename);
     }
 
     /**
@@ -173,21 +133,12 @@ class LegalController extends AbstractController
      */
     private function documentsForIndex(): array
     {
-        $routeMap = [
-            'license_agreement' => 'legal_license_agreement',
-            'user_agreement' => 'legal_user_agreement',
-            'privacy' => 'legal_privacy',
-            'client-agreement' => 'legal_client_agreement',
-            'trainer-agreement' => 'legal_trainer_agreement',
-            'personal-data-consent' => 'legal_personal_data_consent',
-        ];
-
         $documents = [];
-        foreach ($routeMap as $slug => $route) {
+        foreach (self::INDEX_DOCUMENTS as $slug => $doc) {
             $documents[] = [
                 'slug' => $slug,
-                'title' => self::DOCUMENTS[$slug]['title'],
-                'url' => $this->generateUrl($route),
+                'title' => $doc['title'],
+                'url' => $this->generateUrl($doc['route']),
             ];
         }
 
@@ -198,33 +149,6 @@ class LegalController extends AbstractController
         ];
 
         return $documents;
-    }
-
-    private function resolveDownloadFilename(string $slug): string
-    {
-        $doc = self::DOCUMENTS[$slug];
-        $primary = $doc['download'];
-        $primaryPath = $this->getParameter('kernel.project_dir') . '/public/legal/' . $primary;
-        if (is_file($primaryPath)) {
-            return $primary;
-        }
-
-        $fallback = $doc['fallback_download'] ?? null;
-        if (is_string($fallback) && $fallback !== '') {
-            $fallbackPath = $this->getParameter('kernel.project_dir') . '/public/legal/' . $fallback;
-            if (is_file($fallbackPath)) {
-                return $fallback;
-            }
-        }
-
-        return $primary;
-    }
-
-    private function downloadLabel(string $slug): string
-    {
-        $filename = $this->resolveDownloadFilename($slug);
-
-        return str_ends_with(strtolower($filename), '.pdf') ? 'Открыть PDF' : 'Скачать DOCX';
     }
 
     private function servePublicLegalPdf(string $filename, string $downloadName): Response

@@ -87,6 +87,12 @@ class LandingController extends AbstractController
             return $this->redirectToRoute('landing_page', ['_fragment' => 'contact']);
         }
 
+        if (!$request->request->get('pd_consent')) {
+            $this->addFlash('danger', 'Необходимо дать согласие на обработку персональных данных.');
+
+            return $this->redirectToRoute('landing_page', ['_fragment' => 'contact']);
+        }
+
         $name = trim((string) $request->request->get('name', ''));
         $phone = trim((string) $request->request->get('phone', ''));
         $email = trim((string) $request->request->get('email', ''));

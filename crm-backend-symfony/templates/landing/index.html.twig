@@ -1516,17 +1516,28 @@
                                 <textarea name="comment" rows="3" placeholder="Расскажите кратко о вашем клубе"></textarea>
                             </div>
                             <div class="full">
-                                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%">Получить демо-доступ</button>
-                                <small style="display: block; margin-top: 0.6rem; color: var(--muted-on-dark); font-size: 0.8rem">
-                                    Нажимая кнопку «Зарегистрироваться», я подтверждаю, что ознакомился и соглашаюсь с условиями
-                                    <a href="{{ path('legal_license_agreement') }}" target="_blank" rel="noopener">Договора</a>,
-                                    а также подтверждаю ознакомление с
-                                    <a href="{{ path('legal_privacy') }}" target="_blank" rel="noopener">Политикой</a>
-                                    по обработке персональных данных.
-                                </small>
+                                <label style="display:flex;align-items:flex-start;gap:0.65rem;margin-bottom:0.9rem;cursor:pointer;color:var(--muted-on-dark);font-size:0.85rem;line-height:1.45">
+                                    <input type="checkbox" name="pd_consent" id="lead-pd-consent" value="1" required style="margin-top:0.2rem;flex-shrink:0">
+                                    <span>
+                                        Я даю
+                                        <a href="{{ path('legal_consent_personal_data') }}" target="_blank" rel="noopener" style="color:#ffcb45;text-decoration:underline">согласие</a>
+                                        на обработку персональных данных.
+                                    </span>
+                                </label>
+                                <button type="submit" id="lead-submit-btn" class="btn btn-primary btn-lg" style="width: 100%" disabled>Получить демо-доступ</button>
                             </div>
                         </div>
                     </form>
+                    <script>
+                        (function () {
+                            var cb = document.getElementById('lead-pd-consent');
+                            var btn = document.getElementById('lead-submit-btn');
+                            if (!cb || !btn) return;
+                            function sync() { btn.disabled = !cb.checked; }
+                            cb.addEventListener('change', sync);
+                            sync();
+                        })();
+                    </script>
                 </div>
             </div>
         </div>
@@ -1559,13 +1570,10 @@
             </div>
             <div>
                 <h5>Документы</h5>
-                <a href="{{ path('legal_license_agreement') }}">Договор-оферта</a>
-                <a href="{{ path('legal_user_agreement') }}">Пользовательское соглашение</a>
+                <a href="{{ path('legal_license_agreement') }}">Договор-оферта для Клуба</a>
+                <a href="{{ path('legal_user_agreement') }}">Пользовательское соглашение мобильного приложения</a>
                 <a href="{{ path('legal_requisites') }}">Реквизиты</a>
                 <a href="{{ path('legal_privacy') }}">Политика конфиденциальности</a>
-                <a href="{{ path('legal_client_agreement') }}">Договор с клиентом</a>
-                <a href="{{ path('legal_trainer_agreement') }}">Договор с тренером</a>
-                <a href="{{ path('legal_consent_user') }}">Согласие на обработку ПДн</a>
             </div>
             <div>
                 <h5>Контакты</h5>
