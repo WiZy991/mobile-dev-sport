@@ -142,6 +142,15 @@ final class FcmPushSender
             }
         }
 
+        error_log(sprintf(
+            'Push: user_ids=%s, найдено токенов=%d (FCM=%d, APNs=%d), type=%s',
+            implode(',', $userIds),
+            count($rows),
+            count($fcmTokens),
+            count($apnsTokens),
+            (string) ($data['type'] ?? ''),
+        ));
+
         $this->sendToTokens($fcmTokens, $title, $body, $data);
         $this->apnsPushSender?->sendToTokens($apnsTokens, $title, $body, $data);
     }

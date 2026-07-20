@@ -38,14 +38,27 @@ final class ApnsPushSender
     {
         $tokens = array_values(array_unique(array_filter($tokens)));
         if ($tokens === []) {
+            error_log('APNs: нет iOS-токенов для отправки (пропуск)');
+
             return;
         }
 
         $jwt = $this->getJwt();
         $bundleId = trim((string) $this->bundleId);
         if ($jwt === null || $bundleId === '') {
+            error_log(sprintf(
+                'APNs: отправка пропущена — не настроены креды (jwt=%s, keyId=%s, teamId=%s, authKey=%s, bundleId=%s). Задайте APNS_* в .env и перезапустите бэкенд.',
+                $jwt === null ? 'null' : 'ok',
+                trim((string) $this->keyId) === '' ? 'empty' : 'set',
+                trim((string) $this->teamId) === '' ? 'empty' : 'set',
+                trim((string) $this->authKey) === '' ? 'empty' : 'set',
+                $bundleId === '' ? 'empty' : $bundleId,
+            ));
+
             return;
         }
+
+        error_log(sprintf('APNs: отправка %d токен(ов), окружение=%s', count($tokens), $this->production ? 'production' : 'sandbox'));
 
         $prodHost = 'https://api.push.apple.com';
         $sandboxHost = 'https://api.sandbox.push.apple.com';
@@ -75,8 +88,11 @@ final class ApnsPushSender
                 continue;
             }
 
+            $suffix = substr($token, -6);
+
             [$code, $response] = $this->post($primaryHost . '/3/device/' . $token, $payload, $jwt, $bundleId);
             if ($code === 200) {
+                error_log(sprintf('APNs: OK HTTP 200 (host=%s, token=...%s)', $primaryHost, $suffix));
                 continue;
             }
 
@@ -84,7 +100,9 @@ final class ApnsPushSender
             // APNs-окружении: повторяем на альтернативном хосте.
             if ($this->shouldRetryOnOtherEnvironment($code, $response)) {
                 [$retryCode, $retryResponse] = $this->post($fallbackHost . '/3/device/' . $token, $payload, $jwt, $bundleId);
-                if ($retryCode !== 200) {
+                if ($retryCode === 200) {
+                    error_log(sprintf('APNs: OK HTTP 200 после ретрая (host=%s, token=...%s)', $fallbackHost, $suffix));
+                } else {
                     $this->logFailure($retryCode, $bundleId, $fallbackHost, $retryResponse);
                 }
                 continue;
