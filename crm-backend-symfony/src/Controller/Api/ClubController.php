@@ -136,9 +136,9 @@ class ClubController extends AbstractController
             'phone' => $c->getPhone(),
             'email' => $c->getEmail(),
             'working_hours' => $c->getWorkingHours(),
-            'latitude' => $c->getLatitude(),
-            'longitude' => $c->getLongitude(),
-            'amenities' => $c->getAmenities(),
+            'latitude' => $c->getLatitude() ?? 0.0,
+            'longitude' => $c->getLongitude() ?? 0.0,
+            'amenities' => $c->getAmenities() ?? [],
             'max_capacity' => $c->getMaxCapacity(),
             ...$legal,
         ], $clubs);

@@ -122,7 +122,7 @@ class TrainingController extends AbstractController
                 'name' => $trainer->getName(),
                 'photo_url' => $trainer->getPhotoUrl(),
                 'specialization' => $trainer->getSpecialization(),
-                'rating' => $trainer->getRating(),
+                'rating' => $trainer->getRating() ?? 0.0,
                 'description' => $trainer->getDescription(),
             ] : [
                 'id' => '',

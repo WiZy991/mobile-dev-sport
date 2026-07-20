@@ -146,6 +146,13 @@ final class ApnsPushSender
         $teamId = trim((string) $this->teamId);
         $privateKey = $this->loadPrivateKey();
         if ($keyId === '' || $teamId === '' || $privateKey === null) {
+            error_log(sprintf(
+                'APNs JWT: не собран (keyId=%s, teamId=%s, privateKey=%s)',
+                $keyId === '' ? 'empty' : 'ok',
+                $teamId === '' ? 'empty' : 'ok',
+                $privateKey === null ? 'НЕ ЗАГРУЖЕН — проверьте APNS_AUTH_KEY (.p8)' : 'ok',
+            ));
+
             return null;
         }
 
@@ -156,12 +163,16 @@ final class ApnsPushSender
         $signature = '';
         $ok = openssl_sign($unsigned, $signature, $privateKey, OPENSSL_ALGO_SHA256);
         if (!$ok) {
+            error_log('APNs JWT: openssl_sign failed — ключ .p8 не подходит для ES256: ' . (openssl_error_string() ?: 'unknown'));
+
             return null;
         }
 
         // APNs ожидает raw R||S (64 байта), а openssl_sign для EC даёт DER.
         $raw = $this->derToJose($signature);
         if ($raw === null) {
+            error_log('APNs JWT: derToJose failed — подпись не в формате ECDSA (ожидается EC-ключ prime256v1)');
+
             return null;
         }
 
@@ -179,12 +190,32 @@ final class ApnsPushSender
             return null;
         }
         $raw = trim($raw);
-        if ($raw[0] !== '-' && is_file($raw)) {
-            $raw = (string) file_get_contents($raw);
-        }
-        $key = openssl_pkey_get_private($raw);
 
-        return $key instanceof \OpenSSLAsymmetricKey ? $key : null;
+        // APNS_AUTH_KEY может быть: путём к .p8, либо самим PEM-содержимым.
+        if ($raw[0] !== '-') {
+            if (is_file($raw)) {
+                $raw = (string) file_get_contents($raw);
+            } else {
+                error_log(sprintf('APNs: APNS_AUTH_KEY похоже на путь, но файл не найден в контейнере: %s', $raw));
+
+                return null;
+            }
+        }
+
+        // PEM, вставленный в .env одной строкой: переносы строк «\n» становятся литералами —
+        // OpenSSL такой ключ не читает. Восстанавливаем настоящие переносы.
+        if (!str_contains($raw, "\n") && str_contains($raw, '\\n')) {
+            $raw = str_replace('\\n', "\n", $raw);
+        }
+
+        $key = openssl_pkey_get_private($raw);
+        if (!$key instanceof \OpenSSLAsymmetricKey) {
+            error_log('APNs: openssl_pkey_get_private не смог прочитать ключ .p8: ' . (openssl_error_string() ?: 'формат не PEM/PKCS8'));
+
+            return null;
+        }
+
+        return $key;
     }
 
     /**
