@@ -47,7 +47,13 @@ final class ApnsPushSender
             return;
         }
 
-        $host = $this->production ? 'https://api.push.apple.com' : 'https://api.sandbox.push.apple.com';
+        $prodHost = 'https://api.push.apple.com';
+        $sandboxHost = 'https://api.sandbox.push.apple.com';
+        // Сначала пробуем окружение из конфига, затем — второе (сборка из Xcode = sandbox,
+        // TestFlight/App Store = production). Так пуш доходит при любой сборке.
+        $primaryHost = $this->production ? $prodHost : $sandboxHost;
+        $fallbackHost = $this->production ? $sandboxHost : $prodHost;
+
         $payload = json_encode([
             'aps' => [
                 'alert' => [
@@ -68,8 +74,47 @@ final class ApnsPushSender
             if ($token === '') {
                 continue;
             }
-            $this->post($host . '/3/device/' . $token, $payload, $jwt, $bundleId);
+
+            [$code, $response] = $this->post($primaryHost . '/3/device/' . $token, $payload, $jwt, $bundleId);
+            if ($code === 200) {
+                continue;
+            }
+
+            // BadDeviceToken/BadEnvironment/Unregistered — токен зарегистрирован в другом
+            // APNs-окружении: повторяем на альтернативном хосте.
+            if ($this->shouldRetryOnOtherEnvironment($code, $response)) {
+                [$retryCode, $retryResponse] = $this->post($fallbackHost . '/3/device/' . $token, $payload, $jwt, $bundleId);
+                if ($retryCode !== 200) {
+                    $this->logFailure($retryCode, $bundleId, $fallbackHost, $retryResponse);
+                }
+                continue;
+            }
+
+            $this->logFailure($code, $bundleId, $primaryHost, $response);
         }
+    }
+
+    private function shouldRetryOnOtherEnvironment(int $code, string $response): bool
+    {
+        if ($code !== 400 && $code !== 410) {
+            return false;
+        }
+
+        return str_contains($response, 'BadDeviceToken')
+            || str_contains($response, 'BadEnvironmentKeyInToken')
+            || str_contains($response, 'DeviceTokenNotForTopic')
+            || str_contains($response, 'Unregistered');
+    }
+
+    private function logFailure(int $httpCode, string $bundleId, string $host, string $response): void
+    {
+        error_log(sprintf(
+            'APNs push failed HTTP %d (host=%s, topic=%s): %s',
+            $httpCode,
+            $host,
+            $bundleId,
+            $response,
+        ));
     }
 
     private function getJwt(): ?string
@@ -124,15 +169,18 @@ final class ApnsPushSender
         return $key instanceof \OpenSSLAsymmetricKey ? $key : null;
     }
 
-    private function post(string $url, string $payload, string $jwt, string $bundleId): void
+    /**
+     * @return array{0: int, 1: string} [httpCode, responseBody]
+     */
+    private function post(string $url, string $payload, string $jwt, string $bundleId): array
     {
         if (!function_exists('curl_init')) {
-            return;
+            return [0, ''];
         }
 
         $ch = curl_init($url);
         if ($ch === false) {
-            return;
+            return [0, ''];
         }
 
         curl_setopt_array($ch, [
@@ -153,15 +201,7 @@ final class ApnsPushSender
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($httpCode !== 200) {
-            error_log(sprintf(
-                'APNs push failed HTTP %d (production=%s, topic=%s): %s',
-                $httpCode,
-                $this->production ? '1' : '0',
-                $bundleId,
-                is_string($response) ? $response : '',
-            ));
-        }
+        return [$httpCode, is_string($response) ? $response : ''];
     }
 
     private function b64(string $value): string
