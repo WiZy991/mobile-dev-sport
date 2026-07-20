@@ -138,6 +138,25 @@
 
         .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 28px -10px rgba(255, 91, 46, 0.7); }
 
+        .btn-primary:disabled,
+        .btn-primary[disabled],
+        .btn-primary.is-disabled {
+            background: #4a4f5a;
+            color: rgba(255, 255, 255, 0.55);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+            opacity: 1;
+            pointer-events: none;
+        }
+
+        .btn-primary:disabled:hover,
+        .btn-primary[disabled]:hover,
+        .btn-primary.is-disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
         .btn-dark {
             background: var(--bg-dark);
             color: var(--text-on-dark);
@@ -1524,17 +1543,32 @@
                                         на обработку персональных данных.
                                     </span>
                                 </label>
-                                <button type="submit" id="lead-submit-btn" class="btn btn-primary btn-lg" style="width: 100%" disabled>Получить демо-доступ</button>
+                                <button type="submit" id="lead-submit-btn" class="btn btn-primary btn-lg is-disabled" style="width: 100%" disabled aria-disabled="true">Получить демо-доступ</button>
                             </div>
                         </div>
                     </form>
                     <script>
                         (function () {
+                            var form = document.querySelector('#contact form');
                             var cb = document.getElementById('lead-pd-consent');
                             var btn = document.getElementById('lead-submit-btn');
                             if (!cb || !btn) return;
-                            function sync() { btn.disabled = !cb.checked; }
+                            function sync() {
+                                var ok = !!cb.checked;
+                                btn.disabled = !ok;
+                                btn.setAttribute('aria-disabled', ok ? 'false' : 'true');
+                                btn.classList.toggle('is-disabled', !ok);
+                            }
                             cb.addEventListener('change', sync);
+                            cb.addEventListener('click', sync);
+                            if (form) {
+                                form.addEventListener('submit', function (e) {
+                                    if (!cb.checked) {
+                                        e.preventDefault();
+                                        sync();
+                                    }
+                                });
+                            }
                             sync();
                         })();
                     </script>
