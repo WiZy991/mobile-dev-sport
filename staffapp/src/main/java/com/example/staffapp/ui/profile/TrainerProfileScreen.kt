@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -26,16 +27,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.staffapp.ui.components.StaffErrorState
 import com.example.staffapp.ui.components.StaffPrimaryButton
+import com.example.staffapp.ui.phone.RussianPhoneVisualTransformation
 import com.example.staffapp.ui.theme.StaffOnSurfaceVariant
 import com.example.staffapp.ui.theme.StaffPrimary
 
@@ -43,7 +47,8 @@ data class TrainerProfileUiState(
     val name: String = "",
     val specialization: String = "",
     val description: String = "",
-    val phone: String = "",
+    /** 10 национальных цифр без +7; на экране — маска `+7 (XXX) XXX-XX-XX`. */
+    val phoneNationalDigits: String = "",
     val photoUrl: String? = null,
     val localPhotoUri: String? = null,
     val loading: Boolean = true,
@@ -137,13 +142,15 @@ fun TrainerProfileScreen(
                 enabled = !state.saving && !state.loading,
             )
             OutlinedTextField(
-                value = state.phone,
+                value = state.phoneNationalDigits,
                 onValueChange = onPhoneChange,
                 label = { Text("Телефон") },
-                placeholder = { Text("+7 …") },
+                placeholder = { Text("+7 (___) ___-__-__") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !state.saving && !state.loading,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                visualTransformation = remember { RussianPhoneVisualTransformation() },
             )
             OutlinedTextField(
                 value = state.description,

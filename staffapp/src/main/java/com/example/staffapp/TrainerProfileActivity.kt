@@ -9,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.staffapp.ui.phone.normalizeRussianNationalDigits
+import com.example.staffapp.ui.phone.phoneForApi
 import com.example.staffapp.ui.profile.TrainerProfileScreen
 import com.example.staffapp.ui.profile.TrainerProfileUiState
 import com.example.staffapp.ui.theme.StaffTheme
@@ -47,7 +49,12 @@ class TrainerProfileActivity : ComponentActivity() {
                     onNameChange = { uiState = uiState.copy(name = it) },
                     onSpecializationChange = { uiState = uiState.copy(specialization = it) },
                     onDescriptionChange = { uiState = uiState.copy(description = it) },
-                    onPhoneChange = { uiState = uiState.copy(phone = it) },
+                    onPhoneChange = {
+                        uiState = uiState.copy(
+                            phoneNationalDigits = normalizeRussianNationalDigits(it),
+                            errorMessage = null,
+                        )
+                    },
                     onPickPhoto = { pickPhoto.launch("image/*") },
                     onSave = { saveProfile() },
                     onBack = { finish() },
@@ -67,7 +74,7 @@ class TrainerProfileActivity : ComponentActivity() {
                         name = profile.name,
                         specialization = profile.specialization,
                         description = profile.description,
-                        phone = profile.phone,
+                        phoneNationalDigits = normalizeRussianNationalDigits(profile.phone),
                         photoUrl = profile.photoUrl,
                         loading = false,
                     )
@@ -84,6 +91,12 @@ class TrainerProfileActivity : ComponentActivity() {
     }
 
     private fun saveProfile() {
+        val digits = uiState.phoneNationalDigits
+        if (digits.isNotEmpty() && digits.length != 10) {
+            uiState = uiState.copy(errorMessage = "Введите полный номер телефона")
+            return
+        }
+        val phoneApi = phoneForApi(digits)
         uiState = uiState.copy(saving = true, errorMessage = null, statusMessage = null)
         thread {
             try {
@@ -93,7 +106,7 @@ class TrainerProfileActivity : ComponentActivity() {
                         name = uiState.name.trim(),
                         specialization = uiState.specialization.trim(),
                         description = uiState.description.trim(),
-                        phone = uiState.phone.trim(),
+                        phone = phoneApi,
                     )
                 }
                 runOnUiThread {
@@ -101,7 +114,7 @@ class TrainerProfileActivity : ComponentActivity() {
                         name = profile.name,
                         specialization = profile.specialization,
                         description = profile.description,
-                        phone = profile.phone,
+                        phoneNationalDigits = normalizeRussianNationalDigits(profile.phone),
                         photoUrl = profile.photoUrl ?: uiState.photoUrl,
                         saving = false,
                         statusMessage = "Сохранено. Профиль виден клиентам в разделе «Тренеры».",

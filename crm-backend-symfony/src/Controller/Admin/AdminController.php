@@ -1205,9 +1205,7 @@ class AdminController extends AbstractController
         $description = $request->request->get('description');
         $description = is_string($description) ? trim($description) : '';
         $description = $description !== '' ? $description : null;
-        $phone = $request->request->get('phone');
-        $phone = is_string($phone) ? trim($phone) : '';
-        $phone = $phone !== '' ? $phone : null;
+        $phone = $this->normalizeTrainerPhone($request->request->get('phone'));
 
         $trainer = (new Trainer())
             ->setName($name)
@@ -1273,9 +1271,7 @@ class AdminController extends AbstractController
         $description = $request->request->get('description');
         $description = is_string($description) ? trim($description) : '';
         $description = $description !== '' ? $description : null;
-        $phone = $request->request->get('phone');
-        $phone = is_string($phone) ? trim($phone) : '';
-        $phone = $phone !== '' ? $phone : null;
+        $phone = $this->normalizeTrainerPhone($request->request->get('phone'));
 
         $trainer->setName((string) $request->request->get('name'))
             ->setSpecialization($request->request->get('specialization') ?: null)
@@ -1288,6 +1284,30 @@ class AdminController extends AbstractController
         $this->addFlash('success', 'Тренер обновлён.');
 
         return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+    }
+
+    /** Нормализация телефона тренера: `+7XXXXXXXXXX` или null. */
+    private function normalizeTrainerPhone(mixed $raw): ?string
+    {
+        if (!is_string($raw)) {
+            return null;
+        }
+        $digits = preg_replace('/\D+/', '', trim($raw)) ?? '';
+        if ($digits === '') {
+            return null;
+        }
+        if (str_starts_with($digits, '8')) {
+            $digits = '7' . substr($digits, 1);
+        }
+        if (!str_starts_with($digits, '7')) {
+            $digits = '7' . $digits;
+        }
+        $digits = substr($digits, 0, 11);
+        if (strlen($digits) !== 11) {
+            return null;
+        }
+
+        return '+' . $digits;
     }
 
     #[Route('/trainings/{id}/delete', name: 'admin_training_delete', methods: ['POST'])]
