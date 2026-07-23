@@ -14,7 +14,7 @@ services:
     depends_on:
       database:
         condition: service_healthy
-    command: sh -c "php bin/console doctrine:database:create --if-not-exists --no-interaction && php bin/console doctrine:migrations:migrate --no-interaction && php -S 0.0.0.0:8000 -t public public/index.php"
+    command: sh -c "php bin/console cache:clear --no-interaction && php bin/console doctrine:database:create --if-not-exists --no-interaction && php bin/console doctrine:migrations:migrate --no-interaction && php -S 0.0.0.0:8000 -t public public/index.php"
     # Опционально: дополнительные секреты монтируются внутрь приложения как /app/var/secrets (не для бандлового сертификата etc/sber из образа).
     volumes:
       - ./var/secrets:/app/var/secrets:ro

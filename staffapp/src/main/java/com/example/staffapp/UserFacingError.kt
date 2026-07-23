@@ -17,8 +17,8 @@ object UserFacingError {
                 "Сессия истекла. Выйдите и войдите заново."
             lower.contains("http 403") || lower.contains("403") || lower.contains("forbidden") ->
                 "У вас нет прав для этого действия."
-            lower.contains("http 404") || lower.contains("404") ->
-                "Сервис временно недоступен. Попробуйте позже."
+            lower.contains("no route found") || Regex("""\b404\b""").containsMatchIn(lower) ->
+                "На сервере нет нужного API (404). Обновите CRM и перезапустите контейнер."
             lower.contains("http 500") || lower.contains("500") || lower.contains("internal server error") ->
                 "Ошибка сервера CRM. Уже разбираемся, попробуйте позже."
             lower.contains("could not find driver") ->

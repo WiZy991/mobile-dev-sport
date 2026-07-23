@@ -40,5 +40,7 @@ COPY composer.json composer.lock symfony.lock ./
 RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts --no-dev
 
 COPY . .
+# classmap после COPY: иначе новые контроллеры могут не попасть в optimized autoload
+RUN composer dump-autoload --no-interaction --optimize --no-dev
 
 EXPOSE 8000

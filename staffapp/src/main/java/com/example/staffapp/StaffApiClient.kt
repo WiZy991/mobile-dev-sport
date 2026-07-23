@@ -11,7 +11,7 @@ import kotlin.text.Charsets
 class StaffApiClient(private val baseUrl: String) {
     private data class HttpResult(val code: Int, val body: String)
 
-    fun register(email: String, name: String, password: String): StaffSession {
+    fun register(email: String, name: String, password: String): AuthResult {
         val payload = JSONObject()
             .put("email", email)
             .put("name", name)
@@ -71,7 +71,7 @@ class StaffApiClient(private val baseUrl: String) {
         return execute(conn).code in 200..299
     }
 
-    fun login(email: String, password: String): StaffSession {
+    fun login(email: String, password: String): AuthResult {
         val payload = JSONObject()
             .put("email", email)
             .put("password", password)
@@ -354,17 +354,21 @@ class StaffApiClient(private val baseUrl: String) {
         return execute(conn).code in 200..299
     }
 
-    private fun authRequest(path: String, payload: JSONObject): StaffSession {
+    private fun authRequest(path: String, payload: JSONObject): AuthResult {
         val conn = openConnection(path, "POST")
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
         conn.doOutput = true
 
         OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
         val json = requireJson(execute(conn))
-        return StaffSession(
-            accessToken = json.getString("token"),
-            refreshToken = json.getString("refresh_token"),
-            userEmail = json.getJSONObject("user").optString("email"),
+        val onboardingJson = json.optJSONObject("onboarding")
+        return AuthResult(
+            session = StaffSession(
+                accessToken = json.getString("token"),
+                refreshToken = json.getString("refresh_token"),
+                userEmail = json.getJSONObject("user").optString("email"),
+            ),
+            onboarding = onboardingJson?.let { parseOnboarding(it) },
         )
     }
 
@@ -515,6 +519,11 @@ data class StaffSession(
     val accessToken: String,
     val refreshToken: String,
     val userEmail: String,
+)
+
+data class AuthResult(
+    val session: StaffSession,
+    val onboarding: StaffOnboarding?,
 )
 
 private fun parseOnboarding(json: JSONObject): StaffOnboarding {

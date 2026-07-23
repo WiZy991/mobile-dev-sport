@@ -57,35 +57,37 @@ class MainActivity : ComponentActivity() {
 
     private fun runRegister() {
         runAsync("Регистрация...") {
-            session = apiClient.register(
+            val result = apiClient.register(
                 email = uiState.email.trim(),
                 name = uiState.name.trim(),
                 password = uiState.password,
             )
-            session?.let { store.saveSession(it) }
+            session = result.session
+            store.saveSession(result.session)
             store.clearConfig()
             StaffPushRegistrar.registerIfLoggedIn(this)
-            routeAfterAuth()
+            routeAfterAuth(result.onboarding)
             "Заявка отправлена"
         }
     }
 
     private fun runLogin() {
         runAsync("Вход...") {
-            session = apiClient.login(
+            val result = apiClient.login(
                 email = uiState.email.trim(),
                 password = uiState.password,
             )
-            session?.let { store.saveSession(it) }
+            session = result.session
+            store.saveSession(result.session)
             store.clearConfig()
             StaffPushRegistrar.registerIfLoggedIn(this)
-            routeAfterAuth()
+            routeAfterAuth(result.onboarding)
             "Выполнен вход"
         }
     }
 
-    private fun routeAfterAuth() {
-        val onboarding = executeWithRefresh { apiClient.loadOnboarding(it) }
+    private fun routeAfterAuth(prefetched: StaffOnboarding? = null) {
+        val onboarding = prefetched ?: executeWithRefresh { apiClient.loadOnboarding(it) }
         if (onboarding.status == "active") {
             val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
             store.saveConfig(config)

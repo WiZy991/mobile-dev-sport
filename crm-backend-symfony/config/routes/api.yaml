@@ -386,6 +386,38 @@ api_staff_auth_logout:
   controller: App\Controller\Api\StaffAuthController::logout
   methods: [POST]
 
+api_staff_onboarding:
+  path: /api/v1/staff/onboarding
+  controller: App\Controller\Api\StaffOnboardingController::onboarding
+  methods: [GET]
+
+api_staff_rental_quote:
+  path: /api/v1/staff/rental/quote
+  controller: App\Controller\Api\StaffRentalController::quote
+  methods: [GET, POST]
+
+api_staff_rental_init:
+  path: /api/v1/staff/rental/init
+  controller: App\Controller\Api\StaffRentalController::init
+  methods: [POST]
+
+api_staff_rental_payment_status:
+  path: /api/v1/staff/rental/payments/{id}/status
+  controller: App\Controller\Api\StaffRentalController::status
+  methods: [GET]
+  requirements:
+    id: '\d+'
+
+api_staff_training_book:
+  path: /api/v1/staff/trainings/{id}/book
+  controller: App\Controller\Api\StaffBookingController::book
+  methods: [POST]
+
+api_staff_booking_cancel:
+  path: /api/v1/staff/bookings/{id}
+  controller: App\Controller\Api\StaffBookingController::cancel
+  methods: [DELETE]
+
 api_staff_config:
   path: /api/v1/staff/config
   controller: App\Controller\Api\StaffConfigController::config
