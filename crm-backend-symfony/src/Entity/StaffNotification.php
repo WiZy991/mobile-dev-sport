@@ -20,6 +20,7 @@ class StaffNotification
     public const TYPE_GUEST_PASS = 'guest_pass';
     public const TYPE_TASK = 'task';
     public const TYPE_SYSTEM = 'system';
+    public const TYPE_STAFF_REGISTRATION = 'staff_registration';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

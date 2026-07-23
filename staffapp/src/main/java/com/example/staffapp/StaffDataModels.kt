@@ -26,7 +26,15 @@ data class ScheduleDay(
     val count: Int,
 )
 
+data class ScheduleBookingRow(
+    val id: String,
+    val clientName: String,
+    val clientId: String?,
+    val status: String,
+)
+
 data class ScheduleItem(
+    val id: String?,
     val title: String,
     val trainer: String,
     val type: String,
@@ -38,7 +46,27 @@ data class ScheduleItem(
     val endAt: String,
     val room: String,
     val clientNames: List<String>,
+    val bookings: List<ScheduleBookingRow> = emptyList(),
     val participants: String,
+    val maxParticipants: Int? = null,
+    val currentParticipants: Int? = null,
+)
+
+data class StaffOnboarding(
+    val status: String,
+    val registrationStatus: String,
+    val requiresRental: Boolean,
+    val rentalPaidUntil: String?,
+    val offerUrl: String,
+    val rentalAmountKopecks: Int,
+    val rentalAmountRub: Double,
+)
+
+data class RentalPaymentResult(
+    val paymentId: Int,
+    val status: String,
+    val paymentUrl: String?,
+    val onboarding: StaffOnboarding,
 )
 
 data class ScheduleData(

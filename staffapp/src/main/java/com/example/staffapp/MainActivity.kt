@@ -14,7 +14,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.staffapp.ui.auth.LoginScreen
 import com.example.staffapp.ui.auth.LoginUiState
-import com.example.staffapp.ui.auth.RoleOptionUi
 import com.example.staffapp.ui.theme.StaffTheme
 import kotlin.concurrent.thread
 
@@ -23,19 +22,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var store: StaffSessionStore
     private var session: StaffSession? = null
 
-    private val roleOptions = listOf(
-        RoleOptionUi("Тренер", "ROLE_TRAINER"),
-        RoleOptionUi("Менеджер", "ROLE_MANAGER"),
-        RoleOptionUi("Финансы", "ROLE_FINANCE"),
-        RoleOptionUi("Наблюдатель", "ROLE_VIEWER"),
-        RoleOptionUi("Поддержка", "ROLE_SUPPORT"),
-        RoleOptionUi("Администратор", "ROLE_ADMIN"),
-        RoleOptionUi("Суперадминистратор", "ROLE_SUPER_ADMIN"),
-    )
-
-    private var uiState by mutableStateOf(
-        LoginUiState(roles = roleOptions, selectedRole = roleOptions.first()),
-    )
+    private var uiState by mutableStateOf(LoginUiState())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +37,7 @@ class MainActivity : ComponentActivity() {
                     onEmailChange = { uiState = uiState.copy(email = it) },
                     onNameChange = { uiState = uiState.copy(name = it) },
                     onPasswordChange = { uiState = uiState.copy(password = it) },
-                    onRoleSelected = { uiState = uiState.copy(selectedRole = it) },
+                    onRoleSelected = {},
                     onLogin = { runLogin() },
                     onRegister = { runRegister() },
                 )
@@ -62,9 +49,7 @@ class MainActivity : ComponentActivity() {
 
         if (session != null) {
             runAsync("Проверяем доступ...") {
-                val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
-                store.saveConfig(config)
-                openWorkScreen()
+                routeAfterAuth()
                 "Готово"
             }
         }
@@ -76,15 +61,12 @@ class MainActivity : ComponentActivity() {
                 email = uiState.email.trim(),
                 name = uiState.name.trim(),
                 password = uiState.password,
-                role = uiState.selectedRole?.role ?: roleOptions.first().role,
             )
             session?.let { store.saveSession(it) }
             store.clearConfig()
-            val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
-            store.saveConfig(config)
             StaffPushRegistrar.registerIfLoggedIn(this)
-            openWorkScreen()
-            "Зарегистрирован и выполнен вход"
+            routeAfterAuth()
+            "Заявка отправлена"
         }
     }
 
@@ -96,16 +78,20 @@ class MainActivity : ComponentActivity() {
             )
             session?.let { store.saveSession(it) }
             store.clearConfig()
+            StaffPushRegistrar.registerIfLoggedIn(this)
+            routeAfterAuth()
+            "Выполнен вход"
+        }
+    }
+
+    private fun routeAfterAuth() {
+        val onboarding = executeWithRefresh { apiClient.loadOnboarding(it) }
+        if (onboarding.status == "active") {
             val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
             store.saveConfig(config)
-            runOnUiThread {
-                uiState = uiState.copy(
-                    configSummary = "Роли: ${config.roles.joinToString { UiLabels.roleTitle(it) }}\nДоступы загружены",
-                )
-            }
-            StaffPushRegistrar.registerIfLoggedIn(this)
             openWorkScreen()
-            "Выполнен вход"
+        } else {
+            openOnboardingScreen()
         }
     }
 
@@ -150,6 +136,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun openOnboardingScreen() {
+        runOnUiThread {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            finish()
+        }
+    }
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -157,10 +150,6 @@ class MainActivity : ComponentActivity() {
         ) {
             return
         }
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            42,
-        )
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
     }
 }

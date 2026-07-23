@@ -111,9 +111,6 @@ fun TrainingDetailsScreen(
                 uiState.training != null -> {
                     TrainingDetailsContent(
                         training = uiState.training!!,
-                        isBooking = uiState.isBooking,
-                        onBookClick = viewModel::bookTraining,
-                        onWaitingListClick = viewModel::joinWaitingList
                     )
                 }
             }
@@ -124,9 +121,6 @@ fun TrainingDetailsScreen(
 @Composable
 private fun TrainingDetailsContent(
     training: Training,
-    isBooking: Boolean,
-    onBookClick: () -> Unit,
-    onWaitingListClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -236,95 +230,48 @@ private fun TrainingDetailsContent(
         }
     }
     
-    // Bottom booking button
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         contentAlignment = Alignment.BottomCenter
     ) {
-        when {
-            training.isBooked -> {
-                Button(
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        disabledContainerColor = Success,
-                        disabledContentColor = Color.White
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Вы записаны",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
+        if (training.isBooked) {
+            Button(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    disabledContainerColor = Success,
+                    disabledContentColor = Color.White
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Вы записаны",
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
-            training.isFull -> {
-                OutlinedButton(
-                    onClick = onWaitingListClick,
-                    enabled = !isBooking,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    if (isBooking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.HourglassEmpty,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Записаться в лист ожидания",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
-            }
-            else -> {
-                Button(
-                    onClick = onBookClick,
-                    enabled = !isBooking,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    if (isBooking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Записаться",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                Text(
+                    text = "Запись оформляет тренер. Когда вас запишут, занятие появится в «Мои записи».",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

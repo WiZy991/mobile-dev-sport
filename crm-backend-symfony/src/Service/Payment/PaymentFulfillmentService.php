@@ -18,8 +18,14 @@ class PaymentFulfillmentService
         private readonly ClientNotificationScheduler $notificationScheduler,
     ) {}
 
-    public function fulfill(Payment $payment, ?string $paymentWay = null): Subscription
+    public function fulfill(Payment $payment, ?string $paymentWay = null): ?Subscription
     {
+        if ($payment->getType() === Payment::TYPE_TRAINER_RENTAL) {
+            $this->fulfillTrainerRental($payment, $paymentWay);
+
+            return null;
+        }
+
         if ($payment->isPaid() && $payment->getSubscription() !== null) {
             return $payment->getSubscription();
         }
@@ -30,6 +36,9 @@ class PaymentFulfillmentService
 
         $user = $payment->getUser();
         $plan = $payment->getSubscriptionPlan();
+        if ($user === null || $plan === null) {
+            throw new \RuntimeException('Subscription payment missing user or plan');
+        }
         $promo = $payment->getPromoCode();
         $price = $payment->getAmountKopecks() / 100;
 
@@ -96,6 +105,33 @@ class PaymentFulfillmentService
         $this->notificationScheduler->scheduleSubscriptionExpiryReminders($sub);
 
         return $sub;
+    }
+
+    private function fulfillTrainerRental(Payment $payment, ?string $paymentWay): void
+    {
+        if ($payment->isPaid()) {
+            return;
+        }
+        if (!$payment->isPending()) {
+            throw new \RuntimeException('Payment cannot be fulfilled in status: ' . $payment->getStatus());
+        }
+
+        $staff = $payment->getStaffUser();
+        if ($staff === null) {
+            throw new \RuntimeException('Trainer rental payment missing staff user');
+        }
+
+        $now = new \DateTimeImmutable();
+        $base = $staff->getRentalPaidUntil();
+        if ($base === null || $base < $now) {
+            $base = $now;
+        }
+        $staff->setRentalPaidUntil($base->modify('+1 month'));
+
+        $payment->setStatus(Payment::STATUS_PAID)
+            ->setPaidAt($now)
+            ->setPaymentWay($paymentWay);
+        $this->em->flush();
     }
 
     private function resolvePaymentMethod(?string $paymentWay): string

@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 
 use App\Entity\StaffUser;
 use App\Service\Admin\AdminMenuBuilder;
+use App\Service\Staff\StaffOnboardingService;
 use App\Service\Tenant\TenantContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,18 +30,27 @@ final class CrmStaffController extends AbstractController
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly AdminMenuBuilder $adminMenuBuilder,
         private readonly TenantContext $tenantContext,
+        private readonly StaffOnboardingService $onboarding,
     ) {
     }
 
     #[Route('', name: 'admin_crm_staff_index', methods: ['GET'])]
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $filter = (string) $request->query->get('filter', 'all');
         $users = $this->em->getRepository(StaffUser::class)->findBy([], ['id' => 'ASC']);
+        if ($filter === 'pending') {
+            $users = array_values(array_filter(
+                $users,
+                static fn (StaffUser $u) => $u->getRegistrationStatus() === StaffUser::REGISTRATION_PENDING
+            ));
+        }
 
         return $this->render('admin/crm_staff_index.html.twig', [
             'menu' => $this->menu(),
             'current' => 'crm_staff',
             'staffUsers' => $users,
+            'filter' => $filter,
         ]);
     }
 
@@ -56,7 +66,8 @@ final class CrmStaffController extends AbstractController
             'current' => 'crm_staff',
             'staffUser' => null,
             'selectableRoles' => self::SELECTABLE_ROLES,
-            'checkedRoles' => ['ROLE_VIEWER'],
+            'checkedRoles' => ['ROLE_TRAINER'],
+            'generatePassword' => true,
         ]);
     }
 
@@ -83,18 +94,46 @@ final class CrmStaffController extends AbstractController
             'staffUser' => $staff,
             'selectableRoles' => self::SELECTABLE_ROLES,
             'checkedRoles' => $stored !== [] ? $stored : ['ROLE_VIEWER'],
+            'generatePassword' => false,
         ]);
+    }
+
+    #[Route('/{id<\d+>}/approve', name: 'admin_crm_staff_approve', methods: ['POST'])]
+    public function approve(int $id): Response
+    {
+        $staff = $this->em->getRepository(StaffUser::class)->find($id);
+        if (!$staff) {
+            throw $this->createNotFoundException();
+        }
+        $this->onboarding->approve($staff);
+        $this->addFlash('success', sprintf('Заявка %s одобрена. Тренер должен оплатить аренду в приложении.', $staff->getEmail()));
+
+        return $this->redirectToRoute('admin_crm_staff_index', ['filter' => 'pending']);
+    }
+
+    #[Route('/{id<\d+>}/reject', name: 'admin_crm_staff_reject', methods: ['POST'])]
+    public function reject(int $id): Response
+    {
+        $staff = $this->em->getRepository(StaffUser::class)->find($id);
+        if (!$staff) {
+            throw $this->createNotFoundException();
+        }
+        $this->onboarding->reject($staff);
+        $this->addFlash('warning', sprintf('Заявка %s отклонена.', $staff->getEmail()));
+
+        return $this->redirectToRoute('admin_crm_staff_index', ['filter' => 'pending']);
     }
 
     private function processCreate(Request $request): Response
     {
         $email = trim((string) $request->request->get('email', ''));
         $name = trim((string) $request->request->get('name', ''));
-        $password = (string) $request->request->get('password', '');
         $roles = $this->normalizeRolesFromRequest($request);
+        $generate = $request->request->get('generate_password') === '1';
+        $password = (string) $request->request->get('password', '');
 
-        if ($email === '' || $name === '' || $password === '') {
-            $this->addFlash('danger', 'Укажите email, имя и пароль.');
+        if ($email === '' || $name === '') {
+            $this->addFlash('danger', 'Укажите email и имя.');
             return $this->redirectToRoute('admin_crm_staff_new');
         }
 
@@ -103,10 +142,15 @@ final class CrmStaffController extends AbstractController
             return $this->redirectToRoute('admin_crm_staff_new');
         }
 
+        if ($generate || $password === '') {
+            $password = $this->generatePassword();
+        }
+
         $u = (new StaffUser())
             ->setEmail($email)
             ->setName($name)
             ->setRoles($roles)
+            ->setRegistrationStatus(StaffUser::REGISTRATION_APPROVED)
             ->setIsActive($request->request->get('is_active') === '1');
 
         if (!$this->getUser() instanceof StaffUser || !$this->getUser()->isPlatformOperator()) {
@@ -116,7 +160,19 @@ final class CrmStaffController extends AbstractController
         $u->setPassword($this->passwordHasher->hashPassword($u, $password));
         $this->em->persist($u);
         $this->em->flush();
-        $this->addFlash('success', 'Учётная запись создана.');
+
+        if (\in_array('ROLE_TRAINER', $roles, true)) {
+            $this->onboarding->ensureTrainerProfile($u);
+        }
+
+        $this->addFlash(
+            'success',
+            sprintf(
+                'Учётная запись создана (одобрена). Логин: %s. Пароль: %s. Тренеру нужно оплатить аренду в приложении.',
+                $email,
+                $password
+            )
+        );
 
         return $this->redirectToRoute('admin_crm_staff_index');
     }
@@ -142,14 +198,43 @@ final class CrmStaffController extends AbstractController
         $staff->setEmail($email)->setName($name)->setRoles($roles)
             ->setIsActive($request->request->get('is_active') === '1');
 
+        $status = (string) $request->request->get('registration_status', $staff->getRegistrationStatus());
+        if (\in_array($status, [
+            StaffUser::REGISTRATION_PENDING,
+            StaffUser::REGISTRATION_APPROVED,
+            StaffUser::REGISTRATION_REJECTED,
+        ], true)) {
+            $staff->setRegistrationStatus($status);
+        }
+
         if ($password !== '') {
             $staff->setPassword($this->passwordHasher->hashPassword($staff, $password));
         }
 
         $this->em->flush();
+
+        if ($staff->getRegistrationStatus() === StaffUser::REGISTRATION_APPROVED
+            && \in_array('ROLE_TRAINER', $roles, true)
+            && $staff->getTrainer() === null
+        ) {
+            $this->onboarding->ensureTrainerProfile($staff);
+        }
+
         $this->addFlash('success', 'Сохранено.');
 
         return $this->redirectToRoute('admin_crm_staff_index');
+    }
+
+    private function generatePassword(int $length = 10): string
+    {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+        $out = '';
+        $max = strlen($alphabet) - 1;
+        for ($i = 0; $i < $length; $i++) {
+            $out .= $alphabet[random_int(0, $max)];
+        }
+
+        return $out;
     }
 
     /** @param list<string|int|float|bool> $raw */

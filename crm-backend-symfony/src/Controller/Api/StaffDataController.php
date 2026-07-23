@@ -141,16 +141,27 @@ final class StaffDataController extends AbstractController
         $from = new \DateTimeImmutable('today');
         $to = $from->modify('+14 days');
 
-        $items = $this->em->createQueryBuilder()
+        $qb = $this->em->createQueryBuilder()
             ->select('t')
             ->from(Training::class, 't')
             ->where('t.startAt >= :from')
             ->andWhere('t.startAt < :to')
             ->setParameter('from', $from)
             ->setParameter('to', $to)
-            ->orderBy('t.startAt', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('t.startAt', 'ASC');
+
+        if ($user->requiresTrainerRental() || $user->isTrainerRole()) {
+            $linkedTrainer = $user->getTrainer();
+            if ($linkedTrainer !== null
+                && !\in_array('ROLE_ADMIN', $user->getRoles(), true)
+                && !\in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true)
+                && !\in_array('ROLE_MANAGER', $user->getRoles(), true)
+            ) {
+                $qb->andWhere('t.trainer = :trainer')->setParameter('trainer', $linkedTrainer);
+            }
+        }
+
+        $items = $qb->getQuery()->getResult();
 
         $trainingIds = [];
         foreach ($items as $training) {
@@ -195,7 +206,27 @@ final class StaffDataController extends AbstractController
             $trainerEntity = $training->getTrainer();
             $trainerLabel = $training->getTrainerName()
                 ?? ($trainerEntity !== null ? $trainerEntity->getName() : 'Не указан');
+            $bookingRows = [];
+            if ($trainingId !== null) {
+                $dayBookings = $this->em->getRepository(Booking::class)->findBy(
+                    ['training' => $training],
+                    ['id' => 'ASC']
+                );
+                foreach ($dayBookings as $b) {
+                    if (!$b instanceof Booking || $b->getStatus() === 'cancelled') {
+                        continue;
+                    }
+                    $bookingRows[] = [
+                        'id' => 'booking-' . $b->getId(),
+                        'client_name' => $b->getClientName(),
+                        'client_id' => $b->getUser()?->getId() !== null ? 'user-' . $b->getUser()->getId() : null,
+                        'status' => $b->getStatus(),
+                    ];
+                }
+            }
+
             $result[] = [
+                'id' => $trainingId !== null ? 'training-' . $trainingId : null,
                 'title' => $training->getName(),
                 'trainer' => $trainerLabel,
                 'type' => $training->getType(),
@@ -207,7 +238,10 @@ final class StaffDataController extends AbstractController
                 'endAt' => $training->getEndAt()->format('d.m H:i'),
                 'room' => (string) ($training->getRoom() ?? '—'),
                 'clientNames' => $participantNames,
+                'bookings' => $bookingRows,
                 'participants' => $participantsLabel,
+                'maxParticipants' => $training->getMaxParticipants(),
+                'currentParticipants' => $training->getCurrentParticipants(),
             ];
         }
 

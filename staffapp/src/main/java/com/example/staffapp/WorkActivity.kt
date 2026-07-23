@@ -13,6 +13,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.staffapp.ui.theme.StaffTheme
 import com.example.staffapp.ui.work.ActionUi
+import com.example.staffapp.ui.work.AssignClientDialogUi
 import com.example.staffapp.ui.work.ProfileSectionUi
 import com.example.staffapp.ui.work.SectionHints
 import com.example.staffapp.ui.work.BadgeColor
@@ -22,6 +23,7 @@ import com.example.staffapp.ui.work.HomeTabUi
 import com.example.staffapp.ui.work.ListCardUi
 import com.example.staffapp.ui.work.MetricUi
 import com.example.staffapp.ui.work.ProfileTabUi
+import com.example.staffapp.ui.work.ScheduleBookingUi
 import com.example.staffapp.ui.work.ScheduleDayUi
 import com.example.staffapp.ui.work.ScheduleSessionUi
 import com.example.staffapp.ui.work.ScheduleTabUi
@@ -94,6 +96,16 @@ class WorkActivity : ComponentActivity() {
                     },
                     onListCardClick = { handleListCardClick(it) },
                     onProfileSectionClick = { handleProfileSectionClick(it) },
+                    onScheduleSessionClick = { openAssignDialog(it) },
+                    onAssignQueryChange = { q ->
+                        uiState.assignDialog?.let { d ->
+                            uiState = uiState.copy(assignDialog = d.copy(query = q))
+                        }
+                    },
+                    onAssignSearch = { searchAssignClients() },
+                    onAssignBook = { bookAssignClient(it) },
+                    onAssignCancelBooking = { cancelAssignBooking(it) },
+                    onAssignDismiss = { uiState = uiState.copy(assignDialog = null) },
                 )
             }
         }
@@ -101,8 +113,27 @@ class WorkActivity : ComponentActivity() {
         StaffNotificationHelper.ensureChannel(this)
         requestNotificationPermissionIfNeeded()
         StaffPushRegistrar.registerIfLoggedIn(this)
-        selectTab(requestedTab)
-        loadData()
+        thread {
+            try {
+                val onboarding = withRefresh { apiClient.loadOnboarding(it) }
+                if (onboarding.status != "active") {
+                    runOnUiThread {
+                        startActivity(Intent(this, OnboardingActivity::class.java))
+                        finish()
+                    }
+                    return@thread
+                }
+                runOnUiThread {
+                    selectTab(requestedTab)
+                    loadData()
+                }
+            } catch (_: Exception) {
+                runOnUiThread {
+                    selectTab(requestedTab)
+                    loadData()
+                }
+            }
+        }
     }
 
     private fun handleListCardClick(card: ListCardUi) {
@@ -622,6 +653,7 @@ class WorkActivity : ComponentActivity() {
     private fun scheduleToSession(item: ScheduleItem): ScheduleSessionUi {
         val (booked, max) = parseParticipants(item.participants)
         return ScheduleSessionUi(
+            trainingId = item.id,
             title = item.title,
             type = item.type,
             typeLabel = UiLabels.trainingType(item.type),
@@ -630,10 +662,101 @@ class WorkActivity : ComponentActivity() {
             durationMinutes = durationMinutes(item.startTime, item.endTime),
             trainer = item.trainer,
             room = item.room,
-            bookedCount = booked,
-            maxParticipants = max,
+            bookedCount = item.currentParticipants ?: booked,
+            maxParticipants = item.maxParticipants ?: max,
             clientNames = item.clientNames,
+            bookings = item.bookings.map {
+                ScheduleBookingUi(id = it.id, clientName = it.clientName, clientId = it.clientId)
+            },
         )
+    }
+
+    private fun openAssignDialog(session: ScheduleSessionUi) {
+        val trainingId = session.trainingId ?: return
+        uiState = uiState.copy(
+            assignDialog = AssignClientDialogUi(
+                trainingId = trainingId,
+                sessionTitle = "${session.startTime} ${session.title}",
+                booked = session.bookings.map {
+                    ListCardUi(title = it.clientName, meta = it.id)
+                },
+            ),
+        )
+        searchAssignClients()
+    }
+
+    private fun searchAssignClients() {
+        val dialog = uiState.assignDialog ?: return
+        uiState = uiState.copy(assignDialog = dialog.copy(loading = true, errorMessage = null))
+        thread {
+            try {
+                val clients = withRefresh { apiClient.loadClients(it, dialog.query) }
+                runOnUiThread {
+                    val current = uiState.assignDialog ?: return@runOnUiThread
+                    uiState = uiState.copy(
+                        assignDialog = current.copy(
+                            loading = false,
+                            clients = clients.map {
+                                ListCardUi(
+                                    title = it.name,
+                                    subtitle = listOf(it.phone, it.email).filter { s -> s.isNotBlank() }.joinToString(" · "),
+                                    clientId = it.id,
+                                )
+                            },
+                        ),
+                    )
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState.assignDialog?.let {
+                        uiState = uiState.copy(
+                            assignDialog = it.copy(loading = false, errorMessage = UserFacingError.message(e)),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun bookAssignClient(clientId: Int) {
+        val dialog = uiState.assignDialog ?: return
+        thread {
+            try {
+                withRefresh { apiClient.bookClientOnTraining(it, dialog.trainingId, clientId) }
+                runOnUiThread {
+                    uiState = uiState.copy(assignDialog = null, statusMessage = "Клиент записан")
+                    showScheduleTab()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState.assignDialog?.let {
+                        uiState = uiState.copy(
+                            assignDialog = it.copy(errorMessage = UserFacingError.message(e)),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun cancelAssignBooking(bookingId: String) {
+        thread {
+            try {
+                withRefresh { apiClient.cancelStaffBooking(it, bookingId) }
+                runOnUiThread {
+                    uiState = uiState.copy(assignDialog = null, statusMessage = "Запись снята")
+                    showScheduleTab()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState.assignDialog?.let {
+                        uiState = uiState.copy(
+                            assignDialog = it.copy(errorMessage = UserFacingError.message(e)),
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private fun parseDayLabel(label: String): Pair<String, String> {

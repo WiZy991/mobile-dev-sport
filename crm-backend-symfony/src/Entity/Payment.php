@@ -12,6 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 class Payment
 {
     public const TYPE_SUBSCRIPTION = 'subscription';
+    public const TYPE_TRAINER_RENTAL = 'trainer_rental';
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_PAID = 'paid';
@@ -25,15 +26,19 @@ class Payment
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(nullable: false)]
-    private User $user;
+    #[ORM\JoinColumn(nullable: true)]
+    private ?User $user = null;
+
+    #[ORM\ManyToOne(targetEntity: StaffUser::class)]
+    #[ORM\JoinColumn(name: 'staff_user_id', nullable: true, onDelete: 'SET NULL')]
+    private ?StaffUser $staffUser = null;
 
     #[ORM\Column(type: 'string', length: 30)]
     private string $type = self::TYPE_SUBSCRIPTION;
 
     #[ORM\ManyToOne(targetEntity: SubscriptionPlan::class)]
-    #[ORM\JoinColumn(nullable: false)]
-    private SubscriptionPlan $subscriptionPlan;
+    #[ORM\JoinColumn(nullable: true)]
+    private ?SubscriptionPlan $subscriptionPlan = null;
 
     #[ORM\ManyToOne(targetEntity: PromoCode::class)]
     #[ORM\JoinColumn(nullable: true)]
@@ -97,14 +102,26 @@ class Payment
         return $this->id;
     }
 
-    public function getUser(): User
+    public function getUser(): ?User
     {
         return $this->user;
     }
 
-    public function setUser(User $user): self
+    public function setUser(?User $user): self
     {
         $this->user = $user;
+
+        return $this;
+    }
+
+    public function getStaffUser(): ?StaffUser
+    {
+        return $this->staffUser;
+    }
+
+    public function setStaffUser(?StaffUser $staffUser): self
+    {
+        $this->staffUser = $staffUser;
 
         return $this;
     }
@@ -121,12 +138,12 @@ class Payment
         return $this;
     }
 
-    public function getSubscriptionPlan(): SubscriptionPlan
+    public function getSubscriptionPlan(): ?SubscriptionPlan
     {
         return $this->subscriptionPlan;
     }
 
-    public function setSubscriptionPlan(SubscriptionPlan $subscriptionPlan): self
+    public function setSubscriptionPlan(?SubscriptionPlan $subscriptionPlan): self
     {
         $this->subscriptionPlan = $subscriptionPlan;
 

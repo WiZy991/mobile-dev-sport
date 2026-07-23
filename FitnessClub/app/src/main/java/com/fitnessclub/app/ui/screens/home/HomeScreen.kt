@@ -299,8 +299,8 @@ private fun QuickMenuSection(
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             QuickMenuItem(
                 icon = Icons.Default.Person,
-                title = "Записаться на персональную тренировку",
-                subtitle = "Индивидуальное занятие с тренером",
+                title = "Персональные тренировки",
+                subtitle = "Слоты тренеров — запись делает тренер",
                 onClick = onPersonalTraining
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

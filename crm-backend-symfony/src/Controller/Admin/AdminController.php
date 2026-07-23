@@ -1518,10 +1518,17 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
-            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'contact_website', 'social_vk', 'social_telegram'];
+            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'contact_website', 'social_vk', 'social_telegram', 'trainer_rental_amount_rub'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
                 $this->clubSettings->set($key, $value !== '' ? $value : null);
+            }
+            $rentalRub = trim((string) ($request->request->get('trainer_rental_amount_rub') ?? ''));
+            if ($rentalRub !== '' && is_numeric($rentalRub)) {
+                $this->clubSettings->set(
+                    'trainer_rental_amount_kopecks',
+                    (string) (int) round(((float) $rentalRub) * 100)
+                );
             }
 
             $enabledModules = $request->request->all('enabled_modules');
@@ -1570,6 +1577,7 @@ class AdminController extends AbstractController
                 'promo_home_title' => $getSetting('promo_home_title', 'СКИДКА 20%!'),
                 'promo_home_subtitle' => $getSetting('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
                 'offer_url' => $getSetting('offer_url', ''),
+                'trainer_rental_amount_rub' => $getSetting('trainer_rental_amount_rub', '5000'),
                 'privacy_url' => $getSetting('privacy_url', ''),
                 'visiting_rules_url' => $getSetting('visiting_rules_url', ''),
                 'safety_rules_url' => $getSetting('safety_rules_url', ''),

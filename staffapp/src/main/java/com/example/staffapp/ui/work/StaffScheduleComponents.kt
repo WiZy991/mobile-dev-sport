@@ -54,6 +54,7 @@ fun StaffScheduleTabContent(
     schedule: ScheduleTabUi,
     onDaySelected: (String) -> Unit,
     onTypeFilterSelected: (String?) -> Unit,
+    onSessionClick: (ScheduleSessionUi) -> Unit = {},
 ) {
     if (schedule.denied) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -110,8 +111,11 @@ fun StaffScheduleTabContent(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(schedule.sessions, key = { "${it.startTime}_${it.title}" }) { session ->
-                        StaffScheduleSessionCard(session = session)
+                    items(schedule.sessions, key = { "${it.trainingId}_${it.startTime}_${it.title}" }) { session ->
+                        StaffScheduleSessionCard(
+                            session = session,
+                            onClick = { onSessionClick(session) },
+                        )
                     }
                 }
             }
@@ -238,9 +242,12 @@ private fun StaffScheduleTypeFilters(
 fun StaffScheduleSessionCard(
     session: ScheduleSessionUi,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),

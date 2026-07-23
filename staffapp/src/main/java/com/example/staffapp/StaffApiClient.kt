@@ -11,13 +11,64 @@ import kotlin.text.Charsets
 class StaffApiClient(private val baseUrl: String) {
     private data class HttpResult(val code: Int, val body: String)
 
-    fun register(email: String, name: String, password: String, role: String): StaffSession {
+    fun register(email: String, name: String, password: String): StaffSession {
         val payload = JSONObject()
             .put("email", email)
             .put("name", name)
             .put("password", password)
-            .put("role", role)
         return authRequest("/api/v1/staff/auth/register", payload)
+    }
+
+    fun loadOnboarding(token: String): StaffOnboarding {
+        val conn = openConnection("/api/v1/staff/onboarding", "GET")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        return parseOnboarding(requireJson(execute(conn)))
+    }
+
+    fun initRentalPayment(token: String, offerAccepted: Boolean): RentalPaymentResult {
+        val conn = openConnection("/api/v1/staff/rental/init", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use {
+            it.write(JSONObject().put("offer_accepted", offerAccepted).toString())
+        }
+        val json = requireJson(execute(conn))
+        return RentalPaymentResult(
+            paymentId = json.getInt("payment_id"),
+            status = json.optString("status"),
+            paymentUrl = json.optString("payment_url").takeIf { it.isNotBlank() },
+            onboarding = parseOnboarding(json.optJSONObject("onboarding") ?: JSONObject()),
+        )
+    }
+
+    fun rentalPaymentStatus(token: String, paymentId: Int): RentalPaymentResult {
+        val conn = openConnection("/api/v1/staff/rental/payments/$paymentId/status", "GET")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        val json = requireJson(execute(conn))
+        return RentalPaymentResult(
+            paymentId = json.optInt("payment_id", paymentId),
+            status = json.optString("status"),
+            paymentUrl = json.optString("payment_url").takeIf { it.isNotBlank() },
+            onboarding = parseOnboarding(json.optJSONObject("onboarding") ?: JSONObject()),
+        )
+    }
+
+    fun bookClientOnTraining(token: String, trainingId: String, clientId: Int): Boolean {
+        val conn = openConnection("/api/v1/staff/trainings/$trainingId/book", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use {
+            it.write(JSONObject().put("client_id", clientId).toString())
+        }
+        return execute(conn).code in 200..299
+    }
+
+    fun cancelStaffBooking(token: String, bookingId: String): Boolean {
+        val conn = openConnection("/api/v1/staff/bookings/$bookingId", "DELETE")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        return execute(conn).code in 200..299
     }
 
     fun login(email: String, password: String): StaffSession {
@@ -116,7 +167,21 @@ class StaffApiClient(private val baseUrl: String) {
         val items = mutableListOf<ScheduleItem>()
         for (i in 0 until rows.length()) {
             val row = rows.optJSONObject(i) ?: continue
+            val bookingRows = row.optJSONArray("bookings")
+            val bookings = mutableListOf<ScheduleBookingRow>()
+            if (bookingRows != null) {
+                for (j in 0 until bookingRows.length()) {
+                    val b = bookingRows.optJSONObject(j) ?: continue
+                    bookings += ScheduleBookingRow(
+                        id = b.optString("id"),
+                        clientName = b.optString("client_name"),
+                        clientId = b.optString("client_id").takeIf { it.isNotBlank() },
+                        status = b.optString("status"),
+                    )
+                }
+            }
             items += ScheduleItem(
+                id = row.optString("id").takeIf { it.isNotBlank() },
                 title = row.optString("title"),
                 trainer = row.optString("trainer"),
                 type = row.optString("type"),
@@ -128,7 +193,10 @@ class StaffApiClient(private val baseUrl: String) {
                 endAt = row.optString("endAt"),
                 room = row.optString("room"),
                 clientNames = row.optJSONArray("clientNames").toStringList(),
+                bookings = bookings,
                 participants = row.optString("participants"),
+                maxParticipants = row.optInt("maxParticipants").takeIf { row.has("maxParticipants") },
+                currentParticipants = row.optInt("currentParticipants").takeIf { row.has("currentParticipants") },
             )
         }
         return ScheduleData(days = days, items = items)
@@ -448,3 +516,15 @@ data class StaffSession(
     val refreshToken: String,
     val userEmail: String,
 )
+
+private fun parseOnboarding(json: JSONObject): StaffOnboarding {
+    return StaffOnboarding(
+        status = json.optString("status", "active"),
+        registrationStatus = json.optString("registration_status", "approved"),
+        requiresRental = json.optBoolean("requires_rental", false),
+        rentalPaidUntil = json.optString("rental_paid_until").takeIf { it.isNotBlank() },
+        offerUrl = json.optString("offer_url", "https://dobrozal.ru/doc/offer"),
+        rentalAmountKopecks = json.optInt("rental_amount_kopecks", 0),
+        rentalAmountRub = json.optDouble("rental_amount_rub", 0.0),
+    )
+}

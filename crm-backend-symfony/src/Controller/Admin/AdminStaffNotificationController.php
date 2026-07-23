@@ -197,6 +197,9 @@ final class AdminStaffNotificationController extends AbstractController
             StaffNotification::TYPE_CLIENT => $ref !== null
                 ? $this->generateUrl('admin_client_show', ['id' => (int) $ref], UrlGeneratorInterface::ABSOLUTE_PATH)
                 : $this->generateUrl('admin_section', ['section' => 'clients'], UrlGeneratorInterface::ABSOLUTE_PATH),
+            StaffNotification::TYPE_STAFF_REGISTRATION => $ref !== null
+                ? $this->generateUrl('admin_crm_staff_edit', ['id' => (int) $ref], UrlGeneratorInterface::ABSOLUTE_PATH)
+                : $this->generateUrl('admin_crm_staff_index', ['filter' => 'pending'], UrlGeneratorInterface::ABSOLUTE_PATH),
             StaffNotification::TYPE_GUEST_PASS => $this->generateUrl(
                 'admin_section',
                 ['section' => 'visits'],

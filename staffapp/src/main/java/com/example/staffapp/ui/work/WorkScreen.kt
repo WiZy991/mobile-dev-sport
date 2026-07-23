@@ -73,7 +73,23 @@ fun WorkScreen(
     onClientSearch: () -> Unit,
     onListCardClick: (ListCardUi) -> Unit,
     onProfileSectionClick: (String) -> Unit,
+    onScheduleSessionClick: (ScheduleSessionUi) -> Unit = {},
+    onAssignQueryChange: (String) -> Unit = {},
+    onAssignSearch: () -> Unit = {},
+    onAssignBook: (Int) -> Unit = {},
+    onAssignCancelBooking: (String) -> Unit = {},
+    onAssignDismiss: () -> Unit = {},
 ) {
+    state.assignDialog?.let { dialog ->
+        AssignClientDialog(
+            state = dialog,
+            onQueryChange = onAssignQueryChange,
+            onSearch = onAssignSearch,
+            onBookClient = onAssignBook,
+            onCancelBooking = onAssignCancelBooking,
+            onDismiss = onAssignDismiss,
+        )
+    }
     val navItems = buildList {
         add(NavItem(WorkUiState.TAB_HOME, "Главная", Icons.Filled.Home, Icons.Outlined.Home))
         if (state.showScheduleNav) {
@@ -145,6 +161,7 @@ fun WorkScreen(
                     schedule = state.schedule,
                     onDaySelected = onScheduleDaySelected,
                     onTypeFilterSelected = onScheduleTypeFilterSelected,
+                    onSessionClick = onScheduleSessionClick,
                 )
                 WorkUiState.TAB_CLIENTS -> ClientsTabContent(
                     state.clients,

@@ -203,7 +203,7 @@ private fun TrainerCard(
                     onClick = onClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Записаться")
+                    Text("Подробнее")
                 }
             }
         }

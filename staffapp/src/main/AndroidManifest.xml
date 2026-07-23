@@ -13,6 +13,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.StaffApp">
         <activity android:name=".WorkActivity" />
+        <activity
+            android:name=".OnboardingActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="staffapp" android:host="payment" android:pathPrefix="/callback" />
+            </intent-filter>
+        </activity>
         <activity android:name=".AdminActivity" />
         <activity android:name=".AdminSectionActivity" />
         <activity android:name=".ClientDetailActivity" />

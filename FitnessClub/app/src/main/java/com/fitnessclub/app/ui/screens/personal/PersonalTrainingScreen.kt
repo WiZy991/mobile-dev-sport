@@ -275,42 +275,30 @@ fun PersonalTrainingScreen(
             }
         }
     }
-    
-    // Booking confirmation dialog
+
     showBookingDialog?.let { slot ->
         AlertDialog(
             onDismissRequest = { showBookingDialog = null },
-            title = { Text("Записаться на тренировку?") },
+            title = { Text(slot.trainingType) },
             text = {
                 Column {
-                    Text(
-                        text = slot.trainingType,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text("Время: ${slot.time}")
                     Text("Тренер: ${slot.trainerName}")
                     if (!slot.room.isNullOrBlank()) {
                         Text("Зал: ${slot.room}")
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Самозапись отключена. Тренер запишет вас в своё расписание — занятие появится в «Мои записи».",
+                    )
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.bookSlot(slot)
-                        showBookingDialog = null
-                    }
-                ) {
-                    Text("Записаться")
+                TextButton(onClick = { showBookingDialog = null }) {
+                    Text("Понятно")
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showBookingDialog = null }) {
-                    Text("Отмена")
-                }
-            }
+            dismissButton = {},
         )
     }
 }

@@ -136,6 +136,14 @@ services:
             $fiscalizationEnabled: '%env(bool:default:alfa_acquiring_fiscalization_default:ALFA_ACQUIRING_FISCALIZATION)%'
             $taxType: '%env(int:default:alfa_acquiring_tax_type_default:ALFA_ACQUIRING_TAX_TYPE)%'
 
+    App\Service\Payment\TrainerRentalPaymentInitService:
+        arguments:
+            $returnUrlBase: '%env(ALFA_ACQUIRING_RETURN_URL)%'
+            $failUrlBase: '%env(ALFA_ACQUIRING_FAIL_URL)%'
+            $callbackUrl: '%env(ALFA_ACQUIRING_CALLBACK_URL)%'
+            $sessionTimeoutSecs: '%env(int:default:alfa_acquiring_session_timeout_default:ALFA_ACQUIRING_SESSION_TIMEOUT)%'
+            $staffAppBridgeUri: 'staffapp://payment/callback'
+
     App\Controller\PaymentRedirectController:
         arguments:
             $appBridgeUri: '%env(default:alfa_acquiring_app_bridge_default:ALFA_ACQUIRING_APP_BRIDGE_URI)%'

@@ -8,6 +8,10 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+// Android Studio sync may request this on subprojects; with AGP 9 built-in Kotlin
+// the task exists only on the root project unless registered here.
+tasks.register("prepareKotlinBuildScriptModel") {}
+
 val keystorePropertiesFile = rootProject.file("staffapp/keystore.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) {

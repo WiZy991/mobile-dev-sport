@@ -176,7 +176,7 @@ fun TrainerDetailsScreen(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "Запишитесь на персональную тренировку и выберите удобное время в календаре.",
+                                text = "Расписание персональных слотов можно посмотреть в календаре. Записать на занятие может тренер.",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -189,7 +189,7 @@ fun TrainerDetailsScreen(
                             .height(52.dp),
                         shape = RoundedCornerShape(16.dp),
                     ) {
-                        Text("Записаться на персональную")
+                        Text("Смотреть слоты")
                     }
                 }
             }

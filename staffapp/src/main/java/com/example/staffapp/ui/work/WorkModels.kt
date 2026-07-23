@@ -51,6 +51,7 @@ data class ScheduleDayUi(
 )
 
 data class ScheduleSessionUi(
+    val trainingId: String? = null,
     val title: String,
     val type: String,
     val typeLabel: String,
@@ -62,6 +63,13 @@ data class ScheduleSessionUi(
     val bookedCount: Int? = null,
     val maxParticipants: Int? = null,
     val clientNames: List<String> = emptyList(),
+    val bookings: List<ScheduleBookingUi> = emptyList(),
+)
+
+data class ScheduleBookingUi(
+    val id: String,
+    val clientName: String,
+    val clientId: String? = null,
 )
 
 data class ScheduleTabUi(
@@ -120,6 +128,7 @@ data class WorkUiState(
     val clients: ClientsTabUi = ClientsTabUi(),
     val support: SupportTabUi = SupportTabUi(),
     val profile: ProfileTabUi = ProfileTabUi(),
+    val assignDialog: AssignClientDialogUi? = null,
 ) {
     companion object {
         const val TAB_HOME = 1

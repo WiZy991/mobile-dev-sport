@@ -63,6 +63,17 @@
 
             <hr class="border-secondary my-3">
 
+            <div class="mb-2 text-primary small fw-semibold text-uppercase">Аренда клуба для тренеров</div>
+            <p class="small text-secondary mb-3">Ежемесячная сумма, которую тренер оплачивает в staff-приложении после одобрения регистрации (Альфа-Банк).</p>
+            <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label small">Сумма аренды, ₽ / месяц</label>
+                    <input type="number" min="0" step="1" name="trainer_rental_amount_rub" class="form-control form-control-sm" value="{{ club.trainer_rental_amount_rub }}">
+                </div>
+            </div>
+
+            <hr class="border-secondary my-3">
+
             <div class="mb-2 text-primary small fw-semibold text-uppercase">Документы для покупки абонемента</div>
             <p class="small text-secondary mb-3">
                 Эти ссылки показываются клиенту в приложении <strong>перед оплатой абонемента</strong>.
