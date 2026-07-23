@@ -113,6 +113,7 @@ class StaffApiClient(private val baseUrl: String) {
         name: String,
         specialization: String,
         description: String,
+        phone: String,
     ): TrainerPublicProfile {
         val conn = openConnection("/api/v1/staff/trainer-profile", "PUT")
         conn.setRequestProperty("Authorization", "Bearer $token")
@@ -122,6 +123,7 @@ class StaffApiClient(private val baseUrl: String) {
             .put("name", name)
             .put("specialization", specialization)
             .put("description", description)
+            .put("phone", phone)
         OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
         return parseTrainerProfile(requireJson(execute(conn)))
     }
@@ -152,6 +154,7 @@ class StaffApiClient(private val baseUrl: String) {
             name = json.optString("name"),
             specialization = json.optString("specialization"),
             description = json.optString("description"),
+            phone = json.optString("phone"),
             rating = json.optDouble("rating", 0.0).toFloat(),
             photoUrl = json.optString("photo_url").takeIf { it.isNotBlank() },
         )

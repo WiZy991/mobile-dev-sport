@@ -13,6 +13,7 @@ data class TrainerPublicProfile(
     val name: String,
     val specialization: String,
     val description: String,
+    val phone: String = "",
     val rating: Float,
     val photoUrl: String?,
 )

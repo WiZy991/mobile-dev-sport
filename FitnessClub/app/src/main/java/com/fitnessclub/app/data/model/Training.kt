@@ -97,6 +97,9 @@ data class Trainer(
     @SerializedName("rating")
     val rating: Float = 0f,
 
+    @SerializedName("phone")
+    val phone: String? = null,
+
     /** Текст «о себе» из CRM (карточка тренера в приложении). */
     @SerializedName("description")
     val description: String? = null,

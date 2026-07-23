@@ -15,9 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.content.Intent
+import android.net.Uri
 import coil.compose.AsyncImage
 import com.fitnessclub.app.ui.theme.*
 
@@ -30,6 +33,7 @@ data class TrainerInfo(
     val experience: String,
     val description: String,
     val photoUrl: String? = null,
+    val phone: String? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -106,6 +110,7 @@ private fun TrainerCard(
     trainer: TrainerInfo,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -197,6 +202,21 @@ private fun TrainerCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+
+                trainer.phone?.takeIf { it.isNotBlank() }?.let { phone ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = phone,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Primary,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clickable {
+                            context.startActivity(
+                                Intent(Intent.ACTION_DIAL, Uri.parse("tel:${phone.filter { it.isDigit() || it == '+' }}"))
+                            )
+                        },
+                    )
                 }
                 
                 if (trainer.description.isNotEmpty()) {

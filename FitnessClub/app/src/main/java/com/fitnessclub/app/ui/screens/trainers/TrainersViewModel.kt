@@ -46,6 +46,7 @@ class TrainersViewModel @Inject constructor(
                         experience = "",
                         description = t.description.orEmpty(),
                         photoUrl = t.photoUrl,
+                        phone = t.phone,
                     )
                 }
                 _uiState.update {

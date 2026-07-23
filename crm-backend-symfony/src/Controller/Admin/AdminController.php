@@ -1205,11 +1205,15 @@ class AdminController extends AbstractController
         $description = $request->request->get('description');
         $description = is_string($description) ? trim($description) : '';
         $description = $description !== '' ? $description : null;
+        $phone = $request->request->get('phone');
+        $phone = is_string($phone) ? trim($phone) : '';
+        $phone = $phone !== '' ? $phone : null;
 
         $trainer = (new Trainer())
             ->setName($name)
             ->setSpecialization($specialization)
             ->setPhotoUrl($photoUrl)
+            ->setPhone($phone)
             ->setRating($rating)
             ->setDescription($description);
 
@@ -1269,10 +1273,14 @@ class AdminController extends AbstractController
         $description = $request->request->get('description');
         $description = is_string($description) ? trim($description) : '';
         $description = $description !== '' ? $description : null;
+        $phone = $request->request->get('phone');
+        $phone = is_string($phone) ? trim($phone) : '';
+        $phone = $phone !== '' ? $phone : null;
 
         $trainer->setName((string) $request->request->get('name'))
             ->setSpecialization($request->request->get('specialization') ?: null)
             ->setPhotoUrl($request->request->get('photo_url') ?: null)
+            ->setPhone($phone)
             ->setDescription($description);
         $ratingRaw = $request->request->get('rating');
         $trainer->setRating($ratingRaw !== '' && $ratingRaw !== null ? (float) $ratingRaw : null);

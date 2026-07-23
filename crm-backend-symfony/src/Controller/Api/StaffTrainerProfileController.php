@@ -74,6 +74,10 @@ final class StaffTrainerProfileController extends AbstractController
             $desc = trim((string) $data['description']);
             $trainer->setDescription($desc !== '' ? $desc : null);
         }
+        if (array_key_exists('phone', $data)) {
+            $phone = trim((string) $data['phone']);
+            $trainer->setPhone($phone !== '' ? $phone : null);
+        }
         if (array_key_exists('photo_url', $data)) {
             $url = trim((string) $data['photo_url']);
             $trainer->setPhotoUrl($url !== '' ? $url : null);
@@ -143,6 +147,7 @@ final class StaffTrainerProfileController extends AbstractController
             'name' => $trainer->getName(),
             'specialization' => $trainer->getSpecialization(),
             'description' => $trainer->getDescription(),
+            'phone' => $trainer->getPhone(),
             'rating' => $trainer->getRating() ?? 0.0,
             'photo_url' => self::absolutePublicUrl($request, $trainer->getPhotoUrl()),
             'photo_path' => $trainer->getPhotoUrl(),

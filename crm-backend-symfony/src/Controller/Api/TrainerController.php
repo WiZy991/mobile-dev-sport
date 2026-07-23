@@ -51,6 +51,7 @@ class TrainerController extends AbstractController
             'name' => $trainer->getName(),
             'photo_url' => self::absolutePublicUrl($request, $trainer->getPhotoUrl()),
             'specialization' => $trainer->getSpecialization(),
+            'phone' => $trainer->getPhone(),
             'rating' => $trainer->getRating() ?? 0.0,
             'description' => $trainer->getDescription(),
         ];

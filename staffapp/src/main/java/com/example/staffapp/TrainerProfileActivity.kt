@@ -47,6 +47,7 @@ class TrainerProfileActivity : ComponentActivity() {
                     onNameChange = { uiState = uiState.copy(name = it) },
                     onSpecializationChange = { uiState = uiState.copy(specialization = it) },
                     onDescriptionChange = { uiState = uiState.copy(description = it) },
+                    onPhoneChange = { uiState = uiState.copy(phone = it) },
                     onPickPhoto = { pickPhoto.launch("image/*") },
                     onSave = { saveProfile() },
                     onBack = { finish() },
@@ -66,6 +67,7 @@ class TrainerProfileActivity : ComponentActivity() {
                         name = profile.name,
                         specialization = profile.specialization,
                         description = profile.description,
+                        phone = profile.phone,
                         photoUrl = profile.photoUrl,
                         loading = false,
                     )
@@ -91,6 +93,7 @@ class TrainerProfileActivity : ComponentActivity() {
                         name = uiState.name.trim(),
                         specialization = uiState.specialization.trim(),
                         description = uiState.description.trim(),
+                        phone = uiState.phone.trim(),
                     )
                 }
                 runOnUiThread {
@@ -98,6 +101,7 @@ class TrainerProfileActivity : ComponentActivity() {
                         name = profile.name,
                         specialization = profile.specialization,
                         description = profile.description,
+                        phone = profile.phone,
                         photoUrl = profile.photoUrl ?: uiState.photoUrl,
                         saving = false,
                         statusMessage = "Сохранено. Профиль виден клиентам в разделе «Тренеры».",
