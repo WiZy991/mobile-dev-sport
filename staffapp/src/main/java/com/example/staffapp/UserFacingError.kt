@@ -30,6 +30,7 @@ object UserFacingError {
             raw.startsWith("HTTP ") ->
                 "Ошибка CRM: $raw"
             raw.isBlank() -> "Не удалось выполнить запрос. Повторите попытку."
+            Regex("\\p{IsCyrillic}").containsMatchIn(raw) -> raw
             else -> "Не удалось загрузить данные. Повторите попытку."
         }
     }

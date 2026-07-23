@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -50,7 +51,14 @@ class OnboardingActivity : ComponentActivity() {
                 }
             }
         }
+        handlePaymentDeepLink(intent)
         refreshOnboarding()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePaymentDeepLink(intent)
     }
 
     override fun onResume() {
@@ -60,6 +68,16 @@ class OnboardingActivity : ComponentActivity() {
             pollPayment(paymentId)
         } else {
             refreshOnboarding(silent = true)
+        }
+    }
+
+    private fun handlePaymentDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "staffapp" || data.host != "payment") return
+        val paymentId = data.getQueryParameter("payment_id")?.toIntOrNull()
+        if (paymentId != null && paymentId > 0) {
+            lastPaymentId = paymentId
+            pollPayment(paymentId)
         }
     }
 
@@ -79,14 +97,32 @@ class OnboardingActivity : ComponentActivity() {
             val result = executeWithRefresh {
                 apiClient.initRentalPayment(it, offerAccepted = uiState.offerAccepted)
             }
-            lastPaymentId = result.paymentId
             val url = result.paymentUrl
-            if (!url.isNullOrBlank()) {
-                runOnUiThread {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                }
+            if (url.isNullOrBlank()) {
+                throw IllegalStateException("Не получен URL оплаты Альфа-Банка. Проверьте настройки эквайринга на сервере.")
             }
-            "Откройте страницу оплаты"
+            lastPaymentId = result.paymentId
+            runOnUiThread {
+                openPaymentUrl(url)
+            }
+            "Откройте страницу оплаты Альфа-Банка"
+        }
+    }
+
+    private fun openPaymentUrl(url: String) {
+        try {
+            CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .build()
+                .launchUrl(this, Uri.parse(url))
+        } catch (e: Exception) {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (e2: Exception) {
+                uiState = uiState.copy(
+                    errorMessage = "Не удалось открыть страницу оплаты: ${e2.message ?: e.message}",
+                )
+            }
         }
     }
 

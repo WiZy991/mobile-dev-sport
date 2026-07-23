@@ -147,6 +147,7 @@ services:
     App\Controller\PaymentRedirectController:
         arguments:
             $appBridgeUri: '%env(default:alfa_acquiring_app_bridge_default:ALFA_ACQUIRING_APP_BRIDGE_URI)%'
+            $staffAppBridgeUri: 'staffapp://payment/callback'
 
     App\Controller\Api\AccessController:
         bind:

@@ -34,10 +34,12 @@ class StaffApiClient(private val baseUrl: String) {
             it.write(JSONObject().put("offer_accepted", offerAccepted).toString())
         }
         val json = requireJson(execute(conn))
+        val paymentUrl = json.optString("payment_url").takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("Не получен URL оплаты Альфа-Банка (payment_url пустой)")
         return RentalPaymentResult(
             paymentId = json.getInt("payment_id"),
             status = json.optString("status"),
-            paymentUrl = json.optString("payment_url").takeIf { it.isNotBlank() },
+            paymentUrl = paymentUrl,
             onboarding = parseOnboarding(json.optJSONObject("onboarding") ?: JSONObject()),
         )
     }

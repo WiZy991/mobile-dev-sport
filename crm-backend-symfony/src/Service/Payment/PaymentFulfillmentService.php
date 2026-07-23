@@ -128,9 +128,25 @@ class PaymentFulfillmentService
         }
         $staff->setRentalPaidUntil($base->modify('+1 month'));
 
+        $price = $payment->getAmountKopecks() / 100;
+        $sale = (new Sale())
+            ->setUser(null)
+            ->setClientName($staff->getName() !== '' ? $staff->getName() : $staff->getEmail())
+            ->setProductName('Аренда клуба (тренер) — 1 месяц')
+            ->setQuantity(1)
+            ->setPrice($price)
+            ->setTotal($price)
+            ->setPaymentMethod($this->resolvePaymentMethod($paymentWay));
+        if ($staff->getOrganization() !== null) {
+            $sale->setOrganization($staff->getOrganization());
+        }
+
         $payment->setStatus(Payment::STATUS_PAID)
             ->setPaidAt($now)
-            ->setPaymentWay($paymentWay);
+            ->setPaymentWay($paymentWay)
+            ->setSale($sale);
+
+        $this->em->persist($sale);
         $this->em->flush();
     }
 

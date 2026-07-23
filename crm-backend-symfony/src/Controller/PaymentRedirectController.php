@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\Entity\Payment;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,6 +13,8 @@ class PaymentRedirectController extends AbstractController
 {
     public function __construct(
         private readonly string $appBridgeUri,
+        private readonly string $staffAppBridgeUri,
+        private readonly EntityManagerInterface $em,
     ) {}
 
     #[Route('/payment/success', name: 'payment_success_redirect', methods: ['GET'])]
@@ -36,7 +40,8 @@ class PaymentRedirectController extends AbstractController
             'result' => $result,
         ]));
 
-        $deepLink = $this->appBridgeUri . ($query !== '' ? '?' . $query : '');
+        $bridgeBase = $this->resolveBridgeUri($paymentId, $orderId);
+        $deepLink = $bridgeBase . ($query !== '' ? '?' . $query : '');
 
         $html = <<<HTML
 <!DOCTYPE html>
@@ -61,6 +66,24 @@ class PaymentRedirectController extends AbstractController
 HTML;
 
         return new Response($html, Response::HTTP_OK, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
+    private function resolveBridgeUri(int $paymentId, string $orderId): string
+    {
+        $payment = null;
+        if ($paymentId > 0) {
+            $payment = $this->em->getRepository(Payment::class)->find($paymentId);
+        }
+        if ($payment === null && $orderId !== '') {
+            $payment = $this->em->getRepository(Payment::class)->findOneBy(['alfaOrderId' => $orderId])
+                ?? $this->em->getRepository(Payment::class)->findOneBy(['orderNumber' => $orderId]);
+        }
+
+        if ($payment instanceof Payment && $payment->getType() === Payment::TYPE_TRAINER_RENTAL) {
+            return $this->staffAppBridgeUri !== '' ? $this->staffAppBridgeUri : 'staffapp://payment/callback';
+        }
+
+        return $this->appBridgeUri;
     }
 
     private function jsonEscape(string $value): string
