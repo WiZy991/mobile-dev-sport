@@ -17,9 +17,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.fitnessclub.app.ui.theme.AccentOrange
 import com.fitnessclub.app.ui.theme.Primary
 
@@ -93,13 +95,23 @@ fun TrainerDetailsScreen(
                             .background(Primary.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = (t.name.orEmpty()).split(" ").mapNotNull { it.firstOrNull()?.uppercase() }
-                                .take(2).joinToString(""),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Primary,
-                        )
+                        val photo = t.photoUrl
+                        if (!photo.isNullOrBlank()) {
+                            AsyncImage(
+                                model = photo,
+                                contentDescription = t.name,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        } else {
+                            Text(
+                                text = (t.name.orEmpty()).split(" ").mapNotNull { it.firstOrNull()?.uppercase() }
+                                    .take(2).joinToString(""),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Primary,
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(

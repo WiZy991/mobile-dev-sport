@@ -6,6 +6,7 @@ use App\Entity\Trainer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route('/api/v1/trainers')]
@@ -16,26 +17,19 @@ class TrainerController extends AbstractController
     ) {}
 
     #[Route('', name: 'api_trainers_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
         $trainers = $this->em->getRepository(Trainer::class)->findAll();
 
-        $data = array_map(static function (Trainer $t) {
-            return [
-                'id' => 'trainer-' . $t->getId(),
-                'name' => $t->getName(),
-                'photo_url' => $t->getPhotoUrl(),
-                'specialization' => $t->getSpecialization(),
-                'rating' => $t->getRating() ?? 0.0,
-                'description' => $t->getDescription(),
-            ];
+        $data = array_map(function (Trainer $t) use ($request) {
+            return $this->serialize($t, $request);
         }, $trainers);
 
         return $this->json($data);
     }
 
     #[Route('/{id}', name: 'api_trainers_show', methods: ['GET'])]
-    public function show(string $id): JsonResponse
+    public function show(string $id, Request $request): JsonResponse
     {
         $numericId = str_starts_with($id, 'trainer-') ? (int) substr($id, 8) : (int) $id;
 
@@ -46,14 +40,33 @@ class TrainerController extends AbstractController
             return $this->json(['error' => 'Not found'], 404);
         }
 
-        return $this->json([
+        return $this->json($this->serialize($trainer, $request));
+    }
+
+    /** @return array<string, mixed> */
+    private function serialize(Trainer $trainer, Request $request): array
+    {
+        return [
             'id' => 'trainer-' . $trainer->getId(),
             'name' => $trainer->getName(),
-            'photo_url' => $trainer->getPhotoUrl(),
+            'photo_url' => self::absolutePublicUrl($request, $trainer->getPhotoUrl()),
             'specialization' => $trainer->getSpecialization(),
             'rating' => $trainer->getRating() ?? 0.0,
             'description' => $trainer->getDescription(),
-        ]);
+        ];
+    }
+
+    private static function absolutePublicUrl(Request $request, ?string $path): ?string
+    {
+        if ($path === null || trim($path) === '') {
+            return null;
+        }
+        $path = trim($path);
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+        $base = $request->getSchemeAndHttpHost();
+
+        return str_starts_with($path, '/') ? $base . $path : $base . '/' . $path;
     }
 }
-

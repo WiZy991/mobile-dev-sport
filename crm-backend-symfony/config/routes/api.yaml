@@ -418,6 +418,21 @@ api_staff_training_create:
   controller: App\Controller\Api\StaffBookingController::create
   methods: [POST]
 
+api_staff_trainer_profile_get:
+  path: /api/v1/staff/trainer-profile
+  controller: App\Controller\Api\StaffTrainerProfileController::get
+  methods: [GET]
+
+api_staff_trainer_profile_update:
+  path: /api/v1/staff/trainer-profile
+  controller: App\Controller\Api\StaffTrainerProfileController::update
+  methods: [PUT, PATCH]
+
+api_staff_trainer_profile_photo:
+  path: /api/v1/staff/trainer-profile/photo
+  controller: App\Controller\Api\StaffTrainerProfileController::uploadPhoto
+  methods: [POST]
+
 api_staff_booking_cancel:
   path: /api/v1/staff/bookings/{id}
   controller: App\Controller\Api\StaffBookingController::cancel

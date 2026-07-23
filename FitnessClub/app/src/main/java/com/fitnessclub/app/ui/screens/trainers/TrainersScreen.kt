@@ -14,9 +14,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.fitnessclub.app.ui.theme.*
 
 data class TrainerInfo(
@@ -26,7 +28,8 @@ data class TrainerInfo(
     val rating: Float,
     val reviewsCount: Int,
     val experience: String,
-    val description: String
+    val description: String,
+    val photoUrl: String? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,12 +125,21 @@ private fun TrainerCard(
                     .background(Primary.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = trainer.name.split(" ").mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString(""),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Primary
-                )
+                if (!trainer.photoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = trainer.photoUrl,
+                        contentDescription = trainer.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Text(
+                        text = trainer.name.split(" ").mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString(""),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Primary
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.width(16.dp))

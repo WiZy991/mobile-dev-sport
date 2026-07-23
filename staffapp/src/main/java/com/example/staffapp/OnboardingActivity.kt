@@ -153,9 +153,16 @@ class OnboardingActivity : ComponentActivity() {
     }
 
     private fun openWork() {
-        runOnUiThread {
-            startActivity(Intent(this, WorkActivity::class.java))
-            finish()
+        thread {
+            try {
+                val cfg = executeWithRefresh { apiClient.loadConfig(it) }
+                store.saveConfig(cfg)
+            } catch (_: Exception) {
+            }
+            runOnUiThread {
+                startActivity(Intent(this, WorkActivity::class.java))
+                finish()
+            }
         }
     }
 

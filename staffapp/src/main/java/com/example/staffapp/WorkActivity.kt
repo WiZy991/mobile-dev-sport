@@ -210,6 +210,7 @@ class WorkActivity : ComponentActivity() {
     private fun handleAction(actionId: String) {
         when {
             actionId == "open_admin" -> startActivity(Intent(this, AdminActivity::class.java))
+            actionId == "edit_trainer_profile" -> startActivity(Intent(this, TrainerProfileActivity::class.java))
             actionId == "retry" -> selectTab(uiState.selectedTab)
             actionId == "mark_notifications_read" -> {
                 runAsyncForTab(uiState.selectedTab, "Сохранение...") {
@@ -240,7 +241,7 @@ class WorkActivity : ComponentActivity() {
 
     private fun updateNavVisibility() {
         config = store.loadConfig() ?: config
-        val sections = config?.appSections.orEmpty()
+        val sections = (config?.appSections.orEmpty() + allowedSections).distinct()
         val adminSections = config?.adminSections.orEmpty()
         uiState = uiState.copy(
             showScheduleNav = sections.contains("schedule") || adminSections.contains("schedule"),
@@ -257,6 +258,9 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun loadData() = runAsync("Загрузка...") {
+        val cfg = withRefresh { token -> apiClient.loadConfig(token) }
+        config = cfg
+        store.saveConfig(cfg)
         val data = withRefresh { token -> apiClient.loadAppData(token) }
         appData = data
         allowedSections = data.sections
@@ -321,7 +325,10 @@ class WorkActivity : ComponentActivity() {
         )
         val data = appData ?: return
         val role = primaryRole()
-        val showAdmin = !config?.adminSections.isNullOrEmpty() || allowedSections.contains("admin")
+        val showAdmin = config?.adminActions?.contains("admin.write") == true
+            || role == "ROLE_ADMIN"
+            || role == "ROLE_SUPER_ADMIN"
+            || role == "ROLE_MANAGER"
         val metrics = data.metrics.map { (key, value) ->
             MetricUi(UiLabels.metricTitle(key), value.toString())
         }
@@ -596,7 +603,10 @@ class WorkActivity : ComponentActivity() {
         config = store.loadConfig() ?: config
         val data = appData
         val sections = if (allowedSections.isNotEmpty()) allowedSections else config?.appSections.orEmpty()
-        val adminAvailable = !config?.adminSections.isNullOrEmpty() || sections.contains("admin")
+        val adminAvailable = config?.adminActions?.contains("admin.write") == true
+            || primaryRole() in setOf("ROLE_ADMIN", "ROLE_SUPER_ADMIN", "ROLE_MANAGER")
+        val showTrainerEdit = primaryRole() == "ROLE_TRAINER"
+            || (config?.roles.orEmpty() + appData?.roles.orEmpty()).contains("ROLE_TRAINER")
         uiState = uiState.copy(
             screenTitle = "Профиль",
             profile = ProfileTabUi(
@@ -604,6 +614,7 @@ class WorkActivity : ComponentActivity() {
                 email = data?.employeeEmail ?: "",
                 roleTitle = UiLabels.roleTitle(primaryRole()),
                 sections = sections
+                    .distinct()
                     .filterNot { it == "home" || it == "profile" || it == "admin" }
                     .map { key ->
                         ProfileSectionUi(
@@ -614,6 +625,7 @@ class WorkActivity : ComponentActivity() {
                     },
                 adminAvailable = adminAvailable,
                 showAdminButton = adminAvailable,
+                showTrainerProfileEdit = showTrainerEdit,
                 loading = data == null,
             ),
             errorMessage = null,
@@ -961,12 +973,14 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun primaryRole(): String {
-        val roles = config?.roles.orEmpty()
+        val roles = (config?.roles.orEmpty() + appData?.roles.orEmpty()).distinct()
         val priority = listOf(
             "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_TRAINER", "ROLE_MANAGER",
             "ROLE_SUPPORT", "ROLE_FINANCE", "ROLE_VIEWER",
         )
-        return priority.firstOrNull { roles.contains(it) } ?: roles.firstOrNull() ?: "ROLE_VIEWER"
+        return priority.firstOrNull { roles.contains(it) }
+            ?: roles.firstOrNull { it != "ROLE_STAFF" }
+            ?: "ROLE_VIEWER"
     }
 
     private fun todayDate(): String {

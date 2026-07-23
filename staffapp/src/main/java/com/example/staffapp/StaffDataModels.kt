@@ -3,8 +3,18 @@ package com.example.staffapp
 data class StaffAppData(
     val employeeName: String,
     val employeeEmail: String,
+    val roles: List<String> = emptyList(),
     val sections: List<String>,
     val metrics: Map<String, Int>,
+)
+
+data class TrainerPublicProfile(
+    val id: String?,
+    val name: String,
+    val specialization: String,
+    val description: String,
+    val rating: Float,
+    val photoUrl: String?,
 )
 
 data class StaffAdminData(

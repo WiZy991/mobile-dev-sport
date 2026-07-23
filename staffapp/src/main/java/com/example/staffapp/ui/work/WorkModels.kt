@@ -110,6 +110,7 @@ data class ProfileTabUi(
     val sections: List<ProfileSectionUi> = emptyList(),
     val adminAvailable: Boolean = false,
     val showAdminButton: Boolean = false,
+    val showTrainerProfileEdit: Boolean = false,
     val sectionTitle: String? = null,
     val items: List<ListCardUi> = emptyList(),
     val loading: Boolean = false,

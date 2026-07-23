@@ -102,6 +102,61 @@ class StaffApiClient(private val baseUrl: String) {
         return execute(conn).code in 200..299
     }
 
+    fun loadTrainerProfile(token: String): TrainerPublicProfile {
+        val conn = openConnection("/api/v1/staff/trainer-profile", "GET")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        return parseTrainerProfile(requireJson(execute(conn)))
+    }
+
+    fun updateTrainerProfile(
+        token: String,
+        name: String,
+        specialization: String,
+        description: String,
+    ): TrainerPublicProfile {
+        val conn = openConnection("/api/v1/staff/trainer-profile", "PUT")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        val payload = JSONObject()
+            .put("name", name)
+            .put("specialization", specialization)
+            .put("description", description)
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+        return parseTrainerProfile(requireJson(execute(conn)))
+    }
+
+    fun uploadTrainerPhoto(token: String, imageBytes: ByteArray, mimeType: String, fileName: String): TrainerPublicProfile {
+        val boundary = "Boundary-${System.currentTimeMillis()}"
+        val conn = openConnection("/api/v1/staff/trainer-profile/photo", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+        conn.doOutput = true
+        conn.outputStream.use { out ->
+            val writer = OutputStreamWriter(out, Charsets.UTF_8)
+            writer.append("--$boundary\r\n")
+            writer.append("Content-Disposition: form-data; name=\"photo\"; filename=\"$fileName\"\r\n")
+            writer.append("Content-Type: $mimeType\r\n\r\n")
+            writer.flush()
+            out.write(imageBytes)
+            out.flush()
+            writer.append("\r\n--$boundary--\r\n")
+            writer.flush()
+        }
+        return parseTrainerProfile(requireJson(execute(conn)))
+    }
+
+    private fun parseTrainerProfile(json: JSONObject): TrainerPublicProfile {
+        return TrainerPublicProfile(
+            id = json.optString("id").takeIf { it.isNotBlank() },
+            name = json.optString("name"),
+            specialization = json.optString("specialization"),
+            description = json.optString("description"),
+            rating = json.optDouble("rating", 0.0).toFloat(),
+            photoUrl = json.optString("photo_url").takeIf { it.isNotBlank() },
+        )
+    }
+
     fun login(email: String, password: String): AuthResult {
         val payload = JSONObject()
             .put("email", email)
@@ -152,6 +207,7 @@ class StaffApiClient(private val baseUrl: String) {
         return StaffAppData(
             employeeName = employee.optString("name"),
             employeeEmail = employee.optString("email"),
+            roles = employee.optJSONArray("roles").toStringList(),
             sections = json.optJSONArray("sections").toStringList(),
             metrics = metricsJson.toIntMap(),
         )

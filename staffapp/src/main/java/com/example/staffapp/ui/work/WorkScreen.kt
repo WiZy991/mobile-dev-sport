@@ -404,6 +404,14 @@ private fun ProfileTabContent(
                 StaffInfoBanner(profile.email, color = StaffOnSurfaceVariant)
             }
         }
+        if (profile.showTrainerProfileEdit) {
+            item {
+                StaffPrimaryButton(
+                    text = "Редактировать профиль тренера",
+                    onClick = { onAction("edit_trainer_profile") },
+                )
+            }
+        }
         if (profile.showAdminButton) {
             item {
                 StaffPrimaryButton(text = "Открыть админку", onClick = { onAction("open_admin") })

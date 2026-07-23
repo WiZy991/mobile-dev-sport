@@ -27,6 +27,7 @@
         <activity android:name=".AdminActivity" />
         <activity android:name=".AdminSectionActivity" />
         <activity android:name=".ClientDetailActivity" />
+        <activity android:name=".TrainerProfileActivity" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
