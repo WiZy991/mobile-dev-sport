@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
@@ -33,6 +35,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -79,6 +82,15 @@ fun WorkScreen(
     onAssignBook: (Int) -> Unit = {},
     onAssignCancelBooking: (String) -> Unit = {},
     onAssignDismiss: () -> Unit = {},
+    onCreateSessionClick: () -> Unit = {},
+    onCreateNameChange: (String) -> Unit = {},
+    onCreateTypeChange: (String) -> Unit = {},
+    onCreateStartTimeChange: (String) -> Unit = {},
+    onCreateEndTimeChange: (String) -> Unit = {},
+    onCreateRoomChange: (String) -> Unit = {},
+    onCreateMaxParticipantsChange: (String) -> Unit = {},
+    onCreateConfirm: () -> Unit = {},
+    onCreateDismiss: () -> Unit = {},
 ) {
     state.assignDialog?.let { dialog ->
         AssignClientDialog(
@@ -88,6 +100,19 @@ fun WorkScreen(
             onBookClient = onAssignBook,
             onCancelBooking = onAssignCancelBooking,
             onDismiss = onAssignDismiss,
+        )
+    }
+    state.createSessionDialog?.let { dialog ->
+        CreateSessionDialog(
+            state = dialog,
+            onNameChange = onCreateNameChange,
+            onTypeChange = onCreateTypeChange,
+            onStartTimeChange = onCreateStartTimeChange,
+            onEndTimeChange = onCreateEndTimeChange,
+            onRoomChange = onCreateRoomChange,
+            onMaxParticipantsChange = onCreateMaxParticipantsChange,
+            onCreate = onCreateConfirm,
+            onDismiss = onCreateDismiss,
         )
     }
     val navItems = buildList {
@@ -124,6 +149,17 @@ fun WorkScreen(
                     actionIconContentColor = androidx.compose.ui.graphics.Color.White,
                 ),
             )
+        },
+        floatingActionButton = {
+            if (state.selectedTab == WorkUiState.TAB_SCHEDULE && state.showScheduleNav && !state.schedule.denied) {
+                FloatingActionButton(
+                    onClick = onCreateSessionClick,
+                    containerColor = StaffPrimary,
+                    contentColor = Color.White,
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Создать запись")
+                }
+            }
         },
         bottomBar = {
             NavigationBar(

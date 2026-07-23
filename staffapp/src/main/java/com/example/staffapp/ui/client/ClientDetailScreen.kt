@@ -65,7 +65,7 @@ fun ClientDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.title, fontWeight = FontWeight.SemiBold) },
+                title = { Text("Клиент", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")

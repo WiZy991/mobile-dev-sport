@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import com.example.staffapp.ui.theme.StaffTheme
 import com.example.staffapp.ui.work.ActionUi
 import com.example.staffapp.ui.work.AssignClientDialogUi
+import com.example.staffapp.ui.work.CreateSessionDialogUi
 import com.example.staffapp.ui.work.ProfileSectionUi
 import com.example.staffapp.ui.work.SectionHints
 import com.example.staffapp.ui.work.BadgeColor
@@ -106,6 +107,48 @@ class WorkActivity : ComponentActivity() {
                     onAssignBook = { bookAssignClient(it) },
                     onAssignCancelBooking = { cancelAssignBooking(it) },
                     onAssignDismiss = { uiState = uiState.copy(assignDialog = null) },
+                    onCreateSessionClick = { openCreateSessionDialog() },
+                    onCreateNameChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(name = v))
+                        }
+                    },
+                    onCreateTypeChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(
+                                createSessionDialog = it.copy(
+                                    type = v,
+                                    maxParticipants = if (v == "personal") "1" else it.maxParticipants.ifBlank { "10" },
+                                    name = when (v) {
+                                        "group" -> if (it.name.contains("Персональ", true)) "Групповое занятие" else it.name
+                                        else -> if (it.name.contains("Группов", true)) "Персональная тренировка" else it.name
+                                    },
+                                ),
+                            )
+                        }
+                    },
+                    onCreateStartTimeChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(startTime = v))
+                        }
+                    },
+                    onCreateEndTimeChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(endTime = v))
+                        }
+                    },
+                    onCreateRoomChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(room = v))
+                        }
+                    },
+                    onCreateMaxParticipantsChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(maxParticipants = v))
+                        }
+                    },
+                    onCreateConfirm = { createSession() },
+                    onCreateDismiss = { uiState = uiState.copy(createSessionDialog = null) },
                 )
             }
         }
@@ -683,6 +726,74 @@ class WorkActivity : ComponentActivity() {
             ),
         )
         searchAssignClients()
+    }
+
+    private fun openCreateSessionDialog() {
+        val date = selectedScheduleDate ?: todayDate()
+        uiState = uiState.copy(
+            createSessionDialog = CreateSessionDialogUi(date = date),
+        )
+    }
+
+    private fun createSession() {
+        val dialog = uiState.createSessionDialog ?: return
+        val startTime = normalizeTime(dialog.startTime) ?: run {
+            uiState = uiState.copy(
+                createSessionDialog = dialog.copy(errorMessage = "Укажите время начала в формате ЧЧ:ММ"),
+            )
+            return
+        }
+        val endTime = normalizeTime(dialog.endTime) ?: run {
+            uiState = uiState.copy(
+                createSessionDialog = dialog.copy(errorMessage = "Укажите время окончания в формате ЧЧ:ММ"),
+            )
+            return
+        }
+        val max = dialog.maxParticipants.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        uiState = uiState.copy(createSessionDialog = dialog.copy(loading = true, errorMessage = null))
+        thread {
+            try {
+                val created = withRefresh { token ->
+                    apiClient.createTraining(
+                        token = token,
+                        name = dialog.name.trim().ifBlank { "Персональная тренировка" },
+                        type = dialog.type,
+                        startAtIso = "${dialog.date}T$startTime:00",
+                        endAtIso = "${dialog.date}T$endTime:00",
+                        room = dialog.room.trim().ifBlank { null },
+                        maxParticipants = if (dialog.type == "personal") 1 else max,
+                    )
+                }
+                runOnUiThread {
+                    uiState = uiState.copy(
+                        createSessionDialog = null,
+                        statusMessage = "Занятие создано",
+                    )
+                    selectedScheduleDate = created.date.ifBlank { dialog.date }
+                    showScheduleTab()
+                    scheduleToSession(created).let { openAssignDialog(it) }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState.createSessionDialog?.let {
+                        uiState = uiState.copy(
+                            createSessionDialog = it.copy(
+                                loading = false,
+                                errorMessage = UserFacingError.message(e),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun normalizeTime(raw: String): String? {
+        val m = Regex("""^(\d{1,2}):(\d{2})$""").find(raw.trim()) ?: return null
+        val h = m.groupValues[1].toIntOrNull() ?: return null
+        val min = m.groupValues[2].toIntOrNull() ?: return null
+        if (h !in 0..23 || min !in 0..59) return null
+        return "%02d:%02d".format(h, min)
     }
 
     private fun searchAssignClients() {

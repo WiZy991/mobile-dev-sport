@@ -56,6 +56,35 @@ class StaffApiClient(private val baseUrl: String) {
         )
     }
 
+    fun createTraining(
+        token: String,
+        name: String,
+        type: String,
+        startAtIso: String,
+        endAtIso: String,
+        room: String?,
+        maxParticipants: Int,
+        clientId: Int? = null,
+    ): ScheduleItem {
+        val conn = openConnection("/api/v1/staff/trainings", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        val payload = JSONObject()
+            .put("name", name)
+            .put("type", type)
+            .put("start_at", startAtIso)
+            .put("end_at", endAtIso)
+            .put("max_participants", maxParticipants)
+        if (!room.isNullOrBlank()) payload.put("room", room)
+        if (clientId != null) payload.put("client_id", clientId)
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+        val json = requireJson(execute(conn))
+        val training = json.optJSONObject("training")
+            ?: throw IllegalStateException("Сервер не вернул созданное занятие")
+        return parseScheduleItem(training)
+    }
+
     fun bookClientOnTraining(token: String, trainingId: String, clientId: Int): Boolean {
         val conn = openConnection("/api/v1/staff/trainings/$trainingId/book", "POST")
         conn.setRequestProperty("Authorization", "Bearer $token")
@@ -169,39 +198,43 @@ class StaffApiClient(private val baseUrl: String) {
         val items = mutableListOf<ScheduleItem>()
         for (i in 0 until rows.length()) {
             val row = rows.optJSONObject(i) ?: continue
-            val bookingRows = row.optJSONArray("bookings")
-            val bookings = mutableListOf<ScheduleBookingRow>()
-            if (bookingRows != null) {
-                for (j in 0 until bookingRows.length()) {
-                    val b = bookingRows.optJSONObject(j) ?: continue
-                    bookings += ScheduleBookingRow(
-                        id = b.optString("id"),
-                        clientName = b.optString("client_name"),
-                        clientId = b.optString("client_id").takeIf { it.isNotBlank() },
-                        status = b.optString("status"),
-                    )
-                }
-            }
-            items += ScheduleItem(
-                id = row.optString("id").takeIf { it.isNotBlank() },
-                title = row.optString("title"),
-                trainer = row.optString("trainer"),
-                type = row.optString("type"),
-                date = row.optString("date"),
-                dayLabel = row.optString("dayLabel"),
-                startTime = row.optString("startTime"),
-                endTime = row.optString("endTime"),
-                startAt = row.optString("startAt"),
-                endAt = row.optString("endAt"),
-                room = row.optString("room"),
-                clientNames = row.optJSONArray("clientNames").toStringList(),
-                bookings = bookings,
-                participants = row.optString("participants"),
-                maxParticipants = row.optInt("maxParticipants").takeIf { row.has("maxParticipants") },
-                currentParticipants = row.optInt("currentParticipants").takeIf { row.has("currentParticipants") },
-            )
+            items += parseScheduleItem(row)
         }
         return ScheduleData(days = days, items = items)
+    }
+
+    private fun parseScheduleItem(row: JSONObject): ScheduleItem {
+        val bookingRows = row.optJSONArray("bookings")
+        val bookings = mutableListOf<ScheduleBookingRow>()
+        if (bookingRows != null) {
+            for (j in 0 until bookingRows.length()) {
+                val b = bookingRows.optJSONObject(j) ?: continue
+                bookings += ScheduleBookingRow(
+                    id = b.optString("id"),
+                    clientName = b.optString("client_name"),
+                    clientId = b.optString("client_id").takeIf { it.isNotBlank() },
+                    status = b.optString("status"),
+                )
+            }
+        }
+        return ScheduleItem(
+            id = row.optString("id").takeIf { it.isNotBlank() },
+            title = row.optString("title"),
+            trainer = row.optString("trainer"),
+            type = row.optString("type"),
+            date = row.optString("date"),
+            dayLabel = row.optString("dayLabel"),
+            startTime = row.optString("startTime"),
+            endTime = row.optString("endTime"),
+            startAt = row.optString("startAt"),
+            endAt = row.optString("endAt"),
+            room = row.optString("room"),
+            clientNames = row.optJSONArray("clientNames").toStringList(),
+            bookings = bookings,
+            participants = row.optString("participants"),
+            maxParticipants = row.optInt("maxParticipants").takeIf { row.has("maxParticipants") },
+            currentParticipants = row.optInt("currentParticipants").takeIf { row.has("currentParticipants") },
+        )
     }
 
     fun loadList(token: String, section: String): List<FeedListItem> {

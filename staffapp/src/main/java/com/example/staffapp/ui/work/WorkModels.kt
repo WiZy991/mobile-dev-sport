@@ -129,6 +129,7 @@ data class WorkUiState(
     val support: SupportTabUi = SupportTabUi(),
     val profile: ProfileTabUi = ProfileTabUi(),
     val assignDialog: AssignClientDialogUi? = null,
+    val createSessionDialog: CreateSessionDialogUi? = null,
 ) {
     companion object {
         const val TAB_HOME = 1

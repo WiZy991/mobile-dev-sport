@@ -413,6 +413,11 @@ api_staff_training_book:
   controller: App\Controller\Api\StaffBookingController::book
   methods: [POST]
 
+api_staff_training_create:
+  path: /api/v1/staff/trainings
+  controller: App\Controller\Api\StaffBookingController::create
+  methods: [POST]
+
 api_staff_booking_cancel:
   path: /api/v1/staff/bookings/{id}
   controller: App\Controller\Api\StaffBookingController::cancel

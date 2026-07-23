@@ -100,7 +100,7 @@ fun StaffScheduleTabContent(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Нет тренировок на выбранную дату",
+                        text = "Нет тренировок на выбранную дату.\nНажмите +, чтобы создать запись.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
