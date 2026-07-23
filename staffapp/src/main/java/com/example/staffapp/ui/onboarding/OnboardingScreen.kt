@@ -21,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.staffapp.ui.components.StaffErrorState
@@ -45,11 +44,11 @@ data class OnboardingUiState(
 fun OnboardingScreen(
     state: OnboardingUiState,
     onOfferAcceptedChange: (Boolean) -> Unit,
+    onOpenOffer: () -> Unit,
     onPayClick: () -> Unit,
     onRefresh: () -> Unit,
     onLogout: () -> Unit,
 ) {
-    val uriHandler = LocalUriHandler.current
     Surface(modifier = Modifier.fillMaxSize(), color = StaffPrimary) {
         Column(
             modifier = Modifier
@@ -112,8 +111,8 @@ fun OnboardingScreen(
                                 "Без оплаты доступ к рабочим разделам закрыт.",
                                 color = StaffOnSurfaceVariant,
                             )
-                            TextButton(onClick = { uriHandler.openUri(state.offerUrl) }) {
-                                Text("Открыть публичную оферту Доброзал")
+                            TextButton(onClick = onOpenOffer) {
+                                Text("Открыть публичную оферту Доброзал", color = StaffPrimary)
                             }
                             RowAccept(
                                 accepted = state.offerAccepted,

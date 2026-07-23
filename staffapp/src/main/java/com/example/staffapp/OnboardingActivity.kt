@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.staffapp.ui.legal.LegalPdfScreen
 import com.example.staffapp.ui.onboarding.OnboardingScreen
 import com.example.staffapp.ui.onboarding.OnboardingUiState
 import com.example.staffapp.ui.theme.StaffTheme
@@ -20,6 +21,7 @@ class OnboardingActivity : ComponentActivity() {
     private var lastPaymentId: Int? = null
 
     private var uiState by mutableStateOf(OnboardingUiState())
+    private var showOfferPdf by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,13 +36,18 @@ class OnboardingActivity : ComponentActivity() {
 
         setContent {
             StaffTheme {
-                OnboardingScreen(
-                    state = uiState,
-                    onOfferAcceptedChange = { uiState = uiState.copy(offerAccepted = it) },
-                    onPayClick = { startPayment() },
-                    onRefresh = { refreshOnboarding() },
-                    onLogout = { logout() },
-                )
+                if (showOfferPdf) {
+                    LegalPdfScreen(onNavigateBack = { showOfferPdf = false })
+                } else {
+                    OnboardingScreen(
+                        state = uiState,
+                        onOfferAcceptedChange = { uiState = uiState.copy(offerAccepted = it) },
+                        onOpenOffer = { showOfferPdf = true },
+                        onPayClick = { startPayment() },
+                        onRefresh = { refreshOnboarding() },
+                        onLogout = { logout() },
+                    )
+                }
             }
         }
         refreshOnboarding()
