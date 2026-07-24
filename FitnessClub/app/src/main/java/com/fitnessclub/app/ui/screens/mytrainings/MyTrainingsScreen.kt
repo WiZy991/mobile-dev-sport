@@ -333,6 +333,7 @@ private fun EmptyBookingsState() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
     }
 }
 

@@ -24,7 +24,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Keyboard
@@ -37,11 +36,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -114,12 +109,7 @@ fun RegisterScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     var birthPickerOpen by remember { mutableStateOf(false) }
-    var typeMenuExpanded by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
-
-    LaunchedEffect(scrollState.value) {
-        typeMenuExpanded = false
-    }
 
     LaunchedEffect(uiState.showValidationErrors, uiState.validationSummary, uiState.formStep) {
         if (uiState.validationSummary != null) {
@@ -225,8 +215,6 @@ fun RegisterScreen(
                 RegisterFormStep.PERSONAL -> RegisterPersonalStep(
                     uiState = uiState,
                     viewModel = viewModel,
-                    typeMenuExpanded = typeMenuExpanded,
-                    onTypeMenuExpandedChange = { typeMenuExpanded = it },
                     birthPickerOpen = { birthPickerOpen = true },
                     focusManager = focusManager,
                 )
@@ -279,7 +267,6 @@ fun RegisterScreen(
                 val isLastStep = uiState.formStep == RegisterFormStep.ACCOUNT
                 Button(
                     onClick = {
-                        typeMenuExpanded = false
                         focusManager.clearFocus()
                         viewModel.onPrimaryFormAction()
                     },
@@ -389,13 +376,10 @@ private fun RegisterStepIndicator(current: RegisterFormStep) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RegisterPersonalStep(
     uiState: RegisterUiState,
     viewModel: RegisterViewModel,
-    typeMenuExpanded: Boolean,
-    onTypeMenuExpandedChange: (Boolean) -> Unit,
     birthPickerOpen: () -> Unit,
     focusManager: FocusManager,
 ) {
@@ -405,39 +389,6 @@ private fun RegisterPersonalStep(
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.padding(bottom = 12.dp),
     )
-    ExposedDropdownMenuBox(
-        expanded = typeMenuExpanded,
-        onExpandedChange = onTypeMenuExpandedChange,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        TextField(
-            value = uiState.registrationType.label,
-            onValueChange = {},
-            readOnly = true,
-            textStyle = orangeRegisterInputTextStyle(),
-            label = { Text("Тип регистрации", color = Color.White.copy(0.78f)) },
-            trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeMenuExpanded)
-            },
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
-            colors = orangeFieldColors(),
-        )
-        DropdownMenu(
-            expanded = typeMenuExpanded,
-            onDismissRequest = { onTypeMenuExpandedChange(false) },
-            modifier = Modifier.exposedDropdownSize(matchTextFieldWidth = true),
-        ) {
-            RegistrationTypeOption.entries.forEach { opt ->
-                DropdownMenuItem(
-                    text = { Text(opt.label) },
-                    onClick = {
-                        viewModel.onRegistrationTypeChange(opt)
-                        onTypeMenuExpandedChange(false)
-                    },
-                )
-            }
-        }
-    }
 
     OrangeOutlineField(
         value = uiState.lastName,
@@ -793,7 +744,7 @@ private fun OrangeOutlineField(
     )
 }
 
-/** Поля на оранжевом фоне: белый текст/курсор; палитра темы не подменяет onSurface (нужно для DropdownMenu). */
+/** Поля на оранжевом фоне: белый текст/курсор. */
 @Composable
 private fun orangeFieldColors() = TextFieldDefaults.colors(
     focusedTextColor = Color.White,

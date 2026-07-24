@@ -23,11 +23,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-enum class RegistrationTypeOption(val label: String, val apiValue: String) {
-    CLIENT("Я клиент", "client"),
-    COACH("Я тренер", "coach")
-}
-
 enum class GenderOption(val label: String, val apiValue: String) {
     MALE("Муж", "male"),
     FEMALE("Жен", "female")
@@ -43,7 +38,8 @@ data class PassportDraft(
     val streetHouse: String = ""
 ) {
     fun isCompleteForRegister(): Boolean =
-        series.isNotBlank() && number.isNotBlank() &&
+        series.length == 4 && series.all { it.isDigit() } &&
+            number.length == 6 && number.all { it.isDigit() } &&
             issuedBy.isNotBlank() && issuedDateDisplay.isNotBlank() &&
             region.isNotBlank() && city.isNotBlank() && streetHouse.isNotBlank()
 }
@@ -65,7 +61,6 @@ data class RegisterUiState(
     /** Ошибка сети/API при загрузке клубов (отличается от пустого списка) */
     val clubsLoadError: String? = null,
     val selectedClub: ClubItem? = null,
-    val registrationType: RegistrationTypeOption = RegistrationTypeOption.CLIENT,
     val lastName: String = "",
     val firstName: String = "",
     val middleName: String = "",
@@ -217,10 +212,6 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-    fun onRegistrationTypeChange(option: RegistrationTypeOption) {
-        updateForm { it.copy(registrationType = option) }
-    }
-
     fun onLastNameChange(v: String) {
         updateForm { it.copy(lastName = v, lastNameError = null) }
     }
@@ -291,7 +282,7 @@ class RegisterViewModel @Inject constructor(
     fun onPassportSeriesChange(v: String) {
         updateForm {
             it.copy(
-                passport = it.passport.copy(series = v.take(5)),
+                passport = it.passport.copy(series = v.filter { c -> c.isDigit() }.take(4)),
                 passportError = null,
             )
         }
@@ -300,7 +291,7 @@ class RegisterViewModel @Inject constructor(
     fun onPassportNumberChange(v: String) {
         updateForm {
             it.copy(
-                passport = it.passport.copy(number = v.take(7)),
+                passport = it.passport.copy(number = v.filter { c -> c.isDigit() }.take(6)),
                 passportError = null,
             )
         }
@@ -349,14 +340,18 @@ class RegisterViewModel @Inject constructor(
     /** Валидация экрана паспорта перед возвратом. */
     fun validatePassportDraft(): Boolean {
         val p = _uiState.value.passport
-        var ok = true
-        if (p.series.isBlank()) ok = false
-        if (p.number.isBlank()) ok = false
+        val seriesOk = p.series.length == 4 && p.series.all { it.isDigit() }
+        val numberOk = p.number.length == 6 && p.number.all { it.isDigit() }
+        var ok = seriesOk && numberOk
         if (p.issuedBy.isBlank()) ok = false
         if (parseToIsoDate(p.issuedDateDisplay) == null) ok = false
         if (p.region.isBlank() || p.city.isBlank() || p.streetHouse.isBlank()) ok = false
         if (!ok) {
-            _uiState.value = _uiState.value.copy(passportError = "Заполните все поля паспорта корректно")
+            val message = when {
+                !seriesOk || !numberOk -> "Серия — 4 цифры, номер — 6 цифр"
+                else -> "Заполните все поля паспорта корректно"
+            }
+            _uiState.value = _uiState.value.copy(passportError = message)
         } else {
             _uiState.value = _uiState.value.copy(passportError = null)
         }
@@ -498,7 +493,7 @@ class RegisterViewModel @Inject constructor(
             password = state.password,
             phone = phoneApi,
             name = fullName,
-            registrationType = state.registrationType.apiValue,
+            registrationType = "client",
             dateOfBirth = birthIso,
             gender = state.gender!!.apiValue,
             passportSeries = state.passport.series,
@@ -608,7 +603,13 @@ class RegisterViewModel @Inject constructor(
             }
             RegisterFormStep.PASSPORT -> {
                 if (!state.passport.isCompleteForRegister()) {
-                    errors = errors.copy(passportError = "Заполните все поля паспорта")
+                    val p = state.passport
+                    val msg = when {
+                        p.series.length != 4 || p.number.length != 6 ->
+                            "Серия паспорта — 4 цифры, номер — 6 цифр"
+                        else -> "Заполните все поля паспорта"
+                    }
+                    errors = errors.copy(passportError = msg)
                 } else if (parseToIsoDate(state.passport.issuedDateDisplay) == null) {
                     errors = errors.copy(passportError = "Неверная дата выдачи паспорта")
                 }

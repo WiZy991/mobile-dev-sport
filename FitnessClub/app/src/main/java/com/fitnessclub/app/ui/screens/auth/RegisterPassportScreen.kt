@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.ui.theme.Primary
 
@@ -108,11 +110,13 @@ fun RegisterPassportScreen(
                         value = p.series,
                         onValueChange = viewModel::onPassportSeriesChange,
                         label = { Text("Серия паспорта") },
+                        placeholder = { Text("0000") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = lightFieldColors()
                     )
-                    Text("${p.series.length}/5", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text("${p.series.length}/4", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 }
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
@@ -120,11 +124,13 @@ fun RegisterPassportScreen(
                         value = p.number,
                         onValueChange = viewModel::onPassportNumberChange,
                         label = { Text("Номер паспорта") },
+                        placeholder = { Text("000000") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = lightFieldColors()
                     )
-                    Text("${p.number.length}/7", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text("${p.number.length}/6", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 }
             }
             Spacer(Modifier.height(12.dp))
