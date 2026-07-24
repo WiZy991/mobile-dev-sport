@@ -200,6 +200,19 @@ final class StaffDataController extends AbstractController
             }
             $trainingId = $training->getId();
             $participantNames = $trainingId !== null ? ($bookingsByTraining[$trainingId] ?? []) : [];
+            // Пустые персональные/допуслуги после снятия клиента не показываем
+            // (новые слоты без каких-либо bookings ещё можно заполнять).
+            if (
+                \in_array($training->getType(), ['personal', 'extra'], true)
+                && $participantNames === []
+                && $training->getCurrentParticipants() === 0
+                && $trainingId !== null
+            ) {
+                $anyBooking = $this->em->getRepository(Booking::class)->findOneBy(['training' => $training]);
+                if ($anyBooking instanceof Booking) {
+                    continue;
+                }
+            }
             $participantsLabel = $participantNames === []
                 ? ($training->getCurrentParticipants() . '/' . $training->getMaxParticipants())
                 : implode(', ', array_slice($participantNames, 0, 5));

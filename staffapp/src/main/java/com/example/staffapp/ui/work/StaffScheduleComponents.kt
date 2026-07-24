@@ -214,11 +214,6 @@ private fun StaffScheduleTypeFilters(
             label = { Text("Все") },
         )
         FilterChip(
-            selected = selectedFilter == "group",
-            onClick = { onFilterSelected("group") },
-            label = { Text("Групповые") },
-        )
-        FilterChip(
             selected = selectedFilter == "personal",
             onClick = { onFilterSelected("personal") },
             modifier = Modifier.widthIn(min = 110.dp),

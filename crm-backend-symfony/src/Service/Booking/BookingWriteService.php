@@ -81,7 +81,10 @@ final class BookingWriteService
         return $booking;
     }
 
-    public function cancelBooking(Booking $booking, bool $notifyStaff = true): void
+    /**
+     * @return bool true, если занятие удалено из расписания (пустое персональное/допуслуга)
+     */
+    public function cancelBooking(Booking $booking, bool $notifyStaff = true): bool
     {
         $training = $booking->getTraining();
         $bookingUser = $booking->getUser();
@@ -120,5 +123,48 @@ final class BookingWriteService
                 $booking->getId() !== null ? (string) $booking->getId() : null,
             );
         }
+
+        return $this->removeEmptyPersonalOrExtraTraining($training);
+    }
+
+    /**
+     * Персональное / допуслуга без участников не должно висеть в расписании.
+     * Групповые слоты оставляем — их часто создают заранее.
+     */
+    private function removeEmptyPersonalOrExtraTraining(Training $training): bool
+    {
+        if (!\in_array($training->getType(), ['personal', 'extra'], true)) {
+            return false;
+        }
+        if ($training->getCurrentParticipants() > 0) {
+            return false;
+        }
+
+        $activeCount = (int) $this->em->createQueryBuilder()
+            ->select('COUNT(b.id)')
+            ->from(Booking::class, 'b')
+            ->where('b.training = :training')
+            ->andWhere('b.status != :cancelled')
+            ->setParameter('training', $training)
+            ->setParameter('cancelled', 'cancelled')
+            ->getQuery()
+            ->getSingleScalarResult();
+        if ($activeCount > 0) {
+            return false;
+        }
+
+        $this->notificationScheduler->cancelAllTrainingReminders($training);
+
+        $related = $this->em->getRepository(Booking::class)->findBy(['training' => $training]);
+        foreach ($related as $row) {
+            if ($row instanceof Booking) {
+                $this->em->remove($row);
+            }
+        }
+
+        $this->em->remove($training);
+        $this->em->flush();
+
+        return true;
     }
 }

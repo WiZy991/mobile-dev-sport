@@ -99,7 +99,8 @@ class StaffApiClient(private val baseUrl: String) {
     fun cancelStaffBooking(token: String, bookingId: String): Boolean {
         val conn = openConnection("/api/v1/staff/bookings/$bookingId", "DELETE")
         conn.setRequestProperty("Authorization", "Bearer $token")
-        return execute(conn).code in 200..299
+        val json = requireJson(execute(conn))
+        return json.optBoolean("training_removed", false)
     }
 
     fun loadTrainerProfile(token: String): TrainerPublicProfile {

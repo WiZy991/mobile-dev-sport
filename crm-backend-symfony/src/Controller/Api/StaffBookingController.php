@@ -216,9 +216,12 @@ final class StaffBookingController extends AbstractController
             return $this->json(['error' => 'Можно снимать запись только со своих занятий', 'code' => 'forbidden_training'], 403);
         }
 
-        $this->bookingWrite->cancelBooking($booking, notifyStaff: false);
+        $trainingRemoved = $this->bookingWrite->cancelBooking($booking, notifyStaff: false);
 
-        return $this->json(['success' => true]);
+        return $this->json([
+            'success' => true,
+            'training_removed' => $trainingRemoved,
+        ]);
     }
 
     private function canManageTraining(StaffUser $staff, Training $training): bool

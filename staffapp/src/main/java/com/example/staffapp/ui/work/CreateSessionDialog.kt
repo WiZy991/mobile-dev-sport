@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,11 +30,9 @@ data class CreateSessionDialogUi(
 fun CreateSessionDialog(
     state: CreateSessionDialogUi,
     onNameChange: (String) -> Unit,
-    onTypeChange: (String) -> Unit,
     onStartTimeChange: (String) -> Unit,
     onEndTimeChange: (String) -> Unit,
     onRoomChange: (String) -> Unit,
-    onMaxParticipantsChange: (String) -> Unit,
     onCreate: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -55,20 +52,6 @@ fun CreateSessionDialog(
                     singleLine = true,
                     enabled = !state.loading,
                 )
-                androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = state.type == "personal",
-                        onClick = { onTypeChange("personal") },
-                        label = { Text("Персональная") },
-                        enabled = !state.loading,
-                    )
-                    FilterChip(
-                        selected = state.type == "group",
-                        onClick = { onTypeChange("group") },
-                        label = { Text("Групповая") },
-                        enabled = !state.loading,
-                    )
-                }
                 OutlinedTextField(
                     value = state.startTime,
                     onValueChange = onStartTimeChange,
@@ -93,16 +76,6 @@ fun CreateSessionDialog(
                     singleLine = true,
                     enabled = !state.loading,
                 )
-                if (state.type != "personal") {
-                    OutlinedTextField(
-                        value = state.maxParticipants,
-                        onValueChange = onMaxParticipantsChange,
-                        label = { Text("Мест") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !state.loading,
-                    )
-                }
                 state.errorMessage?.let { Text(it) }
                 Text("После создания откроется окно, где можно прикрепить клиента.")
             }

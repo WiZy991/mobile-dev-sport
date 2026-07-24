@@ -80,7 +80,7 @@ class WorkActivity : ComponentActivity() {
                         scheduleData?.let { renderSchedule(it) }
                     },
                     onScheduleTypeFilterSelected = { filter ->
-                        selectedScheduleTypeFilter = filter
+                        selectedScheduleTypeFilter = if (filter == "group") null else filter
                         scheduleData?.let { renderSchedule(it) }
                     },
                     onSupportFilterSelected = { filter ->
@@ -113,20 +113,6 @@ class WorkActivity : ComponentActivity() {
                             uiState = uiState.copy(createSessionDialog = it.copy(name = v))
                         }
                     },
-                    onCreateTypeChange = { v ->
-                        uiState.createSessionDialog?.let {
-                            uiState = uiState.copy(
-                                createSessionDialog = it.copy(
-                                    type = v,
-                                    maxParticipants = if (v == "personal") "1" else it.maxParticipants.ifBlank { "10" },
-                                    name = when (v) {
-                                        "group" -> if (it.name.contains("Персональ", true)) "Групповое занятие" else it.name
-                                        else -> if (it.name.contains("Группов", true)) "Персональная тренировка" else it.name
-                                    },
-                                ),
-                            )
-                        }
-                    },
                     onCreateStartTimeChange = { v ->
                         uiState.createSessionDialog?.let {
                             uiState = uiState.copy(createSessionDialog = it.copy(startTime = v))
@@ -140,11 +126,6 @@ class WorkActivity : ComponentActivity() {
                     onCreateRoomChange = { v ->
                         uiState.createSessionDialog?.let {
                             uiState = uiState.copy(createSessionDialog = it.copy(room = v))
-                        }
-                    },
-                    onCreateMaxParticipantsChange = { v ->
-                        uiState.createSessionDialog?.let {
-                            uiState = uiState.copy(createSessionDialog = it.copy(maxParticipants = v))
                         }
                     },
                     onCreateConfirm = { createSession() },
@@ -474,6 +455,7 @@ class WorkActivity : ComponentActivity() {
         val selectedDate = selectedScheduleDate
         val dayItems = schedule.items
             .filter { it.date == selectedDate }
+            .filter { it.type != "group" }
             .filter { typeFilter == null || it.type == typeFilter }
         uiState = uiState.copy(
             schedule = ScheduleTabUi(
@@ -761,7 +743,6 @@ class WorkActivity : ComponentActivity() {
             )
             return
         }
-        val max = dialog.maxParticipants.toIntOrNull()?.coerceAtLeast(1) ?: 1
         uiState = uiState.copy(createSessionDialog = dialog.copy(loading = true, errorMessage = null))
         thread {
             try {
@@ -769,11 +750,11 @@ class WorkActivity : ComponentActivity() {
                     apiClient.createTraining(
                         token = token,
                         name = dialog.name.trim().ifBlank { "Персональная тренировка" },
-                        type = dialog.type,
+                        type = "personal",
                         startAtIso = "${dialog.date}T$startTime:00",
                         endAtIso = "${dialog.date}T$endTime:00",
                         room = dialog.room.trim().ifBlank { null },
-                        maxParticipants = if (dialog.type == "personal") 1 else max,
+                        maxParticipants = 1,
                     )
                 }
                 runOnUiThread {
@@ -865,9 +846,16 @@ class WorkActivity : ComponentActivity() {
     private fun cancelAssignBooking(bookingId: String) {
         thread {
             try {
-                withRefresh { apiClient.cancelStaffBooking(it, bookingId) }
+                val trainingRemoved = withRefresh { apiClient.cancelStaffBooking(it, bookingId) }
                 runOnUiThread {
-                    uiState = uiState.copy(assignDialog = null, statusMessage = "Запись снята")
+                    uiState = uiState.copy(
+                        assignDialog = null,
+                        statusMessage = if (trainingRemoved) {
+                            "Запись снята, занятие убрано из расписания"
+                        } else {
+                            "Запись снята"
+                        },
+                    )
                     showScheduleTab()
                 }
             } catch (e: Exception) {

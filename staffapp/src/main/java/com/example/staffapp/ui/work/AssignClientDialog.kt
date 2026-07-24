@@ -66,11 +66,17 @@ fun AssignClientDialog(
                 )
                 StaffPrimaryButton(text = "Найти", onClick = onSearch, enabled = !state.loading)
                 state.errorMessage?.let { Text(it) }
-                LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     items(state.clients, key = { it.clientId ?: it.title }) { client ->
                         StaffListCard(
                             item = client,
                             onClick = { client.clientId?.let(onBookClient) },
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }

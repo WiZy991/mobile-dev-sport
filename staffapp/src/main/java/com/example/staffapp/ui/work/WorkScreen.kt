@@ -84,11 +84,9 @@ fun WorkScreen(
     onAssignDismiss: () -> Unit = {},
     onCreateSessionClick: () -> Unit = {},
     onCreateNameChange: (String) -> Unit = {},
-    onCreateTypeChange: (String) -> Unit = {},
     onCreateStartTimeChange: (String) -> Unit = {},
     onCreateEndTimeChange: (String) -> Unit = {},
     onCreateRoomChange: (String) -> Unit = {},
-    onCreateMaxParticipantsChange: (String) -> Unit = {},
     onCreateConfirm: () -> Unit = {},
     onCreateDismiss: () -> Unit = {},
 ) {
@@ -106,11 +104,9 @@ fun WorkScreen(
         CreateSessionDialog(
             state = dialog,
             onNameChange = onCreateNameChange,
-            onTypeChange = onCreateTypeChange,
             onStartTimeChange = onCreateStartTimeChange,
             onEndTimeChange = onCreateEndTimeChange,
             onRoomChange = onCreateRoomChange,
-            onMaxParticipantsChange = onCreateMaxParticipantsChange,
             onCreate = onCreateConfirm,
             onDismiss = onCreateDismiss,
         )
