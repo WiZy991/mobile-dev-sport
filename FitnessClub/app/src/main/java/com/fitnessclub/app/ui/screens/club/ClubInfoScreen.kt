@@ -180,52 +180,47 @@ fun ClubInfoScreen(
                 }
             }
             
-            // Social links
+            // Social links (из CRM: Настройки клуба → О сети / контакты)
             item {
-                Text(
-                    text = "Мы в социальных сетях",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-            
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Column {
-                        SocialItem(
-                            name = "ВКонтакте",
-                            color = Color(0xFF4C75A3),
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vk.com/fitnessclub"))
-                                context.startActivity(intent)
+                val network = club?.network
+                val vk = network?.socialVk?.takeIf { it.isNotBlank() }
+                val tg = network?.socialTelegram?.takeIf { it.isNotBlank() }
+                if (vk != null || tg != null) {
+                    Text(
+                        text = "Мы в социальных сетях",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column {
+                            vk?.let { url ->
+                                SocialItem(
+                                    name = "ВКонтакте",
+                                    color = Color(0xFF4C75A3),
+                                    onClick = {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    }
+                                )
+                                if (tg != null) {
+                                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                                }
                             }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        
-                        SocialItem(
-                            name = "Telegram",
-                            color = Color(0xFF0088CC),
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/fitnessclub"))
-                                context.startActivity(intent)
+                            tg?.let { url ->
+                                SocialItem(
+                                    name = "Telegram",
+                                    color = Color(0xFF0088CC),
+                                    onClick = {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    }
+                                )
                             }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        
-                        SocialItem(
-                            name = "WhatsApp",
-                            color = Color(0xFF25D366),
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/74991234567"))
-                                context.startActivity(intent)
-                            }
-                        )
+                        }
                     }
                 }
             }

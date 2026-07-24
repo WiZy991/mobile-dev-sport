@@ -1616,8 +1616,9 @@ class AdminController extends AbstractController
             $this->persistSetting('perco_cmd_value', trim((string) $request->request->get('perco_cmd_value', '')) ?: null);
             $this->persistSetting('perco_cmd_param', trim((string) $request->request->get('perco_cmd_param', '')) ?: null);
 
+            $this->syncPrimaryClubFromSettings();
             $this->em->flush();
-            $this->addFlash('success', 'Настройки клуба сохранены.');
+            $this->addFlash('success', 'Настройки клуба сохранены. Данные обновятся в приложении: «О клубе», «О сети и контакты», карта.');
 
             return $this->redirectToRoute('admin_settings_club');
         }
@@ -1680,6 +1681,58 @@ class AdminController extends AbstractController
         }
 
         return $this->redirectToRoute('admin_settings_club');
+    }
+
+    /**
+     * Синхронизация таблицы clubs с «Настройками клуба»,
+     * чтобы экран «Мы на карте» / детали клуба совпадали с «О сети и контакты».
+     */
+    private function syncPrimaryClubFromSettings(): void
+    {
+        $get = function (string $key, string $default = ''): string {
+            return $this->clubSettings->get($key) ?? $default;
+        };
+
+        $name = trim($get('name', 'Доброзал'));
+        if ($name === '' || $name === 'FitnessClub') {
+            $name = 'Доброзал';
+        }
+        $address = trim($get('address', ''));
+        if ($address === '') {
+            $address = 'Адрес не указан';
+        }
+
+        $amenitiesRaw = trim($get('amenities', ''));
+        $amenities = $amenitiesRaw !== ''
+            ? array_values(array_filter(array_map('trim', explode(',', $amenitiesRaw))))
+            : [];
+
+        $latRaw = trim($get('latitude', ''));
+        $lngRaw = trim($get('longitude', ''));
+        $lat = is_numeric($latRaw) ? (float) $latRaw : null;
+        $lng = is_numeric($lngRaw) ? (float) $lngRaw : null;
+
+        $phone = trim($get('phone', '')) ?: null;
+        $email = trim($get('email', '')) ?: null;
+        $hours = trim($get('working_hours', '')) ?: null;
+
+        /** @var list<Club> $clubs */
+        $clubs = $this->em->getRepository(Club::class)->findBy([], ['id' => 'ASC']);
+        $club = $clubs[0] ?? null;
+        if (!$club instanceof Club) {
+            $club = new Club();
+            $this->em->persist($club);
+        }
+
+        $club
+            ->setName($name)
+            ->setAddress($address)
+            ->setPhone($phone)
+            ->setEmail($email)
+            ->setWorkingHours($hours)
+            ->setLatitude($lat)
+            ->setLongitude($lng)
+            ->setAmenitiesJson($amenities !== [] ? json_encode($amenities, \JSON_UNESCAPED_UNICODE) : null);
     }
 
     private function persistSetting(string $key, ?string $value): void

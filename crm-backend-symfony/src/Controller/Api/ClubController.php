@@ -205,6 +205,12 @@ class ClubController extends AbstractController
             'amenities' => $club->getAmenities(),
             'latitude' => $club->getLatitude(),
             'longitude' => $club->getLongitude(),
+            'network' => [
+                'about' => $this->clubSettings->get('network_about') ?: null,
+                'social_vk' => $this->clubSettings->get('social_vk') ?: null,
+                'social_telegram' => $this->clubSettings->get('social_telegram') ?: null,
+                'website' => $this->clubSettings->get('contact_website') ?: null,
+            ],
             ...$legal,
         ]);
     }
