@@ -112,6 +112,7 @@ fun MainScreen(
     )
     
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             if (selectedTab == 0) {
                 FloatingActionButton(
@@ -172,6 +173,9 @@ fun MainScreen(
             }
         }
     ) { paddingValues ->
+        // Верхний inset не применяем: TopAppBar вкладок сам заходит под статус-бар (как на «Настройках»).
+        // Снизу оставляем отступ под bottom navigation.
+        val bottomInset = paddingValues.calculateBottomPadding()
         when (selectedTab) {
             0 -> {
                 HomeScreen(
@@ -196,7 +200,7 @@ fun MainScreen(
                 val viewModel: ScheduleViewModel = hiltViewModel()
                 ScheduleScreen(
                     viewModel = viewModel,
-                    modifier = Modifier.padding(paddingValues),
+                    modifier = Modifier.padding(bottom = bottomInset),
                     onTrainingClick = { trainingId ->
                         navController.navigate(Screen.TrainingDetails.createRoute(trainingId))
                     }
@@ -207,7 +211,7 @@ fun MainScreen(
                 val viewModel: MyTrainingsViewModel = hiltViewModel()
                 MyTrainingsScreen(
                     viewModel = viewModel,
-                    modifier = Modifier.padding(paddingValues),
+                    modifier = Modifier.padding(bottom = bottomInset),
                     onTrainingClick = { trainingId ->
                         navController.navigate(Screen.TrainingDetails.createRoute(trainingId))
                     }
@@ -217,7 +221,7 @@ fun MainScreen(
                 val viewModel: ProfileViewModel = hiltViewModel()
                 ProfileScreen(
                     viewModel = viewModel,
-                    modifier = Modifier.padding(paddingValues),
+                    modifier = Modifier.padding(bottom = bottomInset),
                     onLogout = {
                         navController.navigate(Screen.Login.route) {
                             popUpTo(Screen.Home.route) { inclusive = true }
