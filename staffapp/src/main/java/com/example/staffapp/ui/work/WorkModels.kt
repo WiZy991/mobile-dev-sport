@@ -132,8 +132,6 @@ data class WorkUiState(
     val profile: ProfileTabUi = ProfileTabUi(),
     val assignDialog: AssignClientDialogUi? = null,
     val createSessionDialog: CreateSessionDialogUi? = null,
-    /** Наш диалог перед системным запросом POST_NOTIFICATIONS. */
-    val showNotificationPermissionDialog: Boolean = false,
 ) {
     companion object {
         const val TAB_HOME = 1

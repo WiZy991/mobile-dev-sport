@@ -22,7 +22,6 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SupportAgent
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -32,7 +31,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -41,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.staffapp.RequestNotificationPermission
 import com.example.staffapp.ui.components.StaffActionButtons
 import com.example.staffapp.ui.components.StaffChipRow
 import com.example.staffapp.ui.components.StaffEmptyState
@@ -91,7 +90,11 @@ fun WorkScreen(
     onCreateRoomChange: (String) -> Unit = {},
     onCreateConfirm: () -> Unit = {},
     onCreateDismiss: () -> Unit = {},
+    onNotificationPermissionResult: (Boolean) -> Unit = {},
 ) {
+    // Системный диалог Android 13+ — сразу при открытии рабочего экрана (как в клиентском приложении).
+    RequestNotificationPermission(onResult = onNotificationPermissionResult)
+
     state.assignDialog?.let { dialog ->
         AssignClientDialog(
             state = dialog,
@@ -111,28 +114,6 @@ fun WorkScreen(
             onRoomChange = onCreateRoomChange,
             onCreate = onCreateConfirm,
             onDismiss = onCreateDismiss,
-        )
-    }
-    if (state.showNotificationPermissionDialog) {
-        AlertDialog(
-            onDismissRequest = { onAction("dismiss_notification_prompt") },
-            title = { Text("Разрешить уведомления?") },
-            text = {
-                Text(
-                    "Нужны для оповещений о новых обращениях, записях и важных событиях клуба. " +
-                        "На следующем шаге Android покажет системный запрос.",
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { onAction("request_notifications") }) {
-                    Text("Разрешить")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onAction("dismiss_notification_prompt") }) {
-                    Text("Не сейчас")
-                }
-            },
         )
     }
     val navItems = buildList {

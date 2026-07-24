@@ -58,7 +58,6 @@ class WorkActivity : ComponentActivity() {
 
     private var loadGeneration = 0
     private var initialDataLoaded = false
-    private var notificationDialogOffered = false
     private val sessionLock = Any()
 
     private var uiState by mutableStateOf(WorkUiState())
@@ -139,18 +138,18 @@ class WorkActivity : ComponentActivity() {
                     },
                     onCreateConfirm = { createSession() },
                     onCreateDismiss = { uiState = uiState.copy(createSessionDialog = null) },
+                    onNotificationPermissionResult = { granted ->
+                        if (granted) {
+                            StaffPushRegistrar.registerIfLoggedIn(this)
+                        }
+                        refreshNotificationBanner()
+                    },
                 )
             }
         }
 
         StaffNotificationHelper.ensureChannel(this)
         StaffPushRegistrar.registerIfLoggedIn(this)
-        // Свой диалог на стабильном Work-экране (запрос с MainActivity срывался при finish()).
-        window.decorView.postDelayed({
-            if (isFinishing || isDestroyed) return@postDelayed
-            refreshNotificationBanner()
-            maybeShowNotificationPermissionDialog()
-        }, 600)
         thread {
             try {
                 val onboarding = withRefresh { apiClient.loadOnboarding(it) }
@@ -208,14 +207,6 @@ class WorkActivity : ComponentActivity() {
             actionId == "open_admin" -> startActivity(Intent(this, AdminActivity::class.java))
             actionId == "edit_trainer_profile" -> startActivity(Intent(this, TrainerProfileActivity::class.java))
             actionId == "enable_notifications" -> requestOrOpenNotificationSettings()
-            actionId == "request_notifications" -> {
-                uiState = uiState.copy(showNotificationPermissionDialog = false)
-                requestOrOpenNotificationSettings()
-            }
-            actionId == "dismiss_notification_prompt" -> {
-                uiState = uiState.copy(showNotificationPermissionDialog = false)
-                refreshNotificationBanner()
-            }
             actionId == "retry" -> selectTab(uiState.selectedTab)
             actionId == "mark_notifications_read" -> {
                 runAsyncForTab(uiState.selectedTab, "Сохранение...") {
@@ -309,20 +300,8 @@ class WorkActivity : ComponentActivity() {
         }
     }
 
-    private fun maybeShowNotificationPermissionDialog() {
-        if (notificationDialogOffered) return
-        if (NotificationPermissionHelper.notificationsEnabled(this)) {
-            refreshNotificationBanner()
-            return
-        }
-        notificationDialogOffered = true
-        uiState = uiState.copy(showNotificationPermissionDialog = true)
-        refreshNotificationBanner()
-    }
-
     private fun requestOrOpenNotificationSettings() {
         if (NotificationPermissionHelper.needsRuntimePrompt(this)) {
-            // Даже после «не спрашивать» launch безопасен; если диалог не появится — откроем настройки.
             requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             window.decorView.postDelayed({
                 if (!NotificationPermissionHelper.notificationsEnabled(this) &&
