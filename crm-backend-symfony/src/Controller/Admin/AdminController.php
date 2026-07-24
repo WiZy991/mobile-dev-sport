@@ -37,6 +37,7 @@ use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Admin\ClubModuleRegistry;
 use App\Service\Admin\ClubSettingsStore;
+use App\Service\Admin\ClubSocialLinks;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
@@ -1580,11 +1581,21 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
-            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'contact_website', 'social_vk', 'social_telegram', 'trainer_rental_amount_rub'];
+            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'trainer_rental_amount_rub'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
                 $this->clubSettings->set($key, $value !== '' ? $value : null);
             }
+
+            $socialLinks = ClubSocialLinks::normalizeFromRequest(
+                $request->request->all('social_type'),
+                $request->request->all('social_url'),
+            );
+            $this->clubSettings->set('social_links', ClubSocialLinks::encode($socialLinks));
+            // Совместимость со старыми полями / экраном «О сети»
+            $this->clubSettings->set('contact_website', ClubSocialLinks::firstUrlByType($socialLinks, 'website'));
+            $this->clubSettings->set('social_vk', ClubSocialLinks::firstUrlByType($socialLinks, 'vk'));
+            $this->clubSettings->set('social_telegram', ClubSocialLinks::firstUrlByType($socialLinks, 'telegram'));
             $rentalRub = trim((string) ($request->request->get('trainer_rental_amount_rub') ?? ''));
             if ($rentalRub !== '' && is_numeric($rentalRub)) {
                 $this->clubSettings->set(
@@ -1623,11 +1634,22 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('admin_settings_club');
         }
 
+        $socialLinks = ClubSocialLinks::decode($getSetting('social_links', ''));
+        if ($socialLinks === []) {
+            $socialLinks = ClubSocialLinks::fromLegacy(
+                $getSetting('contact_website', ''),
+                $getSetting('social_vk', ''),
+                $getSetting('social_telegram', ''),
+            );
+        }
+
         return $this->render('admin/settings_club.html.twig', [
             'menu' => $menu,
             'current' => 'settings',
             'club_modules' => ClubModuleRegistry::OPTIONAL,
             'enabled_modules' => $this->clubModules->enabledKeys(),
+            'social_catalog' => ClubSocialLinks::CATALOG,
+            'social_links' => $socialLinks,
             'club' => [
                 'name' => $getSetting('name', 'FitnessClub'),
                 'address' => $getSetting('address', 'г. Москва, ул. Примерная, д. 1'),
@@ -1650,9 +1672,6 @@ class AdminController extends AbstractController
                 'network_about' => $getSetting('network_about', ''),
                 'contact_phone' => $getSetting('contact_phone', ''),
                 'contact_email' => $getSetting('contact_email', ''),
-                'contact_website' => $getSetting('contact_website', ''),
-                'social_vk' => $getSetting('social_vk', ''),
-                'social_telegram' => $getSetting('social_telegram', ''),
                 'perco_enabled' => $getSetting('perco_enabled', '0'),
                 'perco_base_url' => $getSetting('perco_base_url', ''),
                 'perco_login' => $getSetting('perco_login', ''),

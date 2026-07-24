@@ -8,6 +8,7 @@ use App\Entity\Product;
 use App\Entity\Promotion;
 use App\Entity\SubscriptionPlan;
 use App\Service\Admin\ClubSettingsStore;
+use App\Service\Admin\ClubSocialLinks;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -207,6 +208,7 @@ class ClubController extends AbstractController
             'longitude' => $club->getLongitude(),
             'network' => [
                 'about' => $this->clubSettings->get('network_about') ?: null,
+                'social_links' => $this->socialLinksForApi(),
                 'social_vk' => $this->clubSettings->get('social_vk') ?: null,
                 'social_telegram' => $this->clubSettings->get('social_telegram') ?: null,
                 'website' => $this->clubSettings->get('contact_website') ?: null,
@@ -232,6 +234,7 @@ class ClubController extends AbstractController
 
         $contactPhone = trim($get('contact_phone', ''));
         $contactEmail = trim($get('contact_email', ''));
+        $socialLinks = $this->socialLinksForApi();
 
         return $this->json([
             'name' => $clubName,
@@ -247,12 +250,33 @@ class ClubController extends AbstractController
             'shop_config' => $this->shopConfigForApi(),
             'network' => [
                 'about' => $get('network_about', '') ?: null,
-                'social_vk' => $get('social_vk', '') ?: null,
-                'social_telegram' => $get('social_telegram', '') ?: null,
-                'website' => $get('contact_website', '') ?: null,
+                'social_links' => $socialLinks,
+                'social_vk' => ClubSocialLinks::firstUrlByType($socialLinks, 'vk')
+                    ?? ($get('social_vk', '') ?: null),
+                'social_telegram' => ClubSocialLinks::firstUrlByType($socialLinks, 'telegram')
+                    ?? ($get('social_telegram', '') ?: null),
+                'website' => ClubSocialLinks::firstUrlByType($socialLinks, 'website')
+                    ?? ($get('contact_website', '') ?: null),
             ],
             ...$this->legalUrlsFromSettings(),
         ]);
+    }
+
+    /**
+     * @return list<array{type: string, label: string, url: string, color: string}>
+     */
+    private function socialLinksForApi(): array
+    {
+        $links = ClubSocialLinks::decode($this->clubSettings->get('social_links'));
+        if ($links !== []) {
+            return $links;
+        }
+
+        return ClubSocialLinks::fromLegacy(
+            $this->clubSettings->get('contact_website'),
+            $this->clubSettings->get('social_vk'),
+            $this->clubSettings->get('social_telegram'),
+        );
     }
 
     /**

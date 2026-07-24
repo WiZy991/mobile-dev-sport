@@ -128,33 +128,84 @@
             <hr class="border-secondary my-3">
 
             <div class="mb-2 text-primary small fw-semibold text-uppercase">О сети / контакты (приложение)</div>
-            <p class="small text-secondary mb-3">Текст и ссылки для единого экрана «О сети и контакты» в настройках приложения. Телефон и email клуба выше используются, если поля ниже пустые.</p>
+            <p class="small text-secondary mb-3">Текст для экрана «О сети и контакты». Соцсети ниже показываются в приложении в блоке «Мы в социальных сетях» (кнопки с иконками). Телефон и email клуба выше используются, если поля переопределения пустые.</p>
             <div class="row g-2 mb-3">
                 <div class="col-12">
                     <label class="form-label small">О сети Доброзал</label>
                     <textarea name="network_about" class="form-control form-control-sm" rows="3" placeholder="Кратко о сети клубов…">{{ club.network_about }}</textarea>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label class="form-label small">Телефон сети (переопределение)</label>
                     <input type="text" name="contact_phone" class="form-control form-control-sm" value="{{ club.contact_phone }}" placeholder="+7 (495) …">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label class="form-label small">Email сети (переопределение)</label>
                     <input type="email" name="contact_email" class="form-control form-control-sm" value="{{ club.contact_email }}">
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label small">Сайт</label>
-                    <input type="url" name="contact_website" class="form-control form-control-sm" value="{{ club.contact_website }}" placeholder="https://…">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label small">ВКонтакте</label>
-                    <input type="url" name="social_vk" class="form-control form-control-sm" value="{{ club.social_vk }}" placeholder="https://vk.com/…">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label small">Telegram</label>
-                    <input type="url" name="social_telegram" class="form-control form-control-sm" value="{{ club.social_telegram }}" placeholder="https://t.me/…">
-                </div>
             </div>
+
+            <div class="mb-2 text-primary small fw-semibold text-uppercase">Соцсети и ссылки</div>
+            <p class="small text-secondary mb-2">Добавьте сколько угодно сетей: выберите тип и вставьте ссылку. Пустые строки при сохранении игнорируются.</p>
+            <div id="social-links-rows" class="mb-2">
+                {% for link in social_links %}
+                    <div class="row g-2 align-items-end mb-2 social-link-row">
+                        <div class="col-md-4">
+                            <label class="form-label small">Сеть</label>
+                            <select name="social_type[]" class="form-select form-select-sm">
+                                {% for key, meta in social_catalog %}
+                                    <option value="{{ key }}" {% if link.type == key %}selected{% endif %}>{{ meta.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label small">Ссылка</label>
+                            <input type="url" name="social_url[]" class="form-control form-control-sm" value="{{ link.url }}" placeholder="https://…">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-sm btn-outline-danger w-100 social-remove" title="Удалить">×</button>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="row g-2 align-items-end mb-2 social-link-row">
+                        <div class="col-md-4">
+                            <label class="form-label small">Сеть</label>
+                            <select name="social_type[]" class="form-select form-select-sm">
+                                {% for key, meta in social_catalog %}
+                                    <option value="{{ key }}">{{ meta.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label small">Ссылка</label>
+                            <input type="url" name="social_url[]" class="form-control form-control-sm" placeholder="https://…">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-sm btn-outline-danger w-100 social-remove" title="Удалить">×</button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mb-3" id="social-add-row">+ Добавить соцсеть</button>
+
+            <template id="social-link-row-template">
+                <div class="row g-2 align-items-end mb-2 social-link-row">
+                    <div class="col-md-4">
+                        <label class="form-label small">Сеть</label>
+                        <select name="social_type[]" class="form-select form-select-sm">
+                            {% for key, meta in social_catalog %}
+                                <option value="{{ key }}">{{ meta.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label small">Ссылка</label>
+                        <input type="url" name="social_url[]" class="form-control form-control-sm" placeholder="https://…">
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-sm btn-outline-danger w-100 social-remove" title="Удалить">×</button>
+                    </div>
+                </div>
+            </template>
 
             <hr class="border-secondary my-3">
 
@@ -241,4 +292,27 @@
             </div>
         </form>
     </div>
+<script>
+(() => {
+    const rows = document.getElementById('social-links-rows');
+    const addBtn = document.getElementById('social-add-row');
+    const tpl = document.getElementById('social-link-row-template');
+    if (!rows || !addBtn || !tpl) return;
+
+    addBtn.addEventListener('click', () => {
+        rows.appendChild(tpl.content.cloneNode(true));
+    });
+    rows.addEventListener('click', (e) => {
+        const btn = e.target.closest('.social-remove');
+        if (!btn) return;
+        const row = btn.closest('.social-link-row');
+        if (!row) return;
+        if (rows.querySelectorAll('.social-link-row').length <= 1) {
+            row.querySelectorAll('input').forEach((el) => { el.value = ''; });
+            return;
+        }
+        row.remove();
+    });
+})();
+</script>
 {% endblock %}
