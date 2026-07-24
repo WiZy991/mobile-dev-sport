@@ -22,6 +22,8 @@ parameters:
     fcm_server_key_default: ''
     fcm_credentials_default: ''
     fcm_project_id_default: ''
+    fcm_staff_credentials_default: ''
+    fcm_staff_project_id_default: ''
     apns_key_id_default: ''
     apns_team_id_default: ''
     apns_bundle_id_default: 'co.worldcashbox.WorldFintess'
@@ -172,6 +174,31 @@ services:
             $credentials: '%env(default:fcm_credentials_default:FCM_CREDENTIALS_JSON)%'
             $projectId: '%env(default:fcm_project_id_default:FCM_PROJECT_ID)%'
             $apnsPushSender: '@App\Service\Push\ApnsPushSender'
+
+    # Отдельный Firebase-проект для staffapp (ru.worldcashfit.staff).
+    # Если FCM_STAFF_CREDENTIALS_JSON пуст — notifiers падают обратно на клиентский FcmPushSender.
+    app.fcm_push_sender.staff:
+        class: App\Service\Push\FcmPushSender
+        arguments:
+            $serverKey: null
+            $credentials: '%env(default:fcm_staff_credentials_default:FCM_STAFF_CREDENTIALS_JSON)%'
+            $projectId: '%env(default:fcm_staff_project_id_default:FCM_STAFF_PROJECT_ID)%'
+            $apnsPushSender: null
+
+    App\Service\Staff\StaffEventNotifier:
+        arguments:
+            $fcmPushSender: '@App\Service\Push\FcmPushSender'
+            $staffFcmPushSender: '@app.fcm_push_sender.staff'
+
+    App\Service\Support\SupportTicketStaffNotifier:
+        arguments:
+            $fcmPushSender: '@App\Service\Push\FcmPushSender'
+            $staffFcmPushSender: '@app.fcm_push_sender.staff'
+
+    App\Service\Security\AccessAlarmNotifier:
+        arguments:
+            $fcmPushSender: '@App\Service\Push\FcmPushSender'
+            $staffFcmPushSender: '@app.fcm_push_sender.staff'
 
     App\Service\Tenant\OrganizationResolver:
         arguments:

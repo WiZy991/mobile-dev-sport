@@ -30,6 +30,7 @@ final class AccessAlarmNotifier
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly FcmPushSender $fcmPushSender,
+        private readonly FcmPushSender $staffFcmPushSender,
         private readonly ClientNotificationService $clientNotifications,
     ) {
     }
@@ -81,7 +82,7 @@ final class AccessAlarmNotifier
             static fn (StaffUser $staff) => $staff->getId(),
             $recipients
         )));
-        $this->fcmPushSender->sendToStaffUserIds(
+        $this->staffPush()->sendToStaffUserIds(
             $staffIds,
             $title,
             $body,
@@ -93,6 +94,13 @@ final class AccessAlarmNotifier
                 'peopleCount' => (string) $count,
             ]
         );
+    }
+
+    private function staffPush(): FcmPushSender
+    {
+        return $this->staffFcmPushSender->isConfigured()
+            ? $this->staffFcmPushSender
+            : $this->fcmPushSender;
     }
 
     private function notifyClient(
