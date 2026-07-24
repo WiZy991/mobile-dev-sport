@@ -1250,12 +1250,46 @@ class AdminController extends AbstractController
     public function deleteTrainer(int $id): Response
     {
         $trainer = $this->em->getRepository(Trainer::class)->find($id);
-        if ($trainer) {
-            $count = $this->em->getRepository(Training::class)->count(['trainer' => $trainer]);
-            if ($count === 0) {
-                $this->em->remove($trainer);
-                $this->em->flush();
+        if (!$trainer) {
+            $this->addFlash('warning', 'Тренер не найден.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+        }
+
+        $name = $trainer->getName();
+
+        // Отвязать staff-аккаунт (FK SET NULL, но снимем явно).
+        $staffLinked = $this->em->getRepository(StaffUser::class)->findBy(['trainer' => $trainer]);
+        foreach ($staffLinked as $staff) {
+            if ($staff instanceof StaffUser) {
+                $staff->setTrainer(null);
             }
+        }
+
+        // Тренер не удалялся, если были занятия: отвязываем FK, имя в расписании оставляем.
+        $trainings = $this->em->getRepository(Training::class)->findBy(['trainer' => $trainer]);
+        $detached = 0;
+        foreach ($trainings as $training) {
+            if (!$training instanceof Training) {
+                continue;
+            }
+            if ($training->getTrainerName() === null || $training->getTrainerName() === '') {
+                $training->setTrainerName($name);
+            }
+            $training->setTrainer(null);
+            ++$detached;
+        }
+
+        $this->em->remove($trainer);
+        $this->em->flush();
+
+        if ($detached > 0) {
+            $this->addFlash(
+                'success',
+                sprintf('Тренер «%s» удалён. Отвязано занятий: %d (в расписании имя сохранено).', $name, $detached),
+            );
+        } else {
+            $this->addFlash('success', sprintf('Тренер «%s» удалён.', $name));
         }
 
         return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
