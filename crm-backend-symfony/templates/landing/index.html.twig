@@ -42,6 +42,11 @@
             background: var(--bg);
             line-height: 1.55;
             -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        body.nav-open {
+            overflow: hidden;
         }
 
         a { color: var(--primary); text-decoration: none; }
@@ -111,7 +116,91 @@
 
         .nav a:hover { opacity: 1; }
 
-        .header-actions { display: flex; align-items: center; gap: 0.6rem; }
+        .header-actions { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+
+        .menu-toggle {
+            display: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            border: 1.5px solid var(--border);
+            background: #fff;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .menu-toggle span {
+            display: block;
+            width: 18px;
+            height: 2px;
+            background: var(--text);
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .menu-toggle span::before,
+        .menu-toggle span::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            width: 18px;
+            height: 2px;
+            background: var(--text);
+            border-radius: 2px;
+        }
+
+        .menu-toggle span::before { top: -6px; }
+        .menu-toggle span::after { top: 6px; }
+
+        .menu-toggle[aria-expanded="true"] span {
+            background: transparent;
+        }
+
+        .menu-toggle[aria-expanded="true"] span::before {
+            top: 0;
+            transform: rotate(45deg);
+        }
+
+        .menu-toggle[aria-expanded="true"] span::after {
+            top: 0;
+            transform: rotate(-45deg);
+        }
+
+        .mobile-nav {
+            display: none;
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            z-index: 40;
+            background: rgba(250, 250, 247, 0.98);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            padding: 0.5rem 1.25rem 1.5rem;
+            max-height: min(70vh, calc(100dvh - 4.5rem));
+            overflow-y: auto;
+        }
+
+        .mobile-nav.is-open { display: block; }
+
+        .mobile-nav a {
+            display: block;
+            padding: 0.85rem 0;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+
+        .mobile-nav .mobile-nav-actions {
+            display: grid;
+            gap: 0.7rem;
+            margin-top: 1.4rem;
+        }
 
         .btn {
             display: inline-flex;
@@ -939,26 +1028,69 @@
 
         @media (max-width: 1000px) {
             .nav { display: none; }
-            .hero-grid, .apps, .features, .industries, .pricing, .benefits, .numbers, .cta-block {
-                grid-template-columns: 1fr 1fr;
-            }
-            .foot-grid {
-                grid-template-columns: 1fr 1fr 1fr;
+            .menu-toggle { display: inline-flex; }
+            .header-actions .btn-ghost { display: none; }
+            .header-actions .btn-primary {
+                padding: 0.65rem 0.9rem;
+                font-size: 0.85rem;
             }
             .hero-grid, .apps, .cta-block { grid-template-columns: 1fr; }
-            .hero-photo { min-height: 360px; }
-            .apps-visual { min-height: 420px; }
+            .features, .industries, .pricing, .benefits { grid-template-columns: 1fr 1fr; }
+            .numbers { grid-template-columns: 1fr 1fr; }
+            .foot-grid { grid-template-columns: 1fr 1fr; }
+            .hero-photo { min-height: 340px; }
+            .apps-visual { min-height: 400px; }
+            .phone { width: 230px; height: 460px; }
         }
 
         @media (max-width: 700px) {
-            .hero-grid, .apps, .features, .industries, .pricing, .benefits, .form-grid, .foot-grid {
+            .container { width: min(1200px, calc(100% - 1.5rem)); }
+            .header-inner { gap: 0.75rem; padding: 0.75rem 0; }
+            .logo { font-size: 1rem; }
+            .logo-mark { width: 34px; height: 34px; border-radius: 10px; }
+            .header-actions .btn-primary { display: none; }
+            .menu-toggle { display: inline-flex; }
+
+            .hero { padding: 2.4rem 0 1.8rem; }
+            .hero-photo { min-height: 280px; border-radius: 22px; }
+            .hero-photo-tag {
+                max-width: calc(100% - 24px);
+                font-size: 0.72rem;
+                white-space: normal;
+                line-height: 1.3;
+            }
+            .hero-actions { flex-direction: column; align-items: stretch; }
+            .hero-actions .btn { width: 100%; white-space: normal; text-align: center; }
+            .hero-stats { grid-template-columns: 1fr; }
+            .lead { font-size: 1rem; }
+
+            .features, .industries, .pricing, .benefits, .form-grid, .foot-grid, .crm-body {
                 grid-template-columns: 1fr;
             }
-            .numbers { grid-template-columns: 1fr 1fr; }
-            .hero { padding: 3rem 0 2rem; }
-            section.block { padding: 3rem 0; }
+            .numbers { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+            .num-value { font-size: 1.7rem; }
+            .numbers small { font-size: 0.85rem; }
+
+            section.block { padding: 2.6rem 0; }
+            .section-head { margin-bottom: 1.8rem; }
+            .section-head p { font-size: 0.98rem; }
+
             .floating-card { display: none; }
-            .cta-side { padding: 2rem 1.4rem; }
+            .industry { min-height: 150px; }
+            .apps-visual { min-height: 360px; margin-top: 0.5rem; }
+            .phone { width: min(220px, 70vw); height: min(440px, 140vw); }
+            .cta-side { padding: 1.6rem 1.2rem; }
+            .cta-side.photo { min-height: 260px; }
+            .price-card { padding: 1.4rem; }
+            .price-value { font-size: 2rem; }
+            .foot-bottom { flex-direction: column; align-items: flex-start; }
+            .cookie-consent-content { align-items: stretch; }
+            .cookie-consent-content button { width: 100%; }
+        }
+
+        @media (max-width: 420px) {
+            .numbers { grid-template-columns: 1fr; }
+            .badge-pill { white-space: normal; line-height: 1.35; }
         }
 
         .cookie-consent-banner {
@@ -1015,7 +1147,7 @@
             <span class="logo-mark">W</span>
             <span>WorldCashFit</span>
         </a>
-        <nav class="nav">
+        <nav class="nav" aria-label="Основная навигация">
             <a href="#features">Возможности</a>
             <a href="#apps">Приложения</a>
             <a href="#crm">CRM</a>
@@ -1025,8 +1157,22 @@
         <div class="header-actions">
             <a href="#contact" class="btn btn-ghost">Демо бесплатно</a>
             <a href="{{ admin_url }}" class="btn btn-primary">Войти в админку</a>
+            <button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="mobile-nav" aria-label="Открыть меню">
+                <span></span>
+            </button>
         </div>
     </div>
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Мобильная навигация" hidden>
+        <a href="#features">Возможности</a>
+        <a href="#apps">Приложения</a>
+        <a href="#crm">CRM</a>
+        <a href="#pricing">Тарифы</a>
+        <a href="#faq">FAQ</a>
+        <div class="mobile-nav-actions">
+            <a href="#contact" class="btn btn-ghost">Демо бесплатно</a>
+            <a href="{{ admin_url }}" class="btn btn-primary">Войти в админку</a>
+        </div>
+    </nav>
 </header>
 
 <main>
@@ -1625,6 +1771,34 @@
     </div>
 </footer>
 {% include 'partials/cookie_banner.html.twig' %}
+
+<script>
+    (function () {
+        var toggle = document.getElementById('menu-toggle');
+        var menu = document.getElementById('mobile-nav');
+        if (!toggle || !menu) return;
+
+        function setOpen(open) {
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            toggle.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+            menu.classList.toggle('is-open', open);
+            menu.hidden = !open;
+            document.body.classList.toggle('nav-open', open);
+        }
+
+        toggle.addEventListener('click', function () {
+            setOpen(toggle.getAttribute('aria-expanded') !== 'true');
+        });
+
+        menu.querySelectorAll('a').forEach(function (link) {
+            link.addEventListener('click', function () { setOpen(false); });
+        });
+
+        window.addEventListener('resize', function () {
+            if (window.innerWidth > 1000) setOpen(false);
+        });
+    })();
+</script>
 
 </body>
 </html>

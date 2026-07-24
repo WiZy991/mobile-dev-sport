@@ -164,6 +164,16 @@
             margin-bottom: 2rem;
         }
 
+        .doc-toc-terms {
+            margin: 0 0 0.55rem;
+            font-weight: 600;
+        }
+
+        .doc-toc-terms a {
+            color: var(--text);
+            font-weight: 600;
+        }
+
         .doc-toc ol {
             margin: 0;
             padding-left: 1.25rem;
@@ -176,8 +186,32 @@
             font-weight: 600;
         }
 
-        .doc-toc a:hover {
+        .doc-toc a:hover,
+        .doc-toc-terms a:hover {
             color: var(--primary);
+        }
+
+        .doc-pd-block {
+            margin: 1.35rem 0 1.6rem;
+            padding: 1rem 0 0.25rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .doc-pd-block:first-of-type {
+            border-top: none;
+            padding-top: 0.25rem;
+        }
+
+        .doc-pd-label {
+            margin: 0.85rem 0 0.35rem;
+            font-weight: 750;
+            color: var(--text);
+        }
+
+        .doc-pd-text {
+            margin: 0 0 0.75rem;
+            text-align: justify;
+            hyphens: auto;
         }
 
         .doc-section {
