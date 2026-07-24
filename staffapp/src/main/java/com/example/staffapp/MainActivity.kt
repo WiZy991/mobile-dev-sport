@@ -2,16 +2,14 @@ package com.example.staffapp
 
 import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.example.staffapp.ui.auth.LoginScreen
 import com.example.staffapp.ui.auth.LoginUiState
 import com.example.staffapp.ui.theme.StaffTheme
@@ -23,6 +21,14 @@ class MainActivity : ComponentActivity() {
     private var session: StaffSession? = null
 
     private var uiState by mutableStateOf(LoginUiState())
+
+    private val requestNotifications = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            StaffPushRegistrar.registerIfLoggedIn(this)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,7 +51,8 @@ class MainActivity : ComponentActivity() {
         }
 
         StaffNotificationHelper.ensureChannel(this)
-        requestNotificationPermissionIfNeeded()
+        // Диалог разрешения — после отрисовки экрана (иначе на части устройств не показывается).
+        window.decorView.post { requestNotificationPermissionIfNeeded() }
 
         if (session != null) {
             runAsync("Проверяем доступ...") {
@@ -65,6 +72,7 @@ class MainActivity : ComponentActivity() {
             session = result.session
             store.saveSession(result.session)
             store.clearConfig()
+            runOnUiThread { requestNotificationPermissionIfNeeded() }
             StaffPushRegistrar.registerIfLoggedIn(this)
             routeAfterAuth(result.onboarding)
             "Заявка отправлена"
@@ -80,6 +88,7 @@ class MainActivity : ComponentActivity() {
             session = result.session
             store.saveSession(result.session)
             store.clearConfig()
+            runOnUiThread { requestNotificationPermissionIfNeeded() }
             StaffPushRegistrar.registerIfLoggedIn(this)
             routeAfterAuth(result.onboarding)
             "Выполнен вход"
@@ -146,12 +155,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestNotificationPermissionIfNeeded() {
+        if (!NotificationPermissionHelper.needsRuntimePrompt(this)) return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+        requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

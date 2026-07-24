@@ -245,6 +245,17 @@ private fun HomeTabContent(
                 subtitle = home.roleTitle,
             )
         }
+        if (home.needNotificationsPermission) {
+            item {
+                StaffInfoBanner("Push-уведомления выключены — вы не получите оповещения о обращениях и записях.")
+            }
+            item {
+                StaffPrimaryButton(
+                    text = "Включить уведомления",
+                    onClick = { onAction("enable_notifications") },
+                )
+            }
+        }
         if (home.metrics.isNotEmpty()) {
             item { StaffMetricsRow(home.metrics) }
         }

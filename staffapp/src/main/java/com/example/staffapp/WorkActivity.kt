@@ -1,16 +1,15 @@
 package com.example.staffapp
 
+import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.example.staffapp.ui.theme.StaffTheme
 import com.example.staffapp.ui.work.ActionUi
 import com.example.staffapp.ui.work.AssignClientDialogUi
@@ -48,6 +47,16 @@ class WorkActivity : ComponentActivity() {
     private var selectedScheduleTypeFilter: String? = null
     private var selectedSupportFilter: String? = null
     private var clientsSearchQuery: String = ""
+
+    private val requestNotifications = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            StaffPushRegistrar.registerIfLoggedIn(this)
+        }
+        refreshNotificationBanner()
+    }
+
     private var loadGeneration = 0
     private var initialDataLoaded = false
     private val sessionLock = Any()
@@ -135,7 +144,10 @@ class WorkActivity : ComponentActivity() {
         }
 
         StaffNotificationHelper.ensureChannel(this)
-        requestNotificationPermissionIfNeeded()
+        window.decorView.post {
+            requestNotificationPermissionIfNeeded()
+            refreshNotificationBanner()
+        }
         StaffPushRegistrar.registerIfLoggedIn(this)
         thread {
             try {
@@ -193,6 +205,7 @@ class WorkActivity : ComponentActivity() {
         when {
             actionId == "open_admin" -> startActivity(Intent(this, AdminActivity::class.java))
             actionId == "edit_trainer_profile" -> startActivity(Intent(this, TrainerProfileActivity::class.java))
+            actionId == "enable_notifications" -> requestOrOpenNotificationSettings()
             actionId == "retry" -> selectTab(uiState.selectedTab)
             actionId == "mark_notifications_read" -> {
                 runAsyncForTab(uiState.selectedTab, "Сохранение...") {
@@ -234,6 +247,7 @@ class WorkActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        refreshNotificationBanner()
         if (session != null && allowedSections.contains("app_support")) {
             pollUnreadNotifications()
         }
@@ -286,24 +300,35 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun requestNotificationPermissionIfNeeded() {
+        if (!NotificationPermissionHelper.needsRuntimePrompt(this)) return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
-            == PackageManager.PERMISSION_GRANTED
+        requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private fun requestOrOpenNotificationSettings() {
+        if (NotificationPermissionHelper.needsRuntimePrompt(this)
+            && !NotificationPermissionHelper.shouldOpenSettings(this)
         ) {
+            requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-            REQUEST_NOTIFICATIONS,
-        )
+        NotificationPermissionHelper.openAppNotificationSettings(this)
+    }
+
+    private fun refreshNotificationBanner() {
+        val need = !NotificationPermissionHelper.notificationsEnabled(this)
+        if (uiState.home.needNotificationsPermission == need) return
+        uiState = uiState.copy(home = uiState.home.copy(needNotificationsPermission = need))
     }
 
     private fun showHomeTab() {
         uiState = uiState.copy(
             screenTitle = "Главная",
             errorMessage = null,
-            home = HomeTabUi(loading = appData == null),
+            home = HomeTabUi(
+                loading = appData == null,
+                needNotificationsPermission = !NotificationPermissionHelper.notificationsEnabled(this),
+            ),
         )
         val data = appData ?: return
         val role = primaryRole()
@@ -321,6 +346,7 @@ class WorkActivity : ComponentActivity() {
                 metrics = metrics,
                 showAdminButton = showAdmin,
                 loading = true,
+                needNotificationsPermission = !NotificationPermissionHelper.notificationsEnabled(this),
             ),
         )
 
@@ -1027,7 +1053,6 @@ class WorkActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_INITIAL_TAB = "extra_initial_tab"
-        private const val REQUEST_NOTIFICATIONS = 42
         private val HOME_SECTIONS = setOf("bookings", "clients", "tasks", "schedule", "app_support")
         private val HIDDEN_APP_SECTIONS = setOf("visits", "subscriptions")
     }

@@ -39,6 +39,7 @@ data class HomeTabUi(
     val actions: List<ActionUi> = emptyList(),
     val loading: Boolean = false,
     val emptyMessage: String? = null,
+    val needNotificationsPermission: Boolean = false,
 )
 
 data class ScheduleDayUi(
