@@ -1,12 +1,9 @@
 package com.example.staffapp
 
-import android.Manifest
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -21,14 +18,6 @@ class MainActivity : ComponentActivity() {
     private var session: StaffSession? = null
 
     private var uiState by mutableStateOf(LoginUiState())
-
-    private val requestNotifications = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) {
-            StaffPushRegistrar.registerIfLoggedIn(this)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,8 +40,6 @@ class MainActivity : ComponentActivity() {
         }
 
         StaffNotificationHelper.ensureChannel(this)
-        // Диалог разрешения — после отрисовки экрана (иначе на части устройств не показывается).
-        window.decorView.post { requestNotificationPermissionIfNeeded() }
 
         if (session != null) {
             runAsync("Проверяем доступ...") {
@@ -72,7 +59,6 @@ class MainActivity : ComponentActivity() {
             session = result.session
             store.saveSession(result.session)
             store.clearConfig()
-            runOnUiThread { requestNotificationPermissionIfNeeded() }
             StaffPushRegistrar.registerIfLoggedIn(this)
             routeAfterAuth(result.onboarding)
             "Заявка отправлена"
@@ -88,7 +74,6 @@ class MainActivity : ComponentActivity() {
             session = result.session
             store.saveSession(result.session)
             store.clearConfig()
-            runOnUiThread { requestNotificationPermissionIfNeeded() }
             StaffPushRegistrar.registerIfLoggedIn(this)
             routeAfterAuth(result.onboarding)
             "Выполнен вход"
@@ -152,11 +137,5 @@ class MainActivity : ComponentActivity() {
             startActivity(Intent(this, OnboardingActivity::class.java))
             finish()
         }
-    }
-
-    private fun requestNotificationPermissionIfNeeded() {
-        if (!NotificationPermissionHelper.needsRuntimePrompt(this)) return
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
