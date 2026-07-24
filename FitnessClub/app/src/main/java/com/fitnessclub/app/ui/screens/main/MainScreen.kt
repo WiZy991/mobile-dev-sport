@@ -33,8 +33,9 @@ import com.fitnessclub.app.ui.screens.mytrainings.MyTrainingsViewModel
 import com.fitnessclub.app.ui.screens.profile.ProfileScreen
 import com.fitnessclub.app.ui.screens.profile.ProfileViewModel
 import com.fitnessclub.app.ui.screens.qrcode.QrCodeViewModel
-import com.fitnessclub.app.ui.screens.schedule.ScheduleScreen
-import com.fitnessclub.app.ui.screens.schedule.ScheduleViewModel
+// TODO(restore): импорты экрана расписания
+// import com.fitnessclub.app.ui.screens.schedule.ScheduleScreen
+// import com.fitnessclub.app.ui.screens.schedule.ScheduleViewModel
 import com.fitnessclub.app.ui.components.SecureScreenEffect
 import com.fitnessclub.app.ui.components.StatusBarEffect
 import com.fitnessclub.app.ui.theme.AppShapes
@@ -60,11 +61,12 @@ fun MainScreen(
     val currentRoute = navController.currentBackStackEntry?.destination?.route
     var selectedTab by remember(startTab) { mutableStateOf(startTab) }
     LaunchedEffect(currentRoute) {
+        // TODO(restore): вернуть Screen.Schedule.route -> 1 и сдвинуть индексы обратно
         val tab = when (currentRoute) {
             Screen.Home.route -> 0
-            Screen.Schedule.route -> 1
-            Screen.MyTrainings.route -> 2
-            Screen.Profile.route -> 3
+            // Screen.Schedule.route -> 1
+            Screen.MyTrainings.route -> 1
+            Screen.Profile.route -> 2
             else -> null
         }
         if (tab != null) selectedTab = tab
@@ -86,12 +88,15 @@ fun MainScreen(
             unselectedIcon = Icons.Outlined.Home,
             route = Screen.Home.route
         ),
+        // TODO(restore): временно скрыта вкладка «Расписание» в нижнем меню
+        /*
         BottomNavItem(
             title = "Расписание",
             selectedIcon = Icons.Filled.CalendarMonth,
             unselectedIcon = Icons.Outlined.CalendarMonth,
             route = Screen.Schedule.route
         ),
+        */
         BottomNavItem(
             title = "Мои записи",
             selectedIcon = Icons.Filled.FitnessCenter,
@@ -185,6 +190,8 @@ fun MainScreen(
                     onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
                 )
             }
+            // TODO(restore): вкладка расписания (был index 1)
+            /*
             1 -> {
                 val viewModel: ScheduleViewModel = hiltViewModel()
                 ScheduleScreen(
@@ -195,7 +202,8 @@ fun MainScreen(
                     }
                 )
             }
-            2 -> {
+            */
+            1 -> {
                 val viewModel: MyTrainingsViewModel = hiltViewModel()
                 MyTrainingsScreen(
                     viewModel = viewModel,
@@ -205,7 +213,7 @@ fun MainScreen(
                     }
                 )
             }
-            3 -> {
+            2 -> {
                 val viewModel: ProfileViewModel = hiltViewModel()
                 ProfileScreen(
                     viewModel = viewModel,

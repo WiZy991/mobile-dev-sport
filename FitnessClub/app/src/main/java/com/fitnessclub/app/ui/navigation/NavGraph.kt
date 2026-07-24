@@ -201,7 +201,9 @@ fun NavGraph(
             }
         }
         
-        // Main screens with bottom navigation (tabs: 0=Home, 1=Schedule, 2=MyTrainings, 3=Profile)
+        // Main screens with bottom navigation
+        // TODO(restore): было 0=Home, 1=Schedule, 2=MyTrainings, 3=Profile
+        // Сейчас без вкладки Расписание: 0=Home, 1=MyTrainings, 2=Profile
         composable(Screen.Home.route) {
             MainScreen(
                 navController = navController,
@@ -209,24 +211,25 @@ fun NavGraph(
             )
         }
         
+        // TODO(restore): маршрут вкладки расписания
         composable(Screen.Schedule.route) {
             MainScreen(
                 navController = navController,
-                startTab = 1
+                startTab = 0 // расписание скрыто — открываем главную
             )
         }
         
         composable(Screen.MyTrainings.route) {
             MainScreen(
                 navController = navController,
-                startTab = 2
+                startTab = 1
             )
         }
         
         composable(Screen.Profile.route) {
             MainScreen(
                 navController = navController,
-                startTab = 3
+                startTab = 2
             )
         }
         
