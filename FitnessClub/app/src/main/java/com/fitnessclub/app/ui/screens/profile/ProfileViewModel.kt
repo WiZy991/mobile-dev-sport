@@ -8,7 +8,9 @@ import com.fitnessclub.app.data.api.UserStats
 import com.fitnessclub.app.data.model.Subscription
 import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
+import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.SubscriptionRepository
+import com.fitnessclub.app.ui.util.addressWithoutCity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +26,7 @@ import javax.inject.Inject
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val subscriptionRepository: SubscriptionRepository,
+    private val clubRepository: ClubRepository,
     private val api: FitnessApi
 ) : ViewModel() {
     
@@ -35,8 +38,23 @@ class ProfileViewModel @Inject constructor(
     
     init {
         loadProfile()
+        loadClubAddress()
         loadSubscriptions()
         loadStats()
+    }
+
+    private fun loadClubAddress() {
+        viewModelScope.launch {
+            when (val result = clubRepository.getClubInfo()) {
+                is ApiResult.Success -> {
+                    val raw = result.data.address.trim()
+                    _uiState.update {
+                        it.copy(clubAddressLine = addressWithoutCity(raw).ifBlank { null })
+                    }
+                }
+                else -> Unit
+            }
+        }
     }
     
     private fun loadProfile() {
@@ -135,6 +153,7 @@ class ProfileViewModel @Inject constructor(
     
     fun refresh() {
         loadProfile()
+        loadClubAddress()
         loadSubscriptions()
         loadStats()
     }
@@ -153,6 +172,8 @@ class ProfileViewModel @Inject constructor(
 
 data class ProfileUiState(
     val user: User? = null,
+    /** Адрес клуба без города — над ФИО. */
+    val clubAddressLine: String? = null,
     val subscriptions: List<Subscription> = emptyList(),
     val isLoadingSubscriptions: Boolean = false,
     val error: String? = null,

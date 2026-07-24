@@ -91,8 +91,10 @@ fun ProfileScreen(
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.primary,
-                titleContentColor = MaterialTheme.colorScheme.onPrimary
-            )
+                titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+            windowInsets = TopAppBarDefaults.windowInsets,
         )
         
         Box(modifier = Modifier.fillMaxSize()) {
@@ -107,24 +109,25 @@ fun ProfileScreen(
             ) {
                 // User info card
                 item {
-                    if (!uiState.user?.clubName.isNullOrBlank()) {
+                    val addressLine = uiState.clubAddressLine
+                    if (!addressLine.isNullOrBlank()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.FitnessCenter,
+                                imageVector = Icons.Default.LocationOn,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = uiState.user?.clubName ?: "",
+                                text = addressLine,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }

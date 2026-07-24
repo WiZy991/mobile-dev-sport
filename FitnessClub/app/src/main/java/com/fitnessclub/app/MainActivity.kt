@@ -44,7 +44,11 @@ class MainActivity : FragmentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        // Edge-to-edge: на API 35+ система игнорирует decorFits=true; хэдер должен заходить под статус-бар.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        @Suppress("DEPRECATION")
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         dispatchDeepLinks(intent)
 
         setContent {
