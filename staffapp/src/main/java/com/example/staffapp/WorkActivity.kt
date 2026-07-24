@@ -172,6 +172,7 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun handleProfileSectionClick(sectionKey: String) {
+        if (sectionKey in HIDDEN_APP_SECTIONS) return
         when (sectionKey) {
             "schedule" -> if (uiState.showScheduleNav) selectTab(WorkUiState.TAB_SCHEDULE)
             "clients" -> if (uiState.showClientsNav) selectTab(WorkUiState.TAB_CLIENTS)
@@ -326,7 +327,7 @@ class WorkActivity : ComponentActivity() {
         val homeSection = when (role) {
             "ROLE_TRAINER" -> "bookings"
             "ROLE_MANAGER" -> "tasks"
-            "ROLE_FINANCE" -> "subscriptions"
+            "ROLE_FINANCE" -> "clients"
             "ROLE_SUPPORT" -> "app_support"
             "ROLE_SUPER_ADMIN", "ROLE_ADMIN" -> "schedule"
             else -> allowedSections.firstOrNull { it in HOME_SECTIONS }
@@ -597,7 +598,9 @@ class WorkActivity : ComponentActivity() {
                 roleTitle = UiLabels.roleTitle(primaryRole()),
                 sections = sections
                     .distinct()
-                    .filterNot { it == "home" || it == "profile" || it == "admin" }
+                    .filterNot {
+                        it == "home" || it == "profile" || it == "admin" || it in HIDDEN_APP_SECTIONS
+                    }
                     .map { key ->
                         ProfileSectionUi(
                             key = key,
@@ -615,6 +618,7 @@ class WorkActivity : ComponentActivity() {
 
         val extraSections = sections.filter {
             it !in setOf("home", "profile", "schedule", "dashboard", "admin", "clients", "app_support")
+                && it !in HIDDEN_APP_SECTIONS
         }
         if (extraSections.isNotEmpty()) {
             runAsyncForTab(WorkUiState.TAB_PROFILE, "Загрузка...") {
@@ -1024,6 +1028,7 @@ class WorkActivity : ComponentActivity() {
     companion object {
         const val EXTRA_INITIAL_TAB = "extra_initial_tab"
         private const val REQUEST_NOTIFICATIONS = 42
-        private val HOME_SECTIONS = setOf("bookings", "clients", "tasks", "subscriptions", "schedule", "app_support")
+        private val HOME_SECTIONS = setOf("bookings", "clients", "tasks", "schedule", "app_support")
+        private val HIDDEN_APP_SECTIONS = setOf("visits", "subscriptions")
     }
 }

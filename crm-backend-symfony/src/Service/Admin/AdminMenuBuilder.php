@@ -253,8 +253,6 @@ final class AdminMenuBuilder
             'clients' => 'clients',
             'schedule' => 'schedule',
             'bookings' => 'bookings',
-            'subscriptions' => 'subscriptions',
-            'visits' => 'visits',
             'analytics' => 'analytics',
             'finance' => 'finance',
             'app_support' => 'app_support',
