@@ -451,7 +451,7 @@ class AdminController extends AbstractController
         return $names !== [] ? implode(', ', $names) : '—';
     }
 
-    #[Route('/clients/{id}', name: 'admin_client_show', methods: ['GET'])]
+    #[Route('/clients/{id}', name: 'admin_client_show', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function showClient(int $id): Response
     {
         $menu = $this->buildMenu();
@@ -561,7 +561,7 @@ class AdminController extends AbstractController
         ]);
     }
 
-    #[Route('/clients/{id}/notes', name: 'admin_note_new', methods: ['POST'])]
+    #[Route('/clients/{id}/notes', name: 'admin_note_new', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function addClientNote(int $id, Request $request): Response
     {
         $client = $this->em->getRepository(User::class)->find($id);
@@ -733,7 +733,7 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_client_show', ['id' => $user->getId()]);
     }
 
-    #[Route('/clients/{id}/update', name: 'admin_client_update', methods: ['POST'])]
+    #[Route('/clients/{id}/update', name: 'admin_client_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function updateClient(int $id, Request $request): Response
     {
         $user = $this->em->getRepository(User::class)->find($id);
@@ -747,7 +747,7 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_client_show', ['id' => $id]);
     }
 
-    #[Route('/clients/{id}/block', name: 'admin_client_block', methods: ['POST'])]
+    #[Route('/clients/{id}/block', name: 'admin_client_block', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function blockClient(int $id): Response
     {
         $user = $this->em->getRepository(User::class)->find($id);
@@ -1926,7 +1926,7 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_section', ['section' => 'promotions']);
     }
 
-    #[Route('/clients/export', name: 'admin_clients_export', methods: ['GET'])]
+    #[Route('/clients/export', name: 'admin_clients_export', priority: 10, methods: ['GET'])]
     public function exportClients(Request $request): Response
     {
         if (!$this->passportAccess->canExportPassportDetails($this->getUser())) {

@@ -78,16 +78,19 @@ admin_client_show:
   path: /admin/clients/{id}
   controller: App\Controller\Admin\AdminController::showClient
   methods: [GET]
+  requirements: { id: '\d+' }
 
 admin_client_update:
   path: /admin/clients/{id}/update
   controller: App\Controller\Admin\AdminController::updateClient
   methods: [POST]
+  requirements: { id: '\d+' }
 
 admin_client_block:
   path: /admin/clients/{id}/block
   controller: App\Controller\Admin\AdminController::blockClient
   methods: [POST]
+  requirements: { id: '\d+' }
 
 admin_subscription_freeze:
   path: /admin/subscriptions/{id}/freeze
@@ -243,11 +246,13 @@ admin_clients_export:
   path: /admin/clients/export
   controller: App\Controller\Admin\AdminController::exportClients
   methods: [GET]
+  priority: 10
 
 admin_clients_import:
   path: /admin/clients/import
   controller: App\Controller\Admin\AdminController::clientsImport
   methods: [GET, POST]
+  priority: 10
 
 admin_sales_export:
   path: /admin/sales/export
@@ -258,6 +263,7 @@ admin_note_new:
   path: /admin/clients/{id}/notes
   controller: App\Controller\Admin\AdminController::addClientNote
   methods: [POST]
+  requirements: { id: '\d+' }
 
 admin_document_upload:
   path: /admin/documents/upload
