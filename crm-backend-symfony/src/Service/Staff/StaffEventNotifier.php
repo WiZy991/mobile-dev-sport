@@ -21,6 +21,7 @@ final class StaffEventNotifier
         private readonly EntityManagerInterface $em,
         private readonly AdminMenuBuilder $adminMenuBuilder,
         private readonly FcmPushSender $fcmPushSender,
+        private readonly FcmPushSender $staffFcmPushSender,
     ) {
     }
 
@@ -88,12 +89,19 @@ final class StaffEventNotifier
             static fn (StaffUser $staff) => $staff->getId(),
             $recipients
         )));
-        $this->fcmPushSender->sendToStaffUserIds(
+        $this->staffPush()->sendToStaffUserIds(
             $staffIds,
             $title,
             $body,
             ['type' => $type, 'referenceId' => $referenceId ?? '']
         );
+    }
+
+    private function staffPush(): FcmPushSender
+    {
+        return $this->staffFcmPushSender->isConfigured()
+            ? $this->staffFcmPushSender
+            : $this->fcmPushSender;
     }
 
     /** @return list<StaffUser> */

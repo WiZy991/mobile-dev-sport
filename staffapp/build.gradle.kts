@@ -8,6 +8,10 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+// Android Studio sync may request this on subprojects; with AGP 9 built-in Kotlin
+// the task exists only on the root project unless registered here.
+tasks.register("prepareKotlinBuildScriptModel") {}
+
 val keystorePropertiesFile = rootProject.file("staffapp/keystore.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) {
@@ -26,8 +30,8 @@ android {
         applicationId = "ru.worldcashfit.staff"
         minSdk = 27
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -85,6 +89,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation("androidx.browser:browser:1.8.0")
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Firebase Cloud Messaging (push-уведомления)
     implementation(platform(libs.firebase.bom))

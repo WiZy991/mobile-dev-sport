@@ -1,0 +1,209 @@
+package com.example.staffapp
+
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.example.staffapp.ui.legal.LegalPdfScreen
+import com.example.staffapp.ui.onboarding.OnboardingScreen
+import com.example.staffapp.ui.onboarding.OnboardingUiState
+import com.example.staffapp.ui.theme.StaffTheme
+import kotlin.concurrent.thread
+
+class OnboardingActivity : ComponentActivity() {
+    private lateinit var apiClient: StaffApiClient
+    private lateinit var store: StaffSessionStore
+    private var session: StaffSession? = null
+    private var lastPaymentId: Int? = null
+
+    private var uiState by mutableStateOf(OnboardingUiState())
+    private var showOfferPdf by mutableStateOf(false)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        apiClient = StaffApiClient(StaffApiUrl.resolve(this))
+        store = StaffSessionStore(this)
+        session = store.loadSession()
+        if (session == null) {
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+            return
+        }
+
+        setContent {
+            StaffTheme {
+                if (showOfferPdf) {
+                    LegalPdfScreen(onNavigateBack = { showOfferPdf = false })
+                } else {
+                    OnboardingScreen(
+                        state = uiState,
+                        onOfferAcceptedChange = { uiState = uiState.copy(offerAccepted = it) },
+                        onOpenOffer = { showOfferPdf = true },
+                        onPayClick = { startPayment() },
+                        onRefresh = { refreshOnboarding() },
+                        onLogout = { logout() },
+                    )
+                }
+            }
+        }
+        handlePaymentDeepLink(intent)
+        refreshOnboarding()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePaymentDeepLink(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val paymentId = lastPaymentId
+        if (paymentId != null) {
+            pollPayment(paymentId)
+        } else {
+            refreshOnboarding(silent = true)
+        }
+    }
+
+    private fun handlePaymentDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "staffapp" || data.host != "payment") return
+        val paymentId = data.getQueryParameter("payment_id")?.toIntOrNull()
+        if (paymentId != null && paymentId > 0) {
+            lastPaymentId = paymentId
+            pollPayment(paymentId)
+        }
+    }
+
+    private fun refreshOnboarding(silent: Boolean = false) {
+        runAsync(if (silent) null else "Обновляем статус...") {
+            val onboarding = executeWithRefresh { apiClient.loadOnboarding(it) }
+            applyOnboarding(onboarding)
+            if (onboarding.status == "active") {
+                openWork()
+            }
+            "Готово"
+        }
+    }
+
+    private fun startPayment() {
+        runAsync("Создаём платёж...") {
+            val result = executeWithRefresh {
+                apiClient.initRentalPayment(it, offerAccepted = uiState.offerAccepted)
+            }
+            val url = result.paymentUrl
+            if (url.isNullOrBlank()) {
+                throw IllegalStateException("Не получен URL оплаты Альфа-Банка. Проверьте настройки эквайринга на сервере.")
+            }
+            lastPaymentId = result.paymentId
+            runOnUiThread {
+                openPaymentUrl(url)
+            }
+            "Откройте страницу оплаты Альфа-Банка"
+        }
+    }
+
+    private fun openPaymentUrl(url: String) {
+        try {
+            CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .build()
+                .launchUrl(this, Uri.parse(url))
+        } catch (e: Exception) {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (e2: Exception) {
+                uiState = uiState.copy(
+                    errorMessage = "Не удалось открыть страницу оплаты: ${e2.message ?: e.message}",
+                )
+            }
+        }
+    }
+
+    private fun pollPayment(paymentId: Int) {
+        runAsync("Проверяем оплату...") {
+            val status = executeWithRefresh { apiClient.rentalPaymentStatus(it, paymentId) }
+            applyOnboarding(status.onboarding)
+            if (status.status == "paid" || status.onboarding.status == "active") {
+                lastPaymentId = null
+                openWork()
+                "Оплата прошла"
+            } else {
+                "Статус: ${status.status}"
+            }
+        }
+    }
+
+    private fun applyOnboarding(onboarding: StaffOnboarding) {
+        runOnUiThread {
+            uiState = uiState.copy(
+                status = onboarding.status,
+                offerUrl = onboarding.offerUrl,
+                amountRub = onboarding.rentalAmountRub,
+                rentalPaidUntil = onboarding.rentalPaidUntil,
+                errorMessage = null,
+            )
+        }
+    }
+
+    private fun openWork() {
+        thread {
+            try {
+                val cfg = executeWithRefresh { apiClient.loadConfig(it) }
+                store.saveConfig(cfg)
+            } catch (_: Exception) {
+            }
+            runOnUiThread {
+                startActivity(Intent(this, WorkActivity::class.java))
+                finish()
+            }
+        }
+    }
+
+    private fun logout() {
+        store.clearAll()
+        startActivity(Intent(this, MainActivity::class.java))
+        finish()
+    }
+
+    private fun runAsync(progressText: String?, action: () -> String) {
+        if (progressText != null) {
+            uiState = uiState.copy(isLoading = true, statusMessage = progressText, errorMessage = null)
+        }
+        thread {
+            try {
+                val msg = action()
+                runOnUiThread {
+                    uiState = uiState.copy(isLoading = false, statusMessage = msg)
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        statusMessage = null,
+                        errorMessage = UserFacingError.message(e),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun <T> executeWithRefresh(action: (token: String) -> T): T {
+        val current = session ?: throw IllegalStateException("Нет сессии")
+        return try {
+            action(current.accessToken)
+        } catch (e: IllegalStateException) {
+            if (!e.message.orEmpty().contains("401")) throw e
+            val refreshed = apiClient.refresh(current.refreshToken)
+            session = refreshed
+            store.saveSession(refreshed)
+            action(refreshed.accessToken)
+        }
+    }
+}

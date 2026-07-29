@@ -22,6 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.ui.theme.*
+import com.fitnessclub.app.data.model.resolvedSocialLinks
+
+private fun parseSocialColor(hex: String): Color =
+    runCatching { Color(android.graphics.Color.parseColor(hex)) }
+        .getOrElse { Color(0xFF6B7280) }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -180,52 +185,41 @@ fun ClubInfoScreen(
                 }
             }
             
-            // Social links
+            // Social links (динамический список из CRM)
             item {
-                Text(
-                    text = "Мы в социальных сетях",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-            
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Column {
-                        SocialItem(
-                            name = "ВКонтакте",
-                            color = Color(0xFF4C75A3),
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vk.com/fitnessclub"))
-                                context.startActivity(intent)
+                val links = club?.network?.resolvedSocialLinks().orEmpty()
+                if (links.isNotEmpty()) {
+                    Text(
+                        text = "Мы в социальных сетях",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column {
+                            links.forEachIndexed { index, link ->
+                                SocialItem(
+                                    name = link.displayLabel,
+                                    letter = link.iconLetter,
+                                    color = parseSocialColor(link.colorHex),
+                                    onClick = {
+                                        runCatching {
+                                            context.startActivity(
+                                                Intent(Intent.ACTION_VIEW, Uri.parse(link.url))
+                                            )
+                                        }
+                                    }
+                                )
+                                if (index < links.lastIndex) {
+                                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                                }
                             }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        
-                        SocialItem(
-                            name = "Telegram",
-                            color = Color(0xFF0088CC),
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/fitnessclub"))
-                                context.startActivity(intent)
-                            }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        
-                        SocialItem(
-                            name = "WhatsApp",
-                            color = Color(0xFF25D366),
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/74991234567"))
-                                context.startActivity(intent)
-                            }
-                        )
+                        }
                     }
                 }
             }
@@ -305,6 +299,7 @@ private fun ContactItem(
 @Composable
 private fun SocialItem(
     name: String,
+    letter: String,
     color: Color,
     onClick: () -> Unit
 ) {
@@ -323,9 +318,10 @@ private fun SocialItem(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = name.first().toString(),
+                text = letter.take(3),
                 color = Color.White,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelMedium,
             )
         }
         Spacer(modifier = Modifier.width(16.dp))

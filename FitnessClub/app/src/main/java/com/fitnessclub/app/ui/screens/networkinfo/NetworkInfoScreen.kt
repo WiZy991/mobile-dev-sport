@@ -158,16 +158,11 @@ fun NetworkInfoScreen(
                 }
             }
 
-            if (uiState.socialVk != null || uiState.socialTelegram != null) {
+            if (uiState.socialLinks.isNotEmpty()) {
                 SectionCard(title = "Соцсети") {
-                    uiState.socialVk?.let { url ->
-                        TextButton(onClick = { runCatching { uriHandler.openUri(url) } }) {
-                            Text("ВКонтакте")
-                        }
-                    }
-                    uiState.socialTelegram?.let { url ->
-                        TextButton(onClick = { runCatching { uriHandler.openUri(url) } }) {
-                            Text("Telegram")
+                    uiState.socialLinks.forEach { link ->
+                        TextButton(onClick = { runCatching { uriHandler.openUri(link.url) } }) {
+                            Text(link.displayLabel)
                         }
                     }
                 }

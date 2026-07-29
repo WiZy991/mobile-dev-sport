@@ -24,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.LaunchedEffect
 import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.push.PushTokenRegistrar
+import com.fitnessclub.app.push.RequestNotificationPermission
 import com.fitnessclub.app.ui.navigation.NavGraph
 import com.fitnessclub.app.ui.theme.FitnessClubTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -43,7 +44,11 @@ class MainActivity : FragmentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        // Edge-to-edge: на API 35+ система игнорирует decorFits=true; хэдер должен заходить под статус-бар.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        @Suppress("DEPRECATION")
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         dispatchDeepLinks(intent)
 
         setContent {
@@ -71,6 +76,8 @@ class MainActivity : FragmentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val isLoggedIn by authRepository.isLoggedIn().collectAsState(initial = false)
+
+                    RequestNotificationPermission(enabled = isLoggedIn)
 
                     LaunchedEffect(isLoggedIn) {
                         if (isLoggedIn) {

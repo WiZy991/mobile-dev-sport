@@ -35,8 +35,8 @@ class PaymentPendingViewModel @Inject constructor(
     private var finished = false
     private var activePaymentId: Int? = null
 
+    /** Останавливает цикл опроса, но не блокирует финальную проверку при уходе. */
     fun cancelPolling() {
-        finished = true
         pollJob?.cancel()
         pollJob = null
     }
@@ -67,6 +67,20 @@ class PaymentPendingViewModel @Inject constructor(
                 pollJob?.cancel()
             }
         }
+    }
+
+    /**
+     * Перед уходом с экрана: остановить polling и один раз проверить статус.
+     * @return true если уже обработано (Success/Failed событие уйдёт в UI), false — можно спокойно уйти.
+     */
+    suspend fun leaveAndCheckOnce(paymentId: Int): Boolean {
+        cancelPolling()
+        if (finished) return true
+        val done = checkOnce(paymentId)
+        if (done) {
+            finished = true
+        }
+        return done
     }
 
     private fun startPolling(paymentId: Int) {

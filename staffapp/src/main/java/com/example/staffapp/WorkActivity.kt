@@ -1,18 +1,18 @@
 package com.example.staffapp
 
+import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.example.staffapp.ui.theme.StaffTheme
 import com.example.staffapp.ui.work.ActionUi
+import com.example.staffapp.ui.work.AssignClientDialogUi
+import com.example.staffapp.ui.work.CreateSessionDialogUi
 import com.example.staffapp.ui.work.ProfileSectionUi
 import com.example.staffapp.ui.work.SectionHints
 import com.example.staffapp.ui.work.BadgeColor
@@ -22,6 +22,7 @@ import com.example.staffapp.ui.work.HomeTabUi
 import com.example.staffapp.ui.work.ListCardUi
 import com.example.staffapp.ui.work.MetricUi
 import com.example.staffapp.ui.work.ProfileTabUi
+import com.example.staffapp.ui.work.ScheduleBookingUi
 import com.example.staffapp.ui.work.ScheduleDayUi
 import com.example.staffapp.ui.work.ScheduleSessionUi
 import com.example.staffapp.ui.work.ScheduleTabUi
@@ -45,6 +46,16 @@ class WorkActivity : ComponentActivity() {
     private var selectedScheduleTypeFilter: String? = null
     private var selectedSupportFilter: String? = null
     private var clientsSearchQuery: String = ""
+
+    private val requestNotifications = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            StaffPushRegistrar.registerIfLoggedIn(this)
+        }
+        refreshNotificationBanner()
+    }
+
     private var loadGeneration = 0
     private var initialDataLoaded = false
     private val sessionLock = Any()
@@ -77,7 +88,7 @@ class WorkActivity : ComponentActivity() {
                         scheduleData?.let { renderSchedule(it) }
                     },
                     onScheduleTypeFilterSelected = { filter ->
-                        selectedScheduleTypeFilter = filter
+                        selectedScheduleTypeFilter = if (filter == "group") null else filter
                         scheduleData?.let { renderSchedule(it) }
                     },
                     onSupportFilterSelected = { filter ->
@@ -94,15 +105,72 @@ class WorkActivity : ComponentActivity() {
                     },
                     onListCardClick = { handleListCardClick(it) },
                     onProfileSectionClick = { handleProfileSectionClick(it) },
+                    onScheduleSessionClick = { openAssignDialog(it) },
+                    onAssignQueryChange = { q ->
+                        uiState.assignDialog?.let { d ->
+                            uiState = uiState.copy(assignDialog = d.copy(query = q))
+                        }
+                    },
+                    onAssignSearch = { searchAssignClients() },
+                    onAssignBook = { bookAssignClient(it) },
+                    onAssignCancelBooking = { cancelAssignBooking(it) },
+                    onAssignDismiss = { uiState = uiState.copy(assignDialog = null) },
+                    onCreateSessionClick = { openCreateSessionDialog() },
+                    onCreateNameChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(name = v))
+                        }
+                    },
+                    onCreateStartTimeChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(startTime = v))
+                        }
+                    },
+                    onCreateEndTimeChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(endTime = v))
+                        }
+                    },
+                    onCreateRoomChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(room = v))
+                        }
+                    },
+                    onCreateConfirm = { createSession() },
+                    onCreateDismiss = { uiState = uiState.copy(createSessionDialog = null) },
+                    onNotificationPermissionResult = { granted ->
+                        if (granted) {
+                            StaffPushRegistrar.registerIfLoggedIn(this)
+                        }
+                        refreshNotificationBanner()
+                    },
                 )
             }
         }
 
         StaffNotificationHelper.ensureChannel(this)
-        requestNotificationPermissionIfNeeded()
         StaffPushRegistrar.registerIfLoggedIn(this)
-        selectTab(requestedTab)
-        loadData()
+        thread {
+            try {
+                val onboarding = withRefresh { apiClient.loadOnboarding(it) }
+                if (onboarding.status != "active") {
+                    runOnUiThread {
+                        startActivity(Intent(this, OnboardingActivity::class.java))
+                        finish()
+                    }
+                    return@thread
+                }
+                runOnUiThread {
+                    selectTab(requestedTab)
+                    loadData()
+                }
+            } catch (_: Exception) {
+                runOnUiThread {
+                    selectTab(requestedTab)
+                    loadData()
+                }
+            }
+        }
     }
 
     private fun handleListCardClick(card: ListCardUi) {
@@ -117,6 +185,7 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun handleProfileSectionClick(sectionKey: String) {
+        if (sectionKey in HIDDEN_APP_SECTIONS) return
         when (sectionKey) {
             "schedule" -> if (uiState.showScheduleNav) selectTab(WorkUiState.TAB_SCHEDULE)
             "clients" -> if (uiState.showClientsNav) selectTab(WorkUiState.TAB_CLIENTS)
@@ -136,6 +205,8 @@ class WorkActivity : ComponentActivity() {
     private fun handleAction(actionId: String) {
         when {
             actionId == "open_admin" -> startActivity(Intent(this, AdminActivity::class.java))
+            actionId == "edit_trainer_profile" -> startActivity(Intent(this, TrainerProfileActivity::class.java))
+            actionId == "enable_notifications" -> requestOrOpenNotificationSettings()
             actionId == "retry" -> selectTab(uiState.selectedTab)
             actionId == "mark_notifications_read" -> {
                 runAsyncForTab(uiState.selectedTab, "Сохранение...") {
@@ -166,7 +237,7 @@ class WorkActivity : ComponentActivity() {
 
     private fun updateNavVisibility() {
         config = store.loadConfig() ?: config
-        val sections = config?.appSections.orEmpty()
+        val sections = (config?.appSections.orEmpty() + allowedSections).distinct()
         val adminSections = config?.adminSections.orEmpty()
         uiState = uiState.copy(
             showScheduleNav = sections.contains("schedule") || adminSections.contains("schedule"),
@@ -177,12 +248,16 @@ class WorkActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        refreshNotificationBanner()
         if (session != null && allowedSections.contains("app_support")) {
             pollUnreadNotifications()
         }
     }
 
     private fun loadData() = runAsync("Загрузка...") {
+        val cfg = withRefresh { token -> apiClient.loadConfig(token) }
+        config = cfg
+        store.saveConfig(cfg)
         val data = withRefresh { token -> apiClient.loadAppData(token) }
         appData = data
         allowedSections = data.sections
@@ -225,29 +300,46 @@ class WorkActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
+    private fun requestOrOpenNotificationSettings() {
+        if (NotificationPermissionHelper.needsRuntimePrompt(this)) {
+            requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+            window.decorView.postDelayed({
+                if (!NotificationPermissionHelper.notificationsEnabled(this) &&
+                    NotificationPermissionHelper.shouldOpenSettings(this)
+                ) {
+                    NotificationPermissionHelper.openAppNotificationSettings(this)
+                }
+                refreshNotificationBanner()
+            }, 800)
             return
         }
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-            REQUEST_NOTIFICATIONS,
-        )
+        if (!NotificationPermissionHelper.notificationsEnabled(this)) {
+            NotificationPermissionHelper.openAppNotificationSettings(this)
+        }
+        refreshNotificationBanner()
+    }
+
+    private fun refreshNotificationBanner() {
+        val need = !NotificationPermissionHelper.notificationsEnabled(this)
+        if (uiState.home.needNotificationsPermission == need) return
+        uiState = uiState.copy(home = uiState.home.copy(needNotificationsPermission = need))
     }
 
     private fun showHomeTab() {
         uiState = uiState.copy(
             screenTitle = "Главная",
             errorMessage = null,
-            home = HomeTabUi(loading = appData == null),
+            home = HomeTabUi(
+                loading = appData == null,
+                needNotificationsPermission = !NotificationPermissionHelper.notificationsEnabled(this),
+            ),
         )
         val data = appData ?: return
         val role = primaryRole()
-        val showAdmin = !config?.adminSections.isNullOrEmpty() || allowedSections.contains("admin")
+        val showAdmin = config?.adminActions?.contains("admin.write") == true
+            || role == "ROLE_ADMIN"
+            || role == "ROLE_SUPER_ADMIN"
+            || role == "ROLE_MANAGER"
         val metrics = data.metrics.map { (key, value) ->
             MetricUi(UiLabels.metricTitle(key), value.toString())
         }
@@ -258,13 +350,14 @@ class WorkActivity : ComponentActivity() {
                 metrics = metrics,
                 showAdminButton = showAdmin,
                 loading = true,
+                needNotificationsPermission = !NotificationPermissionHelper.notificationsEnabled(this),
             ),
         )
 
         val homeSection = when (role) {
             "ROLE_TRAINER" -> "bookings"
             "ROLE_MANAGER" -> "tasks"
-            "ROLE_FINANCE" -> "subscriptions"
+            "ROLE_FINANCE" -> "clients"
             "ROLE_SUPPORT" -> "app_support"
             "ROLE_SUPER_ADMIN", "ROLE_ADMIN" -> "schedule"
             else -> allowedSections.firstOrNull { it in HOME_SECTIONS }
@@ -393,6 +486,7 @@ class WorkActivity : ComponentActivity() {
         val selectedDate = selectedScheduleDate
         val dayItems = schedule.items
             .filter { it.date == selectedDate }
+            .filter { it.type != "group" }
             .filter { typeFilter == null || it.type == typeFilter }
         uiState = uiState.copy(
             schedule = ScheduleTabUi(
@@ -522,7 +616,10 @@ class WorkActivity : ComponentActivity() {
         config = store.loadConfig() ?: config
         val data = appData
         val sections = if (allowedSections.isNotEmpty()) allowedSections else config?.appSections.orEmpty()
-        val adminAvailable = !config?.adminSections.isNullOrEmpty() || sections.contains("admin")
+        val adminAvailable = config?.adminActions?.contains("admin.write") == true
+            || primaryRole() in setOf("ROLE_ADMIN", "ROLE_SUPER_ADMIN", "ROLE_MANAGER")
+        val showTrainerEdit = primaryRole() == "ROLE_TRAINER"
+            || (config?.roles.orEmpty() + appData?.roles.orEmpty()).contains("ROLE_TRAINER")
         uiState = uiState.copy(
             screenTitle = "Профиль",
             profile = ProfileTabUi(
@@ -530,7 +627,10 @@ class WorkActivity : ComponentActivity() {
                 email = data?.employeeEmail ?: "",
                 roleTitle = UiLabels.roleTitle(primaryRole()),
                 sections = sections
-                    .filterNot { it == "home" || it == "profile" || it == "admin" }
+                    .distinct()
+                    .filterNot {
+                        it == "home" || it == "profile" || it == "admin" || it in HIDDEN_APP_SECTIONS
+                    }
                     .map { key ->
                         ProfileSectionUi(
                             key = key,
@@ -540,6 +640,7 @@ class WorkActivity : ComponentActivity() {
                     },
                 adminAvailable = adminAvailable,
                 showAdminButton = adminAvailable,
+                showTrainerProfileEdit = showTrainerEdit,
                 loading = data == null,
             ),
             errorMessage = null,
@@ -547,6 +648,7 @@ class WorkActivity : ComponentActivity() {
 
         val extraSections = sections.filter {
             it !in setOf("home", "profile", "schedule", "dashboard", "admin", "clients", "app_support")
+                && it !in HIDDEN_APP_SECTIONS
         }
         if (extraSections.isNotEmpty()) {
             runAsyncForTab(WorkUiState.TAB_PROFILE, "Загрузка...") {
@@ -622,6 +724,7 @@ class WorkActivity : ComponentActivity() {
     private fun scheduleToSession(item: ScheduleItem): ScheduleSessionUi {
         val (booked, max) = parseParticipants(item.participants)
         return ScheduleSessionUi(
+            trainingId = item.id,
             title = item.title,
             type = item.type,
             typeLabel = UiLabels.trainingType(item.type),
@@ -630,10 +733,175 @@ class WorkActivity : ComponentActivity() {
             durationMinutes = durationMinutes(item.startTime, item.endTime),
             trainer = item.trainer,
             room = item.room,
-            bookedCount = booked,
-            maxParticipants = max,
+            bookedCount = item.currentParticipants ?: booked,
+            maxParticipants = item.maxParticipants ?: max,
             clientNames = item.clientNames,
+            bookings = item.bookings.map {
+                ScheduleBookingUi(id = it.id, clientName = it.clientName, clientId = it.clientId)
+            },
         )
+    }
+
+    private fun openAssignDialog(session: ScheduleSessionUi) {
+        val trainingId = session.trainingId ?: return
+        uiState = uiState.copy(
+            assignDialog = AssignClientDialogUi(
+                trainingId = trainingId,
+                sessionTitle = "${session.startTime} ${session.title}",
+                booked = session.bookings.map {
+                    ListCardUi(title = it.clientName, meta = it.id)
+                },
+            ),
+        )
+        searchAssignClients()
+    }
+
+    private fun openCreateSessionDialog() {
+        val date = selectedScheduleDate ?: todayDate()
+        uiState = uiState.copy(
+            createSessionDialog = CreateSessionDialogUi(date = date),
+        )
+    }
+
+    private fun createSession() {
+        val dialog = uiState.createSessionDialog ?: return
+        val startTime = normalizeTime(dialog.startTime) ?: run {
+            uiState = uiState.copy(
+                createSessionDialog = dialog.copy(errorMessage = "Укажите время начала в формате ЧЧ:ММ"),
+            )
+            return
+        }
+        val endTime = normalizeTime(dialog.endTime) ?: run {
+            uiState = uiState.copy(
+                createSessionDialog = dialog.copy(errorMessage = "Укажите время окончания в формате ЧЧ:ММ"),
+            )
+            return
+        }
+        uiState = uiState.copy(createSessionDialog = dialog.copy(loading = true, errorMessage = null))
+        thread {
+            try {
+                val created = withRefresh { token ->
+                    apiClient.createTraining(
+                        token = token,
+                        name = dialog.name.trim().ifBlank { "Персональная тренировка" },
+                        type = "personal",
+                        startAtIso = "${dialog.date}T$startTime:00",
+                        endAtIso = "${dialog.date}T$endTime:00",
+                        room = dialog.room.trim().ifBlank { null },
+                        maxParticipants = 1,
+                    )
+                }
+                runOnUiThread {
+                    uiState = uiState.copy(
+                        createSessionDialog = null,
+                        statusMessage = "Занятие создано",
+                    )
+                    selectedScheduleDate = created.date.ifBlank { dialog.date }
+                    showScheduleTab()
+                    scheduleToSession(created).let { openAssignDialog(it) }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState.createSessionDialog?.let {
+                        uiState = uiState.copy(
+                            createSessionDialog = it.copy(
+                                loading = false,
+                                errorMessage = UserFacingError.message(e),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun normalizeTime(raw: String): String? {
+        val m = Regex("""^(\d{1,2}):(\d{2})$""").find(raw.trim()) ?: return null
+        val h = m.groupValues[1].toIntOrNull() ?: return null
+        val min = m.groupValues[2].toIntOrNull() ?: return null
+        if (h !in 0..23 || min !in 0..59) return null
+        return "%02d:%02d".format(h, min)
+    }
+
+    private fun searchAssignClients() {
+        val dialog = uiState.assignDialog ?: return
+        uiState = uiState.copy(assignDialog = dialog.copy(loading = true, errorMessage = null))
+        thread {
+            try {
+                val clients = withRefresh { apiClient.loadClients(it, dialog.query) }
+                runOnUiThread {
+                    val current = uiState.assignDialog ?: return@runOnUiThread
+                    uiState = uiState.copy(
+                        assignDialog = current.copy(
+                            loading = false,
+                            clients = clients.map {
+                                ListCardUi(
+                                    title = it.name,
+                                    subtitle = listOf(it.phone, it.email).filter { s -> s.isNotBlank() }.joinToString(" · "),
+                                    clientId = it.id,
+                                )
+                            },
+                        ),
+                    )
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState.assignDialog?.let {
+                        uiState = uiState.copy(
+                            assignDialog = it.copy(loading = false, errorMessage = UserFacingError.message(e)),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun bookAssignClient(clientId: Int) {
+        val dialog = uiState.assignDialog ?: return
+        thread {
+            try {
+                withRefresh { apiClient.bookClientOnTraining(it, dialog.trainingId, clientId) }
+                runOnUiThread {
+                    uiState = uiState.copy(assignDialog = null, statusMessage = "Клиент записан")
+                    showScheduleTab()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState.assignDialog?.let {
+                        uiState = uiState.copy(
+                            assignDialog = it.copy(errorMessage = UserFacingError.message(e)),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun cancelAssignBooking(bookingId: String) {
+        thread {
+            try {
+                val trainingRemoved = withRefresh { apiClient.cancelStaffBooking(it, bookingId) }
+                runOnUiThread {
+                    uiState = uiState.copy(
+                        assignDialog = null,
+                        statusMessage = if (trainingRemoved) {
+                            "Запись снята, занятие убрано из расписания"
+                        } else {
+                            "Запись снята"
+                        },
+                    )
+                    showScheduleTab()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    uiState.assignDialog?.let {
+                        uiState = uiState.copy(
+                            assignDialog = it.copy(errorMessage = UserFacingError.message(e)),
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private fun parseDayLabel(label: String): Pair<String, String> {
@@ -727,12 +995,14 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun primaryRole(): String {
-        val roles = config?.roles.orEmpty()
+        val roles = (config?.roles.orEmpty() + appData?.roles.orEmpty()).distinct()
         val priority = listOf(
             "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_TRAINER", "ROLE_MANAGER",
             "ROLE_SUPPORT", "ROLE_FINANCE", "ROLE_VIEWER",
         )
-        return priority.firstOrNull { roles.contains(it) } ?: roles.firstOrNull() ?: "ROLE_VIEWER"
+        return priority.firstOrNull { roles.contains(it) }
+            ?: roles.firstOrNull { it != "ROLE_STAFF" }
+            ?: "ROLE_VIEWER"
     }
 
     private fun todayDate(): String {
@@ -787,7 +1057,7 @@ class WorkActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_INITIAL_TAB = "extra_initial_tab"
-        private const val REQUEST_NOTIFICATIONS = 42
-        private val HOME_SECTIONS = setOf("bookings", "clients", "tasks", "subscriptions", "schedule", "app_support")
+        private val HOME_SECTIONS = setOf("bookings", "clients", "tasks", "schedule", "app_support")
+        private val HIDDEN_APP_SECTIONS = setOf("visits", "subscriptions")
     }
 }

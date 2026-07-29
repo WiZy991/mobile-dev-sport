@@ -151,7 +151,7 @@ class PaymentController extends AbstractController
         if (!$payment) {
             return $this->json(['error' => 'Payment not found'], 404);
         }
-        if ($payment->getUser()->getId() !== $user->getId()) {
+        if ($payment->getUser()?->getId() !== $user->getId()) {
             return $this->json(['error' => 'Forbidden'], 403);
         }
 
@@ -178,10 +178,11 @@ class PaymentController extends AbstractController
             'amount_kopecks' => $payment->getAmountKopecks(),
             'currency' => $payment->getCurrency(),
             'order_number' => $payment->getOrderNumber(),
-            'plan_id' => 'plan-' . $plan->getId(),
-            'plan_name' => $plan->getName(),
+            'type' => $payment->getType(),
+            'plan_id' => $plan !== null ? 'plan-' . $plan->getId() : null,
+            'plan_name' => $plan?->getName(),
             'discount_amount' => $payment->getDiscountAmount(),
-            'original_price' => $plan->getPrice(),
+            'original_price' => $plan?->getPrice(),
             'final_price' => $payment->getAmountKopecks() / 100,
             'expires_at' => $payment->getExpiresAt()?->format(\DateTimeInterface::ATOM),
             'paid_at' => $payment->getPaidAt()?->format(\DateTimeInterface::ATOM),
@@ -189,7 +190,7 @@ class PaymentController extends AbstractController
             'payment_way' => $payment->getPaymentWay(),
         ];
 
-        if ($includeSubscription && $payment->getSubscription() !== null) {
+        if ($includeSubscription && $payment->getSubscription() !== null && $plan !== null) {
             $sub = $payment->getSubscription();
             $data['subscription'] = [
                 'id' => 'sub-' . $sub->getId(),

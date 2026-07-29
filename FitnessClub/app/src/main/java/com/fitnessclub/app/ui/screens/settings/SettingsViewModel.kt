@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -212,8 +213,14 @@ class SettingsViewModel @Inject constructor(
                 onMessage("Войдите в аккаунт ещё раз, затем включите отпечаток")
                 return@launch
             }
+            val userId = tokenManager.getUser().first()?.id
             withContext(Dispatchers.Main) {
-                BiometricLoginCoordinator.startEncryptPrompt(act, biometricLoginStore, rt) { ok, err ->
+                BiometricLoginCoordinator.startEncryptPrompt(
+                    act,
+                    biometricLoginStore,
+                    rt,
+                    userId = userId,
+                ) { ok, err ->
                     if (ok) {
                         refreshBiometricUi()
                         onMessage("Вход по отпечатку включён")

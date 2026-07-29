@@ -69,7 +69,9 @@ class AdminActivity : ComponentActivity() {
                         metrics = data.widgets.map { (key, value) ->
                             MetricUi(UiLabels.metricTitle(key), value.toString())
                         },
-                        sections = data.adminSections.map { section ->
+                        sections = data.adminSections
+                            .filterNot { it == "visits" || it == "subscriptions" }
+                            .map { section ->
                             AdminSectionRowUi(
                                 key = section,
                                 title = adminMenu[section] ?: UiLabels.sectionTitle(section),

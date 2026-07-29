@@ -13,19 +13,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +43,6 @@ data class LoginUiState(
     val isLoading: Boolean = false,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     state: LoginUiState,
@@ -118,10 +109,10 @@ fun LoginScreen(
                         visualTransformation = PasswordVisualTransformation(),
                         shape = RoundedCornerShape(14.dp),
                     )
-                    RoleDropdown(
-                        roles = state.roles,
-                        selected = state.selectedRole,
-                        onSelected = onRoleSelected,
+                    Text(
+                        text = "Регистрация доступна только для тренеров. После заявки администратор одобрит доступ.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StaffOnSurfaceVariant,
                     )
                     if (state.configSummary.isNotBlank()) {
                         Text(
@@ -151,42 +142,6 @@ fun LoginScreen(
                         StaffErrorState(message = it)
                     }
                 }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RoleDropdown(
-    roles: List<RoleOptionUi>,
-    selected: RoleOptionUi?,
-    onSelected: (RoleOptionUi) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it },
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        OutlinedTextField(
-            value = selected?.label.orEmpty(),
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Должность") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            roles.forEach { role ->
-                DropdownMenuItem(
-                    text = { Text(role.label) },
-                    onClick = {
-                        onSelected(role)
-                        expanded = false
-                    },
-                )
             }
         }
     }

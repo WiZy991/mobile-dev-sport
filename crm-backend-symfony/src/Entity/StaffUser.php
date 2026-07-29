@@ -51,6 +51,23 @@ class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface, Te
     #[ORM\JoinColumn(name: 'organization_id', referencedColumnName: 'id', nullable: true, onDelete: 'CASCADE')]
     private ?Organization $organization = null;
 
+    public const REGISTRATION_PENDING = 'pending';
+    public const REGISTRATION_APPROVED = 'approved';
+    public const REGISTRATION_REJECTED = 'rejected';
+
+    #[ORM\Column(name: 'registration_status', type: 'string', length: 20)]
+    private string $registrationStatus = self::REGISTRATION_APPROVED;
+
+    #[ORM\Column(name: 'offer_accepted_at', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $offerAcceptedAt = null;
+
+    #[ORM\Column(name: 'rental_paid_until', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $rentalPaidUntil = null;
+
+    #[ORM\OneToOne(targetEntity: Trainer::class)]
+    #[ORM\JoinColumn(name: 'trainer_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?Trainer $trainer = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -181,5 +198,80 @@ class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface, Te
     public function isPlatformOperator(): bool
     {
         return \in_array('ROLE_PLATFORM_ADMIN', $this->getRoles(), true);
+    }
+
+    public function getRegistrationStatus(): string
+    {
+        return $this->registrationStatus;
+    }
+
+    public function setRegistrationStatus(string $registrationStatus): self
+    {
+        $this->registrationStatus = $registrationStatus;
+
+        return $this;
+    }
+
+    public function getOfferAcceptedAt(): ?\DateTimeImmutable
+    {
+        return $this->offerAcceptedAt;
+    }
+
+    public function setOfferAcceptedAt(?\DateTimeImmutable $offerAcceptedAt): self
+    {
+        $this->offerAcceptedAt = $offerAcceptedAt;
+
+        return $this;
+    }
+
+    public function getRentalPaidUntil(): ?\DateTimeImmutable
+    {
+        return $this->rentalPaidUntil;
+    }
+
+    public function setRentalPaidUntil(?\DateTimeImmutable $rentalPaidUntil): self
+    {
+        $this->rentalPaidUntil = $rentalPaidUntil;
+
+        return $this;
+    }
+
+    public function getTrainer(): ?Trainer
+    {
+        return $this->trainer;
+    }
+
+    public function setTrainer(?Trainer $trainer): self
+    {
+        $this->trainer = $trainer;
+
+        return $this;
+    }
+
+    public function hasValidRental(?\DateTimeImmutable $now = null): bool
+    {
+        $now ??= new \DateTimeImmutable();
+
+        return $this->rentalPaidUntil !== null && $this->rentalPaidUntil >= $now;
+    }
+
+    public function isTrainerRole(): bool
+    {
+        return \in_array('ROLE_TRAINER', $this->getRoles(), true);
+    }
+
+    /** Тренеру нужна аренда; админам/менеджерам с ролью тренера — нет. */
+    public function requiresTrainerRental(): bool
+    {
+        if (!$this->isTrainerRole()) {
+            return false;
+        }
+        foreach (['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_PLATFORM_ADMIN'] as $adminRole) {
+            if (\in_array($adminRole, $this->getRoles(), true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

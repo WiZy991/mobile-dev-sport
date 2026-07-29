@@ -46,86 +46,19 @@ class BookingController extends AbstractController
     #[Route('/trainings/{id}/book', name: 'api_bookings_book', methods: ['POST'])]
     public function book(string $id, Request $request): JsonResponse
     {
-        $numericId = str_starts_with($id, 'training-') ? (int) substr($id, 9) : (int) $id;
-
-        /** @var Training|null $training */
-        $training = $this->em->getRepository(Training::class)->find($numericId);
-
-        if (!$training) {
-            return $this->json(['error' => 'Training not found'], 404);
-        }
-
-        $clientName = (string) ($request->request->get('client_name') ?: 'Мобильный клиент');
-
-        $user = $this->userResolver->resolve($request);
-
-        $booking = (new Booking())
-            ->setTraining($training)
-            ->setClientName($clientName)
-            ->setUser($user)
-            ->setStatus('confirmed');
-
-        // увеличиваем счётчик записавшихся, если бронь подтверждённая
-        $training->setCurrentParticipants($training->getCurrentParticipants() + 1);
-
-        $this->em->persist($booking);
-        $this->em->persist($training);
-        $this->em->flush();
-
-        if ($user instanceof User) {
-            $trainingName = $training->getName();
-            $when = $training->getStartAt()->format('d.m.Y H:i');
-            $this->clientNotifications->notify(
-                $user,
-                Notification::TYPE_BOOKING_CONFIRMED,
-                'Запись подтверждена',
-                sprintf('Вы записаны на «%s» (%s)', $trainingName, $when),
-                'booking-' . $booking->getId(),
-            );
-            $this->notificationScheduler->scheduleTrainingRemindersForBooking($booking);
-        }
-
-        return $this->json(self::serializeBooking($booking));
+        return $this->json([
+            'error' => 'Самозапись клиентов отключена. Тренер записывает вас в расписание.',
+            'code' => 'client_self_booking_disabled',
+        ], 403);
     }
 
     #[Route('/trainings/{id}/waiting-list', name: 'api_bookings_waiting_list', methods: ['POST'])]
     public function waitingList(string $id, Request $request): JsonResponse
     {
-        $numericId = str_starts_with($id, 'training-') ? (int) substr($id, 9) : (int) $id;
-
-        /** @var Training|null $training */
-        $training = $this->em->getRepository(Training::class)->find($numericId);
-
-        if (!$training) {
-            return $this->json(['error' => 'Training not found'], 404);
-        }
-
-        $clientName = (string) ($request->request->get('client_name') ?: 'Мобильный клиент');
-
-        $user = $this->userResolver->resolve($request);
-
-        $booking = (new Booking())
-            ->setTraining($training)
-            ->setClientName($clientName)
-            ->setUser($user)
-            ->setStatus('waiting');
-
-        $this->em->persist($booking);
-        $this->em->flush();
-
-        if ($user instanceof User) {
-            $trainingName = $training->getName();
-            $when = $training->getStartAt()->format('d.m.Y H:i');
-            $this->clientNotifications->notify(
-                $user,
-                Notification::TYPE_BOOKING_CONFIRMED,
-                'Лист ожидания',
-                sprintf('Вы в листе ожидания на «%s» (%s). Мы уведомим, если освободится место.', $trainingName, $when),
-                'booking-' . $booking->getId(),
-            );
-        }
-
-        return $this->json(self::serializeBooking($booking));
+        return $this->json([
+            'error' => 'Самозапись клиентов отключена. Тренер записывает вас в расписание.',
+            'code' => 'client_self_booking_disabled',
+        ], 403);
     }
 
     #[Route('/bookings/{id}', name: 'api_bookings_cancel', methods: ['DELETE'])]

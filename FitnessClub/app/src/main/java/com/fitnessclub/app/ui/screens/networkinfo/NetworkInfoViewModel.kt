@@ -3,6 +3,7 @@ package com.fitnessclub.app.ui.screens.networkinfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.model.resolvedSocialLinks
 import com.fitnessclub.app.data.repository.ClubRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +22,7 @@ data class NetworkInfoUiState(
     val website: String? = null,
     val workingHours: String? = null,
     val address: String? = null,
-    val socialVk: String? = null,
-    val socialTelegram: String? = null,
+    val socialLinks: List<com.fitnessclub.app.data.model.ClubSocialLink> = emptyList(),
 )
 
 @HiltViewModel
@@ -44,6 +44,7 @@ class NetworkInfoViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val club = result.data
                     val network = club.network
+                    val links = network?.resolvedSocialLinks().orEmpty()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -51,11 +52,11 @@ class NetworkInfoViewModel @Inject constructor(
                             aboutText = network?.about.orEmpty(),
                             phone = club.phone,
                             email = club.email,
-                            website = network?.website,
+                            website = network?.website
+                                ?: links.firstOrNull { l -> l.type == "website" }?.url,
                             workingHours = club.workingHours,
                             address = club.address,
-                            socialVk = network?.socialVk,
-                            socialTelegram = network?.socialTelegram,
+                            socialLinks = links,
                         )
                     }
                 }

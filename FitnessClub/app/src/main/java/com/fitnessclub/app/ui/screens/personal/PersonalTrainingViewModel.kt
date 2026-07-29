@@ -197,13 +197,13 @@ class PersonalTrainingViewModel @Inject constructor(
                     val allTrainings = result.body() ?: emptyList()
                     val trainings = allTrainings.filter { it.type == TrainingType.PERSONAL }
                     loadedSlots = trainings.map { t ->
-                        val start = extractTimeHm(t.startTime)
-                        val end = extractTimeHm(t.endTime)
+                        val start = extractTimeHm(t.safeStartTime)
+                        val end = extractTimeHm(t.safeEndTime)
                         TimeSlot(
-                            id = t.id,
+                            id = t.safeId,
                             time = "$start-$end",
-                            trainerName = t.trainer.name.ifBlank { "Без тренера" },
-                            trainingType = t.name,
+                            trainerName = t.safeTrainerName,
+                            trainingType = t.safeName,
                             room = t.room,
                             isAvailable = !t.isBooked && t.spotsLeft > 0
                         )

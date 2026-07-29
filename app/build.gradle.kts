@@ -2,10 +2,15 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+// Same stub as :staffapp — IDE sync can request this on every module.
+tasks.register("prepareKotlinBuildScriptModel") {}
+
 android {
     namespace = "com.example.mobiledev"
     compileSdk {
-        version = release(36)
+        version = release(36) {
+            minorApiLevel = 1
+        }
     }
 
     defaultConfig {

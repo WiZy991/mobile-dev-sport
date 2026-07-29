@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
@@ -33,9 +35,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.staffapp.RequestNotificationPermission
 import com.example.staffapp.ui.components.StaffActionButtons
 import com.example.staffapp.ui.components.StaffChipRow
 import com.example.staffapp.ui.components.StaffEmptyState
@@ -73,7 +77,45 @@ fun WorkScreen(
     onClientSearch: () -> Unit,
     onListCardClick: (ListCardUi) -> Unit,
     onProfileSectionClick: (String) -> Unit,
+    onScheduleSessionClick: (ScheduleSessionUi) -> Unit = {},
+    onAssignQueryChange: (String) -> Unit = {},
+    onAssignSearch: () -> Unit = {},
+    onAssignBook: (Int) -> Unit = {},
+    onAssignCancelBooking: (String) -> Unit = {},
+    onAssignDismiss: () -> Unit = {},
+    onCreateSessionClick: () -> Unit = {},
+    onCreateNameChange: (String) -> Unit = {},
+    onCreateStartTimeChange: (String) -> Unit = {},
+    onCreateEndTimeChange: (String) -> Unit = {},
+    onCreateRoomChange: (String) -> Unit = {},
+    onCreateConfirm: () -> Unit = {},
+    onCreateDismiss: () -> Unit = {},
+    onNotificationPermissionResult: (Boolean) -> Unit = {},
 ) {
+    // Системный диалог Android 13+ — сразу при открытии рабочего экрана (как в клиентском приложении).
+    RequestNotificationPermission(onResult = onNotificationPermissionResult)
+
+    state.assignDialog?.let { dialog ->
+        AssignClientDialog(
+            state = dialog,
+            onQueryChange = onAssignQueryChange,
+            onSearch = onAssignSearch,
+            onBookClient = onAssignBook,
+            onCancelBooking = onAssignCancelBooking,
+            onDismiss = onAssignDismiss,
+        )
+    }
+    state.createSessionDialog?.let { dialog ->
+        CreateSessionDialog(
+            state = dialog,
+            onNameChange = onCreateNameChange,
+            onStartTimeChange = onCreateStartTimeChange,
+            onEndTimeChange = onCreateEndTimeChange,
+            onRoomChange = onCreateRoomChange,
+            onCreate = onCreateConfirm,
+            onDismiss = onCreateDismiss,
+        )
+    }
     val navItems = buildList {
         add(NavItem(WorkUiState.TAB_HOME, "Главная", Icons.Filled.Home, Icons.Outlined.Home))
         if (state.showScheduleNav) {
@@ -108,6 +150,17 @@ fun WorkScreen(
                     actionIconContentColor = androidx.compose.ui.graphics.Color.White,
                 ),
             )
+        },
+        floatingActionButton = {
+            if (state.selectedTab == WorkUiState.TAB_SCHEDULE && state.showScheduleNav && !state.schedule.denied) {
+                FloatingActionButton(
+                    onClick = onCreateSessionClick,
+                    containerColor = StaffPrimary,
+                    contentColor = Color.White,
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Создать запись")
+                }
+            }
         },
         bottomBar = {
             NavigationBar(
@@ -145,6 +198,7 @@ fun WorkScreen(
                     schedule = state.schedule,
                     onDaySelected = onScheduleDaySelected,
                     onTypeFilterSelected = onScheduleTypeFilterSelected,
+                    onSessionClick = onScheduleSessionClick,
                 )
                 WorkUiState.TAB_CLIENTS -> ClientsTabContent(
                     state.clients,
@@ -195,6 +249,17 @@ private fun HomeTabContent(
                 title = home.greeting.ifBlank { "Добро пожаловать" },
                 subtitle = home.roleTitle,
             )
+        }
+        if (home.needNotificationsPermission) {
+            item {
+                StaffInfoBanner("Push-уведомления выключены — вы не получите оповещения о обращениях и записях.")
+            }
+            item {
+                StaffPrimaryButton(
+                    text = "Включить уведомления",
+                    onClick = { onAction("enable_notifications") },
+                )
+            }
         }
         if (home.metrics.isNotEmpty()) {
             item { StaffMetricsRow(home.metrics) }
@@ -349,6 +414,14 @@ private fun ProfileTabContent(
         if (profile.email.isNotBlank()) {
             item {
                 StaffInfoBanner(profile.email, color = StaffOnSurfaceVariant)
+            }
+        }
+        if (profile.showTrainerProfileEdit) {
+            item {
+                StaffPrimaryButton(
+                    text = "Редактировать профиль тренера",
+                    onClick = { onAction("edit_trainer_profile") },
+                )
             }
         }
         if (profile.showAdminButton) {

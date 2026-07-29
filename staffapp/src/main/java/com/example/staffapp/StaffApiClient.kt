@@ -11,16 +11,157 @@ import kotlin.text.Charsets
 class StaffApiClient(private val baseUrl: String) {
     private data class HttpResult(val code: Int, val body: String)
 
-    fun register(email: String, name: String, password: String, role: String): StaffSession {
+    fun register(email: String, name: String, password: String): AuthResult {
         val payload = JSONObject()
             .put("email", email)
             .put("name", name)
             .put("password", password)
-            .put("role", role)
         return authRequest("/api/v1/staff/auth/register", payload)
     }
 
-    fun login(email: String, password: String): StaffSession {
+    fun loadOnboarding(token: String): StaffOnboarding {
+        val conn = openConnection("/api/v1/staff/onboarding", "GET")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        return parseOnboarding(requireJson(execute(conn)))
+    }
+
+    fun initRentalPayment(token: String, offerAccepted: Boolean): RentalPaymentResult {
+        val conn = openConnection("/api/v1/staff/rental/init", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use {
+            it.write(JSONObject().put("offer_accepted", offerAccepted).toString())
+        }
+        val json = requireJson(execute(conn))
+        val paymentUrl = json.optString("payment_url").takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("Не получен URL оплаты Альфа-Банка (payment_url пустой)")
+        return RentalPaymentResult(
+            paymentId = json.getInt("payment_id"),
+            status = json.optString("status"),
+            paymentUrl = paymentUrl,
+            onboarding = parseOnboarding(json.optJSONObject("onboarding") ?: JSONObject()),
+        )
+    }
+
+    fun rentalPaymentStatus(token: String, paymentId: Int): RentalPaymentResult {
+        val conn = openConnection("/api/v1/staff/rental/payments/$paymentId/status", "GET")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        val json = requireJson(execute(conn))
+        return RentalPaymentResult(
+            paymentId = json.optInt("payment_id", paymentId),
+            status = json.optString("status"),
+            paymentUrl = json.optString("payment_url").takeIf { it.isNotBlank() },
+            onboarding = parseOnboarding(json.optJSONObject("onboarding") ?: JSONObject()),
+        )
+    }
+
+    fun createTraining(
+        token: String,
+        name: String,
+        type: String,
+        startAtIso: String,
+        endAtIso: String,
+        room: String?,
+        maxParticipants: Int,
+        clientId: Int? = null,
+    ): ScheduleItem {
+        val conn = openConnection("/api/v1/staff/trainings", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        val payload = JSONObject()
+            .put("name", name)
+            .put("type", type)
+            .put("start_at", startAtIso)
+            .put("end_at", endAtIso)
+            .put("max_participants", maxParticipants)
+        if (!room.isNullOrBlank()) payload.put("room", room)
+        if (clientId != null) payload.put("client_id", clientId)
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+        val json = requireJson(execute(conn))
+        val training = json.optJSONObject("training")
+            ?: throw IllegalStateException("Сервер не вернул созданное занятие")
+        return parseScheduleItem(training)
+    }
+
+    fun bookClientOnTraining(token: String, trainingId: String, clientId: Int): Boolean {
+        val conn = openConnection("/api/v1/staff/trainings/$trainingId/book", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use {
+            it.write(JSONObject().put("client_id", clientId).toString())
+        }
+        return execute(conn).code in 200..299
+    }
+
+    fun cancelStaffBooking(token: String, bookingId: String): Boolean {
+        val conn = openConnection("/api/v1/staff/bookings/$bookingId", "DELETE")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        val json = requireJson(execute(conn))
+        return json.optBoolean("training_removed", false)
+    }
+
+    fun loadTrainerProfile(token: String): TrainerPublicProfile {
+        val conn = openConnection("/api/v1/staff/trainer-profile", "GET")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        return parseTrainerProfile(requireJson(execute(conn)))
+    }
+
+    fun updateTrainerProfile(
+        token: String,
+        name: String,
+        specialization: String,
+        description: String,
+        phone: String,
+    ): TrainerPublicProfile {
+        val conn = openConnection("/api/v1/staff/trainer-profile", "PUT")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        val payload = JSONObject()
+            .put("name", name)
+            .put("specialization", specialization)
+            .put("description", description)
+            .put("phone", phone)
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+        return parseTrainerProfile(requireJson(execute(conn)))
+    }
+
+    fun uploadTrainerPhoto(token: String, imageBytes: ByteArray, mimeType: String, fileName: String): TrainerPublicProfile {
+        val boundary = "Boundary-${System.currentTimeMillis()}"
+        val conn = openConnection("/api/v1/staff/trainer-profile/photo", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+        conn.doOutput = true
+        conn.outputStream.use { out ->
+            val writer = OutputStreamWriter(out, Charsets.UTF_8)
+            writer.append("--$boundary\r\n")
+            writer.append("Content-Disposition: form-data; name=\"photo\"; filename=\"$fileName\"\r\n")
+            writer.append("Content-Type: $mimeType\r\n\r\n")
+            writer.flush()
+            out.write(imageBytes)
+            out.flush()
+            writer.append("\r\n--$boundary--\r\n")
+            writer.flush()
+        }
+        return parseTrainerProfile(requireJson(execute(conn)))
+    }
+
+    private fun parseTrainerProfile(json: JSONObject): TrainerPublicProfile {
+        return TrainerPublicProfile(
+            id = json.optString("id").takeIf { it.isNotBlank() },
+            name = json.optString("name"),
+            specialization = json.optString("specialization"),
+            description = json.optString("description"),
+            phone = json.optString("phone"),
+            rating = json.optDouble("rating", 0.0).toFloat(),
+            photoUrl = json.optString("photo_url").takeIf { it.isNotBlank() },
+        )
+    }
+
+    fun login(email: String, password: String): AuthResult {
         val payload = JSONObject()
             .put("email", email)
             .put("password", password)
@@ -70,6 +211,7 @@ class StaffApiClient(private val baseUrl: String) {
         return StaffAppData(
             employeeName = employee.optString("name"),
             employeeEmail = employee.optString("email"),
+            roles = employee.optJSONArray("roles").toStringList(),
             sections = json.optJSONArray("sections").toStringList(),
             metrics = metricsJson.toIntMap(),
         )
@@ -116,22 +258,43 @@ class StaffApiClient(private val baseUrl: String) {
         val items = mutableListOf<ScheduleItem>()
         for (i in 0 until rows.length()) {
             val row = rows.optJSONObject(i) ?: continue
-            items += ScheduleItem(
-                title = row.optString("title"),
-                trainer = row.optString("trainer"),
-                type = row.optString("type"),
-                date = row.optString("date"),
-                dayLabel = row.optString("dayLabel"),
-                startTime = row.optString("startTime"),
-                endTime = row.optString("endTime"),
-                startAt = row.optString("startAt"),
-                endAt = row.optString("endAt"),
-                room = row.optString("room"),
-                clientNames = row.optJSONArray("clientNames").toStringList(),
-                participants = row.optString("participants"),
-            )
+            items += parseScheduleItem(row)
         }
         return ScheduleData(days = days, items = items)
+    }
+
+    private fun parseScheduleItem(row: JSONObject): ScheduleItem {
+        val bookingRows = row.optJSONArray("bookings")
+        val bookings = mutableListOf<ScheduleBookingRow>()
+        if (bookingRows != null) {
+            for (j in 0 until bookingRows.length()) {
+                val b = bookingRows.optJSONObject(j) ?: continue
+                bookings += ScheduleBookingRow(
+                    id = b.optString("id"),
+                    clientName = b.optString("client_name"),
+                    clientId = b.optString("client_id").takeIf { it.isNotBlank() },
+                    status = b.optString("status"),
+                )
+            }
+        }
+        return ScheduleItem(
+            id = row.optString("id").takeIf { it.isNotBlank() },
+            title = row.optString("title"),
+            trainer = row.optString("trainer"),
+            type = row.optString("type"),
+            date = row.optString("date"),
+            dayLabel = row.optString("dayLabel"),
+            startTime = row.optString("startTime"),
+            endTime = row.optString("endTime"),
+            startAt = row.optString("startAt"),
+            endAt = row.optString("endAt"),
+            room = row.optString("room"),
+            clientNames = row.optJSONArray("clientNames").toStringList(),
+            bookings = bookings,
+            participants = row.optString("participants"),
+            maxParticipants = row.optInt("maxParticipants").takeIf { row.has("maxParticipants") },
+            currentParticipants = row.optInt("currentParticipants").takeIf { row.has("currentParticipants") },
+        )
     }
 
     fun loadList(token: String, section: String): List<FeedListItem> {
@@ -286,17 +449,21 @@ class StaffApiClient(private val baseUrl: String) {
         return execute(conn).code in 200..299
     }
 
-    private fun authRequest(path: String, payload: JSONObject): StaffSession {
+    private fun authRequest(path: String, payload: JSONObject): AuthResult {
         val conn = openConnection(path, "POST")
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
         conn.doOutput = true
 
         OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
         val json = requireJson(execute(conn))
-        return StaffSession(
-            accessToken = json.getString("token"),
-            refreshToken = json.getString("refresh_token"),
-            userEmail = json.getJSONObject("user").optString("email"),
+        val onboardingJson = json.optJSONObject("onboarding")
+        return AuthResult(
+            session = StaffSession(
+                accessToken = json.getString("token"),
+                refreshToken = json.getString("refresh_token"),
+                userEmail = json.getJSONObject("user").optString("email"),
+            ),
+            onboarding = onboardingJson?.let { parseOnboarding(it) },
         )
     }
 
@@ -448,3 +615,20 @@ data class StaffSession(
     val refreshToken: String,
     val userEmail: String,
 )
+
+data class AuthResult(
+    val session: StaffSession,
+    val onboarding: StaffOnboarding?,
+)
+
+private fun parseOnboarding(json: JSONObject): StaffOnboarding {
+    return StaffOnboarding(
+        status = json.optString("status", "active"),
+        registrationStatus = json.optString("registration_status", "approved"),
+        requiresRental = json.optBoolean("requires_rental", false),
+        rentalPaidUntil = json.optString("rental_paid_until").takeIf { it.isNotBlank() },
+        offerUrl = json.optString("offer_url", "https://dobrozal.ru/doc/offer"),
+        rentalAmountKopecks = json.optInt("rental_amount_kopecks", 0),
+        rentalAmountRub = json.optDouble("rental_amount_rub", 0.0),
+    )
+}

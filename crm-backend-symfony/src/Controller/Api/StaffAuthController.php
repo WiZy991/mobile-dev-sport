@@ -2,9 +2,11 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\StaffNotification;
 use App\Entity\StaffUser;
-use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Api\StaffMobileAuthTokenIssuer;
+use App\Service\Staff\StaffEventNotifier;
+use App\Service\Staff\StaffOnboardingService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,7 +21,8 @@ final class StaffAuthController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly StaffMobileAuthTokenIssuer $tokens,
-        private readonly AdminMenuBuilder $adminMenuBuilder,
+        private readonly StaffEventNotifier $staffEventNotifier,
+        private readonly StaffOnboardingService $onboarding,
     ) {
     }
 
@@ -28,15 +31,11 @@ final class StaffAuthController extends AbstractController
     {
         $data = json_decode($request->getContent(), true) ?? [];
         $email = trim((string) ($data['email'] ?? ''));
-        $name = trim((string) ($data['name'] ?? 'Новый сотрудник'));
+        $name = trim((string) ($data['name'] ?? 'Новый тренер'));
         $password = (string) ($data['password'] ?? '');
-        $role = trim((string) ($data['role'] ?? 'ROLE_VIEWER'));
 
         if ($email === '' || $password === '') {
             return $this->json(['error' => 'Укажите email и password', 'code' => 'missing_credentials'], 400);
-        }
-        if (!in_array($role, $this->adminMenuBuilder->supportedRoles(), true)) {
-            return $this->json(['error' => 'Недопустимая роль', 'code' => 'invalid_role'], 400);
         }
 
         $existing = $this->em->getRepository(StaffUser::class)->findOneBy(['email' => $email]);
@@ -46,15 +45,26 @@ final class StaffAuthController extends AbstractController
 
         $user = (new StaffUser())
             ->setEmail($email)
-            ->setName($name)
-            ->setRoles([$role])
+            ->setName($name !== '' ? $name : 'Новый тренер')
+            ->setRoles(['ROLE_TRAINER'])
+            ->setRegistrationStatus(StaffUser::REGISTRATION_PENDING)
             ->setIsActive(true);
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 
         $this->em->persist($user);
         $this->em->flush();
 
-        return $this->json($this->tokens->issue($user, true));
+        $this->staffEventNotifier->notifyAdmins(
+            StaffNotification::TYPE_STAFF_REGISTRATION,
+            'Заявка тренера на регистрацию',
+            sprintf('%s (%s) хочет зарегистрироваться как тренер', $user->getName(), $user->getEmail()),
+            $user->getId() !== null ? (string) $user->getId() : null,
+        );
+
+        $issued = $this->tokens->issue($user, true);
+        $issued['onboarding'] = $this->onboarding->serialize($user);
+
+        return $this->json($issued, 201);
     }
 
     #[Route('/login', name: 'api_staff_auth_login', methods: ['POST'])]
@@ -65,14 +75,27 @@ final class StaffAuthController extends AbstractController
         $password = (string) ($data['password'] ?? '');
 
         $user = $this->em->getRepository(StaffUser::class)->findOneBy(['email' => $email]);
-        if ($user === null || !$user->isActive()) {
+        if ($user === null) {
             return $this->json(['error' => 'Неверные данные', 'code' => 'invalid_credentials'], 401);
+        }
+        if ($user->getRegistrationStatus() === StaffUser::REGISTRATION_REJECTED || !$user->isActive()) {
+            return $this->json([
+                'error' => $user->getRegistrationStatus() === StaffUser::REGISTRATION_REJECTED
+                    ? 'Регистрация отклонена администратором'
+                    : 'Неверные данные',
+                'code' => $user->getRegistrationStatus() === StaffUser::REGISTRATION_REJECTED
+                    ? 'registration_rejected'
+                    : 'invalid_credentials',
+            ], 401);
         }
         if (!$this->passwordHasher->isPasswordValid($user, $password)) {
             return $this->json(['error' => 'Неверные данные', 'code' => 'invalid_credentials'], 401);
         }
 
-        return $this->json($this->tokens->issue($user, false));
+        $issued = $this->tokens->issue($user, false);
+        $issued['onboarding'] = $this->onboarding->serialize($user);
+
+        return $this->json($issued);
     }
 
     #[Route('/refresh', name: 'api_staff_auth_refresh', methods: ['POST'])]
@@ -84,11 +107,16 @@ final class StaffAuthController extends AbstractController
         }
 
         $user = $this->em->getRepository(StaffUser::class)->findOneBy(['apiRefreshToken' => $refresh]);
-        if ($user === null || !$user->isActive()) {
+        if ($user === null || !$user->isActive()
+            || $user->getRegistrationStatus() === StaffUser::REGISTRATION_REJECTED
+        ) {
             return $this->json(['error' => 'Недействительный refresh-токен', 'code' => 'invalid_refresh'], 401);
         }
 
-        return $this->json($this->tokens->issue($user, false));
+        $issued = $this->tokens->issue($user, false);
+        $issued['onboarding'] = $this->onboarding->serialize($user);
+
+        return $this->json($issued);
     }
 
     #[Route('/logout', name: 'api_staff_auth_logout', methods: ['POST'])]

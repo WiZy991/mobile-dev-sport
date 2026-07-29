@@ -1,7 +1,6 @@
 {% set is_dobrozal = app.request is defined and ('dobrozal.ru' in app.request.host|lower) %}
 <div id="cookie-consent-banner" class="cookie-consent-banner" hidden>
     <div class="cookie-consent-content">
-        {% if is_dobrozal %}
         <p>
             Этот сайт использует куки-файлы для улучшения пользовательского опыта и сбора статистики.
             Нажимая на кнопку «Согласен», а также оставаясь на сайте — Вы предоставляете
@@ -9,21 +8,14 @@
             на использование файлов куки.
             При несогласии — Вы можете покинуть сайт или самостоятельно изменить настройки работы с куки-файлами в используемом браузере.
         </p>
-        <button id="cookie-consent-accept" type="button">СОГЛАСЕН</button>
-        {% else %}
-        <p>
-            Сайт использует cookie-файлы. Нажимая «Согласен» или продолжая пользоваться сайтом, вы соглашаетесь на использование cookie.
-            <a href="{{ path('legal_consent_user') }}" target="_blank" rel="noopener">Подробнее</a>.
-        </p>
-        <button id="cookie-consent-accept" type="button">Согласен</button>
-        {% endif %}
+        <button id="cookie-consent-accept" type="button">{{ is_dobrozal ? 'СОГЛАСЕН' : 'Согласен' }}</button>
     </div>
 </div>
 
 <script>
     (function () {
         var isDobrozal = {{ is_dobrozal ? 'true' : 'false' }};
-        var consentKey = isDobrozal ? "dobrozal_cookie_consent_v1" : "wcf_cookie_consent_v1";
+        var consentKey = isDobrozal ? "dobrozal_cookie_consent_v1" : "wcf_cookie_consent_v2";
         var banner = document.getElementById("cookie-consent-banner");
         var acceptBtn = document.getElementById("cookie-consent-accept");
         var metrikaId = {{ yandex_metrika_id|default(0)|json_encode|raw }};

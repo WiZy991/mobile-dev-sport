@@ -111,9 +111,6 @@ fun TrainingDetailsScreen(
                 uiState.training != null -> {
                     TrainingDetailsContent(
                         training = uiState.training!!,
-                        isBooking = uiState.isBooking,
-                        onBookClick = viewModel::bookTraining,
-                        onWaitingListClick = viewModel::joinWaitingList
                     )
                 }
             }
@@ -124,9 +121,6 @@ fun TrainingDetailsScreen(
 @Composable
 private fun TrainingDetailsContent(
     training: Training,
-    isBooking: Boolean,
-    onBookClick: () -> Unit,
-    onWaitingListClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -152,10 +146,11 @@ private fun TrainingDetailsContent(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = if (training.type == TrainingType.GROUP) 
-                            "Групповая" 
-                        else 
-                            "Персональная",
+                        text = when (training.type) {
+                            TrainingType.GROUP -> "Групповая"
+                            TrainingType.EXTRA -> "Допуслуга"
+                            else -> "Персональная"
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         color = if (training.type == TrainingType.GROUP) AccentBlue else Primary,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -165,7 +160,7 @@ private fun TrainingDetailsContent(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Text(
-                    text = training.name,
+                    text = training.safeName,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -189,7 +184,7 @@ private fun TrainingDetailsContent(
             DetailRow(
                 icon = Icons.Default.Schedule,
                 title = "Время",
-                value = "${formatHm(training.startTime)} - ${formatHm(training.endTime)}",
+                value = "${formatHm(training.safeStartTime)} - ${formatHm(training.safeEndTime)}",
                 subtitle = "${training.durationMinutes} минут"
             )
             
@@ -197,7 +192,7 @@ private fun TrainingDetailsContent(
             DetailRow(
                 icon = Icons.Default.CalendarToday,
                 title = "Дата",
-                value = formatIsoDate(training.startTime)
+                value = formatIsoDate(training.safeStartTime)
             )
             
             // Room info
@@ -235,95 +230,48 @@ private fun TrainingDetailsContent(
         }
     }
     
-    // Bottom booking button
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         contentAlignment = Alignment.BottomCenter
     ) {
-        when {
-            training.isBooked -> {
-                Button(
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        disabledContainerColor = Success,
-                        disabledContentColor = Color.White
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Вы записаны",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
+        if (training.isBooked) {
+            Button(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    disabledContainerColor = Success,
+                    disabledContentColor = Color.White
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Вы записаны",
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
-            training.isFull -> {
-                OutlinedButton(
-                    onClick = onWaitingListClick,
-                    enabled = !isBooking,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    if (isBooking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.HourglassEmpty,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Записаться в лист ожидания",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
-            }
-            else -> {
-                Button(
-                    onClick = onBookClick,
-                    enabled = !isBooking,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    if (isBooking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Записаться",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                Text(
+                    text = "Запись оформляет тренер. Когда вас запишут, занятие появится в «Мои записи».",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -402,7 +350,7 @@ private fun TrainerCard(training: Training) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = training.trainer.name.firstOrNull()?.uppercase() ?: "?",
+                    text = training.safeTrainerName.firstOrNull()?.uppercase() ?: "?",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
@@ -418,11 +366,11 @@ private fun TrainerCard(training: Training) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = training.trainer.name,
+                    text = training.safeTrainerName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                training.trainer.specialization?.let {
+                training.trainer?.specialization?.let {
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodyMedium,
@@ -432,7 +380,7 @@ private fun TrainerCard(training: Training) {
             }
             
             // Rating
-            if (training.trainer.rating > 0) {
+            if ((training.trainer?.rating ?: 0f) > 0) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -444,7 +392,7 @@ private fun TrainerCard(training: Training) {
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = String.format("%.1f", training.trainer.rating),
+                        text = String.format("%.1f", training.trainer?.rating ?: 0f),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )

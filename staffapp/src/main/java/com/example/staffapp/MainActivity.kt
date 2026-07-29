@@ -1,20 +1,14 @@
 package com.example.staffapp
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.example.staffapp.ui.auth.LoginScreen
 import com.example.staffapp.ui.auth.LoginUiState
-import com.example.staffapp.ui.auth.RoleOptionUi
 import com.example.staffapp.ui.theme.StaffTheme
 import kotlin.concurrent.thread
 
@@ -23,19 +17,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var store: StaffSessionStore
     private var session: StaffSession? = null
 
-    private val roleOptions = listOf(
-        RoleOptionUi("Тренер", "ROLE_TRAINER"),
-        RoleOptionUi("Менеджер", "ROLE_MANAGER"),
-        RoleOptionUi("Финансы", "ROLE_FINANCE"),
-        RoleOptionUi("Наблюдатель", "ROLE_VIEWER"),
-        RoleOptionUi("Поддержка", "ROLE_SUPPORT"),
-        RoleOptionUi("Администратор", "ROLE_ADMIN"),
-        RoleOptionUi("Суперадминистратор", "ROLE_SUPER_ADMIN"),
-    )
-
-    private var uiState by mutableStateOf(
-        LoginUiState(roles = roleOptions, selectedRole = roleOptions.first()),
-    )
+    private var uiState by mutableStateOf(LoginUiState())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +32,7 @@ class MainActivity : ComponentActivity() {
                     onEmailChange = { uiState = uiState.copy(email = it) },
                     onNameChange = { uiState = uiState.copy(name = it) },
                     onPasswordChange = { uiState = uiState.copy(password = it) },
-                    onRoleSelected = { uiState = uiState.copy(selectedRole = it) },
+                    onRoleSelected = {},
                     onLogin = { runLogin() },
                     onRegister = { runRegister() },
                 )
@@ -58,13 +40,10 @@ class MainActivity : ComponentActivity() {
         }
 
         StaffNotificationHelper.ensureChannel(this)
-        requestNotificationPermissionIfNeeded()
 
         if (session != null) {
             runAsync("Проверяем доступ...") {
-                val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
-                store.saveConfig(config)
-                openWorkScreen()
+                routeAfterAuth()
                 "Готово"
             }
         }
@@ -72,40 +51,43 @@ class MainActivity : ComponentActivity() {
 
     private fun runRegister() {
         runAsync("Регистрация...") {
-            session = apiClient.register(
+            val result = apiClient.register(
                 email = uiState.email.trim(),
                 name = uiState.name.trim(),
                 password = uiState.password,
-                role = uiState.selectedRole?.role ?: roleOptions.first().role,
             )
-            session?.let { store.saveSession(it) }
+            session = result.session
+            store.saveSession(result.session)
             store.clearConfig()
-            val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
-            store.saveConfig(config)
             StaffPushRegistrar.registerIfLoggedIn(this)
-            openWorkScreen()
-            "Зарегистрирован и выполнен вход"
+            routeAfterAuth(result.onboarding)
+            "Заявка отправлена"
         }
     }
 
     private fun runLogin() {
         runAsync("Вход...") {
-            session = apiClient.login(
+            val result = apiClient.login(
                 email = uiState.email.trim(),
                 password = uiState.password,
             )
-            session?.let { store.saveSession(it) }
+            session = result.session
+            store.saveSession(result.session)
             store.clearConfig()
+            StaffPushRegistrar.registerIfLoggedIn(this)
+            routeAfterAuth(result.onboarding)
+            "Выполнен вход"
+        }
+    }
+
+    private fun routeAfterAuth(prefetched: StaffOnboarding? = null) {
+        val onboarding = prefetched ?: executeWithRefresh { apiClient.loadOnboarding(it) }
+        if (onboarding.status == "active") {
             val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
             store.saveConfig(config)
-            runOnUiThread {
-                uiState = uiState.copy(
-                    configSummary = "Роли: ${config.roles.joinToString { UiLabels.roleTitle(it) }}\nДоступы загружены",
-                )
-            }
-            StaffPushRegistrar.registerIfLoggedIn(this)
             openWorkScreen()
-            "Выполнен вход"
+        } else {
+            openOnboardingScreen()
         }
     }
 
@@ -150,17 +132,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            return
+    private fun openOnboardingScreen() {
+        runOnUiThread {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            finish()
         }
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            42,
-        )
     }
 }

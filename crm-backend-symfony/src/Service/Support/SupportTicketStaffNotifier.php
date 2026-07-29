@@ -18,6 +18,7 @@ final class SupportTicketStaffNotifier
         private readonly EntityManagerInterface $em,
         private readonly AdminMenuBuilder $adminMenuBuilder,
         private readonly FcmPushSender $fcmPushSender,
+        private readonly FcmPushSender $staffFcmPushSender,
     ) {
     }
 
@@ -55,12 +56,19 @@ final class SupportTicketStaffNotifier
             static fn (StaffUser $staff) => $staff->getId(),
             $recipients
         )));
-        $this->fcmPushSender->sendToStaffUserIds(
+        $this->staffPush()->sendToStaffUserIds(
             $staffIds,
             $title,
             $body,
             ['type' => 'support_ticket', 'ticketId' => $referenceId ?? '']
         );
+    }
+
+    private function staffPush(): FcmPushSender
+    {
+        return $this->staffFcmPushSender->isConfigured()
+            ? $this->staffFcmPushSender
+            : $this->fcmPushSender;
     }
 
     /** @return list<StaffUser> */

@@ -272,6 +272,7 @@ private fun parsePromoColor(hex: String?, fallback: Color): Color {
 }
 
 @Composable
+@Suppress("UNUSED_PARAMETER") // onPersonalTraining / onSchedule — временно скрыты в меню (см. TODO выше)
 private fun QuickMenuSection(
     isInsideGym: Boolean,
     onQrCode: () -> Unit,
@@ -296,11 +297,14 @@ private fun QuickMenuSection(
                 subtitle = if (isInsideGym) "Показать QR-код для выхода" else "Показать QR-код для прохода",
                 onClick = onQrCode
             )
+            // TODO(restore): временно скрыто — персональные тренировки и расписание на главной.
+            // Вернуть позже, когда снова понадобится самозапись клиента.
+            /*
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             QuickMenuItem(
                 icon = Icons.Default.Person,
-                title = "Записаться на персональную тренировку",
-                subtitle = "Индивидуальное занятие с тренером",
+                title = "Персональные тренировки",
+                subtitle = "Слоты тренеров — запись делает тренер",
                 onClick = onPersonalTraining
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -310,6 +314,7 @@ private fun QuickMenuSection(
                 subtitle = "Групповые программы",
                 onClick = onSchedule
             )
+            */
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             QuickMenuItem(
                 icon = Icons.Default.ShoppingCart,

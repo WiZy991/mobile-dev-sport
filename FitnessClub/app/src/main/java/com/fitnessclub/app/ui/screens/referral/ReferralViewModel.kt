@@ -18,7 +18,9 @@ data class ReferralUiState(
     val referralLink: String = "",
     val invitedCount: Int = 0,
     val registeredCount: Int = 0,
-    val earnedBonuses: Int = 0
+    val earnedBonuses: Int = 0,
+    /** Пока API статистики нет — блок не показываем как реальные цифры. */
+    val statsAvailable: Boolean = false,
 )
 
 @HiltViewModel
@@ -48,10 +50,10 @@ class ReferralViewModel @Inject constructor(
                         isLoading = false,
                         referralCode = code,
                         referralLink = link,
-                        // Mock statistics
-                        invitedCount = 5,
-                        registeredCount = 3,
-                        earnedBonuses = 1500
+                        invitedCount = 0,
+                        registeredCount = 0,
+                        earnedBonuses = 0,
+                        statsAvailable = false,
                     )
                 }
             } else {

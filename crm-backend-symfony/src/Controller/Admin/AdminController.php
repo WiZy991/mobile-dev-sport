@@ -37,6 +37,7 @@ use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Admin\ClubModuleRegistry;
 use App\Service\Admin\ClubSettingsStore;
+use App\Service\Admin\ClubSocialLinks;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
@@ -450,7 +451,7 @@ class AdminController extends AbstractController
         return $names !== [] ? implode(', ', $names) : '—';
     }
 
-    #[Route('/clients/{id}', name: 'admin_client_show', methods: ['GET'])]
+    #[Route('/clients/{id}', name: 'admin_client_show', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function showClient(int $id): Response
     {
         $menu = $this->buildMenu();
@@ -560,7 +561,7 @@ class AdminController extends AbstractController
         ]);
     }
 
-    #[Route('/clients/{id}/notes', name: 'admin_note_new', methods: ['POST'])]
+    #[Route('/clients/{id}/notes', name: 'admin_note_new', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function addClientNote(int $id, Request $request): Response
     {
         $client = $this->em->getRepository(User::class)->find($id);
@@ -732,7 +733,7 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_client_show', ['id' => $user->getId()]);
     }
 
-    #[Route('/clients/{id}/update', name: 'admin_client_update', methods: ['POST'])]
+    #[Route('/clients/{id}/update', name: 'admin_client_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function updateClient(int $id, Request $request): Response
     {
         $user = $this->em->getRepository(User::class)->find($id);
@@ -746,7 +747,7 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_client_show', ['id' => $id]);
     }
 
-    #[Route('/clients/{id}/block', name: 'admin_client_block', methods: ['POST'])]
+    #[Route('/clients/{id}/block', name: 'admin_client_block', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function blockClient(int $id): Response
     {
         $user = $this->em->getRepository(User::class)->find($id);
@@ -1205,11 +1206,13 @@ class AdminController extends AbstractController
         $description = $request->request->get('description');
         $description = is_string($description) ? trim($description) : '';
         $description = $description !== '' ? $description : null;
+        $phone = $this->normalizeTrainerPhone($request->request->get('phone'));
 
         $trainer = (new Trainer())
             ->setName($name)
             ->setSpecialization($specialization)
             ->setPhotoUrl($photoUrl)
+            ->setPhone($phone)
             ->setRating($rating)
             ->setDescription($description);
 
@@ -1248,12 +1251,46 @@ class AdminController extends AbstractController
     public function deleteTrainer(int $id): Response
     {
         $trainer = $this->em->getRepository(Trainer::class)->find($id);
-        if ($trainer) {
-            $count = $this->em->getRepository(Training::class)->count(['trainer' => $trainer]);
-            if ($count === 0) {
-                $this->em->remove($trainer);
-                $this->em->flush();
+        if (!$trainer) {
+            $this->addFlash('warning', 'Тренер не найден.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+        }
+
+        $name = $trainer->getName();
+
+        // Отвязать staff-аккаунт (FK SET NULL, но снимем явно).
+        $staffLinked = $this->em->getRepository(StaffUser::class)->findBy(['trainer' => $trainer]);
+        foreach ($staffLinked as $staff) {
+            if ($staff instanceof StaffUser) {
+                $staff->setTrainer(null);
             }
+        }
+
+        // Тренер не удалялся, если были занятия: отвязываем FK, имя в расписании оставляем.
+        $trainings = $this->em->getRepository(Training::class)->findBy(['trainer' => $trainer]);
+        $detached = 0;
+        foreach ($trainings as $training) {
+            if (!$training instanceof Training) {
+                continue;
+            }
+            if ($training->getTrainerName() === null || $training->getTrainerName() === '') {
+                $training->setTrainerName($name);
+            }
+            $training->setTrainer(null);
+            ++$detached;
+        }
+
+        $this->em->remove($trainer);
+        $this->em->flush();
+
+        if ($detached > 0) {
+            $this->addFlash(
+                'success',
+                sprintf('Тренер «%s» удалён. Отвязано занятий: %d (в расписании имя сохранено).', $name, $detached),
+            );
+        } else {
+            $this->addFlash('success', sprintf('Тренер «%s» удалён.', $name));
         }
 
         return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
@@ -1269,10 +1306,12 @@ class AdminController extends AbstractController
         $description = $request->request->get('description');
         $description = is_string($description) ? trim($description) : '';
         $description = $description !== '' ? $description : null;
+        $phone = $this->normalizeTrainerPhone($request->request->get('phone'));
 
         $trainer->setName((string) $request->request->get('name'))
             ->setSpecialization($request->request->get('specialization') ?: null)
             ->setPhotoUrl($request->request->get('photo_url') ?: null)
+            ->setPhone($phone)
             ->setDescription($description);
         $ratingRaw = $request->request->get('rating');
         $trainer->setRating($ratingRaw !== '' && $ratingRaw !== null ? (float) $ratingRaw : null);
@@ -1280,6 +1319,30 @@ class AdminController extends AbstractController
         $this->addFlash('success', 'Тренер обновлён.');
 
         return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+    }
+
+    /** Нормализация телефона тренера: `+7XXXXXXXXXX` или null. */
+    private function normalizeTrainerPhone(mixed $raw): ?string
+    {
+        if (!is_string($raw)) {
+            return null;
+        }
+        $digits = preg_replace('/\D+/', '', trim($raw)) ?? '';
+        if ($digits === '') {
+            return null;
+        }
+        if (str_starts_with($digits, '8')) {
+            $digits = '7' . substr($digits, 1);
+        }
+        if (!str_starts_with($digits, '7')) {
+            $digits = '7' . $digits;
+        }
+        $digits = substr($digits, 0, 11);
+        if (strlen($digits) !== 11) {
+            return null;
+        }
+
+        return '+' . $digits;
     }
 
     #[Route('/trainings/{id}/delete', name: 'admin_training_delete', methods: ['POST'])]
@@ -1518,10 +1581,27 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
-            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'contact_website', 'social_vk', 'social_telegram'];
+            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'trainer_rental_amount_rub'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
                 $this->clubSettings->set($key, $value !== '' ? $value : null);
+            }
+
+            $socialLinks = ClubSocialLinks::normalizeFromRequest(
+                $request->request->all('social_type'),
+                $request->request->all('social_url'),
+            );
+            $this->clubSettings->set('social_links', ClubSocialLinks::encode($socialLinks));
+            // Совместимость со старыми полями / экраном «О сети»
+            $this->clubSettings->set('contact_website', ClubSocialLinks::firstUrlByType($socialLinks, 'website'));
+            $this->clubSettings->set('social_vk', ClubSocialLinks::firstUrlByType($socialLinks, 'vk'));
+            $this->clubSettings->set('social_telegram', ClubSocialLinks::firstUrlByType($socialLinks, 'telegram'));
+            $rentalRub = trim((string) ($request->request->get('trainer_rental_amount_rub') ?? ''));
+            if ($rentalRub !== '' && is_numeric($rentalRub)) {
+                $this->clubSettings->set(
+                    'trainer_rental_amount_kopecks',
+                    (string) (int) round(((float) $rentalRub) * 100)
+                );
             }
 
             $enabledModules = $request->request->all('enabled_modules');
@@ -1547,10 +1627,20 @@ class AdminController extends AbstractController
             $this->persistSetting('perco_cmd_value', trim((string) $request->request->get('perco_cmd_value', '')) ?: null);
             $this->persistSetting('perco_cmd_param', trim((string) $request->request->get('perco_cmd_param', '')) ?: null);
 
+            $this->syncPrimaryClubFromSettings();
             $this->em->flush();
-            $this->addFlash('success', 'Настройки клуба сохранены.');
+            $this->addFlash('success', 'Настройки клуба сохранены. Данные обновятся в приложении: «О клубе», «О сети и контакты», карта.');
 
             return $this->redirectToRoute('admin_settings_club');
+        }
+
+        $socialLinks = ClubSocialLinks::decode($getSetting('social_links', ''));
+        if ($socialLinks === []) {
+            $socialLinks = ClubSocialLinks::fromLegacy(
+                $getSetting('contact_website', ''),
+                $getSetting('social_vk', ''),
+                $getSetting('social_telegram', ''),
+            );
         }
 
         return $this->render('admin/settings_club.html.twig', [
@@ -1558,6 +1648,8 @@ class AdminController extends AbstractController
             'current' => 'settings',
             'club_modules' => ClubModuleRegistry::OPTIONAL,
             'enabled_modules' => $this->clubModules->enabledKeys(),
+            'social_catalog' => ClubSocialLinks::CATALOG,
+            'social_links' => $socialLinks,
             'club' => [
                 'name' => $getSetting('name', 'FitnessClub'),
                 'address' => $getSetting('address', 'г. Москва, ул. Примерная, д. 1'),
@@ -1570,6 +1662,7 @@ class AdminController extends AbstractController
                 'promo_home_title' => $getSetting('promo_home_title', 'СКИДКА 20%!'),
                 'promo_home_subtitle' => $getSetting('promo_home_subtitle', 'на все карты 12 и 6 месяцев'),
                 'offer_url' => $getSetting('offer_url', ''),
+                'trainer_rental_amount_rub' => $getSetting('trainer_rental_amount_rub', '5000'),
                 'privacy_url' => $getSetting('privacy_url', ''),
                 'visiting_rules_url' => $getSetting('visiting_rules_url', ''),
                 'safety_rules_url' => $getSetting('safety_rules_url', ''),
@@ -1579,9 +1672,6 @@ class AdminController extends AbstractController
                 'network_about' => $getSetting('network_about', ''),
                 'contact_phone' => $getSetting('contact_phone', ''),
                 'contact_email' => $getSetting('contact_email', ''),
-                'contact_website' => $getSetting('contact_website', ''),
-                'social_vk' => $getSetting('social_vk', ''),
-                'social_telegram' => $getSetting('social_telegram', ''),
                 'perco_enabled' => $getSetting('perco_enabled', '0'),
                 'perco_base_url' => $getSetting('perco_base_url', ''),
                 'perco_login' => $getSetting('perco_login', ''),
@@ -1610,6 +1700,58 @@ class AdminController extends AbstractController
         }
 
         return $this->redirectToRoute('admin_settings_club');
+    }
+
+    /**
+     * Синхронизация таблицы clubs с «Настройками клуба»,
+     * чтобы экран «Мы на карте» / детали клуба совпадали с «О сети и контакты».
+     */
+    private function syncPrimaryClubFromSettings(): void
+    {
+        $get = function (string $key, string $default = ''): string {
+            return $this->clubSettings->get($key) ?? $default;
+        };
+
+        $name = trim($get('name', 'Доброзал'));
+        if ($name === '' || $name === 'FitnessClub') {
+            $name = 'Доброзал';
+        }
+        $address = trim($get('address', ''));
+        if ($address === '') {
+            $address = 'Адрес не указан';
+        }
+
+        $amenitiesRaw = trim($get('amenities', ''));
+        $amenities = $amenitiesRaw !== ''
+            ? array_values(array_filter(array_map('trim', explode(',', $amenitiesRaw))))
+            : [];
+
+        $latRaw = trim($get('latitude', ''));
+        $lngRaw = trim($get('longitude', ''));
+        $lat = is_numeric($latRaw) ? (float) $latRaw : null;
+        $lng = is_numeric($lngRaw) ? (float) $lngRaw : null;
+
+        $phone = trim($get('phone', '')) ?: null;
+        $email = trim($get('email', '')) ?: null;
+        $hours = trim($get('working_hours', '')) ?: null;
+
+        /** @var list<Club> $clubs */
+        $clubs = $this->em->getRepository(Club::class)->findBy([], ['id' => 'ASC']);
+        $club = $clubs[0] ?? null;
+        if (!$club instanceof Club) {
+            $club = new Club();
+            $this->em->persist($club);
+        }
+
+        $club
+            ->setName($name)
+            ->setAddress($address)
+            ->setPhone($phone)
+            ->setEmail($email)
+            ->setWorkingHours($hours)
+            ->setLatitude($lat)
+            ->setLongitude($lng)
+            ->setAmenitiesJson($amenities !== [] ? json_encode($amenities, \JSON_UNESCAPED_UNICODE) : null);
     }
 
     private function persistSetting(string $key, ?string $value): void
@@ -1784,7 +1926,7 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_section', ['section' => 'promotions']);
     }
 
-    #[Route('/clients/export', name: 'admin_clients_export', methods: ['GET'])]
+    #[Route('/clients/export', name: 'admin_clients_export', priority: 10, methods: ['GET'])]
     public function exportClients(Request $request): Response
     {
         if (!$this->passportAccess->canExportPassportDetails($this->getUser())) {

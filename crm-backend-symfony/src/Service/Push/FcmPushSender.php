@@ -32,6 +32,15 @@ final class FcmPushSender
     }
 
     /**
+     * Есть ли валидные креды для отправки (сервисный аккаунт).
+     * Без них send* тихо ничего не делают.
+     */
+    public function isConfigured(): bool
+    {
+        return $this->loadServiceAccount() !== null;
+    }
+
+    /**
      * @param list<string>          $tokens
      * @param array<string, mixed>  $data
      */

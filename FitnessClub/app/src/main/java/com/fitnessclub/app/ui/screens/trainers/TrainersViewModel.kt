@@ -39,12 +39,14 @@ class TrainersViewModel @Inject constructor(
                 val trainers = apiTrainers.map { t ->
                     TrainerInfo(
                         id = t.id.orEmpty(),
-                        name = t.name,
+                        name = t.name.orEmpty(),
                         specialization = t.specialization ?: "",
                         rating = t.rating,
                         reviewsCount = 0,
                         experience = "",
                         description = t.description.orEmpty(),
+                        photoUrl = t.photoUrl,
+                        phone = t.phone,
                     )
                 }
                 _uiState.update {

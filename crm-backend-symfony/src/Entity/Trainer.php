@@ -28,6 +28,9 @@ class Trainer implements TenantAware
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $photoUrl = null;
 
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    private ?string $phone = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -77,6 +80,17 @@ class Trainer implements TenantAware
     public function setPhotoUrl(?string $photoUrl): self
     {
         $this->photoUrl = $photoUrl;
+        return $this;
+    }
+
+    public function getPhone(): ?string
+    {
+        return $this->phone;
+    }
+
+    public function setPhone(?string $phone): self
+    {
+        $this->phone = $phone;
         return $this;
     }
 

@@ -20,7 +20,10 @@
         </div>
         <div class="col-md-4">
             <label class="form-label small">Пароль {{ staffUser ? '(оставьте пустым, чтобы не менять)' : '' }}</label>
-            <input type="password" name="password" class="form-control form-control-sm" {{ staffUser ? '' : 'required' }} autocomplete="new-password">
+            <input type="password" name="password" class="form-control form-control-sm" {{ staffUser or generatePassword ? '' : 'required' }} autocomplete="new-password">
+            {% if not staffUser %}
+                <label class="small mt-1 mb-0"><input type="checkbox" name="generate_password" value="1" checked> Сгенерировать пароль автоматически</label>
+            {% endif %}
         </div>
         <div class="col-12">
             <label class="form-label small">Роли</label>
@@ -30,9 +33,24 @@
                 {% endfor %}
             </div>
         </div>
+        {% if staffUser %}
+            <div class="col-md-4">
+                <label class="form-label small">Статус заявки</label>
+                <select name="registration_status" class="form-select form-select-sm">
+                    <option value="pending" {{ staffUser.registrationStatus == 'pending' ? 'selected' : '' }}>Ожидает</option>
+                    <option value="approved" {{ staffUser.registrationStatus == 'approved' ? 'selected' : '' }}>Одобрен</option>
+                    <option value="rejected" {{ staffUser.registrationStatus == 'rejected' ? 'selected' : '' }}>Отклонён</option>
+                </select>
+            </div>
+        {% endif %}
         <div class="col-12">
             <label class="small mb-0"><input type="checkbox" name="is_active" value="1" {{ (staffUser is null or staffUser.isActive) ? 'checked' : '' }}> Учётная запись активна</label>
         </div>
+        {% if not staffUser %}
+            <div class="col-12">
+                <p class="small text-secondary mb-0">Созданный тренер считается одобренным и при входе сразу попадает на оплату аренды клуба.</p>
+            </div>
+        {% endif %}
         <div class="col-12">
             <button type="submit" class="btn btn-sm btn-success">Сохранить</button>
         </div>

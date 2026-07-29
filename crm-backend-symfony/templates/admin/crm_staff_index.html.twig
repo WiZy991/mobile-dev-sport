@@ -5,7 +5,11 @@
 {% block body %}
 <div class="content-header">
     <h1 class="h4 mb-0">Учётные записи CRM</h1>
-    <a href="{{ path('admin_crm_staff_new') }}" class="btn btn-sm btn-primary">Новый пользователь</a>
+    <div class="d-flex gap-2">
+        <a href="{{ path('admin_crm_staff_index', {filter: 'pending'}) }}" class="btn btn-sm {{ filter == 'pending' ? 'btn-warning' : 'btn-outline-warning' }}">Ожидают одобрения</a>
+        <a href="{{ path('admin_crm_staff_index') }}" class="btn btn-sm {{ filter != 'pending' ? 'btn-secondary' : 'btn-outline-secondary' }}">Все</a>
+        <a href="{{ path('admin_crm_staff_new') }}" class="btn btn-sm btn-primary">Новый пользователь</a>
+    </div>
 </div>
 
 <div class="content-card">
@@ -17,6 +21,8 @@
                 <th>Email</th>
                 <th>Имя</th>
                 <th>Роли</th>
+                <th>Статус заявки</th>
+                <th>Аренда до</th>
                 <th>Активен</th>
                 <th></th>
             </tr>
@@ -28,11 +34,37 @@
                     <td>{{ u.email }}</td>
                     <td>{{ u.name }}</td>
                     <td><small class="text-secondary">{{ u.roles|join(', ') }}</small></td>
+                    <td>
+                        {% if u.registrationStatus == 'pending' %}
+                            <span class="badge text-bg-warning">ожидает</span>
+                        {% elseif u.registrationStatus == 'rejected' %}
+                            <span class="badge text-bg-danger">отклонён</span>
+                        {% else %}
+                            <span class="badge text-bg-success">одобрен</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.rentalPaidUntil %}
+                            {{ u.rentalPaidUntil|date('d.m.Y') }}
+                        {% else %}
+                            <span class="text-secondary">—</span>
+                        {% endif %}
+                    </td>
                     <td>{{ u.isActive ? 'да' : 'нет' }}</td>
-                    <td><a href="{{ path('admin_crm_staff_edit', {id: u.id}) }}" class="btn btn-sm btn-outline-secondary">Изменить</a></td>
+                    <td class="text-nowrap">
+                        {% if u.registrationStatus == 'pending' %}
+                            <form method="post" action="{{ path('admin_crm_staff_approve', {id: u.id}) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-success">Одобрить</button>
+                            </form>
+                            <form method="post" action="{{ path('admin_crm_staff_reject', {id: u.id}) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Отклонить</button>
+                            </form>
+                        {% endif %}
+                        <a href="{{ path('admin_crm_staff_edit', {id: u.id}) }}" class="btn btn-sm btn-outline-secondary">Изменить</a>
+                    </td>
                 </tr>
             {% else %}
-                <tr><td colspan="6" class="text-center text-secondary">Пока нет записей. Создайте первого пользователя командой <code>php bin/console app:create-staff-user</code> или кнопкой выше.</td></tr>
+                <tr><td colspan="8" class="text-center text-secondary">Нет записей{% if filter == 'pending' %} в ожидании{% endif %}.</td></tr>
             {% endfor %}
             </tbody>
         </table>

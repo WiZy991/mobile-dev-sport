@@ -33,8 +33,9 @@ import com.fitnessclub.app.ui.screens.mytrainings.MyTrainingsViewModel
 import com.fitnessclub.app.ui.screens.profile.ProfileScreen
 import com.fitnessclub.app.ui.screens.profile.ProfileViewModel
 import com.fitnessclub.app.ui.screens.qrcode.QrCodeViewModel
-import com.fitnessclub.app.ui.screens.schedule.ScheduleScreen
-import com.fitnessclub.app.ui.screens.schedule.ScheduleViewModel
+// TODO(restore): импорты экрана расписания
+// import com.fitnessclub.app.ui.screens.schedule.ScheduleScreen
+// import com.fitnessclub.app.ui.screens.schedule.ScheduleViewModel
 import com.fitnessclub.app.ui.components.SecureScreenEffect
 import com.fitnessclub.app.ui.components.StatusBarEffect
 import com.fitnessclub.app.ui.theme.AppShapes
@@ -60,11 +61,12 @@ fun MainScreen(
     val currentRoute = navController.currentBackStackEntry?.destination?.route
     var selectedTab by remember(startTab) { mutableStateOf(startTab) }
     LaunchedEffect(currentRoute) {
+        // TODO(restore): вернуть Screen.Schedule.route -> 1 и сдвинуть индексы обратно
         val tab = when (currentRoute) {
             Screen.Home.route -> 0
-            Screen.Schedule.route -> 1
-            Screen.MyTrainings.route -> 2
-            Screen.Profile.route -> 3
+            // Screen.Schedule.route -> 1
+            Screen.MyTrainings.route -> 1
+            Screen.Profile.route -> 2
             else -> null
         }
         if (tab != null) selectedTab = tab
@@ -86,12 +88,15 @@ fun MainScreen(
             unselectedIcon = Icons.Outlined.Home,
             route = Screen.Home.route
         ),
+        // TODO(restore): временно скрыта вкладка «Расписание» в нижнем меню
+        /*
         BottomNavItem(
             title = "Расписание",
             selectedIcon = Icons.Filled.CalendarMonth,
             unselectedIcon = Icons.Outlined.CalendarMonth,
             route = Screen.Schedule.route
         ),
+        */
         BottomNavItem(
             title = "Мои записи",
             selectedIcon = Icons.Filled.FitnessCenter,
@@ -107,6 +112,7 @@ fun MainScreen(
     )
     
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             if (selectedTab == 0) {
                 FloatingActionButton(
@@ -167,6 +173,9 @@ fun MainScreen(
             }
         }
     ) { paddingValues ->
+        // Верхний inset не применяем: TopAppBar вкладок сам заходит под статус-бар (как на «Настройках»).
+        // Снизу оставляем отступ под bottom navigation.
+        val bottomInset = paddingValues.calculateBottomPadding()
         when (selectedTab) {
             0 -> {
                 HomeScreen(
@@ -175,7 +184,7 @@ fun MainScreen(
                     onNavigateToShop = { navController.navigate(Screen.Shop.route) },
                     onNavigateToSubscriptionPlans = { navController.navigate(Screen.SubscriptionPlans.route) },
                     onNavigateToTrainers = { navController.navigate(Screen.Trainers.route) },
-                    onNavigateToClubInfo = { navController.navigate(Screen.Clubs.route) },
+                    onNavigateToClubInfo = { navController.navigate(Screen.ClubInfo.route) },
                     onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
                     onNavigateToQrCode = { navController.navigate(Screen.QrCode.route) },
                     onNavigateToTrainingDetails = { trainingId ->
@@ -185,31 +194,34 @@ fun MainScreen(
                     onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
                 )
             }
+            // TODO(restore): вкладка расписания (был index 1)
+            /*
             1 -> {
                 val viewModel: ScheduleViewModel = hiltViewModel()
                 ScheduleScreen(
                     viewModel = viewModel,
-                    modifier = Modifier.padding(paddingValues),
+                    modifier = Modifier.padding(bottom = bottomInset),
+                    onTrainingClick = { trainingId ->
+                        navController.navigate(Screen.TrainingDetails.createRoute(trainingId))
+                    }
+                )
+            }
+            */
+            1 -> {
+                val viewModel: MyTrainingsViewModel = hiltViewModel()
+                MyTrainingsScreen(
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(bottom = bottomInset),
                     onTrainingClick = { trainingId ->
                         navController.navigate(Screen.TrainingDetails.createRoute(trainingId))
                     }
                 )
             }
             2 -> {
-                val viewModel: MyTrainingsViewModel = hiltViewModel()
-                MyTrainingsScreen(
-                    viewModel = viewModel,
-                    modifier = Modifier.padding(paddingValues),
-                    onTrainingClick = { trainingId ->
-                        navController.navigate(Screen.TrainingDetails.createRoute(trainingId))
-                    }
-                )
-            }
-            3 -> {
                 val viewModel: ProfileViewModel = hiltViewModel()
                 ProfileScreen(
                     viewModel = viewModel,
-                    modifier = Modifier.padding(paddingValues),
+                    modifier = Modifier.padding(bottom = bottomInset),
                     onLogout = {
                         navController.navigate(Screen.Login.route) {
                             popUpTo(Screen.Home.route) { inclusive = true }
