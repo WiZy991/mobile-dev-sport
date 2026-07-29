@@ -67,31 +67,36 @@
 
     {% if admin_can_mutate() %}
     <div class="content-card mb-3">
-        <div class="row g-3 align-items-end">
-            <div class="col-lg-6">
-                <div class="small text-secondary mb-1">Клиентов без абонемента: <strong class="text-light">{{ clientsWithoutSubscriptionCount|default(0) }}</strong></div>
-                <form method="post" action="{{ path('admin_clients_bulk_delete_without_subscription') }}"
-                      onsubmit="return confirm('Удалить ВСЕХ клиентов без абонемента ({{ clientsWithoutSubscriptionCount|default(0) }})? Это необратимо.');">
-                    <div class="input-group input-group-sm">
-                        <input type="text" name="confirm" class="form-control" placeholder="Введите УДАЛИТЬ" autocomplete="off" required>
-                        <button type="submit" class="btn btn-outline-danger" {{ (clientsWithoutSubscriptionCount|default(0)) == 0 ? 'disabled' : '' }}>
-                            Удалить всех без абонемента
-                        </button>
-                    </div>
-                </form>
+        <form method="post" action="{{ path('admin_clients_bulk_delete') }}" id="clients-bulk-form"
+              onsubmit="return clientsBulkSubmit(event);">
+            <input type="hidden" name="return_subscription" value="{{ filterSubscription|default('') }}">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="small text-secondary">Выбрано: <strong id="clients-selected-count" class="text-light">0</strong></span>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" id="clients-bulk-actions"
+                            data-bs-toggle="dropdown" aria-expanded="false" disabled>
+                        Действия
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="clients-bulk-actions">
+                        <li>
+                            <button type="submit" name="action" value="delete" class="dropdown-item text-danger">
+                                Удалить выбранных
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <span class="text-secondary mx-1">|</span>
+                <span class="small text-secondary">Без абонемента: <strong class="text-light">{{ clientsWithoutSubscriptionCount|default(0) }}</strong></span>
+                <button type="submit"
+                        formaction="{{ path('admin_clients_bulk_delete_without_subscription') }}"
+                        name="action" value="delete_all_without_subscription"
+                        class="btn btn-sm btn-outline-danger"
+                        {{ (clientsWithoutSubscriptionCount|default(0)) == 0 ? 'disabled' : '' }}
+                        onclick="return confirm('Удалить всех клиентов без абонемента ({{ clientsWithoutSubscriptionCount|default(0) }})?');">
+                    Удалить всех без абонемента
+                </button>
             </div>
-            <div class="col-lg-6">
-                <div class="small text-secondary mb-1">Или удалить выбранных в таблице (только без абонемента)</div>
-                <form method="post" action="{{ path('admin_clients_bulk_delete') }}" id="clients-bulk-delete-form"
-                      onsubmit="return confirm('Удалить выбранных клиентов без абонемента?');">
-                    <input type="hidden" name="return_subscription" value="{{ filterSubscription|default('none') }}">
-                    <div class="input-group input-group-sm">
-                        <input type="text" name="confirm" class="form-control" placeholder="Введите УДАЛИТЬ" autocomplete="off" required>
-                        <button type="submit" class="btn btn-danger">Удалить выбранных</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        </form>
     </div>
     {% endif %}
 
@@ -102,7 +107,7 @@
                 <tr>
                     {% if admin_can_mutate() %}
                         <th style="width:2rem">
-                            <input type="checkbox" class="form-check-input" id="clients-check-all" title="Выбрать всех на странице">
+                            <input type="checkbox" class="form-check-input" id="clients-check-all" title="Выбрать всех без абонемента в списке">
                         </th>
                     {% endif %}
                     <th>ID</th>
@@ -124,7 +129,7 @@
                         {% if admin_can_mutate() %}
                             <td>
                                 {% if sub is null %}
-                                    <input type="checkbox" class="form-check-input client-row-check" form="clients-bulk-delete-form" name="ids[]" value="{{ client.id }}">
+                                    <input type="checkbox" class="form-check-input client-row-check" form="clients-bulk-form" name="ids[]" value="{{ client.id }}">
                                 {% else %}
                                     <span class="text-secondary" title="Есть абонемент — массовое удаление недоступно">—</span>
                                 {% endif %}
@@ -191,12 +196,46 @@
     <script>
         (function () {
             var all = document.getElementById('clients-check-all');
-            if (!all) return;
-            all.addEventListener('change', function () {
-                document.querySelectorAll('.client-row-check').forEach(function (cb) {
-                    cb.checked = all.checked;
+            var actionsBtn = document.getElementById('clients-bulk-actions');
+            var countEl = document.getElementById('clients-selected-count');
+
+            function selectedBoxes() {
+                return Array.prototype.slice.call(document.querySelectorAll('.client-row-check:checked'));
+            }
+
+            function refreshSelection() {
+                var n = selectedBoxes().length;
+                if (countEl) countEl.textContent = String(n);
+                if (actionsBtn) actionsBtn.disabled = n === 0;
+            }
+
+            if (all) {
+                all.addEventListener('change', function () {
+                    document.querySelectorAll('.client-row-check').forEach(function (cb) {
+                        cb.checked = all.checked;
+                    });
+                    refreshSelection();
                 });
+            }
+            document.querySelectorAll('.client-row-check').forEach(function (cb) {
+                cb.addEventListener('change', refreshSelection);
             });
+            refreshSelection();
+
+            window.clientsBulkSubmit = function (event) {
+                var submitter = event.submitter;
+                var action = submitter && submitter.getAttribute('name') === 'action'
+                    ? submitter.value
+                    : 'delete';
+                if (action === 'delete_all_without_subscription') {
+                    return true;
+                }
+                if (selectedBoxes().length === 0) {
+                    alert('Отметьте клиентов галочкой.');
+                    return false;
+                }
+                return confirm('Удалить выбранных клиентов без абонемента (' + selectedBoxes().length + ')?');
+            };
         })();
     </script>
 {% endblock %}

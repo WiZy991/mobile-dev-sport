@@ -906,16 +906,6 @@ class AdminController extends AbstractController
     #[Route('/clients/bulk-delete-without-subscription', name: 'admin_clients_bulk_delete_without_subscription', priority: 10, methods: ['POST'])]
     public function bulkDeleteClientsWithoutSubscription(Request $request): Response
     {
-        $confirm = trim((string) $request->request->get('confirm', ''));
-        if ($confirm !== 'УДАЛИТЬ') {
-            $this->addFlash('danger', 'Для массового удаления введите слово УДАЛИТЬ в поле подтверждения.');
-
-            return $this->redirectToRoute('admin_section', [
-                'section' => 'clients',
-                'subscription' => 'none',
-            ]);
-        }
-
         $ids = $this->em->createQueryBuilder()
             ->select('u.id')
             ->from(User::class, 'u')
@@ -944,22 +934,13 @@ class AdminController extends AbstractController
             $idsRaw = [];
         }
         $ids = array_values(array_unique(array_filter(array_map('intval', $idsRaw), static fn (int $id) => $id > 0)));
-        $confirm = trim((string) $request->request->get('confirm', ''));
 
         if ($ids === []) {
             $this->addFlash('danger', 'Выберите клиентов для удаления.');
 
             return $this->redirectToRoute('admin_section', [
                 'section' => 'clients',
-                'subscription' => (string) $request->request->get('return_subscription', 'none'),
-            ]);
-        }
-        if ($confirm !== 'УДАЛИТЬ') {
-            $this->addFlash('danger', 'Для удаления введите слово УДАЛИТЬ в поле подтверждения.');
-
-            return $this->redirectToRoute('admin_section', [
-                'section' => 'clients',
-                'subscription' => (string) $request->request->get('return_subscription', 'none'),
+                'subscription' => (string) $request->request->get('return_subscription', ''),
             ]);
         }
 
@@ -984,7 +965,7 @@ class AdminController extends AbstractController
 
         return $this->redirectToRoute('admin_section', [
             'section' => 'clients',
-            'subscription' => (string) $request->request->get('return_subscription', 'none'),
+            'subscription' => (string) $request->request->get('return_subscription', ''),
         ]);
     }
 
