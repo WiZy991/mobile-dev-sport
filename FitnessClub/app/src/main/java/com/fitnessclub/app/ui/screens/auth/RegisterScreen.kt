@@ -633,6 +633,7 @@ private fun RegisterAccountStep(
     )
 
     Spacer(Modifier.height(12.dp))
+
     TextField(
         value = uiState.promoCode,
         onValueChange = viewModel::onPromoChange,
@@ -645,7 +646,7 @@ private fun RegisterAccountStep(
         singleLine = true,
     )
 
-    Spacer(Modifier.height(12.dp))
+    Spacer(modifier.height(12.dp))
 
     val legal = legalAnnotatedString()
     ClickableText(

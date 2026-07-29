@@ -112,7 +112,7 @@ fun RegisterPassportScreen(
                         singleLine = true,
                         colors = lightFieldColors()
                     )
-                    Text("${p.series.length}/5", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text("${p.series.length}/4", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 }
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
@@ -124,7 +124,7 @@ fun RegisterPassportScreen(
                         singleLine = true,
                         colors = lightFieldColors()
                     )
-                    Text("${p.number.length}/7", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text("${p.number.length}/6", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 }
             }
             Spacer(Modifier.height(12.dp))

@@ -19,6 +19,9 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  *
  * Excel: несколько листов — по имени листа («Клиенты», «Абонементы», «Записи») или колонка «тип».
  * CSV: одна таблица — колонка «тип» / record_type: client | subscription | booking (или клиент | абонемент | запись).
+ *
+ * Экспорт Fitness365 («Абонемент» / «активная карта» + «Дата продажи» / «Дата окончания» в строке клиента):
+ * после импорта клиента абонемент создаётся автоматически, без требования паспорта.
  */
 final class ClientImportService
 {
@@ -118,6 +121,27 @@ final class ClientImportService
         }
 
         $this->em->flush();
+
+        // Fitness365-style: абонемент в той же строке, что клиент (колонки «Абонемент» + даты).
+        // Паспорт не требуется — в отличие от ручной выдачи в админке.
+        foreach ($clientJobs as $job) {
+            if (!$this->clientRowHasInlineSubscription($job['data'])) {
+                continue;
+            }
+            try {
+                $r = $this->importSubscriptionRow($job['data'], $updateExisting);
+                if ($r === 'created') {
+                    ++$subsCreated;
+                } elseif ($r === 'updated') {
+                    ++$subsUpdated;
+                } else {
+                    ++$skipped;
+                }
+            } catch (\Throwable $e) {
+                $errors[] = $job['ref'] . ' (абонемент): ' . $e->getMessage();
+                ++$skipped;
+            }
+        }
 
         foreach ($subJobs as $job) {
             try {
@@ -350,11 +374,16 @@ final class ClientImportService
             'название тарифа' => 'plan_name',
             'тариф' => 'plan_name',
             'plan_name' => 'plan_name',
+            'абонемент' => 'plan_name',
+            'активная карта' => 'plan_name',
+            'карта' => 'plan_name',
             'начало абонемента' => 'subscription_start',
             'дата начала абонемента' => 'subscription_start',
+            'дата продажи' => 'subscription_start',
             'subscription_start' => 'subscription_start',
             'окончание абонемента' => 'subscription_end',
             'дата окончания абонемента' => 'subscription_end',
+            'дата окончания' => 'subscription_end',
             'subscription_end' => 'subscription_end',
             'статус абонемента' => 'subscription_status',
             'subscription_status' => 'subscription_status',
@@ -689,6 +718,43 @@ final class ClientImportService
     /**
      * @param array<string, mixed> $data
      */
+    private function clientRowHasInlineSubscription(array $data): bool
+    {
+        $planName = trim((string) ($data['plan_name'] ?? ''));
+
+        return $planName !== '' && $planName !== '—';
+    }
+
+    /**
+     * Синонимы названий тарифов из внешних CRM (Fitness365 и др.) → варианты для поиска в нашей CRM.
+     *
+     * @return list<string> lowercase candidates
+     */
+    private function planNameCandidates(string $pname): array
+    {
+        $low = mb_strtolower(trim($pname));
+        if ($low === '') {
+            return [];
+        }
+
+        /** @var array<string, list<string>> $aliases */
+        $aliases = [
+            'абонемент на год' => ['на 12 месяцев', 'абонемент на 12 месяцев', '12 месяцев'],
+            'на 12 месяцев' => ['абонемент на год', 'абонемент на 12 месяцев', '12 месяцев'],
+            'абонемент на 12 месяцев' => ['на 12 месяцев', 'абонемент на год', '12 месяцев'],
+        ];
+
+        $out = [$low];
+        foreach ($aliases[$low] ?? [] as $alias) {
+            $out[] = mb_strtolower($alias);
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
     private function resolvePlan(array $data): ?SubscriptionPlan
     {
         $pid = trim((string) ($data['plan_id'] ?? ''));
@@ -702,10 +768,13 @@ final class ClientImportService
         if ($pname === '') {
             return null;
         }
-        $low = mb_strtolower($pname);
+        $candidates = $this->planNameCandidates($pname);
         foreach ($this->em->getRepository(SubscriptionPlan::class)->findAll() as $p) {
-            if (mb_strtolower($p->getName()) === $low) {
-                return $p;
+            $plow = mb_strtolower($p->getName());
+            foreach ($candidates as $c) {
+                if ($plow === $c) {
+                    return $p;
+                }
             }
         }
 

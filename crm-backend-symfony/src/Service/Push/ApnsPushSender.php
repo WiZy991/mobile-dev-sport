@@ -183,6 +183,41 @@ final class ApnsPushSender
         return $jwt;
     }
 
+    /**
+     * Находит .p8 по пути. На Linux регистр важен (ZSZF ≠ ZSZf), поэтому при промахе
+     * пробуем case-insensitive совпадение в той же папке.
+     */
+    private function resolveKeyFilePath(string $path): ?string
+    {
+        if (is_file($path)) {
+            return $path;
+        }
+
+        $dir = dirname($path);
+        $want = basename($path);
+        if (!is_dir($dir)) {
+            return null;
+        }
+
+        $entries = @scandir($dir);
+        if (!is_array($entries)) {
+            return null;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            if (strcasecmp($entry, $want) === 0 && is_file($dir . DIRECTORY_SEPARATOR . $entry)) {
+                error_log(sprintf('APNs: путь скорректирован по регистру: %s → %s/%s', $path, $dir, $entry));
+
+                return $dir . DIRECTORY_SEPARATOR . $entry;
+            }
+        }
+
+        return null;
+    }
+
     private function loadPrivateKey(): ?\OpenSSLAsymmetricKey
     {
         $raw = $this->authKey;
@@ -193,13 +228,16 @@ final class ApnsPushSender
 
         // APNS_AUTH_KEY может быть: путём к .p8, либо самим PEM-содержимым.
         if ($raw[0] !== '-') {
-            if (is_file($raw)) {
-                $raw = (string) file_get_contents($raw);
-            } else {
-                error_log(sprintf('APNs: APNS_AUTH_KEY похоже на путь, но файл не найден в контейнере: %s', $raw));
+            $path = $this->resolveKeyFilePath($raw);
+            if ($path === null) {
+                error_log(sprintf(
+                    'APNs: APNS_AUTH_KEY похоже на путь, но файл не найден в контейнере: %s (проверьте регистр имени — Linux чувствителен к регистру, и что etc/Apns смонтирован в контейнер)',
+                    $raw,
+                ));
 
                 return null;
             }
+            $raw = (string) file_get_contents($path);
         }
 
         // PEM, вставленный в .env одной строкой: переносы строк «\n» становятся литералами —

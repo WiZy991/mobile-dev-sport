@@ -43,7 +43,7 @@ data class PassportDraft(
     val streetHouse: String = ""
 ) {
     fun isCompleteForRegister(): Boolean =
-        series.isNotBlank() && number.isNotBlank() &&
+        series.length == 4 && number.length == 6 &&
             issuedBy.isNotBlank() && issuedDateDisplay.isNotBlank() &&
             region.isNotBlank() && city.isNotBlank() && streetHouse.isNotBlank()
 }
@@ -291,7 +291,7 @@ class RegisterViewModel @Inject constructor(
     fun onPassportSeriesChange(v: String) {
         updateForm {
             it.copy(
-                passport = it.passport.copy(series = v.take(5)),
+                passport = it.passport.copy(series = v.filter { it.isDigit() }.take(4)),
                 passportError = null,
             )
         }
@@ -300,7 +300,7 @@ class RegisterViewModel @Inject constructor(
     fun onPassportNumberChange(v: String) {
         updateForm {
             it.copy(
-                passport = it.passport.copy(number = v.take(7)),
+                passport = it.passport.copy(number = v.filter { it.isDigit() }.take(6)),
                 passportError = null,
             )
         }
@@ -350,13 +350,13 @@ class RegisterViewModel @Inject constructor(
     fun validatePassportDraft(): Boolean {
         val p = _uiState.value.passport
         var ok = true
-        if (p.series.isBlank()) ok = false
-        if (p.number.isBlank()) ok = false
+        if (p.series.length != 4) ok = false
+        if (p.number.length != 6) ok = false
         if (p.issuedBy.isBlank()) ok = false
         if (parseToIsoDate(p.issuedDateDisplay) == null) ok = false
         if (p.region.isBlank() || p.city.isBlank() || p.streetHouse.isBlank()) ok = false
         if (!ok) {
-            _uiState.value = _uiState.value.copy(passportError = "Заполните все поля паспорта корректно")
+            _uiState.value = _uiState.value.copy(passportError = "Заполните все поля паспорта корректно (серия — 4 цифры, номер — 6)")
         } else {
             _uiState.value = _uiState.value.copy(passportError = null)
         }
@@ -507,7 +507,7 @@ class RegisterViewModel @Inject constructor(
             passportIssueDate = passportIssueIso,
             registrationAddress = address,
             promoCode = state.promoCode.takeIf { it.isNotBlank() },
-            newsletter = state.newsletter,
+            newsletter = false,
             clubId = state.selectedClub?.id,
             referralSource = state.referralSource,
             referralSourceOther = state.referralSourceOther.takeIf { it.isNotBlank() }
