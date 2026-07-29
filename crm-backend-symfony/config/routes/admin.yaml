@@ -112,6 +112,11 @@ admin_subscription_cancel:
   controller: App\Controller\Admin\AdminController::cancelSubscription
   methods: [POST]
 
+admin_subscription_change_plan:
+  path: /admin/subscriptions/{id}/change-plan
+  controller: App\Controller\Admin\AdminController::changeSubscriptionPlan
+  methods: [POST]
+
 admin_lead_new:
   path: /admin/leads/new
   controller: App\Controller\Admin\AdminController::createLead
