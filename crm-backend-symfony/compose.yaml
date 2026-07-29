@@ -8,6 +8,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      TZ: Asia/Vladivostok
+      APP_TIMEZONE: Asia/Vladivostok
     # С compose.https.yaml порт 80/443 открывает только nginx. Здесь только отладочный 8000 на хосте.
     ports:
       - "8000:8000"

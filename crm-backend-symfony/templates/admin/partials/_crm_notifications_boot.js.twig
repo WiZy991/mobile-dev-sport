@@ -135,9 +135,23 @@
 
         fetch(pollUrl + '?since_id=' + encodeURIComponent(String(sinceId)), {
             credentials: 'same-origin',
-            headers: { 'Accept': 'application/json' },
+            redirect: 'manual',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         })
-            .then(function (res) { return res.json(); })
+            .then(function (res) {
+                // Сессия истекла: 302 на логин. Не трогаем DOM, пользователь обновит/войдёт сам.
+                if (res.type === 'opaqueredirect' || res.status === 0 || res.status === 301 || res.status === 302 || res.status === 401 || res.status === 403) {
+                    return null;
+                }
+                if (!res.ok) {
+                    return null;
+                }
+                var ct = res.headers.get('content-type') || '';
+                if (ct.indexOf('application/json') === -1) {
+                    return null;
+                }
+                return res.json();
+            })
             .then(function (data) {
                 if (!data || !data.enabled) return;
 

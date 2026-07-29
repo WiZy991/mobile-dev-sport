@@ -66,7 +66,7 @@
     </div>
 
     {% if admin_can_mutate() %}
-    <div class="content-card mb-3">
+    <div class="content-card mb-3 clients-bulk-toolbar">
         <form method="post" action="{{ path('admin_clients_bulk_delete') }}" id="clients-bulk-form"
               onsubmit="return clientsBulkSubmit(event);">
             <input type="hidden" name="return_subscription" value="{{ filterSubscription|default('') }}">
@@ -74,10 +74,10 @@
                 <span class="small text-secondary">Выбрано: <strong id="clients-selected-count" class="text-light">0</strong></span>
                 <div class="dropdown">
                     <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" id="clients-bulk-actions"
-                            data-bs-toggle="dropdown" aria-expanded="false" disabled>
+                            data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" disabled>
                         Действия
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="clients-bulk-actions">
+                    <ul class="dropdown-menu dropdown-menu-dark shadow" aria-labelledby="clients-bulk-actions">
                         <li>
                             <button type="submit" name="action" value="delete" class="dropdown-item text-danger">
                                 Удалить выбранных
@@ -98,6 +98,25 @@
             </div>
         </form>
     </div>
+    <style>
+        /* backdrop-filter у .content-card создаёт stacking context — меню иначе уходит под таблицу */
+        .clients-bulk-toolbar {
+            position: relative;
+            z-index: 40;
+            overflow: visible;
+        }
+        .clients-bulk-toolbar .dropdown {
+            position: relative;
+            z-index: 41;
+        }
+        .clients-bulk-toolbar .dropdown-menu {
+            z-index: 1055;
+        }
+        .content-card[data-dz-tour="clients-table"] {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
     {% endif %}
 
     <div class="content-card" data-dz-tour="clients-table">

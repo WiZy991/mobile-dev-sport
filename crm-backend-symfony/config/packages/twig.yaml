@@ -1,5 +1,7 @@
 twig:
     file_name_pattern: '*.twig'
+    date:
+        timezone: '%env(default:app_timezone_default:APP_TIMEZONE)%'
     globals:
         yandex_metrika_id: '%env(int:default:yandex_metrika_id_default:YANDEX_METRIKA_ID)%'
 
