@@ -106,9 +106,8 @@ class AuthController extends AbstractController
 
         if ($this->userPasswordNotSet($user)) {
             return [
-                'message' => $this->isSberLinkedAccount($user)
-                    ? $this->passwordNotSetMessage()
-                    : 'Аккаунт найден, но пароль для входа по email не задан. Задайте пароль в профиле или обратитесь в клуб.',
+                'message' => 'Аккаунт с этим email уже есть в клубе, но пароль ещё не задан. '
+                    . 'Пройдите регистрацию с этим email и придумайте пароль — вход откроется сразу.',
                 'code' => 'password_not_set',
             ];
         }
@@ -140,19 +139,31 @@ class AuthController extends AbstractController
 
         $existing = $this->findUserByEmail($email);
         if ($existing !== null) {
-            $existingHash = $existing->getPasswordHash();
-            if ($existingHash === null || $existingHash === '') {
-                return $this->json([
-                    'error' => 'Этот email уже привязан к аккаунту Сбер ID. Войдите через Сбер ID '
-                        . 'и задайте пароль в Профиле → Изменить пароль.',
-                    'code' => 'password_not_set',
-                ], 409);
+            if ($existing->isBlocked()) {
+                return $this->json(['error' => 'Access denied', 'code' => 'user_blocked'], 403);
             }
 
-            return $this->json([
-                'error' => 'Пользователь с таким email уже зарегистрирован',
-                'code' => 'email_already_exists',
-            ], 409);
+            // Клиент уже в CRM (импорт / Сбер / прошлый вход): принимаем регистрацию как
+            // установку/смену пароля и сразу выдаём сессию.
+            $existing->setPasswordHash(password_hash($password, PASSWORD_BCRYPT));
+            if ($name !== '' && $name !== 'Новый пользователь') {
+                $existing->setName(mb_substr($name, 0, 100));
+            }
+            if ($phone !== '' && $phone !== '+7 900 000-00-00') {
+                $existing->setPhone(mb_substr($phone, 0, 32));
+            }
+            $this->mobileClientPayloadApplier->applyRegistrationPayload($existing, $data);
+            $this->em->persist($existing);
+            $this->em->flush();
+
+            $this->leadIngestion->attachUserIfOpenLead(
+                $existing->getPhone(),
+                $existing,
+                'Клиент вошёл в приложение (email уже был в CRM)',
+            );
+            $this->em->flush();
+
+            return $this->json($this->mobileTokens->issue($existing, true));
         }
 
         $user = (new User())
@@ -277,21 +288,6 @@ class AuthController extends AbstractController
         $hash = $user->getPasswordHash();
 
         return $hash === null || trim((string) $hash) === '';
-    }
-
-    private function isSberLinkedAccount(User $user): bool
-    {
-        $sberId = $user->getSberId();
-
-        return ($sberId !== null && trim($sberId) !== '')
-            || $user->getPassportVerificationProvider() === 'sber_id';
-    }
-
-    private function passwordNotSetMessage(): string
-    {
-        return 'Аккаунт с этим email есть, но пароль не задан (вход через Сбер ID). '
-            . 'Нажмите «Войти через Сбер ID» ниже, затем Профиль → Изменить пароль — '
-            . 'и задайте пароль для входа по email.';
     }
 }
 
