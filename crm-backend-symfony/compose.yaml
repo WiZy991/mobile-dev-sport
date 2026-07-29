@@ -18,6 +18,9 @@ services:
     # Опционально: дополнительные секреты монтируются внутрь приложения как /app/var/secrets (не для бандлового сертификата etc/sber из образа).
     volumes:
       - ./var/secrets:/app/var/secrets:ro
+      # ВАЖНО: файлы акций (uploaded images) должны сохраняться на хосте.
+      # Иначе при пересоздании контейнера `public/uploads/promotions` внутри контейнера будет пустым.
+      - ./public/uploads/promotions:/app/public/uploads/promotions
     networks:
       - crm_backend_net
 
