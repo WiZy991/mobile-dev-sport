@@ -68,9 +68,21 @@
         </form>
     {% endif %}
 
-    {% if not subscription_can_freeze(sub) and sub.status != 'frozen' and not subscription_can_extend(sub) and not subscription_can_cancel(sub) and not (subscription_can_change_plan(sub) and plansForChange|length > 0) %}
-        <span class="text-secondary small">—</span>
-    {% endif %}
+    <form method="post" action="{{ path('admin_subscription_update_dates', {id: sub.id}) }}" class="sub-mgmt-actions__plan mt-1">
+        {% if return_to is defined and return_to %}
+            <input type="hidden" name="return_to" value="{{ return_to }}">
+        {% endif %}
+        {% if return_status is defined and return_status %}
+            <input type="hidden" name="return_status" value="{{ return_status }}">
+        {% endif %}
+        <div class="d-flex flex-wrap gap-1 align-items-center">
+            <input type="date" name="start_date" class="form-control form-control-sm" style="width:9.5rem"
+                   value="{{ sub.startDate|date('Y-m-d') }}" title="Дата начала" required>
+            <input type="date" name="end_date" class="form-control form-control-sm" style="width:9.5rem"
+                   value="{{ sub.endDate ? sub.endDate|date('Y-m-d') : '' }}" title="Дата окончания">
+            <button type="submit" class="btn btn-sm btn-outline-info sub-mgmt-actions__btn">Даты</button>
+        </div>
+    </form>
 </div>
 {% else %}
     —

@@ -92,6 +92,16 @@ admin_client_block:
   methods: [POST]
   requirements: { id: '\d+' }
 
+admin_clients_bulk_delete_without_subscription:
+  path: /admin/clients/bulk-delete-without-subscription
+  controller: App\Controller\Admin\AdminController::bulkDeleteClientsWithoutSubscription
+  methods: [POST]
+
+admin_clients_bulk_delete:
+  path: /admin/clients/bulk-delete
+  controller: App\Controller\Admin\AdminController::bulkDeleteSelectedClients
+  methods: [POST]
+
 admin_subscription_freeze:
   path: /admin/subscriptions/{id}/freeze
   controller: App\Controller\Admin\AdminController::freezeSubscription
@@ -115,6 +125,11 @@ admin_subscription_cancel:
 admin_subscription_change_plan:
   path: /admin/subscriptions/{id}/change-plan
   controller: App\Controller\Admin\AdminController::changeSubscriptionPlan
+  methods: [POST]
+
+admin_subscription_update_dates:
+  path: /admin/subscriptions/{id}/update-dates
+  controller: App\Controller\Admin\AdminController::updateSubscriptionDates
   methods: [POST]
 
 admin_subscriptions_bulk_dates:

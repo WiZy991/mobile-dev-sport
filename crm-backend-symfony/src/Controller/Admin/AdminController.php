@@ -16,6 +16,10 @@ use App\Entity\Training;
 use App\Entity\Trainer;
 use App\Entity\Booking;
 use App\Entity\AccessLog;
+use App\Entity\AccessAlarm;
+use App\Entity\Feedback;
+use App\Entity\Payment;
+use App\Entity\PushToken;
 use App\Entity\Tag;
 use App\Entity\Club;
 use App\Entity\LeadNote;
@@ -419,26 +423,159 @@ class AdminController extends AbstractController
         $search = trim((string) $request->query->get('q', ''));
         $tagId = $request->query->get('tag_id') ? (int) $request->query->get('tag_id') : null;
         $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
+        $subscriptionFilter = trim((string) $request->query->get('subscription', ''));
 
-        if ($tagId) {
-            $tag = $this->em->getRepository(Tag::class)->find($tagId);
-            $clients = $tag ? $tag->getUsers()->toArray() : [];
-        } else {
-            $clients = $this->em->getRepository(User::class)->findBy([], ['name' => 'ASC']);
+        $qb = $this->em->createQueryBuilder()
+            ->select('DISTINCT u')
+            ->from(User::class, 'u')
+            ->leftJoin('u.club', 'club')
+            ->leftJoin('u.tags', 'tag')
+            ->orderBy('u.name', 'ASC');
+
+        if ($tagId !== null && $tagId > 0) {
+            $qb->andWhere('tag.id = :tagId')->setParameter('tagId', $tagId);
         }
         if ($clubId !== null && $clubId > 0) {
-            $clients = array_values(array_filter($clients, fn (User $u) => $u->getClub()?->getId() === $clubId));
+            $qb->andWhere('club.id = :clubId')->setParameter('clubId', $clubId);
         }
         if ($search !== '') {
-            $searchLower = mb_strtolower($search);
-            $clients = array_filter($clients, fn (User $u) =>
-                str_contains(mb_strtolower($u->getName()), $searchLower)
-                || str_contains((string) $u->getEmail(), $search)
-                || str_contains((string) $u->getPhone(), $search)
-            );
+            $qb->andWhere('LOWER(u.name) LIKE :q OR LOWER(u.email) LIKE :q OR u.phone LIKE :qPhone')
+                ->setParameter('q', '%' . mb_strtolower($search) . '%')
+                ->setParameter('qPhone', '%' . $search . '%');
         }
 
-        return array_values($clients);
+        $today = new \DateTimeImmutable('today');
+        if ($subscriptionFilter === 'none') {
+            $qb->andWhere('NOT EXISTS (SELECT 1 FROM App\Entity\Subscription sNone WHERE sNone.user = u)');
+        } elseif ($subscriptionFilter === 'any') {
+            $qb->andWhere('EXISTS (SELECT 1 FROM App\Entity\Subscription sAny WHERE sAny.user = u)');
+        } elseif ($subscriptionFilter === 'active') {
+            $qb->andWhere(
+                'EXISTS (SELECT 1 FROM App\Entity\Subscription sAct
+                    WHERE sAct.user = u
+                      AND sAct.status = :activeStatus
+                      AND sAct.startDate <= :today
+                      AND (sAct.endDate IS NULL OR sAct.endDate >= :today))'
+            )
+                ->setParameter('activeStatus', 'active')
+                ->setParameter('today', $today);
+        } elseif ($subscriptionFilter === 'frozen') {
+            $qb->andWhere('EXISTS (SELECT 1 FROM App\Entity\Subscription sFr WHERE sFr.user = u AND sFr.status = :frozenStatus)')
+                ->setParameter('frozenStatus', 'frozen');
+        } elseif ($subscriptionFilter === 'expired') {
+            $qb->andWhere(
+                'EXISTS (SELECT 1 FROM App\Entity\Subscription sExp WHERE sExp.user = u)
+                 AND NOT EXISTS (SELECT 1 FROM App\Entity\Subscription sLive
+                    WHERE sLive.user = u
+                      AND (
+                        (sLive.status = :activeStatus AND sLive.startDate <= :today AND (sLive.endDate IS NULL OR sLive.endDate >= :today))
+                        OR sLive.status = :frozenStatus
+                      ))'
+            )
+                ->setParameter('activeStatus', 'active')
+                ->setParameter('frozenStatus', 'frozen')
+                ->setParameter('today', $today);
+        } elseif (str_starts_with($subscriptionFilter, 'plan:')) {
+            $planId = (int) substr($subscriptionFilter, 5);
+            if ($planId > 0) {
+                $qb->andWhere(
+                    'EXISTS (SELECT 1 FROM App\Entity\Subscription sPlan WHERE sPlan.user = u AND IDENTITY(sPlan.plan) = :planId)'
+                )->setParameter('planId', $planId);
+            }
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * @param list<User> $clients
+     * @return array<int, array{label: string, status: string, plan_name: string, plan_type: string, visits: ?string, end: ?string}>
+     */
+    private function buildClientSubscriptionSummaries(array $clients): array
+    {
+        if ($clients === []) {
+            return [];
+        }
+
+        $ids = array_values(array_filter(array_map(
+            static fn (User $u) => $u->getId(),
+            $clients
+        )));
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var list<Subscription> $subs */
+        $subs = $this->em->createQueryBuilder()
+            ->select('s', 'p')
+            ->from(Subscription::class, 's')
+            ->join('s.plan', 'p')
+            ->join('s.user', 'u')
+            ->where('u.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->orderBy('s.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        $today = new \DateTimeImmutable('today');
+        $byUser = [];
+        foreach ($subs as $sub) {
+            if (!$sub instanceof Subscription) {
+                continue;
+            }
+            $uid = $sub->getUser()->getId();
+            if ($uid === null || isset($byUser[$uid])) {
+                continue;
+            }
+            $plan = $sub->getPlan();
+            // Название тарифа как в разделе «Абонементы»: «На 12 месяцев», «Разовое посещение» и т.д.
+            $planName = $plan->getName();
+            $typeLabel = match ($plan->getType()) {
+                'limited' => 'по посещениям',
+                'personal' => 'персональный',
+                default => 'безлимит',
+            };
+
+            $visitsLabel = null;
+            if ($sub->getVisitsTotal() !== null) {
+                $visitsLabel = ($sub->getVisitsUsed() ?? 0) . ' / ' . $sub->getVisitsTotal() . ' пос.';
+            } elseif ($plan->getVisitsCount() !== null) {
+                $visitsLabel = $plan->getVisitsCount() . ' пос.';
+            }
+
+            if ($sub->isEffectiveActiveOn($today)) {
+                $status = 'active';
+            } elseif ($sub->getStatus() === 'frozen') {
+                $status = 'frozen';
+            } elseif ($sub->getStatus() === 'active' && $sub->getStartDate() > $today) {
+                $status = 'pending';
+            } elseif ($sub->getStatus() === 'cancelled') {
+                $status = 'cancelled';
+            } else {
+                $status = 'expired';
+            }
+
+            $byUser[$uid] = [
+                'label' => $planName,
+                'status' => $status,
+                'plan_name' => $planName,
+                'plan_type' => $typeLabel,
+                'visits' => $visitsLabel,
+                'end' => $sub->getEndDate()?->format('d.m.Y'),
+            ];
+        }
+
+        return $byUser;
+    }
+
+    private function countClientsWithoutSubscription(): int
+    {
+        return (int) $this->em->createQueryBuilder()
+            ->select('COUNT(u.id)')
+            ->from(User::class, 'u')
+            ->where('NOT EXISTS (SELECT 1 FROM App\Entity\Subscription s WHERE s.user = u)')
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     private function clientTagNamesJoined(User $u): string
@@ -764,6 +901,225 @@ class AdminController extends AbstractController
         $this->addFlash($user->isBlocked() ? 'warning' : 'success', $user->isBlocked() ? 'Клиент заблокирован — доступ в приложение запрещён.' : 'Доступ в приложение разблокирован.');
 
         return $this->redirectToRoute('admin_client_show', ['id' => $id]);
+    }
+
+    #[Route('/clients/bulk-delete-without-subscription', name: 'admin_clients_bulk_delete_without_subscription', priority: 10, methods: ['POST'])]
+    public function bulkDeleteClientsWithoutSubscription(Request $request): Response
+    {
+        $confirm = trim((string) $request->request->get('confirm', ''));
+        if ($confirm !== 'УДАЛИТЬ') {
+            $this->addFlash('danger', 'Для массового удаления введите слово УДАЛИТЬ в поле подтверждения.');
+
+            return $this->redirectToRoute('admin_section', [
+                'section' => 'clients',
+                'subscription' => 'none',
+            ]);
+        }
+
+        $ids = $this->em->createQueryBuilder()
+            ->select('u.id')
+            ->from(User::class, 'u')
+            ->where('NOT EXISTS (SELECT 1 FROM App\Entity\Subscription s WHERE s.user = u)')
+            ->getQuery()
+            ->getSingleColumnResult();
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn (int $id) => $id > 0));
+
+        if ($ids === []) {
+            $this->addFlash('info', 'Клиентов без абонемента не найдено.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'clients']);
+        }
+
+        $deleted = $this->deleteClientsByIds($ids);
+        $this->addFlash('success', 'Удалено клиентов без абонемента: ' . $deleted . '.');
+
+        return $this->redirectToRoute('admin_section', ['section' => 'clients']);
+    }
+
+    #[Route('/clients/bulk-delete', name: 'admin_clients_bulk_delete', priority: 10, methods: ['POST'])]
+    public function bulkDeleteSelectedClients(Request $request): Response
+    {
+        $idsRaw = $request->request->all('ids');
+        if (!\is_array($idsRaw)) {
+            $idsRaw = [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $idsRaw), static fn (int $id) => $id > 0)));
+        $confirm = trim((string) $request->request->get('confirm', ''));
+
+        if ($ids === []) {
+            $this->addFlash('danger', 'Выберите клиентов для удаления.');
+
+            return $this->redirectToRoute('admin_section', [
+                'section' => 'clients',
+                'subscription' => (string) $request->request->get('return_subscription', 'none'),
+            ]);
+        }
+        if ($confirm !== 'УДАЛИТЬ') {
+            $this->addFlash('danger', 'Для удаления введите слово УДАЛИТЬ в поле подтверждения.');
+
+            return $this->redirectToRoute('admin_section', [
+                'section' => 'clients',
+                'subscription' => (string) $request->request->get('return_subscription', 'none'),
+            ]);
+        }
+
+        // Защита: не удаляем клиентов, у которых есть любой абонемент.
+        $withSub = $this->em->createQueryBuilder()
+            ->select('DISTINCT IDENTITY(s.user)')
+            ->from(Subscription::class, 's')
+            ->where('IDENTITY(s.user) IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getSingleColumnResult();
+        $withSub = array_map('intval', $withSub);
+        $safeIds = array_values(array_diff($ids, $withSub));
+        $skipped = \count($ids) - \count($safeIds);
+
+        $deleted = $this->deleteClientsByIds($safeIds);
+        $msg = 'Удалено клиентов: ' . $deleted . '.';
+        if ($skipped > 0) {
+            $msg .= ' Пропущено (есть абонемент): ' . $skipped . '.';
+        }
+        $this->addFlash($deleted > 0 ? 'success' : 'warning', $msg);
+
+        return $this->redirectToRoute('admin_section', [
+            'section' => 'clients',
+            'subscription' => (string) $request->request->get('return_subscription', 'none'),
+        ]);
+    }
+
+    /**
+     * @param list<int> $ids
+     */
+    private function deleteClientsByIds(array $ids): int
+    {
+        if ($ids === []) {
+            return 0;
+        }
+
+        // Снимаем nullable-связи (без CASCADE в схеме).
+        $nullableUpdates = [
+            [Sale::class, 'user'],
+            [Booking::class, 'user'],
+            [Payment::class, 'user'],
+            [AccessLog::class, 'user'],
+            [Task::class, 'client'],
+            [Lead::class, 'convertedUser'],
+            [Feedback::class, 'user'],
+            [SupportTicket::class, 'user'],
+            [AccessAlarm::class, 'user'],
+        ];
+        foreach ($nullableUpdates as [$entity, $field]) {
+            try {
+                $this->em->createQueryBuilder()
+                    ->update($entity, 'e')
+                    ->set('e.' . $field, ':null')
+                    ->where('IDENTITY(e.' . $field . ') IN (:ids)')
+                    ->setParameter('null', null)
+                    ->setParameter('ids', $ids)
+                    ->getQuery()
+                    ->execute();
+            } catch (\Throwable) {
+                // сущность/поле может отсутствовать в конкретной схеме
+            }
+        }
+
+        $this->em->createQueryBuilder()
+            ->delete(ClientNote::class, 'n')
+            ->where('IDENTITY(n.client) IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->execute();
+
+        try {
+            $this->em->createQueryBuilder()
+                ->delete(PushToken::class, 'p')
+                ->where('IDENTITY(p.user) IN (:ids)')
+                ->setParameter('ids', $ids)
+                ->getQuery()
+                ->execute();
+        } catch (\Throwable) {
+        }
+        try {
+            $this->em->createQueryBuilder()
+                ->delete(\App\Entity\Notification::class, 'n')
+                ->where('IDENTITY(n.user) IN (:ids)')
+                ->setParameter('ids', $ids)
+                ->getQuery()
+                ->execute();
+        } catch (\Throwable) {
+        }
+
+        // Теги (ManyToMany) — через сущности, чтобы очистить join-таблицу.
+        $users = $this->em->getRepository(User::class)->findBy(['id' => $ids]);
+        $deleted = 0;
+        foreach ($users as $user) {
+            if (!$user instanceof User) {
+                continue;
+            }
+            // Доп. защита: не удалять, если появился абонемент.
+            $hasSub = (int) $this->em->createQueryBuilder()
+                ->select('COUNT(s.id)')
+                ->from(Subscription::class, 's')
+                ->where('s.user = :u')
+                ->setParameter('u', $user)
+                ->getQuery()
+                ->getSingleScalarResult();
+            if ($hasSub > 0) {
+                continue;
+            }
+            $user->clearTags();
+            $this->em->remove($user);
+            ++$deleted;
+        }
+        $this->em->flush();
+
+        return $deleted;
+    }
+
+    #[Route('/subscriptions/{id}/update-dates', name: 'admin_subscription_update_dates', methods: ['POST'])]
+    public function updateSubscriptionDates(int $id, Request $request): Response
+    {
+        $subscription = $this->em->getRepository(Subscription::class)->find($id);
+        if (!$subscription) {
+            $this->addFlash('danger', 'Абонемент не найден');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
+        $startRaw = trim((string) $request->request->get('start_date', ''));
+        $endRaw = trim((string) $request->request->get('end_date', ''));
+        if ($startRaw === '' && $endRaw === '') {
+            $this->addFlash('danger', 'Укажите дату начала и/или дату окончания.');
+
+            return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
+        }
+
+        try {
+            if ($startRaw !== '') {
+                $subscription->setStartDate(new \DateTimeImmutable($startRaw));
+            }
+            if ($endRaw !== '') {
+                $subscription->setEndDate(new \DateTimeImmutable($endRaw));
+            } elseif ($request->request->get('clear_end') === '1') {
+                $subscription->setEndDate(null);
+            }
+        } catch (\Throwable) {
+            $this->addFlash('danger', 'Некорректный формат даты.');
+
+            return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
+        }
+
+        if ($subscription->getEndDate() !== null && $subscription->getEndDate() < $subscription->getStartDate()) {
+            $this->addFlash('danger', 'Дата окончания не может быть раньше даты начала.');
+
+            return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
+        }
+
+        $this->em->flush();
+        $this->addFlash('success', 'Даты абонемента обновлены.');
+
+        return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
     }
 
     #[Route('/subscriptions/{id}/freeze', name: 'admin_subscription_freeze', methods: ['POST'])]
@@ -2304,9 +2660,15 @@ class AdminController extends AbstractController
             $search = trim((string) $request->query->get('q', ''));
             $tagId = $request->query->get('tag_id') ? (int) $request->query->get('tag_id') : null;
             $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
+            $subscriptionFilter = trim((string) $request->query->get('subscription', ''));
             $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
             $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+            $subscriptionPlans = $this->planCatalog->sortForDisplay(
+                $this->em->getRepository(SubscriptionPlan::class)->findAll()
+            );
             $clients = $this->buildFilteredClientsList($request);
+            $subscriptionSummaries = $this->buildClientSubscriptionSummaries($clients);
+            $clientsWithoutSubscriptionCount = $this->countClientsWithoutSubscription();
 
             return $this->render('admin/clients.html.twig', [
                 'menu' => $menu,
@@ -2315,8 +2677,12 @@ class AdminController extends AbstractController
                 'search' => $search,
                 'allTags' => $allTags,
                 'allClubs' => $allClubs,
+                'subscriptionPlans' => $subscriptionPlans,
                 'filterTagId' => $tagId,
                 'filterClubId' => $clubId,
+                'filterSubscription' => $subscriptionFilter,
+                'subscriptionSummaries' => $subscriptionSummaries,
+                'clientsWithoutSubscriptionCount' => $clientsWithoutSubscriptionCount,
             ]);
         }
 

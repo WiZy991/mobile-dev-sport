@@ -3,9 +3,9 @@
 {% block title %}CRM FitnessClub — Клиенты{% endblock %}
 
 {% block body %}
-    {% set export_base = path('admin_clients_export') ~ '?q=' ~ (search|default('')|url_encode) ~ '&tag_id=' ~ (filterTagId|default('')) ~ '&club_id=' ~ (filterClubId|default('')) %}
+    {% set export_base = path('admin_clients_export') ~ '?q=' ~ (search|default('')|url_encode) ~ '&tag_id=' ~ (filterTagId|default('')) ~ '&club_id=' ~ (filterClubId|default('')) ~ '&subscription=' ~ (filterSubscription|default('')|url_encode) %}
     <div class="content-header" data-dz-tour="clients-header">
-        <h1 class="h4 mb-0">Клиенты</h1>
+        <h1 class="h4 mb-0">Клиенты <span class="text-secondary fs-6 fw-normal">({{ clients|length }})</span></h1>
         <div>
             <a href="{{ export_base ~ '&format=csv' }}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
             <a href="{{ export_base ~ '&format=xlsx' }}" class="btn btn-sm btn-success me-2">Скачать Excel</a>
@@ -20,7 +20,7 @@
                 <label class="form-label small mb-0">Поиск</label>
                 <input type="text" name="q" class="form-control form-control-sm" placeholder="Имя, email, телефон..." value="{{ search|default('') }}">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label small mb-0">Тег</label>
                 <select name="tag_id" class="form-select form-select-sm">
                     <option value="">— Все —</option>
@@ -29,7 +29,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label small mb-0">Клуб</label>
                 <select name="club_id" class="form-select form-select-sm">
                     <option value="">— Все клубы —</option>
@@ -38,19 +38,76 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-0">Абонемент</label>
+                <select name="subscription" class="form-select form-select-sm">
+                    <option value="" {{ (filterSubscription|default('')) == '' ? 'selected' : '' }}>— Все —</option>
+                    <option value="active" {{ filterSubscription|default('') == 'active' ? 'selected' : '' }}>Активный</option>
+                    <option value="frozen" {{ filterSubscription|default('') == 'frozen' ? 'selected' : '' }}>Заморожен</option>
+                    <option value="expired" {{ filterSubscription|default('') == 'expired' ? 'selected' : '' }}>Истёк / не действует</option>
+                    <option value="any" {{ filterSubscription|default('') == 'any' ? 'selected' : '' }}>Любой абонемент (был/есть)</option>
+                    <option value="none" {{ filterSubscription|default('') == 'none' ? 'selected' : '' }}>Без абонемента</option>
+                    {% if subscriptionPlans|default([])|length > 0 %}
+                        <optgroup label="По тарифу">
+                            {% for plan in subscriptionPlans %}
+                                <option value="plan:{{ plan.id }}" {{ filterSubscription|default('') == ('plan:' ~ plan.id) ? 'selected' : '' }}>
+                                    {{ plan.name }}
+                                    {%- if plan.type == 'limited' and plan.visitsCount %} · {{ plan.visitsCount }} пос.{% elseif plan.durationDays %} · {{ plan.durationDays }} дн.{% endif %}
+                                </option>
+                            {% endfor %}
+                        </optgroup>
+                    {% endif %}
+                </select>
+            </div>
             <div class="col-md-2">
                 <button type="submit" class="btn btn-sm btn-primary">Найти</button>
             </div>
         </form>
     </div>
 
+    {% if admin_can_mutate() %}
+    <div class="content-card mb-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-lg-6">
+                <div class="small text-secondary mb-1">Клиентов без абонемента: <strong class="text-light">{{ clientsWithoutSubscriptionCount|default(0) }}</strong></div>
+                <form method="post" action="{{ path('admin_clients_bulk_delete_without_subscription') }}"
+                      onsubmit="return confirm('Удалить ВСЕХ клиентов без абонемента ({{ clientsWithoutSubscriptionCount|default(0) }})? Это необратимо.');">
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="confirm" class="form-control" placeholder="Введите УДАЛИТЬ" autocomplete="off" required>
+                        <button type="submit" class="btn btn-outline-danger" {{ (clientsWithoutSubscriptionCount|default(0)) == 0 ? 'disabled' : '' }}>
+                            Удалить всех без абонемента
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="col-lg-6">
+                <div class="small text-secondary mb-1">Или удалить выбранных в таблице (только без абонемента)</div>
+                <form method="post" action="{{ path('admin_clients_bulk_delete') }}" id="clients-bulk-delete-form"
+                      onsubmit="return confirm('Удалить выбранных клиентов без абонемента?');">
+                    <input type="hidden" name="return_subscription" value="{{ filterSubscription|default('none') }}">
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="confirm" class="form-control" placeholder="Введите УДАЛИТЬ" autocomplete="off" required>
+                        <button type="submit" class="btn btn-danger">Удалить выбранных</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="content-card" data-dz-tour="clients-table">
         <div class="table-responsive">
             <table class="table table-sm table-dark align-middle mb-0">
                 <thead>
                 <tr>
+                    {% if admin_can_mutate() %}
+                        <th style="width:2rem">
+                            <input type="checkbox" class="form-check-input" id="clients-check-all" title="Выбрать всех на странице">
+                        </th>
+                    {% endif %}
                     <th>ID</th>
                     <th>Имя</th>
+                    <th>Абонемент</th>
                     <th>Клуб</th>
                     <th>Теги</th>
                     <th>Email</th>
@@ -62,13 +119,49 @@
                 </thead>
                 <tbody>
                 {% for client in clients %}
+                    {% set sub = subscriptionSummaries[client.id]|default(null) %}
                     <tr>
+                        {% if admin_can_mutate() %}
+                            <td>
+                                {% if sub is null %}
+                                    <input type="checkbox" class="form-check-input client-row-check" form="clients-bulk-delete-form" name="ids[]" value="{{ client.id }}">
+                                {% else %}
+                                    <span class="text-secondary" title="Есть абонемент — массовое удаление недоступно">—</span>
+                                {% endif %}
+                            </td>
+                        {% endif %}
                         <td>
                             <a href="{{ path('admin_client_show', {id: client.id}) }}" class="link-light text-decoration-none">
                                 {{ client.id }}
                             </a>
                         </td>
-                        <td>{{ client.name }}</td>
+                        <td>
+                            <a href="{{ path('admin_client_show', {id: client.id}) }}" class="link-light text-decoration-none">
+                                {{ client.name }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if sub %}
+                                <div class="fw-semibold">{{ sub.label }}</div>
+                                <div class="small text-secondary">{{ sub.plan_type }}{% if sub.visits %} · {{ sub.visits }}{% endif %}</div>
+                                {% if sub.status == 'active' %}
+                                    <span class="badge bg-success">Активен</span>
+                                {% elseif sub.status == 'frozen' %}
+                                    <span class="badge bg-warning text-dark">Заморожен</span>
+                                {% elseif sub.status == 'pending' %}
+                                    <span class="badge bg-info text-dark">Ожидает</span>
+                                {% elseif sub.status == 'cancelled' %}
+                                    <span class="badge bg-danger">Отменён</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Истёк</span>
+                                {% endif %}
+                                {% if sub.end %}
+                                    <div class="small text-secondary">до {{ sub.end }}</div>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-secondary">Нет</span>
+                            {% endif %}
+                        </td>
                         <td>{{ client.club ? client.club.name : '—' }}</td>
                         <td>{% for tag in client.tags %}<span class="badge me-1" style="background-color: {{ tag.color ?? '#6c757d' }}">{{ tag.name }}</span>{% else %}—{% endfor %}</td>
                         <td>{{ client.email }}</td>
@@ -85,8 +178,8 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="9" class="text-center text-secondary">
-                            Пока нет ни одного клиента.
+                        <td colspan="{{ admin_can_mutate() ? 11 : 10 }}" class="text-center text-secondary">
+                            Клиенты не найдены.
                         </td>
                     </tr>
                 {% endfor %}
@@ -94,4 +187,16 @@
             </table>
         </div>
     </div>
+
+    <script>
+        (function () {
+            var all = document.getElementById('clients-check-all');
+            if (!all) return;
+            all.addEventListener('change', function () {
+                document.querySelectorAll('.client-row-check').forEach(function (cb) {
+                    cb.checked = all.checked;
+                });
+            });
+        })();
+    </script>
 {% endblock %}
