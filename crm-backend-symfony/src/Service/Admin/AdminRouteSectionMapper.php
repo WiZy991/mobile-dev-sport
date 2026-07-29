@@ -26,6 +26,7 @@ final class AdminRouteSectionMapper
         'admin_subscription_extend' => 'subscriptions',
         'admin_subscription_cancel' => 'subscriptions',
         'admin_subscription_change_plan' => 'subscriptions',
+        'admin_subscriptions_bulk_dates' => 'subscriptions',
         'admin_subscription_issue' => 'subscriptions',
         'admin_plan_update' => 'subscriptions',
         'admin_plan_delete' => 'subscriptions',

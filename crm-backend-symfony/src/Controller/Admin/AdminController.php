@@ -881,6 +881,81 @@ class AdminController extends AbstractController
         return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
     }
 
+    #[Route('/subscriptions/bulk-dates', name: 'admin_subscriptions_bulk_dates', priority: 10, methods: ['POST'])]
+    public function bulkUpdateSubscriptionDates(Request $request): Response
+    {
+        $redirect = $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        $statusFilter = (string) $request->request->get('return_status', '');
+        if ($statusFilter !== '') {
+            $redirect->setTargetUrl($redirect->getTargetUrl() . '?status=' . urlencode($statusFilter));
+        }
+
+        $idsRaw = $request->request->all('ids');
+        if (!\is_array($idsRaw)) {
+            $idsRaw = [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $idsRaw), static fn (int $id) => $id > 0)));
+
+        $startRaw = trim((string) $request->request->get('start_date', ''));
+        $endRaw = trim((string) $request->request->get('end_date', ''));
+
+        if ($ids === []) {
+            $this->addFlash('danger', 'Выберите хотя бы один абонемент.');
+
+            return $redirect;
+        }
+        if ($startRaw === '' && $endRaw === '') {
+            $this->addFlash('danger', 'Укажите дату начала и/или дату окончания.');
+
+            return $redirect;
+        }
+
+        $start = null;
+        $end = null;
+        try {
+            if ($startRaw !== '') {
+                $start = new \DateTimeImmutable($startRaw);
+            }
+            if ($endRaw !== '') {
+                $end = new \DateTimeImmutable($endRaw);
+            }
+        } catch (\Throwable) {
+            $this->addFlash('danger', 'Некорректный формат даты.');
+
+            return $redirect;
+        }
+
+        if ($start !== null && $end !== null && $end < $start) {
+            $this->addFlash('danger', 'Дата окончания не может быть раньше даты начала.');
+
+            return $redirect;
+        }
+
+        $updated = 0;
+        foreach ($ids as $id) {
+            $sub = $this->em->getRepository(Subscription::class)->find($id);
+            if (!$sub instanceof Subscription) {
+                continue;
+            }
+            if ($start !== null) {
+                $sub->setStartDate($start);
+            }
+            if ($end !== null) {
+                $sub->setEndDate($end);
+            }
+            // If only start changed and end exists and becomes invalid, clamp end to start.
+            if ($start !== null && $end === null && $sub->getEndDate() !== null && $sub->getEndDate() < $sub->getStartDate()) {
+                $sub->setEndDate($sub->getStartDate());
+            }
+            $this->em->persist($sub);
+            ++$updated;
+        }
+        $this->em->flush();
+        $this->addFlash('success', 'Даты обновлены у абонементов: ' . $updated . '.');
+
+        return $redirect;
+    }
+
     private function redirectAfterSubscriptionFreezeAction(Subscription $subscription, Request $request): Response
     {
         if ($request->request->get('return_to') === 'subscriptions') {

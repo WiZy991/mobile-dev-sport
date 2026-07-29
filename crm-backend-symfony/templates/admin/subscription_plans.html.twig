@@ -240,10 +240,34 @@
 
     <div class="content-card mt-3" data-dz-tour="subscriptions-list">
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Абонементы клиентов</div>
+        {% if admin_can_mutate() and subscriptions|length > 0 %}
+        <form method="post" action="{{ path('admin_subscriptions_bulk_dates') }}" id="bulk-sub-dates-form"
+              onsubmit="var n=document.querySelectorAll('.sub-bulk-cb:checked').length; if(n&lt;1){alert('Выберите хотя бы один абонемент.'); return false;} var s=document.getElementById('bulk-start-date').value; var e=document.getElementById('bulk-end-date').value; if(!s &amp;&amp; !e){alert('Укажите дату начала и/или дату окончания.'); return false;} return confirm('Изменить даты у '+n+' абонемент(ов)?');">
+            <input type="hidden" name="return_status" value="{{ statusFilter|default('') }}">
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary mb-0" for="bulk-start-date">Дата начала</label>
+                    <input type="date" name="start_date" id="bulk-start-date" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary mb-0" for="bulk-end-date">Дата окончания</label>
+                    <input type="date" name="end_date" id="bulk-end-date" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Применить к выбранным</button>
+                    <span class="small text-secondary ms-2">Пустое поле не меняется</span>
+                </div>
+            </div>
+        {% endif %}
         <div class="table-responsive">
             <table class="table table-sm table-dark align-middle mb-0">
                 <thead>
                 <tr>
+                    {% if admin_can_mutate() and subscriptions|length > 0 %}
+                    <th style="width:2rem">
+                        <input type="checkbox" id="select-all-subs" class="form-check-input" title="Выбрать все" form="bulk-sub-dates-form">
+                    </th>
+                    {% endif %}
                     <th>ID</th>
                     <th>Клиент</th>
                     <th>План</th>
@@ -259,6 +283,11 @@
                 <tbody>
                 {% for sub in subscriptions %}
                     <tr id="sub-{{ sub.id }}">
+                        {% if admin_can_mutate() %}
+                        <td>
+                            <input type="checkbox" name="ids[]" value="{{ sub.id }}" class="form-check-input sub-bulk-cb" form="bulk-sub-dates-form">
+                        </td>
+                        {% endif %}
                         <td>{{ sub.id }}</td>
                         <td>
                             <a href="{{ path('admin_client_show', {id: sub.user.id}) }}" class="link-light text-decoration-none">{{ sub.user.name }}</a>
@@ -307,7 +336,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="10" class="text-center text-secondary">
+                        <td colspan="{{ admin_can_mutate() ? 11 : 10 }}" class="text-center text-secondary">
                             Абонементы клиентам пока не выданы.
                         </td>
                     </tr>
@@ -315,9 +344,21 @@
                 </tbody>
             </table>
         </div>
+        {% if admin_can_mutate() and subscriptions|length > 0 %}
+        </form>
+        {% endif %}
     </div>
     <script>
         (function () {
+            var selectAll = document.getElementById('select-all-subs');
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    document.querySelectorAll('.sub-bulk-cb').forEach(function (cb) {
+                        cb.checked = selectAll.checked;
+                    });
+                });
+            }
+
             var planSelect = document.getElementById('issue-plan-select');
             var freezeInput = document.getElementById('issue-freeze-days');
             if (planSelect && freezeInput) {
