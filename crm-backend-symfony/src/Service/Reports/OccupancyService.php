@@ -12,7 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * «Сколько людей сейчас в зале» и кто именно.
  *
- * Логика: за текущий день (с 00:00) для каждой пары (клиент, клуб) берём ПОСЛЕДНЕЕ событие
+ * Логика: за текущий клубный день для каждой пары (клиент, клуб) берём ПОСЛЕДНЕЕ событие
  * с result='granted'. Если оно eventType='entry' — клиент сейчас в зале этого клуба.
  * Если eventType='exit' — он уже вышел (для этого клуба).
  *
@@ -20,14 +20,46 @@ use Doctrine\ORM\EntityManagerInterface;
  *  - читаем только entry (нет считывателя на выход) — каждый зашедший считается «в зале»;
  *  - читаем entry/exit (двусторонний турникет) — пара entry→exit убирает клиента из зала.
  *
- * Внутренний день — Asia/Vladivostok (APP_TIMEZONE); реализация считает
- * границу дня по PHP-таймзоне приложения, чтобы совпасть с остальной CRM.
+ * Клубный день — Asia/Vladivostok (APP_TIMEZONE).
+ * В access_logs historically писался UTC (пока PHP был в UTC), после смены TZ — локальное время.
+ * Поэтому граница «сегодня» берётся с запасом: min/max локальной полуночи и её UTC-представления.
  */
 final class OccupancyService
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
     ) {
+    }
+
+    /**
+     * Окно «сегодня» для SQL по access_logs (naive DATETIME).
+     *
+     * @return array{from: string, to: string}
+     */
+    private function todayWindow(): array
+    {
+        $tzName = date_default_timezone_get() ?: 'Asia/Vladivostok';
+        try {
+            $clubTz = new \DateTimeZone($tzName);
+        } catch (\Throwable) {
+            $clubTz = new \DateTimeZone('Asia/Vladivostok');
+        }
+        $utc = new \DateTimeZone('UTC');
+
+        $localStart = new \DateTimeImmutable('today', $clubTz);
+        $localEnd = $localStart->modify('+1 day');
+
+        $localFrom = $localStart->format('Y-m-d H:i:s');
+        $localTo = $localEnd->format('Y-m-d H:i:s');
+
+        // Те же мгновения в UTC wall-clock — как писалось в БД, пока PHP был в UTC.
+        $utcFrom = $localStart->setTimezone($utc)->format('Y-m-d H:i:s');
+        $utcTo = $localEnd->setTimezone($utc)->format('Y-m-d H:i:s');
+
+        return [
+            'from' => min($localFrom, $utcFrom),
+            'to' => max($localTo, $utcTo),
+        ];
     }
 
     /** Сколько клиентов сейчас в зале (опционально по конкретному клубу). */
@@ -85,9 +117,6 @@ final class OccupancyService
 
     /**
      * Сборщик SQL: «последнее за сегодня granted-событие в разрезе (user_id, club_id) — entry».
-     * Раньше MAX(created_at) считался только по user_id (все клубы), затем фильтр по club_id —
-     * выход в клубе A не «перебивал» вход, если где-то была более поздняя запись без club_id
-     * или в другом клубе; счётчик «в зале» залипал на entry.
      *
      * @return array{sql: string, params: array<string, mixed>}
      */
@@ -98,14 +127,13 @@ final class OccupancyService
         ?string $orderBy = null,
         ?int $limit = null,
     ): array {
-        $todayStart = (new \DateTimeImmutable('today'))->format('Y-m-d H:i:s');
-        $tomorrow = (new \DateTimeImmutable('today'))->modify('+1 day')->format('Y-m-d H:i:s');
+        $window = $this->todayWindow();
 
         $clubFilter = '';
         $innerClubFilter = '';
         $params = [
-            'from' => $todayStart,
-            'to' => $tomorrow,
+            'from' => $window['from'],
+            'to' => $window['to'],
         ];
         if ($club instanceof Club) {
             $clubFilter = ' AND a.club_id = :club_id';
@@ -113,8 +141,6 @@ final class OccupancyService
             $params['club_id'] = $club->getId();
         }
 
-        // Подзапрос: последний granted за сегодня отдельно для каждой пары (user_id, club_id).
-        // Соединяем с club_id (в т.ч. оба NULL для старых логов без клуба).
         $sql = "SELECT $selectColumns
                 FROM access_logs a
                 INNER JOIN (
@@ -151,13 +177,12 @@ final class OccupancyService
     /** Сейчас ли указанный клиент в зале (по тому же правилу). */
     public function isUserCurrentlyInside(User $user, ?Club $club = null): bool
     {
-        $todayStart = (new \DateTimeImmutable('today'))->format('Y-m-d H:i:s');
-        $tomorrow = (new \DateTimeImmutable('today'))->modify('+1 day')->format('Y-m-d H:i:s');
+        $window = $this->todayWindow();
 
         $params = [
             'user_id' => $user->getId(),
-            'from' => $todayStart,
-            'to' => $tomorrow,
+            'from' => $window['from'],
+            'to' => $window['to'],
         ];
         $clubFilter = '';
         if ($club instanceof Club) {
@@ -189,13 +214,12 @@ final class OccupancyService
      */
     public function getUserAccessSnapshot(User $user, ?Club $club = null): array
     {
-        $todayStart = (new \DateTimeImmutable('today'))->format('Y-m-d H:i:s');
-        $tomorrow = (new \DateTimeImmutable('today'))->modify('+1 day')->format('Y-m-d H:i:s');
+        $window = $this->todayWindow();
 
         $params = [
             'user_id' => $user->getId(),
-            'from' => $todayStart,
-            'to' => $tomorrow,
+            'from' => $window['from'],
+            'to' => $window['to'],
         ];
         $clubFilter = '';
         if ($club instanceof Club) {

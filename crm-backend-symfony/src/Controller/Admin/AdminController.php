@@ -416,27 +416,20 @@ class AdminController extends AbstractController
     }
 
     /**
-     * @return User[]
+     * Общий QueryBuilder фильтров клиентов (без SELECT/ORDER — вызывающий задаёт).
      */
-    private function buildFilteredClientsList(Request $request): array
+    private function applyClientListFilters(\Doctrine\ORM\QueryBuilder $qb, Request $request): \Doctrine\ORM\QueryBuilder
     {
         $search = trim((string) $request->query->get('q', ''));
         $tagId = $request->query->get('tag_id') ? (int) $request->query->get('tag_id') : null;
         $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
         $subscriptionFilter = trim((string) $request->query->get('subscription', ''));
 
-        $qb = $this->em->createQueryBuilder()
-            ->select('DISTINCT u')
-            ->from(User::class, 'u')
-            ->leftJoin('u.club', 'club')
-            ->leftJoin('u.tags', 'tag')
-            ->orderBy('u.name', 'ASC');
-
         if ($tagId !== null && $tagId > 0) {
             $qb->andWhere('tag.id = :tagId')->setParameter('tagId', $tagId);
         }
         if ($clubId !== null && $clubId > 0) {
-            $qb->andWhere('club.id = :clubId')->setParameter('clubId', $clubId);
+            $qb->andWhere('IDENTITY(u.club) = :clubId')->setParameter('clubId', $clubId);
         }
         if ($search !== '') {
             $qb->andWhere('LOWER(u.name) LIKE :q OR LOWER(u.email) LIKE :q OR u.phone LIKE :qPhone')
@@ -484,7 +477,71 @@ class AdminController extends AbstractController
             }
         }
 
-        return $qb->getQuery()->getResult();
+        return $qb;
+    }
+
+    /**
+     * @return User[]
+     */
+    private function buildFilteredClientsList(Request $request, ?int $limit = null, ?int $offset = null): array
+    {
+        // Сначала только ID — иначе DISTINCT + join tags + LIMIT ломает пагинацию.
+        $idQb = $this->em->createQueryBuilder()
+            ->select('DISTINCT u.id')
+            ->from(User::class, 'u')
+            ->leftJoin('u.tags', 'tag')
+            ->orderBy('u.name', 'ASC')
+            ->addOrderBy('u.id', 'ASC');
+        $this->applyClientListFilters($idQb, $request);
+        if ($limit !== null) {
+            $idQb->setMaxResults($limit);
+        }
+        if ($offset !== null) {
+            $idQb->setFirstResult($offset);
+        }
+        $ids = array_map('intval', $idQb->getQuery()->getSingleColumnResult());
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var list<User> $rows */
+        $rows = $this->em->createQueryBuilder()
+            ->select('u', 'club', 'tag')
+            ->from(User::class, 'u')
+            ->leftJoin('u.club', 'club')
+            ->leftJoin('u.tags', 'tag')
+            ->where('u.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
+
+        $byId = [];
+        foreach ($rows as $user) {
+            if ($user instanceof User && $user->getId() !== null) {
+                $byId[$user->getId()] = $user;
+            }
+        }
+
+        $ordered = [];
+        foreach ($ids as $id) {
+            if (isset($byId[$id])) {
+                $ordered[] = $byId[$id];
+            }
+        }
+
+        return $ordered;
+    }
+
+    private function countFilteredClients(Request $request): int
+    {
+        $qb = $this->em->createQueryBuilder()
+            ->select('COUNT(DISTINCT u.id)')
+            ->from(User::class, 'u')
+            ->leftJoin('u.tags', 'tag');
+
+        $this->applyClientListFilters($qb, $request);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
     /**
@@ -2642,12 +2699,19 @@ class AdminController extends AbstractController
             $tagId = $request->query->get('tag_id') ? (int) $request->query->get('tag_id') : null;
             $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
             $subscriptionFilter = trim((string) $request->query->get('subscription', ''));
+            $page = max(1, (int) $request->query->get('page', 1));
+            $perPage = 50;
             $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
             $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
             $subscriptionPlans = $this->planCatalog->sortForDisplay(
                 $this->em->getRepository(SubscriptionPlan::class)->findAll()
             );
-            $clients = $this->buildFilteredClientsList($request);
+            $totalClients = $this->countFilteredClients($request);
+            $totalPages = max(1, (int) ceil($totalClients / $perPage));
+            if ($page > $totalPages) {
+                $page = $totalPages;
+            }
+            $clients = $this->buildFilteredClientsList($request, $perPage, ($page - 1) * $perPage);
             $subscriptionSummaries = $this->buildClientSubscriptionSummaries($clients);
             $clientsWithoutSubscriptionCount = $this->countClientsWithoutSubscription();
 
@@ -2664,6 +2728,10 @@ class AdminController extends AbstractController
                 'filterSubscription' => $subscriptionFilter,
                 'subscriptionSummaries' => $subscriptionSummaries,
                 'clientsWithoutSubscriptionCount' => $clientsWithoutSubscriptionCount,
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalClients' => $totalClients,
+                'totalPages' => $totalPages,
             ]);
         }
 
