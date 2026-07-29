@@ -27,6 +27,7 @@ final class SubscriptionFreezeExtension extends AbstractExtension
             new TwigFunction('subscription_can_freeze', $this->canFreeze(...)),
             new TwigFunction('subscription_can_extend', $this->canExtend(...)),
             new TwigFunction('subscription_can_cancel', $this->canCancel(...)),
+            new TwigFunction('subscription_can_change_plan', $this->canChangePlan(...)),
         ];
     }
 
@@ -53,5 +54,10 @@ final class SubscriptionFreezeExtension extends AbstractExtension
     public function canCancel(Subscription $subscription): bool
     {
         return $this->lifecycleService->canCancel($subscription);
+    }
+
+    public function canChangePlan(Subscription $subscription): bool
+    {
+        return $this->lifecycleService->canChangePlan($subscription);
     }
 }

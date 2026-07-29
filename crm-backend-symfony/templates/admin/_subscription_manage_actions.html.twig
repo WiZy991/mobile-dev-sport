@@ -1,4 +1,5 @@
 {% if admin_can_mutate() %}
+{% set plansForChange = subscriptionPlans|default(plans|default([])) %}
 <div class="sub-mgmt-actions">
     {% if subscription_can_freeze(sub) %}
         {% set maxDays = subscription_freeze_days_left(sub) %}
@@ -38,6 +39,23 @@
         </form>
     {% endif %}
 
+    {% if subscription_can_change_plan(sub) and plansForChange|length > 0 %}
+        <form method="post" action="{{ path('admin_subscription_change_plan', {id: sub.id}) }}" class="sub-mgmt-actions__plan">
+            {% if return_to is defined and return_to %}
+                <input type="hidden" name="return_to" value="{{ return_to }}">
+            {% endif %}
+            {% if return_status is defined and return_status %}
+                <input type="hidden" name="return_status" value="{{ return_status }}">
+            {% endif %}
+            <select name="plan_id" class="form-select form-select-sm sub-mgmt-actions__plan-select" required title="Тариф">
+                {% for plan in plansForChange %}
+                    <option value="{{ plan.id }}" {% if plan.id == sub.plan.id %}selected{% endif %}>{{ plan.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-secondary sub-mgmt-actions__btn">Сменить тариф</button>
+        </form>
+    {% endif %}
+
     {% if subscription_can_cancel(sub) %}
         <form method="post" action="{{ path('admin_subscription_cancel', {id: sub.id}) }}" class="sub-mgmt-actions__row" onsubmit="return confirm('Отменить абонемент? Доступ в клуб будет закрыт.');">
             {% if return_to is defined and return_to %}
@@ -50,7 +68,7 @@
         </form>
     {% endif %}
 
-    {% if not subscription_can_freeze(sub) and sub.status != 'frozen' and not subscription_can_extend(sub) and not subscription_can_cancel(sub) %}
+    {% if not subscription_can_freeze(sub) and sub.status != 'frozen' and not subscription_can_extend(sub) and not subscription_can_cancel(sub) and not (subscription_can_change_plan(sub) and plansForChange|length > 0) %}
         <span class="text-secondary small">—</span>
     {% endif %}
 </div>

@@ -541,12 +541,17 @@ class AdminController extends AbstractController
 
         $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
         $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+        $subscriptionPlans = $this->planCatalog->sortForDisplay(
+            $this->em->getRepository(SubscriptionPlan::class)->findAll()
+        );
+
         return $this->render('admin/client_show.html.twig', [
             'menu' => $menu,
             'current' => 'clients',
             'client' => $client,
             'can_view_passport' => $this->passportAccess->canViewPassportDetails($this->getUser()),
             'subscriptions' => $subscriptions,
+            'subscriptionPlans' => $subscriptionPlans,
             'bookings' => $bookings,
             'sales' => $sales,
             'clientTasks' => $clientTasks,
@@ -842,6 +847,35 @@ class AdminController extends AbstractController
         } else {
             $this->em->flush();
             $this->addFlash('success', 'Абонемент отменён.');
+        }
+
+        return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
+    }
+
+    #[Route('/subscriptions/{id}/change-plan', name: 'admin_subscription_change_plan', methods: ['POST'])]
+    public function changeSubscriptionPlan(int $id, Request $request): Response
+    {
+        $subscription = $this->em->getRepository(Subscription::class)->find($id);
+        if (!$subscription) {
+            $this->addFlash('danger', 'Абонемент не найден');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
+        $planId = (int) $request->request->get('plan_id');
+        $plan = $this->em->getRepository(SubscriptionPlan::class)->find($planId);
+        if (!$plan) {
+            $this->addFlash('danger', 'Тариф не найден');
+
+            return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
+        }
+
+        $error = $this->lifecycleService->changePlan($subscription, $plan);
+        if ($error !== null) {
+            $this->addFlash('danger', $error);
+        } else {
+            $this->em->flush();
+            $this->addFlash('success', 'Тариф абонемента изменён на «' . $plan->getName() . '».');
         }
 
         return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
