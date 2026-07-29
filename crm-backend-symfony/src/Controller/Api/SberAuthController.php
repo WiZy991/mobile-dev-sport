@@ -386,41 +386,24 @@ HTML;
             return $bySub;
         }
 
+        // Сначала ищем клиента в CRM по телефону/email (импорт из другой CRM).
+        // Важнее, чем текущая сессия приложения — иначе создаётся дубликат без абонемента.
+        $matched = $this->findCrmUserBySberContact($merged);
+        if ($matched instanceof User) {
+            $existingSber = $matched->getSberId();
+            if ($existingSber !== null && $existingSber !== '' && $existingSber !== $sub) {
+                throw new \RuntimeException('Найден профиль с тем же телефоном/email, но другим Сбер ID. Обратитесь в клуб.');
+            }
+
+            return $matched;
+        }
+
         if ($sessionUser !== null) {
             return $sessionUser;
         }
 
         $email = $this->sberProfile->extractEmailForLookup($merged);
         $phone = $this->sberProfile->extractPhoneForLookup($merged);
-
-        $candidates = [];
-        if ($email !== null) {
-            $byEmail = $this->em->createQueryBuilder()
-                ->select('u')
-                ->from(User::class, 'u')
-                ->where('LOWER(u.email) = :email')
-                ->setParameter('email', mb_strtolower($email))
-                ->setMaxResults(1)
-                ->getQuery()
-                ->getOneOrNullResult();
-            if ($byEmail instanceof User) {
-                $candidates[] = $byEmail;
-            }
-        }
-        if ($phone !== null) {
-            $candidates[] = $this->findUserByNormalizedPhone($phone);
-        }
-
-        foreach ($candidates as $candidate) {
-            if ($candidate instanceof User) {
-                $existingSber = $candidate->getSberId();
-                if ($existingSber !== null && $existingSber !== '' && $existingSber !== $sub) {
-                    throw new \RuntimeException('Найден профиль с тем же телефоном/email, но другим Сбер ID. Обратитесь в клуб.');
-                }
-
-                return $candidate;
-            }
-        }
 
         $user = new User();
         $user
@@ -431,6 +414,38 @@ HTML;
             ->setIsBlocked(false);
 
         return $user;
+    }
+
+    /**
+     * Поиск существующего клиента: телефон важнее email (после миграции телефоны совпадают чаще).
+     *
+     * @param array<string, mixed> $merged
+     */
+    private function findCrmUserBySberContact(array $merged): ?User
+    {
+        $phone = $this->sberProfile->extractPhoneForLookup($merged);
+        if ($phone !== null) {
+            $byPhone = $this->findUserByNormalizedPhone($phone);
+            if ($byPhone instanceof User) {
+                return $byPhone;
+            }
+        }
+
+        $email = $this->sberProfile->extractEmailForLookup($merged);
+        if ($email === null) {
+            return null;
+        }
+
+        $byEmail = $this->em->createQueryBuilder()
+            ->select('u')
+            ->from(User::class, 'u')
+            ->where('LOWER(u.email) = :email')
+            ->setParameter('email', mb_strtolower($email))
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $byEmail instanceof User ? $byEmail : null;
     }
 
     /**
@@ -498,16 +513,38 @@ HTML;
     private function findUserByNormalizedPhone(string $phone): ?User
     {
         $needle = $this->normalizePhoneKey($phone);
-        if ($needle === '') {
+        if (strlen($needle) < 10) {
             return null;
         }
+        $last10 = substr($needle, -10);
 
-        foreach ($this->em->getRepository(User::class)->findAll() as $u) {
+        $users = $this->em->createQueryBuilder()
+            ->select('u')
+            ->from(User::class, 'u')
+            ->where('u.phone LIKE :tail')
+            ->setParameter('tail', '%' . $last10)
+            ->setMaxResults(50)
+            ->getQuery()
+            ->getResult();
+
+        $matches = [];
+        foreach ($users as $u) {
             if (!$u instanceof User) {
                 continue;
             }
             $hay = $this->normalizePhoneKey($u->getPhone());
-            if ($hay === $needle || (strlen($needle) >= 10 && str_ends_with($hay, substr($needle, -10)))) {
+            if ($hay === $needle || str_ends_with($hay, $last10)) {
+                $matches[] = $u;
+            }
+        }
+
+        if (\count($matches) === 1) {
+            return $matches[0];
+        }
+
+        // Несколько совпадений по хвосту — только точное совпадение цифр.
+        foreach ($matches as $u) {
+            if ($this->normalizePhoneKey($u->getPhone()) === $needle) {
                 return $u;
             }
         }

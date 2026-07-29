@@ -259,12 +259,32 @@ final class SberIdProfileApplicator
     /** @param array<string, mixed> $merged */
     private function pickPhone(array $merged): ?string
     {
-        foreach (['phone_number', 'mobile', 'tel'] as $k) {
-            if (isset($merged[$k]) && is_string($merged[$k])) {
-                $p = trim($merged[$k]);
-                if ($p !== '') {
-                    return $this->formatRussianPhoneDigits($p);
+        foreach (['phone_number', 'mobile', 'tel', 'phone'] as $k) {
+            if (!isset($merged[$k])) {
+                continue;
+            }
+            $raw = $merged[$k];
+            if (is_int($raw) || is_float($raw)) {
+                $raw = (string) $raw;
+            }
+            if (is_array($raw)) {
+                // Иногда Сбер отдаёт phone_number как объект { number: "..." }.
+                foreach (['number', 'phone_number', 'value', 'mobile'] as $nk) {
+                    if (isset($raw[$nk]) && (is_string($raw[$nk]) || is_numeric($raw[$nk]))) {
+                        $raw = (string) $raw[$nk];
+                        break;
+                    }
                 }
+                if (!is_string($raw)) {
+                    continue;
+                }
+            }
+            if (!is_string($raw)) {
+                continue;
+            }
+            $p = trim($raw);
+            if ($p !== '') {
+                return $this->formatRussianPhoneDigits($p);
             }
         }
 
