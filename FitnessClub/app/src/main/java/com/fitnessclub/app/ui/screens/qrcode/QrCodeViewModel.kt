@@ -51,10 +51,13 @@ class QrCodeViewModel @Inject constructor(
     @Volatile
     private var entryBlockCachedAtMs: Long = 0L
 
-    /** Запускать только когда открыт QR-sheet — иначе фоновый опрос грузит сеть. */
+    /** Запускать только когда открыт QR-sheet / экран — иначе фоновый опрос грузит сеть. */
     fun onSheetOpened() {
         if (sheetVisible) return
         sheetVisible = true
+        // QR строится локально из userId — не ждём медленный API (occupancy/subscriptions по 10+ с).
+        startQrRotation()
+        startAccessStatusPolling()
         viewModelScope.launch {
             coroutineScope {
                 val accessDeferred = async { accessRepository.refreshAccessStatus(force = true) }
@@ -62,9 +65,12 @@ class QrCodeViewModel @Inject constructor(
                 accessDeferred.await()
                 blockDeferred.await()
             }
-            _uiState.update { it.copy(isInsideGym = accessRepository.accessStatus.value.isInside) }
-            startQrRotation()
-            startAccessStatusPolling()
+            val isInside = accessRepository.accessStatus.value.isInside
+            if (isInside != _uiState.value.isInsideGym || cachedEntryBlock != _uiState.value.entryBlockedMessage) {
+                _uiState.update { it.copy(isInsideGym = isInside) }
+                rotationJob?.cancel()
+                startQrRotation()
+            }
         }
     }
 

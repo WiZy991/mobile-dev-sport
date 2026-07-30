@@ -166,7 +166,7 @@ fun RegisterScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
                 IconButton(
                     onClick = {
                         if (uiState.formStep == RegisterFormStep.PERSONAL) {
@@ -209,7 +209,7 @@ fun RegisterScreen(
                 onChangeClub = onChangeClub,
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             when (uiState.formStep) {
                 RegisterFormStep.PERSONAL -> RegisterPersonalStep(
@@ -240,7 +240,7 @@ fun RegisterScreen(
             }
 
             uiState.validationSummary?.let { summary ->
-                Spacer(Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF5D2E00).copy(0.55f)),
@@ -255,7 +255,7 @@ fun RegisterScreen(
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             }
 
             Column(
@@ -415,7 +415,7 @@ private fun RegisterPersonalStep(
         onNext = { focusManager.moveFocus(FocusDirection.Down) },
     )
 
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         TextField(
             value = uiState.birthDateDisplay,
             onValueChange = viewModel::onBirthDateChange,
@@ -436,7 +436,7 @@ private fun RegisterPersonalStep(
         }
     }
 
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         TextField(
             value = uiState.phoneNationalDigits,
             onValueChange = viewModel::onPhoneChange,
@@ -510,7 +510,7 @@ private fun RegisterPassportStep(
         error = uiState.fieldError(uiState.passportError),
         onClick = onOpenPassport,
     )
-    Spacer(Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(16.dp))
     Button(
         onClick = onOpenPassport,
         modifier = Modifier.fillMaxWidth(),
@@ -583,7 +583,7 @@ private fun RegisterAccountStep(
         },
     )
 
-    Spacer(Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(12.dp))
 
     TextField(
         value = uiState.promoCode,
@@ -597,7 +597,7 @@ private fun RegisterAccountStep(
         singleLine = true,
     )
 
-    Spacer(modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(12.dp))
 
     val legal = legalAnnotatedString()
     ClickableText(
@@ -665,9 +665,9 @@ private fun SelectedClubSummary(
                         .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop,
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(12.dp))
             }
-            Column(Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text("Ваш клуб", color = Color.White.copy(0.75f), style = MaterialTheme.typography.labelMedium)
                 Text(
                     text = club?.let { "${it.name}\n${it.address}" } ?: "Не выбран",
@@ -675,11 +675,11 @@ private fun SelectedClubSummary(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 clubsLoadError?.let {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(it, color = Color(0xFFFFE0B2), style = MaterialTheme.typography.bodySmall)
                 }
                 clubError?.let {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(it, color = Color(0xFFFFE0B2), style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -704,7 +704,7 @@ private fun PassportCard(
             .padding(16.dp)
     ) {
         Text("Мой паспорт", color = Color.White.copy(0.8f), style = MaterialTheme.typography.labelMedium)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(summary, color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White)
         }

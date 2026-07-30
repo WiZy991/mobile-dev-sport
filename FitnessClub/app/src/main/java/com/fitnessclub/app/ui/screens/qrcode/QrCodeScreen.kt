@@ -1,7 +1,7 @@
 package com.fitnessclub.app.ui.screens.qrcode
 
 import android.graphics.Bitmap
-import android.graphics.Color
+import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,7 +15,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -23,8 +25,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.ui.components.SecureScreenEffect
 import com.fitnessclub.app.ui.theme.Primary
 import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QrCodeScreen(
@@ -33,6 +35,11 @@ fun QrCodeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     SecureScreenEffect()
+
+    DisposableEffect(Unit) {
+        viewModel.onSheetOpened()
+        onDispose { viewModel.onSheetClosed() }
+    }
 
     Scaffold(
         topBar = {
@@ -86,8 +93,8 @@ fun QrCodeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(24.dp),
+                        .background(Color.White)
+                        .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     if (uiState.isLoading) {
@@ -112,13 +119,14 @@ fun QrCodeScreen(
                         }
                     } else if (uiState.qrCodeData != null) {
                         val qrBitmap = remember(uiState.qrCodeData) {
-                            generateQrCode(uiState.qrCodeData!!, 560)
+                            generateQrCode(uiState.qrCodeData!!, 640)
                         }
                         qrBitmap?.let {
                             Image(
                                 bitmap = it.asImageBitmap(),
                                 contentDescription = "QR код для входа",
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
                             )
                         }
                     } else {
@@ -207,12 +215,16 @@ fun QrCodeScreen(
 
 private fun generateQrCode(content: String, size: Int): Bitmap? {
     return try {
+        val hints = mapOf(
+            EncodeHintType.MARGIN to 1,
+            EncodeHintType.CHARACTER_SET to "UTF-8",
+        )
         val writer = QRCodeWriter()
-        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size)
+        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size, hints)
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
         for (x in 0 until size) {
             for (y in 0 until size) {
-                bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
+                bitmap.setPixel(x, y, if (bitMatrix[x, y]) AndroidColor.BLACK else AndroidColor.WHITE)
             }
         }
         bitmap

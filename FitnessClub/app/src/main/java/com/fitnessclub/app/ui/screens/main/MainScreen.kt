@@ -338,7 +338,7 @@ private fun QrQuickAccessContent(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(MaterialTheme.colorScheme.surface)
-                                .padding(16.dp),
+                                .padding(8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
@@ -395,8 +395,12 @@ private fun QrQuickAccessContent(
 
 private fun generateQrBitmap(content: String, size: Int): Bitmap? {
     return try {
+        val hints = mapOf(
+            com.google.zxing.EncodeHintType.MARGIN to 1,
+            com.google.zxing.EncodeHintType.CHARACTER_SET to "UTF-8",
+        )
         val writer = QRCodeWriter()
-        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size)
+        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size, hints)
         val pixels = IntArray(size * size)
         for (y in 0 until size) {
             val offset = y * size
