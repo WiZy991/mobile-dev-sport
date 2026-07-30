@@ -19,8 +19,8 @@
             </div>
             <div class="d-flex flex-column align-items-end gap-2">
                 <div class="small text-secondary text-end">
-                    Клубные сутки (Владивосток): последнее <em>granted</em>-событие клиента — <code>entry</code>.<br>
-                    Повторный скан на том же турникете = <code>exit</code>. В БД время хранится в UTC.
+                    Считается за сегодня (UTC): последнее <em>granted</em>-событие клиента — это <code>entry</code>.<br>
+                    Повторный скан на том же турникете = <code>exit</code> (минус человек). Журнал ниже — только входы.
                 </div>
                 {% if admin_can_mutate() and currentlyInside|default(0) > 0 %}
                     <form method="post" action="{{ path('admin_visits_clear_hall') }}"

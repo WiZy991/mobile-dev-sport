@@ -22,15 +22,10 @@ use Symfony\Contracts\Cache\ItemInterface;
  * Важно: события с club_id = NULL (legacy / старые логи) считаются тем же залом,
  * что и текущий шлюз. Иначе вход без клуба + выход с club_id оставляют человека «в зале».
  *
- * access_logs.created_at хранится как UTC wall-clock (AccessLog всегда пишет UTC).
- * «Сегодня» — клубные сутки Asia/Vladivostok, границы для SQL переводятся в UTC.
- * Иначе утро по местному (= ещё «вчера» по UTC) не попадает в счётчик, а повторный
- * скан ошибочно становится entry/exit.
+ * Время в access_logs и окно «сегодня» — UTC wall-clock (как до эксперимента с TZ).
  */
 final class OccupancyService
 {
-    private const CLUB_TIMEZONE = 'Asia/Vladivostok';
-    private const STORAGE_TIMEZONE = 'UTC';
     private const COUNT_CACHE_TTL_SECONDS = 15;
 
     public function __construct(
@@ -41,44 +36,30 @@ final class OccupancyService
     }
 
     /**
-     * Клубные сутки (Владивосток) → границы в UTC для сравнения с access_logs.
+     * Окно «сегодня» в UTC — совпадает с AccessLog::createdAt (всегда UTC).
      *
      * @return array{from: string, to: string}
      */
     private function todayWindow(): array
     {
-        try {
-            $clubTz = new \DateTimeZone(self::CLUB_TIMEZONE);
-        } catch (\Throwable) {
-            $clubTz = new \DateTimeZone('UTC');
-        }
-        $utc = new \DateTimeZone(self::STORAGE_TIMEZONE);
-
-        $localStart = new \DateTimeImmutable('today', $clubTz);
-        $localEnd = $localStart->modify('+1 day');
+        $tz = new \DateTimeZone('UTC');
+        $start = new \DateTimeImmutable('today', $tz);
+        $end = $start->modify('+1 day');
 
         return [
-            'from' => $localStart->setTimezone($utc)->format('Y-m-d H:i:s'),
-            'to' => $localEnd->setTimezone($utc)->format('Y-m-d H:i:s'),
+            'from' => $start->format('Y-m-d H:i:s'),
+            'to' => $end->format('Y-m-d H:i:s'),
         ];
     }
 
     /**
-     * Окно для счётчика и вход↔выход: клубный день, но не короче 16 ч назад
-     * (чтобы после сбоев TZ / ухода без скана повторный проход снова переключал статус).
+     * То же окно, что и счётчик — вход/выход и «в зале» не расходятся.
      *
      * @return array{from: string, to: string}
      */
     private function presenceWindow(): array
     {
-        $today = $this->todayWindow();
-        $lookback = (new \DateTimeImmutable('-16 hours', new \DateTimeZone(self::STORAGE_TIMEZONE)))
-            ->format('Y-m-d H:i:s');
-
-        return [
-            'from' => min($today['from'], $lookback),
-            'to' => $today['to'],
-        ];
+        return $this->todayWindow();
     }
 
     /**
