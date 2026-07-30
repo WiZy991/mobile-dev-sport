@@ -55,24 +55,46 @@ final class ClientNotificationService
         $this->em->persist($notification);
         $this->em->flush();
 
-        if ($this->preferences->allowsPush($user, $type) || ($force && $user->isNotifyPushEnabled())) {
-            $userId = $user->getId();
-            if ($userId !== null) {
-                $this->fcmPushSender->sendToClientUserIds(
-                    [$userId],
-                    $title,
-                    $body,
-                    ['type' => $type, 'referenceId' => $referenceId ?? ''],
-                );
-            }
-        }
+        $userId = $user->getId();
+        $sendPush = $this->preferences->allowsPush($user, $type) || ($force && $user->isNotifyPushEnabled());
+        $sendEmail = $this->preferences->allowsEmail($user, $type) || ($force && $user->isNotifyEmailEnabled());
+        $email = $user->getEmail();
 
-        if ($this->preferences->allowsEmail($user, $type) || ($force && $user->isNotifyEmailEnabled())) {
-            $this->emailNotifier->send(
-                $user->getEmail(),
+        // Не держим HTTP-ответ на FCM/SMTP — отправляем после flush ответа.
+        if (($sendPush && $userId !== null) || $sendEmail) {
+            $fcm = $this->fcmPushSender;
+            $mailer = $this->emailNotifier;
+            register_shutdown_function(static function () use (
+                $sendPush,
+                $sendEmail,
+                $userId,
+                $email,
                 $title,
-                $body . "\n\n— WorldCashFit",
-            );
+                $body,
+                $type,
+                $referenceId,
+                $fcm,
+                $mailer,
+            ): void {
+                try {
+                    if ($sendPush && $userId !== null) {
+                        $fcm->sendToClientUserIds(
+                            [$userId],
+                            $title,
+                            $body,
+                            ['type' => $type, 'referenceId' => $referenceId ?? ''],
+                        );
+                    }
+                    if ($sendEmail) {
+                        $mailer->send(
+                            $email,
+                            $title,
+                            $body . "\n\n— WorldCashFit",
+                        );
+                    }
+                } catch (\Throwable) {
+                }
+            });
         }
     }
 

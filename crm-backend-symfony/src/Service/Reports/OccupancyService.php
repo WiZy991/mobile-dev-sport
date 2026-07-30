@@ -9,6 +9,9 @@ use App\Entity\Club;
 use App\Entity\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 /**
  * «Сколько людей сейчас в зале» и кто именно.
@@ -30,11 +33,10 @@ final class OccupancyService
     private const STORAGE_TIMEZONE = 'UTC';
     private const COUNT_CACHE_TTL_SECONDS = 15;
 
-    /** @var array{at: float, clubId: ?int, count: int}|null */
-    private ?array $countCache = null;
-
     public function __construct(
         private readonly EntityManagerInterface $em,
+        #[Autowire(service: 'cache.app')]
+        private readonly CacheInterface $cache,
     ) {
     }
 
@@ -99,22 +101,15 @@ final class OccupancyService
     /** Сколько клиентов сейчас в зале (опционально по клубу; NULL-club считается этим залом). */
     public function countCurrentlyInside(?Club $club = null): int
     {
-        $clubId = $club?->getId();
-        $now = microtime(true);
-        if (
-            $this->countCache !== null
-            && $this->countCache['clubId'] === $clubId
-            && ($now - $this->countCache['at']) < self::COUNT_CACHE_TTL_SECONDS
-        ) {
-            return $this->countCache['count'];
-        }
+        $cacheKey = 'occupancy.count.' . ($club?->getId() ?? 'all');
 
-        $sql = $this->buildCurrentlyInsideSql($club, selectColumns: 'COUNT(*) AS cnt');
-        $row = $this->connection()->executeQuery($sql['sql'], $sql['params'])->fetchAssociative();
-        $count = (int) ($row['cnt'] ?? 0);
-        $this->countCache = ['at' => $now, 'clubId' => $clubId, 'count' => $count];
+        return (int) $this->cache->get($cacheKey, function (ItemInterface $item) use ($club): int {
+            $item->expiresAfter(self::COUNT_CACHE_TTL_SECONDS);
+            $sql = $this->buildCurrentlyInsideSql($club, selectColumns: 'COUNT(*) AS cnt');
+            $row = $this->connection()->executeQuery($sql['sql'], $sql['params'])->fetchAssociative();
 
-        return $count;
+            return (int) ($row['cnt'] ?? 0);
+        });
     }
 
     /**
@@ -172,7 +167,7 @@ final class OccupancyService
 
         $this->em->persist($log);
         $this->em->flush();
-        $this->countCache = null;
+        $this->invalidateCountCache($club);
     }
 
     /**
@@ -200,10 +195,21 @@ final class OccupancyService
         }
         if ($count > 0) {
             $this->em->flush();
-            $this->countCache = null;
+            $this->invalidateCountCache($club);
         }
 
         return $count;
+    }
+
+    private function invalidateCountCache(?Club $club = null): void
+    {
+        try {
+            $this->cache->delete('occupancy.count.all');
+            if ($club?->getId() !== null) {
+                $this->cache->delete('occupancy.count.' . $club->getId());
+            }
+        } catch (\Throwable) {
+        }
     }
 
     /**
@@ -225,18 +231,22 @@ final class OccupancyService
             'to' => $window['to'],
         ] + $scope['params'];
 
-        // GROUP_CONCAT: последнее event_type / created_at / club_id по user_id.
-        $inner = "SELECT user_id,
-                         SUBSTRING_INDEX(GROUP_CONCAT(event_type ORDER BY created_at DESC, id DESC SEPARATOR ','), ',', 1) AS last_type,
-                         SUBSTRING_INDEX(GROUP_CONCAT(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') ORDER BY created_at DESC, id DESC SEPARATOR ','), ',', 1) AS last_at,
-                         SUBSTRING_INDEX(GROUP_CONCAT(IFNULL(club_id, '') ORDER BY created_at DESC, id DESC SEPARATOR ','), ',', 1) AS last_club_id
-                  FROM access_logs
-                  WHERE result = 'granted'
-                    AND user_id IS NOT NULL
-                    AND created_at >= :from
-                    AND created_at < :to" . $scope['sql'] . '
-                  GROUP BY user_id
-                  HAVING last_type = \'entry\'';
+        // MAX(id): id монотонно растёт вместе со временем — без тяжёлого GROUP_CONCAT по всей таблице.
+        $inner = 'SELECT al.user_id AS user_id,
+                         al.event_type AS last_type,
+                         DATE_FORMAT(al.created_at, \'%Y-%m-%d %H:%i:%s\') AS last_at,
+                         IFNULL(al.club_id, \'\') AS last_club_id
+                  FROM access_logs al
+                  INNER JOIN (
+                      SELECT user_id, MAX(id) AS max_id
+                      FROM access_logs
+                      WHERE result = \'granted\'
+                        AND user_id IS NOT NULL
+                        AND created_at >= :from
+                        AND created_at < :to' . $scope['sql'] . '
+                      GROUP BY user_id
+                  ) latest ON latest.max_id = al.id
+                  WHERE al.event_type = \'entry\'';
 
         $sql = "SELECT $selectColumns FROM ($inner) t";
 
@@ -291,37 +301,30 @@ final class OccupancyService
             'to' => $window['to'],
         ] + $scope['params'];
 
-        // Один запрос вместо трёх: last entry / last exit / is_inside.
-        $sql = 'SELECT event_type, created_at
+        // Один лёгкий запрос: последнее событие + даты entry/exit через условные MAX.
+        $sql = 'SELECT
+                    (SELECT event_type
+                     FROM access_logs
+                     WHERE result = \'granted\'
+                       AND user_id = :user_id
+                       AND created_at >= :from
+                       AND created_at < :to' . $scope['sql'] . '
+                     ORDER BY created_at DESC, id DESC
+                     LIMIT 1) AS last_type,
+                    MAX(CASE WHEN event_type = \'entry\' THEN created_at END) AS last_entry_at,
+                    MAX(CASE WHEN event_type = \'exit\' THEN created_at END) AS last_exit_at
                 FROM access_logs
                 WHERE result = \'granted\'
                   AND user_id = :user_id
                   AND created_at >= :from
-                  AND created_at < :to' . $scope['sql'] . '
-                ORDER BY created_at DESC, id DESC
-                LIMIT 200';
+                  AND created_at < :to' . $scope['sql'];
 
-        $rows = $this->connection()->executeQuery($sql, $params)->fetchAllAssociative();
-        $isInside = false;
-        $lastEntry = null;
-        $lastExit = null;
-        if ($rows !== []) {
-            $isInside = (($rows[0]['event_type'] ?? '') === 'entry');
-            foreach ($rows as $row) {
-                $type = (string) ($row['event_type'] ?? '');
-                if ($type === 'entry' && $lastEntry === null) {
-                    $lastEntry = new \DateTimeImmutable((string) $row['created_at']);
-                } elseif ($type === 'exit' && $lastExit === null) {
-                    $lastExit = new \DateTimeImmutable((string) $row['created_at']);
-                }
-                if ($lastEntry !== null && $lastExit !== null) {
-                    break;
-                }
-            }
-        }
+        $row = $this->connection()->executeQuery($sql, $params)->fetchAssociative() ?: [];
+        $lastEntry = !empty($row['last_entry_at']) ? new \DateTimeImmutable((string) $row['last_entry_at']) : null;
+        $lastExit = !empty($row['last_exit_at']) ? new \DateTimeImmutable((string) $row['last_exit_at']) : null;
 
         return [
-            'is_inside' => $isInside,
+            'is_inside' => (($row['last_type'] ?? '') === 'entry'),
             'club_id' => $club?->getId(),
             'last_entry_at' => $lastEntry?->format(\DateTimeInterface::ATOM),
             'last_exit_at' => $lastExit?->format(\DateTimeInterface::ATOM),

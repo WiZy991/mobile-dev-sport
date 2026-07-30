@@ -6,6 +6,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'notifications')]
+#[ORM\Index(name: 'idx_notifications_user_created', columns: ['user_id', 'created_at'])]
+#[ORM\Index(name: 'idx_notifications_user_read', columns: ['user_id', 'read_at'])]
 class Notification
 {
     public const TYPE_TRAINING_REMINDER = 'training_reminder';

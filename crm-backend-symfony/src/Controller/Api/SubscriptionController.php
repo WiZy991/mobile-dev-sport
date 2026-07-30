@@ -47,25 +47,47 @@ class SubscriptionController extends AbstractController
         }
 
         $subs = $this->em->createQueryBuilder()
-            ->select('s', 'p', 'c', 'sale')
+            ->select('s', 'p', 'c')
             ->from(Subscription::class, 's')
             ->leftJoin('s.plan', 'p')
             ->leftJoin('s.club', 'c')
-            ->leftJoin('s.sales', 'sale')
             ->where('s.user = :user')
             ->setParameter('user', $user)
             ->orderBy('s.id', 'DESC')
             ->getQuery()
             ->getResult();
 
-        $data = array_map(static function (Subscription $s) {
+        $saleBySubId = [];
+        if ($subs !== []) {
+            $ids = array_values(array_filter(array_map(
+                static fn (Subscription $s): ?int => $s->getId(),
+                $subs,
+            )));
+            if ($ids !== []) {
+                $rows = $this->em->getConnection()->executeQuery(
+                    'SELECT s.subscription_id AS sid, s.price AS price, s.product_name AS product_name
+                     FROM sales s
+                     INNER JOIN (
+                         SELECT subscription_id, MIN(id) AS min_id
+                         FROM sales
+                         WHERE subscription_id IN (' . implode(',', array_map('intval', $ids)) . ')
+                         GROUP BY subscription_id
+                     ) first_sale ON first_sale.min_id = s.id'
+                )->fetchAllAssociative();
+                foreach ($rows as $row) {
+                    $saleBySubId[(int) $row['sid']] = $row;
+                }
+            }
+        }
+
+        $data = array_map(static function (Subscription $s) use ($saleBySubId) {
             $plan = $s->getPlan();
-            $sale = $s->getSales()->first();
             $displayName = $plan->getName();
             $displayPrice = $plan->getPrice();
-            if ($sale !== false && $sale !== null) {
-                $displayPrice = $sale->getPrice();
-                $productName = $sale->getProductName();
+            $sale = $saleBySubId[$s->getId()] ?? null;
+            if ($sale !== null) {
+                $displayPrice = (float) $sale['price'];
+                $productName = (string) $sale['product_name'];
                 if (str_starts_with($productName, 'Абонемент: ')) {
                     $displayName = substr($productName, strlen('Абонемент: '));
                 }

@@ -271,22 +271,19 @@ class UserController extends AbstractController
 
     private function computeStreak(User $user): int
     {
-        $logs = $this->em->getRepository(AccessLog::class)->findBy(
-            ['user' => $user, 'eventType' => 'entry', 'result' => 'granted'],
-            ['createdAt' => 'DESC'],
-            60
+        $dates = $this->em->getConnection()->fetchFirstColumn(
+            'SELECT DISTINCT DATE(created_at) AS d
+             FROM access_logs
+             WHERE user_id = :uid
+               AND event_type = \'entry\'
+               AND result = \'granted\'
+             ORDER BY d DESC
+             LIMIT 60',
+            ['uid' => $user->getId()],
         );
+        $dates = array_values(array_map('strval', $dates));
 
-        $dates = [];
-        foreach ($logs as $log) {
-            $d = $log->getCreatedAt()->format('Y-m-d');
-            if (!in_array($d, $dates, true)) {
-                $dates[] = $d;
-            }
-        }
-        $dates = array_values(array_unique($dates));
-
-        if (empty($dates)) {
+        if ($dates === []) {
             return 0;
         }
 
@@ -304,9 +301,10 @@ class UserController extends AbstractController
             if ($d !== $expected) {
                 break;
             }
-            $streak++;
+            ++$streak;
             $expected = (new \DateTimeImmutable($d . ' -1 day'))->format('Y-m-d');
         }
+
         return $streak;
     }
 }
