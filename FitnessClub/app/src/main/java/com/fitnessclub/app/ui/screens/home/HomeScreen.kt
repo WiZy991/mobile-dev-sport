@@ -57,10 +57,18 @@ fun HomeScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.loadUnreadCount()
+                viewModel.loadOccupancy()
             }
         }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(20_000)
+            viewModel.loadOccupancy()
+        }
     }
 
     Scaffold(

@@ -193,6 +193,12 @@ final class OccupancyService
         }
     }
 
+    /** Сбросить кэш счётчика после реального входа/выхода (шлюз / QR). */
+    public function notifyPresenceChanged(?Club $club = null): void
+    {
+        $this->invalidateCountCache($club);
+    }
+
     /**
      * Последнее событие по user_id (не по паре user+club) — иначе NULL-club «залипает».
      *

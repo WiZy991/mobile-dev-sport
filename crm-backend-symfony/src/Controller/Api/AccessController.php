@@ -139,6 +139,7 @@ class AccessController extends AbstractController
                 ->setReason('ok');
             $this->em->persist($log);
             $this->em->flush();
+            $this->occupancyService->notifyPresenceChanged($gateClub);
 
             $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
 
@@ -200,6 +201,7 @@ class AccessController extends AbstractController
 
         $this->em->persist($log);
         $this->em->flush();
+        $this->occupancyService->notifyPresenceChanged($gateClub);
 
         $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
 
@@ -249,6 +251,7 @@ class AccessController extends AbstractController
 
         $this->em->persist($log);
         $this->em->flush();
+        $this->occupancyService->notifyPresenceChanged(null);
 
         return $this->json(['success' => true]);
     }
@@ -281,6 +284,7 @@ class AccessController extends AbstractController
         $this->em->persist($log);
         $this->em->persist($guestPass);
         $this->em->flush();
+        $this->occupancyService->notifyPresenceChanged(null);
 
         $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
 

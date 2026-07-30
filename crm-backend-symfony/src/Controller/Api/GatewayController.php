@@ -135,6 +135,7 @@ class GatewayController extends AbstractController
                 ->setReason('ok');
             $this->em->persist($log);
             $this->em->flush();
+            $this->occupancyService->notifyPresenceChanged($club);
 
             return $this->json($this->grantedPayload($club, [
                 'access_granted' => true,
@@ -167,6 +168,7 @@ class GatewayController extends AbstractController
         $log->setResult('granted')->setReason('ok');
         $this->em->persist($log);
         $this->em->flush();
+        $this->occupancyService->notifyPresenceChanged($club);
 
         return $this->json($this->grantedPayload($club, [
             'access_granted' => true,
@@ -222,6 +224,7 @@ class GatewayController extends AbstractController
         $log->setResult('granted')->setReason('ok');
         $this->em->persist($log);
         $this->em->flush();
+        $this->occupancyService->notifyPresenceChanged($club);
 
         $payload = [
             'access_granted' => true,
