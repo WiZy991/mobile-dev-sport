@@ -1,10 +1,10 @@
 FitnessClub Agent - install guide
 =================================
 
-OPTION A - Setup wizard (if FitnessClubAgent-Setup.exe exists)
-  1. Double-click FitnessClubAgent-Setup.exe
-  2. Follow wizard, enable firewall rule for port 8765
-  3. Launch agent from desktop shortcut
+OPTION A - Setup.cmd (recommended)
+  1. Put Setup.cmd and FitnessClubAgent-Setup-1.0.1.zip in the same folder
+  2. Double-click Setup.cmd
+  3. Follow install.bat (firewall + launch)
 
 OPTION B - ZIP package
   1. Extract FitnessClubAgent-Setup-1.0.1.zip
@@ -25,9 +25,4 @@ Uninstall
   Start menu -> FitnessClub Agent -> Uninstall
   or Settings -> Apps -> FitnessClub Agent
 
-Rebuild installer (developers)
-  powershell -ExecutionPolicy Bypass -File build_installer.ps1
-
-Changelog 1.0.1
-  - Local QR dedupe (~90s): same code from C01 echo is not sent to CRM twice
-    (avoids entry+instant exit and double visit charge)
+Version: 1.0.1

@@ -1,7 +1,7 @@
 @echo off
 title FitnessClub Agent - Setup
 cd /d "%~dp0"
-set "ZIP=FitnessClubAgent-Setup-1.0.0.zip"
+set "ZIP=FitnessClubAgent-Setup-1.0.1.zip"
 if not exist "%ZIP%" (
     echo Missing %ZIP% in this folder.
     pause
