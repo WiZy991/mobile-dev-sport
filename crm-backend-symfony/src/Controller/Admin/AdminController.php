@@ -191,13 +191,16 @@ class AdminController extends AbstractController
             ->setParameter('end', $todayEnd);
         $revenueToday = (float) $qbRevenue->getQuery()->getSingleScalarResult();
 
+        // Только входы: выход — отдельное событие, не второе «посещение».
         $visitsToday = (int) $this->em->createQueryBuilder()
             ->select('COUNT(a.id)')
             ->from(AccessLog::class, 'a')
             ->where('a.result = :result')
+            ->andWhere('a.eventType = :eventType')
             ->andWhere('a.createdAt >= :start')
             ->andWhere('a.createdAt < :end')
             ->setParameter('result', 'granted')
+            ->setParameter('eventType', 'entry')
             ->setParameter('start', $todayStart)
             ->setParameter('end', $todayEnd)
             ->getQuery()->getSingleScalarResult();
@@ -724,7 +727,9 @@ class AdminController extends AbstractController
             ->select('a')
             ->from(AccessLog::class, 'a')
             ->where('a.user = :user')->andWhere('a.result = :result')
+            ->andWhere('a.eventType = :entry')
             ->setParameter('user', $client)->setParameter('result', 'granted')
+            ->setParameter('entry', 'entry')
             ->orderBy('a.createdAt', 'DESC')
             ->setMaxResults(1)
             ->getQuery()->getOneOrNullResult();
@@ -770,7 +775,11 @@ class AdminController extends AbstractController
             ->setMaxResults(20)
             ->getQuery()->getResult();
         foreach ($accessLogs as $a) {
-            $activities[] = ['type' => 'visit', 'entity' => $a, 'date' => $a->getCreatedAt()];
+            if ($a->getEventType() === 'exit') {
+                $activities[] = ['type' => 'exit', 'entity' => $a, 'date' => $a->getCreatedAt()];
+            } else {
+                $activities[] = ['type' => 'visit', 'entity' => $a, 'date' => $a->getCreatedAt()];
+            }
         }
         usort($activities, fn ($a, $b) => $b['date'] <=> $a['date']);
         $activities = array_slice($activities, 0, 30);

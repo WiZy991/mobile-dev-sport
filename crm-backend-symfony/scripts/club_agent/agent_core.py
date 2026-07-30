@@ -92,6 +92,27 @@ class ClubAgent:
         self._last_qr_entry_mono: float = 0.0
         self._last_standalone_alarm_mono: float = 0.0
         self._standalone_thread: Optional[threading.Thread] = None
+        # Один QR не должен уходить в CRM дважды (card + pass_personal / эхо C01).
+        self._qr_dedupe_lock = threading.Lock()
+        self._recent_qrs: dict[str, float] = {}
+
+    QR_DEDUPE_SECONDS = 90.0
+
+    def _claim_qr_or_duplicate(self, qr: str) -> bool:
+        """True = уже видели этот QR недавно (пропустить). False = первый раз, можно слать в CRM."""
+        q = (qr or "").strip()
+        if not q:
+            return False
+        now = time.monotonic()
+        with self._qr_dedupe_lock:
+            if len(self._recent_qrs) > 500:
+                cutoff = now - self.QR_DEDUPE_SECONDS
+                self._recent_qrs = {k: t for k, t in self._recent_qrs.items() if t >= cutoff}
+            last = self._recent_qrs.get(q)
+            if last is not None and (now - last) < self.QR_DEDUPE_SECONDS:
+                return True
+            self._recent_qrs[q] = now
+            return False
 
     def _emit(self, level: str, msg: str) -> None:
         self.on_log(level, msg)
@@ -162,6 +183,13 @@ class ClubAgent:
         if not self.cfg.crm_ready():
             self._emit("error", "CRM не настроен (URL / gateway_token) — проход запрещён")
             return False
+
+        if self._claim_qr_or_duplicate(qr):
+            self._emit(
+                "info",
+                f"QR dedupe: повтор того же кода за {self.QR_DEDUPE_SECONDS:.0f} с — в CRM не шлём (эхо C01).",
+            )
+            return True
 
         import asyncio
 

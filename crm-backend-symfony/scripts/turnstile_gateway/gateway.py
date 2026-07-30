@@ -247,6 +247,9 @@ def _perco_open(cfg: GatewayConfig, perco: PercoClient, override: Optional[dict]
 class GatewayDaemon:
     """Главный цикл шлюза: heartbeat + long-poll commands + опционально stdin reader."""
 
+    # Один QR не должен уходить в CRM дважды (stdin + PERCo events).
+    QR_DEDUPE_SECONDS = 90.0
+
     def __init__(self, cfg: GatewayConfig, *, read_stdin: bool = True) -> None:
         self.cfg = cfg
         self.crm = CrmClient(cfg)
@@ -255,6 +258,8 @@ class GatewayDaemon:
         self._read_stdin = read_stdin
         self._perco_seen_uids: set[str] = set()
         self._perco_last_numeric_id: Optional[int] = None
+        self._qr_lock = threading.Lock()
+        self._recent_qrs: dict[str, float] = {}
 
     def stop(self, *_a: Any) -> None:
         if not self._stop.is_set():
@@ -519,6 +524,25 @@ class GatewayDaemon:
             self.handle_qr(qr)
 
     def handle_qr(self, qr: str) -> dict:
+        qr = (qr or "").strip()
+        now = time.time()
+        with self._qr_lock:
+            # Чистка старых ключей
+            if len(self._recent_qrs) > 500:
+                cutoff = now - self.QR_DEDUPE_SECONDS
+                self._recent_qrs = {k: t for k, t in self._recent_qrs.items() if t >= cutoff}
+            last = self._recent_qrs.get(qr)
+            if last is not None and (now - last) < self.QR_DEDUPE_SECONDS:
+                LOG.info("QR dedupe (local): повтор за %.1fs — не шлём в CRM (%s)", now - last, qr[:96])
+                return {
+                    "access_granted": True,
+                    "reason": "ok",
+                    "passage": "entry",
+                    "duplicate": True,
+                    "success": True,
+                }
+            self._recent_qrs[qr] = now
+
         code, body = self.crm.submit_qr(qr)
         LOG.info("QR → CRM: HTTP %s, granted=%s, reason=%s", code, body.get("access_granted"), body.get("reason"))
         if code == 200 and body.get("access_granted"):

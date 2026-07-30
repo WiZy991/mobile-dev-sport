@@ -49,6 +49,10 @@ class GatewayController extends AbstractController
     private const LONG_POLL_SECONDS = 2.0;
     private const POLL_INTERVAL_US = 400_000;
     private const COMMAND_BATCH_LIMIT = 5;
+    /** Эхо PERCo / двойной скан того же QR — не писать второй лог. */
+    private const QR_DEDUPE_SECONDS = 90;
+    /** Сразу после входа не считать повторный скан выходом (эхо считывателя). */
+    private const EXIT_GRACE_SECONDS = 45;
     private const ALARM_TYPES = [
         AccessAlarm::TYPE_TAILGATING,
         AccessAlarm::TYPE_GROUP_ENTRY,
@@ -118,11 +122,44 @@ class GatewayController extends AbstractController
             return $this->denied($log, 'user_blocked', 403);
         }
 
-        // Выход важнее срока QR: один турникет / повторный скан.
-        // Счётчик в приложении — глобальный (club=null); проверка «в зале» должна совпадать,
-        // иначе повторный скан пишется как entry и человек «залипает» в зале.
-        // Срок QR (15 с) на выход не применяем — иначе отказ до записи exit.
+        // Тот же QR уже прошёл (скан + эхо PERCo) — не плодим entry/exit и не списываем посещение.
+        $dup = $this->occupancyService->findRecentGrantedByRawQr($qr, self::QR_DEDUPE_SECONDS);
+        if ($dup !== null) {
+            $passage = ($dup['event_type'] === 'exit') ? 'exit' : 'entry';
+
+            return $this->json($this->grantedPayload($club, [
+                'access_granted' => true,
+                'reason' => 'ok',
+                'passage' => $passage,
+                'duplicate' => true,
+                'success' => true,
+                'user' => [
+                    'id' => 'user-' . $user->getId(),
+                    'name' => $user->getName(),
+                    'phone' => $user->getPhone(),
+                ],
+            ]));
+        }
+
+        // Выход: повторный скан с НОВЫМ QR, если человек уже в зале.
+        // Grace после входа — защита от мгновенного exit из эха считывателя с другим timestamp.
         if ($this->occupancyService->isUserCurrentlyInside($user, null)) {
+            $sinceEntry = $this->occupancyService->secondsSinceLastGrantedEntry($user, null);
+            if ($sinceEntry !== null && $sinceEntry < self::EXIT_GRACE_SECONDS) {
+                return $this->json($this->grantedPayload($club, [
+                    'access_granted' => true,
+                    'reason' => 'ok',
+                    'passage' => 'entry',
+                    'duplicate' => true,
+                    'success' => true,
+                    'user' => [
+                        'id' => 'user-' . $user->getId(),
+                        'name' => $user->getName(),
+                        'phone' => $user->getPhone(),
+                    ],
+                ]));
+            }
+
             $log->setEventType('exit')
                 ->setResult('granted')
                 ->setReason('ok');

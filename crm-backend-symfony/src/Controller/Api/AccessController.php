@@ -20,6 +20,11 @@ use Symfony\Component\Routing\Annotation\Route;
 #[Route('/api/v1/access')]
 class AccessController extends AbstractController
 {
+    /** Эхо PERCo / двойной скан того же QR — не писать второй лог. */
+    private const QR_DEDUPE_SECONDS = 90;
+    /** Сразу после входа не считать повторный скан выходом (эхо считывателя). */
+    private const EXIT_GRACE_SECONDS = 45;
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PercoWebClient $percoWebClient,
@@ -121,8 +126,52 @@ class AccessController extends AbstractController
             return $this->json($response, 403);
         }
 
-        // Повторный скан = выход. Глобально (как счётчик), без проверки срока QR.
+        // Тот же QR уже прошёл (скан + эхо PERCo) — не плодим entry/exit и не списываем посещение.
+        $dup = $this->occupancyService->findRecentGrantedByRawQr($qr, self::QR_DEDUPE_SECONDS);
+        if ($dup !== null) {
+            $passage = ($dup['event_type'] === 'exit') ? 'exit' : 'entry';
+            $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
+
+            return $this->json($this->mergeEntrySuccess(
+                [
+                    'access_granted' => true,
+                    'reason' => 'ok',
+                    'passage' => $passage,
+                    'duplicate' => true,
+                    'success' => true,
+                    'user' => [
+                        'id' => 'user-' . $user->getId(),
+                        'name' => $user->getName(),
+                        'phone' => $user->getPhone(),
+                    ],
+                ],
+                $percoUnlock,
+            ));
+        }
+
+        // Повторный скан = выход. Grace после входа — защита от мгновенного exit из эха.
         if ($this->occupancyService->isUserCurrentlyInside($user, null)) {
+            $sinceEntry = $this->occupancyService->secondsSinceLastGrantedEntry($user, null);
+            if ($sinceEntry !== null && $sinceEntry < self::EXIT_GRACE_SECONDS) {
+                $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
+
+                return $this->json($this->mergeEntrySuccess(
+                    [
+                        'access_granted' => true,
+                        'reason' => 'ok',
+                        'passage' => 'entry',
+                        'duplicate' => true,
+                        'success' => true,
+                        'user' => [
+                            'id' => 'user-' . $user->getId(),
+                            'name' => $user->getName(),
+                            'phone' => $user->getPhone(),
+                        ],
+                    ],
+                    $percoUnlock,
+                ));
+            }
+
             $log->setEventType('exit')
                 ->setResult('granted')
                 ->setReason('ok');

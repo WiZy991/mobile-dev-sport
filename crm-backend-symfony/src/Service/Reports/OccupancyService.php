@@ -252,6 +252,63 @@ final class OccupancyService
     /** Сейчас ли клиент в зале — то же правило, что и счётчик (с учётом NULL club_id). */
     public function isUserCurrentlyInside(User $user, ?Club $club = null): bool
     {
+        $row = $this->lastGrantedEventRow($user, $club);
+
+        return $row !== null && ($row['event_type'] ?? '') === 'entry';
+    }
+
+    /**
+     * Последнее granted-событие пользователя за окно присутствия.
+     *
+     * @return array{event_type: string, id: int, created_at: string}|null
+     */
+    public function lastGrantedEvent(User $user, ?Club $club = null): ?array
+    {
+        return $this->lastGrantedEventRow($user, $club);
+    }
+
+    /**
+     * Тот же QR уже успешно обработан недавно (скан + эхо PERCo events) — не писать второй лог.
+     *
+     * @return array{event_type: string, id: int}|null
+     */
+    public function findRecentGrantedByRawQr(string $qr, int $withinSeconds = 90): ?array
+    {
+        $qr = trim($qr);
+        if ($qr === '' || $withinSeconds < 1) {
+            return null;
+        }
+
+        $from = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
+            ->modify('-' . $withinSeconds . ' seconds')
+            ->format('Y-m-d H:i:s');
+
+        $row = $this->connection()->executeQuery(
+            'SELECT id, event_type
+             FROM access_logs
+             WHERE result = \'granted\'
+               AND raw_data = :qr
+               AND created_at >= :from
+             ORDER BY id DESC
+             LIMIT 1',
+            ['qr' => $qr, 'from' => $from],
+        )->fetchAssociative();
+
+        if ($row === false) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $row['id'],
+            'event_type' => (string) $row['event_type'],
+        ];
+    }
+
+    /**
+     * Секунды с последнего granted entry (для защиты от мгновенного «выхода» из эха PERCo).
+     */
+    public function secondsSinceLastGrantedEntry(User $user, ?Club $club = null): ?int
+    {
         $window = $this->presenceWindow();
         $scope = $this->clubScopeSql($club);
         $params = [
@@ -260,21 +317,61 @@ final class OccupancyService
             'to' => $window['to'],
         ] + $scope['params'];
 
-        $sql = 'SELECT event_type
+        $row = $this->connection()->executeQuery(
+            'SELECT created_at
+             FROM access_logs
+             WHERE result = \'granted\'
+               AND event_type = \'entry\'
+               AND user_id = :user_id
+               AND created_at >= :from
+               AND created_at < :to' . $scope['sql'] . '
+             ORDER BY id DESC
+             LIMIT 1',
+            $params,
+        )->fetchAssociative();
+
+        if ($row === false || empty($row['created_at'])) {
+            return null;
+        }
+
+        $at = new \DateTimeImmutable((string) $row['created_at'], new \DateTimeZone('UTC'));
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+
+        return max(0, $now->getTimestamp() - $at->getTimestamp());
+    }
+
+    /**
+     * @return array{event_type: string, id: int, created_at: string}|null
+     */
+    private function lastGrantedEventRow(User $user, ?Club $club = null): ?array
+    {
+        $window = $this->presenceWindow();
+        $scope = $this->clubScopeSql($club);
+        $params = [
+            'user_id' => $user->getId(),
+            'from' => $window['from'],
+            'to' => $window['to'],
+        ] + $scope['params'];
+
+        $sql = 'SELECT event_type, id, DATE_FORMAT(created_at, \'%Y-%m-%d %H:%i:%s\') AS created_at
                 FROM access_logs
                 WHERE result = \'granted\'
                   AND user_id = :user_id
                   AND created_at >= :from
                   AND created_at < :to' . $scope['sql'] . '
-                ORDER BY created_at DESC, id DESC
+                ORDER BY id DESC
                 LIMIT 1';
 
         $row = $this->connection()->executeQuery($sql, $params)->fetchAssociative();
         if ($row === false) {
-            return false;
+            return null;
         }
 
-        return ($row['event_type'] ?? '') === 'entry';
+        return [
+            'event_type' => (string) ($row['event_type'] ?? ''),
+            'id' => (int) ($row['id'] ?? 0),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+        ];
     }
 
     /**

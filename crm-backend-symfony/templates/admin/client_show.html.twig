@@ -187,6 +187,8 @@
                         <span class="badge bg-secondary me-2">Заметка</span> {{ a.entity.text|slice(0, 80) }}{% if a.entity.text|length > 80 %}...{% endif %}
                     {% elseif a.type == 'visit' %}
                         <span class="badge bg-success me-2">Вход QR</span> вход в зал
+                    {% elseif a.type == 'exit' %}
+                        <span class="badge bg-secondary me-2">Выход QR</span> выход из зала
                     {% endif %}
                 </div>
             {% else %}
