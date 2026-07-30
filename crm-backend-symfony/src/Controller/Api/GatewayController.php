@@ -11,6 +11,7 @@ use App\Entity\StaffNotification;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\SubscriptionGateResolver;
+use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Reports\OccupancyService;
 use App\Service\Security\AccessAlarmNotifier;
 use App\Service\Staff\StaffEventNotifier;
@@ -54,6 +55,7 @@ class GatewayController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SubscriptionGateResolver $subscriptionGateResolver,
+        private readonly SubscriptionLifecycleService $subscriptionLifecycle,
         private readonly AccessAlarmNotifier $accessAlarmNotifier,
         private readonly StaffEventNotifier $staffEventNotifier,
         private readonly OccupancyService $occupancyService,
@@ -158,10 +160,8 @@ class GatewayController extends AbstractController
             return $this->denied($log, $reason, 403, $deny === 'wrong_club' ? ['club_id' => $club->getId()] : []);
         }
 
-        if ($activeSub->getVisitsTotal() !== null) {
-            $used = (int) ($activeSub->getVisitsUsed() ?? 0);
-            $activeSub->setVisitsUsed($used + 1);
-            $this->em->persist($activeSub);
+        if (!$this->subscriptionLifecycle->consumeVisitForEntry($activeSub)) {
+            return $this->denied($log, 'visits_exhausted', 403);
         }
 
         $log->setResult('granted')->setReason('ok');

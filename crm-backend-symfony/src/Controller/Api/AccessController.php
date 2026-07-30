@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Integration\SubscriptionGateResolver;
+use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,6 +25,7 @@ class AccessController extends AbstractController
         private readonly PercoWebClient $percoWebClient,
         private readonly SubscriptionGateResolver $subscriptionGateResolver,
         private readonly OccupancyService $occupancyService,
+        private readonly SubscriptionLifecycleService $subscriptionLifecycle,
         private readonly string $accessGateToken = '',
         private readonly string $percoOpenFromCrm = '1',
     ) {}
@@ -181,11 +183,15 @@ class AccessController extends AbstractController
             return $this->json($response, 403);
         }
 
-        // Доступ разрешён — увеличиваем visits_used у активного абонемента
-        if ($activeSub->getVisitsTotal() !== null) {
-            $used = (int) ($activeSub->getVisitsUsed() ?? 0);
-            $activeSub->setVisitsUsed($used + 1);
-            $this->em->persist($activeSub);
+        // Доступ разрешён — атомарно списываем посещение (не уходит в минус).
+        if (!$this->subscriptionLifecycle->consumeVisitForEntry($activeSub)) {
+            $log->setReason('visits_exhausted');
+            $response['reason'] = 'visits_exhausted';
+            $response['message'] = 'Лимит посещений по абонементу исчерпан';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 403);
         }
 
         $log->setEventType('entry')

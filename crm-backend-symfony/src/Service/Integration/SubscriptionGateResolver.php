@@ -5,6 +5,7 @@ namespace App\Service\Integration;
 use App\Entity\Club;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Service\Api\SubscriptionLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -14,6 +15,7 @@ final class SubscriptionGateResolver
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly SubscriptionLifecycleService $lifecycle,
     ) {
     }
 
@@ -32,11 +34,17 @@ final class SubscriptionGateResolver
 
         $calendarOk = [];
         foreach ($subs as $sub) {
+            // Подчищаем «зомби» с used >= total, которые ещё active.
+            if ($this->lifecycle->cancelIfVisitsExhausted($sub)) {
+                continue;
+            }
             if ($sub->coversCalendarDay($today)) {
                 $calendarOk[] = $sub;
             }
         }
         if ($calendarOk === []) {
+            $this->em->flush();
+
             return [null, 'no_active'];
         }
 
@@ -50,15 +58,22 @@ final class SubscriptionGateResolver
                 }
             }
             if ($clubOk === []) {
+                $this->em->flush();
+
                 return [null, 'wrong_club'];
             }
         }
 
         foreach ($clubOk as $sub) {
             if ($sub->hasRemainingVisits()) {
+                $this->em->flush();
+
                 return [$sub, null];
             }
+            $this->lifecycle->cancelIfVisitsExhausted($sub);
         }
+
+        $this->em->flush();
 
         return [null, 'visits_exhausted'];
     }

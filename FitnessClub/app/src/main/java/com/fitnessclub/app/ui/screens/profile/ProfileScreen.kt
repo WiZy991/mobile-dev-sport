@@ -727,7 +727,10 @@ private fun SubscriptionCard(
                 }
             }
 
-            if (subscription.status == SubscriptionStatus.ACTIVE || subscription.status == SubscriptionStatus.FROZEN) {
+            if (
+                (subscription.status == SubscriptionStatus.ACTIVE || subscription.status == SubscriptionStatus.FROZEN)
+                && (subscription.visitsLeft == null || subscription.visitsLeft > 0)
+            ) {
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(
                     onClick = onCancelClick,

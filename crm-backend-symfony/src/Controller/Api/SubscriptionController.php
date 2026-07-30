@@ -57,6 +57,16 @@ class SubscriptionController extends AbstractController
             ->getQuery()
             ->getResult();
 
+        $changed = false;
+        foreach ($subs as $sub) {
+            if ($sub instanceof Subscription && $this->lifecycleService->cancelIfVisitsExhausted($sub)) {
+                $changed = true;
+            }
+        }
+        if ($changed) {
+            $this->em->flush();
+        }
+
         $saleBySubId = [];
         if ($subs !== []) {
             $ids = array_values(array_filter(array_map(

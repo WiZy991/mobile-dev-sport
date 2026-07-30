@@ -164,6 +164,9 @@ class Subscription implements TenantAware
         if ($this->visitsTotal === null) {
             return true;
         }
+        if ($this->visitsTotal <= 0) {
+            return false;
+        }
 
         return (int) ($this->visitsUsed ?? 0) < $this->visitsTotal;
     }
