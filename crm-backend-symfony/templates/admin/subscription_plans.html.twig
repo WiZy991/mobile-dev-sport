@@ -183,15 +183,14 @@
             {% if statusFilter %}<input type="hidden" name="return_status" value="{{ statusFilter }}">{% endif %}
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label small text-secondary">Клиент</label>
-                    <select name="user_id" class="form-select form-select-sm" required>
-                        <option value="">Выберите клиента</option>
-                        {% for user in users %}
-                            <option value="{{ user.id }}">
-                                {{ user.name }} ({{ user.phone }}) {% if not user.hasRequiredDataForSubscription %}[данные не заполнены]{% endif %}
-                            </option>
-                        {% endfor %}
-                    </select>
+                    <label class="form-label small text-secondary" for="issue-client-q">Клиент</label>
+                    <div class="crm-client-picker" id="issue-client-picker"
+                         data-search-url="{{ path('admin_clients_search_json') }}">
+                        <input type="hidden" name="user_id" id="issue-user-id" value="" required>
+                        <input type="text" id="issue-client-q" class="form-control form-control-sm crm-client-picker__input"
+                               placeholder="Фамилия или телефон…" autocomplete="off" required>
+                        <div class="crm-client-picker__menu" hidden></div>
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small text-secondary">Тарифный план</label>
@@ -358,6 +357,112 @@
                     });
                 });
             }
+
+            (function initIssueClientPicker() {
+                var root = document.getElementById('issue-client-picker');
+                if (!root) return;
+                var url = root.getAttribute('data-search-url');
+                var hidden = document.getElementById('issue-user-id');
+                var input = document.getElementById('issue-client-q');
+                var menu = root.querySelector('.crm-client-picker__menu');
+                if (!url || !hidden || !input || !menu) return;
+
+                var timer = null;
+                var seq = 0;
+                var pickedLabel = '';
+
+                function hideMenu() {
+                    menu.hidden = true;
+                    menu.innerHTML = '';
+                }
+
+                function selectItem(item) {
+                    hidden.value = String(item.id);
+                    pickedLabel = item.label || item.name;
+                    input.value = pickedLabel;
+                    hideMenu();
+                }
+
+                function render(items) {
+                    menu.innerHTML = '';
+                    if (!items.length) {
+                        var empty = document.createElement('div');
+                        empty.className = 'crm-client-picker__empty';
+                        empty.textContent = 'Ничего не найдено';
+                        menu.appendChild(empty);
+                        menu.hidden = false;
+                        return;
+                    }
+                    items.forEach(function (item) {
+                        var btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'crm-client-picker__option';
+                        btn.textContent = item.label || item.name;
+                        if (!item.ready) {
+                            btn.classList.add('is-warn');
+                        }
+                        btn.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            selectItem(item);
+                        });
+                        menu.appendChild(btn);
+                    });
+                    menu.hidden = false;
+                }
+
+                function search(q) {
+                    var my = ++seq;
+                    fetch(url + '?q=' + encodeURIComponent(q), {
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'same-origin'
+                    }).then(function (r) {
+                        if (!r.ok) throw new Error('search failed');
+                        return r.json();
+                    }).then(function (data) {
+                        if (my !== seq) return;
+                        render((data && data.items) ? data.items : []);
+                    }).catch(function () {
+                        if (my !== seq) return;
+                        hideMenu();
+                    });
+                }
+
+                input.addEventListener('input', function () {
+                    var q = input.value.trim();
+                    if (input.value !== pickedLabel) {
+                        hidden.value = '';
+                        pickedLabel = '';
+                    }
+                    clearTimeout(timer);
+                    if (q.length < 2) {
+                        hideMenu();
+                        return;
+                    }
+                    timer = setTimeout(function () { search(q); }, 250);
+                });
+
+                input.addEventListener('focus', function () {
+                    var q = input.value.trim();
+                    if (q.length >= 2 && !hidden.value) {
+                        search(q);
+                    }
+                });
+
+                document.addEventListener('click', function (e) {
+                    if (!root.contains(e.target)) hideMenu();
+                });
+
+                var form = root.closest('form');
+                if (form) {
+                    form.addEventListener('submit', function (e) {
+                        if (!hidden.value) {
+                            e.preventDefault();
+                            input.focus();
+                            alert('Выберите клиента из списка поиска.');
+                        }
+                    });
+                }
+            })();
 
             var planSelect = document.getElementById('issue-plan-select');
             var freezeInput = document.getElementById('issue-freeze-days');

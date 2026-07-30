@@ -102,6 +102,11 @@ admin_clients_bulk_delete:
   controller: App\Controller\Admin\AdminController::bulkDeleteSelectedClients
   methods: [POST]
 
+admin_clients_search_json:
+  path: /admin/clients/search-json
+  controller: App\Controller\Admin\AdminController::searchClientsJson
+  methods: [GET]
+
 admin_subscription_freeze:
   path: /admin/subscriptions/{id}/freeze
   controller: App\Controller\Admin\AdminController::freezeSubscription

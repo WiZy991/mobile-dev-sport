@@ -432,6 +432,12 @@ a.text-reset:hover .content-card {
 .crm-select__option.is-selected { background: rgba(255,91,46,0.18); color: #fff; font-weight: 600; }
 .crm-select__option.is-disabled { opacity: 0.45; cursor: not-allowed; }
 .crm-select--disabled .crm-select__trigger { opacity: 0.55; cursor: not-allowed; }
+.crm-client-picker { position: relative; width: 100%; }
+.crm-client-picker__menu { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 1060; max-height: 260px; overflow-y: auto; padding: 0.35rem; background: #1c2029; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,0.45); }
+.crm-client-picker__option { display: block; width: 100%; padding: 0.45rem 0.65rem; border: none; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer; }
+.crm-client-picker__option:hover { background: rgba(255,255,255,0.06); }
+.crm-client-picker__option.is-warn { color: #f0c674; }
+.crm-client-picker__empty { padding: 0.45rem 0.65rem; font-size: 0.875rem; color: var(--muted); }
 
 .btn-primary {
     background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important;

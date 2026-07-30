@@ -262,6 +262,45 @@ class AdminController extends AbstractController
         ]);
     }
 
+    #[Route('/clients/search-json', name: 'admin_clients_search_json', priority: 10, methods: ['GET'])]
+    public function searchClientsJson(Request $request): Response
+    {
+        $q = trim((string) $request->query->get('q', ''));
+        if (mb_strlen($q) < 2) {
+            return $this->json(['items' => []]);
+        }
+
+        $qLike = '%' . $q . '%';
+        /** @var list<User> $users */
+        $users = $this->em->createQueryBuilder()
+            ->select('u')
+            ->from(User::class, 'u')
+            ->where('u.name LIKE :q OR u.phone LIKE :q OR u.email LIKE :q')
+            ->setParameter('q', $qLike)
+            ->orderBy('u.name', 'ASC')
+            ->setMaxResults(30)
+            ->getQuery()
+            ->getResult();
+
+        $items = [];
+        foreach ($users as $user) {
+            $items[] = [
+                'id' => $user->getId(),
+                'name' => $user->getName(),
+                'phone' => $user->getPhone(),
+                'ready' => $user->hasRequiredDataForSubscription(),
+                'label' => sprintf(
+                    '%s (%s)%s',
+                    $user->getName(),
+                    $user->getPhone() ?: '—',
+                    $user->hasRequiredDataForSubscription() ? '' : ' [данные не заполнены]'
+                ),
+            ];
+        }
+
+        return $this->json(['items' => $items]);
+    }
+
     #[Route('/clients/new', name: 'admin_client_new', methods: ['GET', 'POST'])]
     public function clientNew(Request $request): Response
     {
@@ -2792,7 +2831,6 @@ class AdminController extends AbstractController
             foreach ($plans as $plan) {
                 $issuedByPlan[$plan->getId()] = $subRepo->count(['plan' => $plan]);
             }
-            $users = $this->em->getRepository(User::class)->findBy([], ['id' => 'ASC']);
             $statusFilter = $request->query->get('status', '');
             $subsQb = $this->em->createQueryBuilder()->select('s')->from(Subscription::class, 's')->orderBy('s.id', 'DESC');
             if ($statusFilter === 'active' || $statusFilter === 'frozen' || $statusFilter === 'cancelled') {
@@ -2812,7 +2850,6 @@ class AdminController extends AbstractController
                 'issuedByPlan' => $issuedByPlan,
                 'planTemplates' => $this->planCatalog->all(),
                 'availablePlanTemplates' => $this->planCatalog->availableFor($plans),
-                'users' => $users,
                 'clubs' => $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']),
                 'subscriptions' => $subscriptions,
                 'statusFilter' => $statusFilter,

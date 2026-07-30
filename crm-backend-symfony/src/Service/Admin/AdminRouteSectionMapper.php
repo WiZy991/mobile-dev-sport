@@ -23,6 +23,7 @@ final class AdminRouteSectionMapper
         'admin_clients_import' => 'clients',
         'admin_clients_bulk_delete' => 'clients',
         'admin_clients_bulk_delete_without_subscription' => 'clients',
+        'admin_clients_search_json' => 'subscriptions',
         'admin_subscription_freeze' => 'subscriptions',
         'admin_subscription_unfreeze' => 'subscriptions',
         'admin_subscription_extend' => 'subscriptions',
