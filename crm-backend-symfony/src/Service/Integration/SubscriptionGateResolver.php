@@ -8,7 +8,7 @@ use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Выбор абонемента для прохода: календарь + привязка к клубу шлюза.
+ * Выбор абонемента для прохода: календарь + привязка к клубу шлюза + лимит посещений.
  */
 final class SubscriptionGateResolver
 {
@@ -19,7 +19,10 @@ final class SubscriptionGateResolver
 
     /**
      * @return array{0: ?Subscription, 1: ?string} [абонемент или null, код отказа]
-     *                 Код: null при успехе; «no_active» — нет по датам/статусу; «wrong_club» — есть по датам, но не этот клуб.
+     *                 null при успехе;
+     *                 «no_active» — нет по датам/статусу;
+     *                 «wrong_club» — есть по датам, но не этот клуб;
+     *                 «visits_exhausted» — срок/клуб ок, но посещения закончились.
      */
     public function resolveForEntry(User $user, ?Club $gateClub): array
     {
@@ -38,15 +41,25 @@ final class SubscriptionGateResolver
         }
 
         if ($gateClub === null) {
-            return [$calendarOk[0], null];
+            $clubOk = $calendarOk;
+        } else {
+            $clubOk = [];
+            foreach ($calendarOk as $sub) {
+                if ($sub->isValidAtClub($gateClub)) {
+                    $clubOk[] = $sub;
+                }
+            }
+            if ($clubOk === []) {
+                return [null, 'wrong_club'];
+            }
         }
 
-        foreach ($calendarOk as $sub) {
-            if ($sub->isValidAtClub($gateClub)) {
+        foreach ($clubOk as $sub) {
+            if ($sub->hasRemainingVisits()) {
                 return [$sub, null];
             }
         }
 
-        return [null, 'wrong_club'];
+        return [null, 'visits_exhausted'];
     }
 }

@@ -2,8 +2,11 @@ package com.fitnessclub.app.ui.screens.qrcode
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.model.SubscriptionStatus
 import com.fitnessclub.app.data.repository.AccessRepository
 import com.fitnessclub.app.data.repository.AuthRepository
+import com.fitnessclub.app.data.repository.SubscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,12 +26,15 @@ data class QrCodeUiState(
     val qrCodeData: String? = null,
     val isInsideGym: Boolean = false,
     val secondsRemaining: Int = 15,
+    /** Почему QR для входа не показывается (лимит/нет абонемента). */
+    val entryBlockedMessage: String? = null,
 )
 
 @HiltViewModel
 class QrCodeViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val accessRepository: AccessRepository,
+    private val subscriptionRepository: SubscriptionRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(QrCodeUiState())
@@ -73,12 +79,29 @@ class QrCodeViewModel @Inject constructor(
         }
     }
 
+    private suspend fun entryBlockReason(): String? {
+        return when (val result = subscriptionRepository.getMySubscriptions().first { it !is ApiResult.Loading }) {
+            is ApiResult.Success -> {
+                val active = result.data.filter { it.status == SubscriptionStatus.ACTIVE && !it.isFrozen }
+                when {
+                    active.isEmpty() -> "Нет активного абонемента. Оформите абонемент, чтобы войти в зал."
+                    active.none { sub ->
+                        val left = sub.visitsLeft
+                        left == null || left > 0
+                    } -> "Посещения по абонементу закончились. Купите новый или продлите текущий."
+                    else -> null
+                }
+            }
+            else -> null // сеть/ошибка — не блокируем QR, сервер всё равно откажет
+        }
+    }
+
     private fun startQrRotation() {
         rotationJob = viewModelScope.launch {
             val user = authRepository.getCurrentUser().first()
             if (user == null) {
                 _uiState.update {
-                    it.copy(isLoading = false, qrCodeData = null, secondsRemaining = 0)
+                    it.copy(isLoading = false, qrCodeData = null, secondsRemaining = 0, entryBlockedMessage = null)
                 }
                 return@launch
             }
@@ -94,12 +117,41 @@ class QrCodeViewModel @Inject constructor(
                         memberId = user.id.takeLast(8).uppercase(),
                         qrCodeData = generateQrData(user.id, System.currentTimeMillis()),
                         secondsRemaining = 0,
+                        entryBlockedMessage = null,
+                    )
+                }
+                return@launch
+            }
+
+            val blocked = entryBlockReason()
+            if (blocked != null) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        userName = user.name,
+                        memberId = user.id.takeLast(8).uppercase(),
+                        qrCodeData = null,
+                        secondsRemaining = 0,
+                        entryBlockedMessage = blocked,
                     )
                 }
                 return@launch
             }
 
             while (isActive) {
+                // Перепроверяем лимит на каждом цикле обновления QR.
+                val again = entryBlockReason()
+                if (again != null) {
+                    _uiState.update {
+                        it.copy(
+                            qrCodeData = null,
+                            secondsRemaining = 0,
+                            entryBlockedMessage = again,
+                        )
+                    }
+                    return@launch
+                }
+
                 val ts = System.currentTimeMillis()
                 _uiState.update {
                     it.copy(
@@ -108,6 +160,7 @@ class QrCodeViewModel @Inject constructor(
                         memberId = user.id.takeLast(8).uppercase(),
                         qrCodeData = generateQrData(user.id, ts),
                         secondsRemaining = 15,
+                        entryBlockedMessage = null,
                     )
                 }
                 repeat(15) {

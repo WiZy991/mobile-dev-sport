@@ -160,9 +160,18 @@ class AccessController extends AbstractController
         [$activeSub, $deny] = $this->subscriptionGateResolver->resolveForEntry($user, $gateClub);
 
         if (!$activeSub) {
-            $reason = $deny === 'wrong_club' ? 'subscription_wrong_club' : 'no_active_subscription';
+            $reason = match ($deny) {
+                'wrong_club' => 'subscription_wrong_club',
+                'visits_exhausted' => 'visits_exhausted',
+                default => 'no_active_subscription',
+            };
             $log->setReason($reason);
             $response['reason'] = $reason;
+            $response['message'] = match ($reason) {
+                'visits_exhausted' => 'Лимит посещений по абонементу исчерпан',
+                'subscription_wrong_club' => 'Абонемент оформлен на другой клуб',
+                default => 'Нет действующего абонемента',
+            };
             if ($deny === 'wrong_club' && $gateClub !== null) {
                 $response['club_id'] = $gateClub->getId();
             }

@@ -303,6 +303,15 @@ private fun QrQuickAccessContent(
         )
         Spacer(modifier = Modifier.height(16.dp))
         when {
+            uiState.entryBlockedMessage != null -> {
+                Text(
+                    text = uiState.entryBlockedMessage!!,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            }
             uiState.qrCodeData != null -> {
                 val qrBitmap = remember(uiState.qrCodeData) {
                     generateQrBitmap(uiState.qrCodeData!!, 300)
@@ -350,7 +359,11 @@ private fun QrQuickAccessContent(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = if (uiState.isInsideGym) "Поднесите к сканеру на выходе" else "Поднесите к сканеру",
+            text = when {
+                uiState.isInsideGym -> "Поднесите к сканеру на выходе"
+                uiState.entryBlockedMessage != null -> "Вход недоступен"
+                else -> "Поднесите к сканеру"
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

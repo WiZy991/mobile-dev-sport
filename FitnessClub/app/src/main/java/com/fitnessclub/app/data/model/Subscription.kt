@@ -46,7 +46,7 @@ data class Subscription(
     val description: String? = null
 ) {
     val visitsLeft: Int?
-        get() = visitsTotal?.minus(visitsUsed)
+        get() = visitsTotal?.let { total -> maxOf(0, total - visitsUsed) }
     
     val freezeDaysLeft: Int
         get() = freezeDaysTotal - freezeDaysUsed

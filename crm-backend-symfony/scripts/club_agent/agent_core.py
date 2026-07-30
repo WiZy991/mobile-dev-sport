@@ -187,6 +187,12 @@ class ClubAgent:
                     "CRM: у этого пользователя нет действующего абонемента (не ошибка турникета). "
                     "В админке CRM откройте клиента по id из QR и оформите/активируйте абонемент, проверьте даты и клуб.",
                 )
+            if reason == "visits_exhausted":
+                self._emit(
+                    "info",
+                    "CRM: абонемент есть, но лимит посещений исчерпан. "
+                    "Клиенту нужно купить/продлить абонемент или увеличить число посещений в CRM.",
+                )
             if reason == "subscription_wrong_club":
                 self._emit(
                     "info",
@@ -585,6 +591,8 @@ class ClubAgent:
             )
         elif reason == "no_active_subscription":
             summary += " — у клиента в CRM нет действующего абонемента (админка → клиент → абонемент)."
+        elif reason == "visits_exhausted":
+            summary += " — лимит посещений по абонементу исчерпан."
         elif reason == "subscription_wrong_club":
             summary += " — абонемент не на этот клуб (CRM: subscriptions.club_id vs клуб шлюза по gateway_token)."
         if name:

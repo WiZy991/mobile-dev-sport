@@ -92,6 +92,24 @@ fun QrCodeScreen(
                 ) {
                     if (uiState.isLoading) {
                         CircularProgressIndicator()
+                    } else if (uiState.entryBlockedMessage != null) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.QrCode2,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = uiState.entryBlockedMessage!!,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     } else if (uiState.qrCodeData != null) {
                         val qrBitmap = remember(uiState.qrCodeData) {
                             generateQrCode(uiState.qrCodeData!!, 500)
@@ -146,6 +164,8 @@ fun QrCodeScreen(
                     Text(
                         text = if (uiState.isInsideGym) {
                             "Поднесите QR-код к сканеру на выходе. Турникет откроется автоматически."
+                        } else if (uiState.entryBlockedMessage != null) {
+                            uiState.entryBlockedMessage!!
                         } else {
                             "Поднесите QR-код к сканеру на входе в клуб. Турникет откроется автоматически."
                         },
@@ -172,6 +192,7 @@ fun QrCodeScreen(
             // Valid until
             Text(
                 text = when {
+                    uiState.entryBlockedMessage != null -> "Вход недоступен"
                     uiState.isInsideGym && uiState.qrCodeData != null -> "Код для выхода из зала"
                     uiState.secondsRemaining > 0 -> "Код обновится через ${uiState.secondsRemaining} сек (действует 15 сек)"
                     else -> "Обновление…"

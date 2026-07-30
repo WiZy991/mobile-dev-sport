@@ -149,7 +149,11 @@ class GatewayController extends AbstractController
 
         [$activeSub, $deny] = $this->subscriptionGateResolver->resolveForEntry($user, $club);
         if (!$activeSub) {
-            $reason = $deny === 'wrong_club' ? 'subscription_wrong_club' : 'no_active_subscription';
+            $reason = match ($deny) {
+                'wrong_club' => 'subscription_wrong_club',
+                'visits_exhausted' => 'visits_exhausted',
+                default => 'no_active_subscription',
+            };
 
             return $this->denied($log, $reason, 403, $deny === 'wrong_club' ? ['club_id' => $club->getId()] : []);
         }
@@ -491,6 +495,14 @@ class GatewayController extends AbstractController
         return $this->json(array_merge([
             'access_granted' => false,
             'reason' => $reason,
+            'message' => match ($reason) {
+                'visits_exhausted' => 'Лимит посещений по абонементу исчерпан',
+                'no_active_subscription' => 'Нет действующего абонемента',
+                'subscription_wrong_club' => 'Абонемент оформлен на другой клуб',
+                'user_blocked' => 'Клиент заблокирован',
+                'qr_expired' => 'QR-код устарел, обновите в приложении',
+                default => null,
+            },
         ], $extra), $status);
     }
 

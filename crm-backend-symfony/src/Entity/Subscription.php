@@ -155,6 +155,19 @@ class Subscription implements TenantAware
         return $this;
     }
 
+    /**
+     * Остались ли посещения для входа.
+     * visitsTotal = null — безлимит (не считаем посещения).
+     */
+    public function hasRemainingVisits(): bool
+    {
+        if ($this->visitsTotal === null) {
+            return true;
+        }
+
+        return (int) ($this->visitsUsed ?? 0) < $this->visitsTotal;
+    }
+
     public function getFreezeDaysTotal(): ?int
     {
         return $this->freezeDaysTotal;
