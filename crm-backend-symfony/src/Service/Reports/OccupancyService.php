@@ -21,8 +21,7 @@ use Doctrine\ORM\EntityManagerInterface;
  *  - читаем entry/exit (двусторонний турникет) — пара entry→exit убирает клиента из зала.
  *
  * Клубный день — Asia/Vladivostok (APP_TIMEZONE).
- * В access_logs historically писался UTC (пока PHP был в UTC), после смены TZ — локальное время.
- * Поэтому граница «сегодня» берётся с запасом: min/max локальной полуночи и её UTC-представления.
+ * В БД после миграции Version20260730103000 — клубное wall-clock время (не UTC).
  */
 final class OccupancyService
 {
@@ -32,7 +31,7 @@ final class OccupancyService
     }
 
     /**
-     * Окно «сегодня» для SQL по access_logs (naive DATETIME).
+     * Окно «сегодня» для SQL по access_logs (naive DATETIME в TZ клуба).
      *
      * @return array{from: string, to: string}
      */
@@ -44,21 +43,13 @@ final class OccupancyService
         } catch (\Throwable) {
             $clubTz = new \DateTimeZone('Asia/Vladivostok');
         }
-        $utc = new \DateTimeZone('UTC');
 
         $localStart = new \DateTimeImmutable('today', $clubTz);
         $localEnd = $localStart->modify('+1 day');
 
-        $localFrom = $localStart->format('Y-m-d H:i:s');
-        $localTo = $localEnd->format('Y-m-d H:i:s');
-
-        // Те же мгновения в UTC wall-clock — как писалось в БД, пока PHP был в UTC.
-        $utcFrom = $localStart->setTimezone($utc)->format('Y-m-d H:i:s');
-        $utcTo = $localEnd->setTimezone($utc)->format('Y-m-d H:i:s');
-
         return [
-            'from' => min($localFrom, $utcFrom),
-            'to' => max($localTo, $utcTo),
+            'from' => $localStart->format('Y-m-d H:i:s'),
+            'to' => $localEnd->format('Y-m-d H:i:s'),
         ];
     }
 

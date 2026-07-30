@@ -48,7 +48,13 @@ class AccessLog implements TenantAware
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable();
+        // Клубное время (APP_TIMEZONE / Asia/Vladivostok), не UTC.
+        $tz = date_default_timezone_get() ?: 'Asia/Vladivostok';
+        try {
+            $this->createdAt = new \DateTimeImmutable('now', new \DateTimeZone($tz));
+        } catch (\Throwable) {
+            $this->createdAt = new \DateTimeImmutable('now', new \DateTimeZone('Asia/Vladivostok'));
+        }
     }
 
     public function getId(): ?int
