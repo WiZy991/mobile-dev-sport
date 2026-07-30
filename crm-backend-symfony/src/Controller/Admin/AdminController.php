@@ -2574,6 +2574,41 @@ class AdminController extends AbstractController
         return $response;
     }
 
+    #[Route('/visits/clear-hall', name: 'admin_visits_clear_hall', methods: ['POST'])]
+    public function clearHall(): Response
+    {
+        $n = $this->occupancy->forceExitAllCurrentlyInside();
+        $this->addFlash('success', $n > 0
+            ? ('Отмечен выход: ' . $n . ' чел. Счётчик «в зале» обновлён.')
+            : 'В зале никого не было.');
+
+        return $this->redirectToRoute('admin_section', ['section' => 'visits']);
+    }
+
+    #[Route('/visits/force-exit/{userId}', name: 'admin_visits_force_exit', requirements: ['userId' => '\\d+'], methods: ['POST'])]
+    public function forceExitUser(int $userId): Response
+    {
+        $user = $this->em->getRepository(User::class)->find($userId);
+        if (!$user) {
+            $this->addFlash('danger', 'Клиент не найден.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'visits']);
+        }
+
+        $clubId = null;
+        foreach ($this->occupancy->listCurrentlyInside(null, 200) as $row) {
+            if ($row['user']->getId() === $userId) {
+                $clubId = $row['club_id'];
+                break;
+            }
+        }
+        $club = $clubId !== null ? $this->em->find(Club::class, $clubId) : null;
+        $this->occupancy->forceExit($user, $club instanceof Club ? $club : null);
+        $this->addFlash('success', 'Выход отмечен для «' . $user->getName() . '».');
+
+        return $this->redirectToRoute('admin_section', ['section' => 'visits']);
+    }
+
     #[Route('/visits/export', name: 'admin_visits_export', methods: ['GET'])]
     public function exportVisits(Request $request): StreamedResponse
     {

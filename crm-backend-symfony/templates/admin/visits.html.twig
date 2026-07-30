@@ -17,9 +17,17 @@
                     <span class="fs-6 text-secondary">чел.</span>
                 </div>
             </div>
-            <div class="small text-secondary">
-                Считается за сегодня: последнее <em>granted</em>-событие клиента — это <code>entry</code>.<br>
-                Если поставлен второй считыватель «на выход», пара <em>entry → exit</em> убирает клиента из зала.
+            <div class="d-flex flex-column align-items-end gap-2">
+                <div class="small text-secondary text-end">
+                    Считается за сегодня: последнее <em>granted</em>-событие клиента — это <code>entry</code>.<br>
+                    Если поставлен второй считыватель «на выход», пара <em>entry → exit</em> убирает клиента из зала.
+                </div>
+                {% if admin_can_mutate() and currentlyInside|default(0) > 0 %}
+                    <form method="post" action="{{ path('admin_visits_clear_hall') }}"
+                          onsubmit="return confirm('Отметить выход всем, кто сейчас числится в зале ({{ currentlyInside }})?');">
+                        <button type="submit" class="btn btn-sm btn-outline-warning">Очистить зал (все вышли)</button>
+                    </form>
+                {% endif %}
             </div>
         </div>
         {% if currentlyInsideList is defined and currentlyInsideList|length > 0 %}
@@ -28,9 +36,10 @@
                 <table class="table table-sm table-dark align-middle mb-0">
                     <thead class="sticky-top">
                         <tr>
-                            <th style="width: 60%;">Клиент</th>
+                            <th style="width: 50%;">Клиент</th>
                             <th>Телефон</th>
                             <th class="text-end">Зашёл</th>
+                            {% if admin_can_mutate() %}<th class="text-end" style="width: 7rem;"></th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -41,6 +50,13 @@
                                 </td>
                                 <td>{{ row.user.phone }}</td>
                                 <td class="text-end">{{ row.entered_at|date('H:i') }}</td>
+                                {% if admin_can_mutate() %}
+                                <td class="text-end">
+                                    <form method="post" action="{{ path('admin_visits_force_exit', {userId: row.user.id}) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary py-0">Вышел</button>
+                                    </form>
+                                </td>
+                                {% endif %}
                             </tr>
                         {% endfor %}
                     </tbody>

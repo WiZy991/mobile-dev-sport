@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Reports;
 
+use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\User;
 use Doctrine\DBAL\Connection;
@@ -50,6 +51,24 @@ final class OccupancyService
         return [
             'from' => $localStart->format('Y-m-d H:i:s'),
             'to' => $localEnd->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    /**
+     * Окно для статуса «сейчас в зале» / переключения вход↔выход.
+     * Берём с полуночи клубного дня, но не короче чем 16 ч назад —
+     * чтобы после смены TZ повторный скан стал выходом, а не вторым входом.
+     *
+     * @return array{from: string, to: string}
+     */
+    private function presenceWindow(): array
+    {
+        $today = $this->todayWindow();
+        $lookback = (new \DateTimeImmutable('-16 hours'))->format('Y-m-d H:i:s');
+
+        return [
+            'from' => min($today['from'], $lookback),
+            'to' => $today['to'],
         ];
     }
 
@@ -104,6 +123,56 @@ final class OccupancyService
         }
 
         return $result;
+    }
+
+    /**
+     * Принудительный выход (для CRM, если клиент ушёл без скана / залип после смены TZ).
+     */
+    public function forceExit(User $user, ?Club $club = null, string $reason = 'admin_force_exit'): void
+    {
+        $log = (new AccessLog())
+            ->setUser($user)
+            ->setClub($club)
+            ->setRawData('ADMIN:FORCE_EXIT:' . $user->getId())
+            ->setDeviceId('crm-admin')
+            ->setEventType('exit')
+            ->setResult('granted')
+            ->setReason($reason);
+
+        $this->em->persist($log);
+        $this->em->flush();
+    }
+
+    /**
+     * Отметить выход всем, кто сейчас числится в зале.
+     *
+     * @return int число созданных exit-событий
+     */
+    public function forceExitAllCurrentlyInside(?Club $club = null): int
+    {
+        $inside = $this->listCurrentlyInside($club, 500);
+        $count = 0;
+        foreach ($inside as $row) {
+            $rowClub = $club;
+            if ($rowClub === null && $row['club_id'] !== null) {
+                $rowClub = $this->em->find(Club::class, $row['club_id']);
+            }
+            $log = (new AccessLog())
+                ->setUser($row['user'])
+                ->setClub($rowClub instanceof Club ? $rowClub : null)
+                ->setRawData('ADMIN:FORCE_EXIT:' . $row['user']->getId())
+                ->setDeviceId('crm-admin')
+                ->setEventType('exit')
+                ->setResult('granted')
+                ->setReason('admin_clear_hall');
+            $this->em->persist($log);
+            ++$count;
+        }
+        if ($count > 0) {
+            $this->em->flush();
+        }
+
+        return $count;
     }
 
     /**
@@ -168,7 +237,7 @@ final class OccupancyService
     /** Сейчас ли указанный клиент в зале (по тому же правилу). */
     public function isUserCurrentlyInside(User $user, ?Club $club = null): bool
     {
-        $window = $this->todayWindow();
+        $window = $this->presenceWindow();
 
         $params = [
             'user_id' => $user->getId(),
@@ -187,7 +256,7 @@ final class OccupancyService
                   AND user_id = :user_id
                   AND created_at >= :from
                   AND created_at < :to" . $clubFilter . "
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, id DESC
                 LIMIT 1";
 
         $row = $this->connection()->executeQuery($sql, $params)->fetchAssociative();
@@ -205,7 +274,7 @@ final class OccupancyService
      */
     public function getUserAccessSnapshot(User $user, ?Club $club = null): array
     {
-        $window = $this->todayWindow();
+        $window = $this->presenceWindow();
 
         $params = [
             'user_id' => $user->getId(),
@@ -226,7 +295,7 @@ final class OccupancyService
                       AND event_type = :event_type
                       AND created_at >= :from
                       AND created_at < :to" . $clubFilter . "
-                    ORDER BY created_at DESC
+                    ORDER BY created_at DESC, id DESC
                     LIMIT 1";
             $queryParams = $params + ['event_type' => $eventType];
             $row = $this->connection()->executeQuery($sql, $queryParams)->fetchAssociative();

@@ -58,6 +58,8 @@ final class AdminRouteSectionMapper
         'admin_settings_club' => 'settings',
         'admin_perco_test' => 'settings',
         'admin_visits_export' => 'visits',
+        'admin_visits_clear_hall' => 'visits',
+        'admin_visits_force_exit' => 'visits',
         'admin_document_upload' => 'documents',
         'admin_document_delete' => 'documents',
         'admin_document_download' => 'documents',

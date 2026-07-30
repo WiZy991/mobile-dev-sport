@@ -272,6 +272,17 @@ admin_visits_export:
   controller: App\Controller\Admin\AdminController::exportVisits
   methods: [GET]
 
+admin_visits_clear_hall:
+  path: /admin/visits/clear-hall
+  controller: App\Controller\Admin\AdminController::clearHall
+  methods: [POST]
+
+admin_visits_force_exit:
+  path: /admin/visits/force-exit/{userId}
+  controller: App\Controller\Admin\AdminController::forceExitUser
+  methods: [POST]
+  requirements: { userId: '\d+' }
+
 admin_clients_export:
   path: /admin/clients/export
   controller: App\Controller\Admin\AdminController::exportClients
