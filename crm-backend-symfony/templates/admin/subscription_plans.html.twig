@@ -371,9 +371,51 @@
                 var seq = 0;
                 var pickedLabel = '';
 
+                function positionMenu() {
+                    var rect = input.getBoundingClientRect();
+                    var maxH = 260;
+                    var spaceBelow = window.innerHeight - rect.bottom - 8;
+                    var spaceAbove = rect.top - 8;
+                    var openUp = spaceBelow < 160 && spaceAbove > spaceBelow;
+                    var height = Math.max(120, Math.min(maxH, openUp ? spaceAbove : spaceBelow));
+
+                    menu.style.position = 'fixed';
+                    menu.style.left = Math.max(8, rect.left) + 'px';
+                    menu.style.width = Math.max(rect.width, 240) + 'px';
+                    menu.style.zIndex = '10060';
+                    menu.style.maxHeight = height + 'px';
+                    if (openUp) {
+                        menu.style.top = 'auto';
+                        menu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+                    } else {
+                        menu.style.bottom = 'auto';
+                        menu.style.top = (rect.bottom + 4) + 'px';
+                    }
+                }
+
+                function showMenu() {
+                    if (menu.parentNode !== document.body) {
+                        document.body.appendChild(menu);
+                    }
+                    menu.hidden = false;
+                    menu.classList.add('crm-client-picker__menu--portal');
+                    positionMenu();
+                }
+
                 function hideMenu() {
                     menu.hidden = true;
+                    menu.classList.remove('crm-client-picker__menu--portal');
                     menu.innerHTML = '';
+                    menu.style.position = '';
+                    menu.style.left = '';
+                    menu.style.width = '';
+                    menu.style.top = '';
+                    menu.style.bottom = '';
+                    menu.style.zIndex = '';
+                    menu.style.maxHeight = '';
+                    if (menu.parentNode === document.body) {
+                        root.appendChild(menu);
+                    }
                 }
 
                 function selectItem(item) {
@@ -390,7 +432,7 @@
                         empty.className = 'crm-client-picker__empty';
                         empty.textContent = 'Ничего не найдено';
                         menu.appendChild(empty);
-                        menu.hidden = false;
+                        showMenu();
                         return;
                     }
                     items.forEach(function (item) {
@@ -401,13 +443,13 @@
                         if (!item.ready) {
                             btn.classList.add('is-warn');
                         }
-                        btn.addEventListener('click', function (e) {
+                        btn.addEventListener('mousedown', function (e) {
                             e.preventDefault();
                             selectItem(item);
                         });
                         menu.appendChild(btn);
                     });
-                    menu.hidden = false;
+                    showMenu();
                 }
 
                 function search(q) {
@@ -449,8 +491,15 @@
                 });
 
                 document.addEventListener('click', function (e) {
-                    if (!root.contains(e.target)) hideMenu();
+                    if (root.contains(e.target) || menu.contains(e.target)) return;
+                    hideMenu();
                 });
+                window.addEventListener('resize', function () {
+                    if (!menu.hidden) positionMenu();
+                });
+                window.addEventListener('scroll', function () {
+                    if (!menu.hidden) positionMenu();
+                }, true);
 
                 var form = root.closest('form');
                 if (form) {

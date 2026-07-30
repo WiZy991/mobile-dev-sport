@@ -345,6 +345,12 @@ body {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
+.crm-client-picker__menu--portal {
+    position: fixed;
+    right: auto;
+    z-index: 10060;
+}
+
 .crm-client-picker__option {
     display: block;
     width: 100%;
