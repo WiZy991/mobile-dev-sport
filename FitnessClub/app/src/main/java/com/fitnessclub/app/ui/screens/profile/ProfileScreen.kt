@@ -727,9 +727,10 @@ private fun SubscriptionCard(
                 }
             }
 
+            val visitsLeft = subscription.visitsLeft
             if (
                 (subscription.status == SubscriptionStatus.ACTIVE || subscription.status == SubscriptionStatus.FROZEN)
-                && (subscription.visitsLeft == null || subscription.visitsLeft > 0)
+                && (visitsLeft == null || visitsLeft > 0)
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(

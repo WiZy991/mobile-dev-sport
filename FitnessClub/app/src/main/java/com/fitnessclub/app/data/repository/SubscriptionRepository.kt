@@ -38,6 +38,8 @@ class SubscriptionRepository @Inject constructor(
             } else {
                 emit(ApiResult.Error(response.message() ?: "Ошибка загрузки абонементов", response.code()))
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
         }
