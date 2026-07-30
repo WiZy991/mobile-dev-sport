@@ -20,18 +20,7 @@ import javax.inject.Inject
 data class HomeUiState(
     val isLoading: Boolean = false,
     val clubBrandName: String = "Доброзал",
-    val promotions: List<ClubPromotion> = listOf(
-        ClubPromotion(
-            id = "default",
-            title = "СКИДКА 20%!",
-            subtitle = "на все карты 12 и 6 месяцев",
-            buttonText = "Подробнее",
-            actionType = "shop",
-            bgFrom = "#F97316",
-            bgTo = "#3B82F6",
-            sortOrder = 100
-        )
-    ),
+    val promotions: List<ClubPromotion> = emptyList(),
     val unreadNotifications: Int = 0,
     val upcomingTrainings: List<UpcomingTraining> = emptyList(),
     val occupancyCurrent: Int? = null,

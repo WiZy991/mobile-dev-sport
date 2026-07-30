@@ -229,8 +229,9 @@ class SeedDataCommand extends Command
             ['latitude', '55.7558'],
             ['longitude', '37.6173'],
             ['gym_max_capacity', '100'],
-            ['promo_home_title', 'СКИДКА 20%!'],
-            ['promo_home_subtitle', 'на все карты 12 и 6 месяцев'],
+            // Баннер на главной — только из раздела «Акции» или явных настроек; без дефолта «СКИДКА 20%».
+            ['promo_home_title', ''],
+            ['promo_home_subtitle', ''],
         ];
         foreach ($settings as [$key, $value]) {
             $s = (new ClubSetting())

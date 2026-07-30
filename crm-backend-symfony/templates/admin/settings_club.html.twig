@@ -50,14 +50,19 @@
                 </div>
                 <div class="col-12 mt-3">
                     <div class="text-primary small fw-semibold text-uppercase mb-2">Баннер на главной экране приложения</div>
+                    <p class="small text-secondary mb-2">
+                        Запасной текст, если в разделе <strong>Акции</strong> нет активных баннеров.
+                        Если акции настроены и включены — в приложении показываются они.
+                        Оставьте поля пустыми, чтобы не показывать этот запасной баннер.
+                    </p>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small">Заголовок акции / новости</label>
-                    <input type="text" name="promo_home_title" class="form-control form-control-sm" value="{{ club.promo_home_title }}" placeholder="СКИДКА 20%!">
+                    <input type="text" name="promo_home_title" class="form-control form-control-sm" value="{{ club.promo_home_title }}" placeholder="необязательно">
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small">Подзаголовок</label>
-                    <input type="text" name="promo_home_subtitle" class="form-control form-control-sm" value="{{ club.promo_home_subtitle }}" placeholder="на все карты 12 и 6 месяцев">
+                    <input type="text" name="promo_home_subtitle" class="form-control form-control-sm" value="{{ club.promo_home_subtitle }}" placeholder="необязательно">
                 </div>
             </div>
 
