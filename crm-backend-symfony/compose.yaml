@@ -10,20 +10,14 @@ services:
     environment:
       TZ: UTC
       APP_TIMEZONE: UTC
-    # PHP-FPM слушает 9000 внутри сети; снаружи HTTP/HTTPS только через nginx (compose.https.yaml).
+    # HTTP :8000 (nginx+FPM внутри контейнера). Снаружи — только через TLS nginx.
     expose:
-      - "9000"
+      - "8000"
     depends_on:
       database:
         condition: service_healthy
-    command: >
-      sh -c "php bin/console cache:clear --no-interaction || true;
-      php bin/console doctrine:database:create --if-not-exists --no-interaction || true;
-      php bin/console doctrine:migrations:migrate --no-interaction || true;
-      chown -R www-data:www-data /app/var || true;
-      exec php-fpm -F"
-    # Секреты с хоста: var/secrets + APNs .p8 (иначе файл есть на хосте, а в контейнере — нет).
-    # Акции: public/uploads/promotions на хосте, иначе при пересоздании контейнера uploads пропадут.
+    # ENTRYPOINT сам делает migrate + supervisord; CMD пустой.
+    # Секреты / uploads с хоста.
     volumes:
       - ./var/secrets:/app/var/secrets:ro
       - ./etc/Apns:/app/etc/Apns:ro
@@ -31,7 +25,6 @@ services:
     networks:
       - crm_backend_net
 
-  # Доставка отложенных push/email вне HTTP — иначе API тормозит на 30–40с.
   notifications_worker:
     build:
       context: .
@@ -48,7 +41,8 @@ services:
         condition: service_healthy
       app:
         condition: service_started
-    command: sh -c "while true; do php bin/console app:process-scheduled-notifications --no-interaction || true; sleep 20; done"
+    # ENTRYPOINT выполнит migrate, затем этот CMD вместо supervisord.
+    command: ["sh", "-c", "while true; do php bin/console app:process-scheduled-notifications --no-interaction || true; sleep 20; done"]
     volumes:
       - ./var/secrets:/app/var/secrets:ro
       - ./etc/Apns:/app/etc/Apns:ro
@@ -64,8 +58,6 @@ services:
       MYSQL_USER: app
       MYSQL_PASSWORD: app_password
       MYSQL_ROOT_PASSWORD: root_password
-    # Порт 3306 не публикуется наружу — только docker-сеть (безопасность / опросник ДКБ).
-    # Для локальной отладки: COMPOSE_FILE=compose.yaml:compose.dev.yaml
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uapp", "-papp_password"]

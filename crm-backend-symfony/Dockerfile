@@ -1,8 +1,6 @@
 FROM php:8.4-fpm
 
-# Сертификаты oauth.sber.ru выдаются «Russian Trusted Sub CA» (Минцифры). В международных и старых бандлах этих корней нет —
-# добавляем официальные PEM с gu-st.ru, затем единый /etc/ssl/certs/ca-certificates.crt для curl, PHP openssl и Symfony.
-# См. также: developers.sber.ru/help/certificates
+# Сертификаты oauth.sber.ru выдаются «Russian Trusted Sub CA» (Минцифры).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -14,6 +12,8 @@ RUN apt-get update \
         libjpeg62-turbo-dev \
         libpng-dev \
         libzip-dev \
+        nginx \
+        supervisor \
         unzip \
     && curl -fsSL https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt \
         -o /usr/local/share/ca-certificates/russian-trusted-root.crt \
@@ -36,11 +36,10 @@ ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
 
 RUN printf '%s\n' 'date.timezone=UTC' > /usr/local/etc/php/conf.d/99-timezone.ini
 
-# PHP-FPM должен слушать 0.0.0.0:9000 — иначе nginx в соседнем контейнере получит 502.
+# FPM только localhost — HTTP отдаёт nginx в ЭТОМ же контейнере на :8000 (как раньше для TLS-nginx).
 RUN printf '%s\n' \
         '[www]' \
-        'listen = 9000' \
-        'listen.allowed_clients = ' \
+        'listen = 127.0.0.1:9000' \
         'pm = dynamic' \
         'pm.max_children = 20' \
         'pm.start_servers = 4' \
@@ -51,10 +50,38 @@ RUN printf '%s\n' \
         'clear_env = no' \
         'catch_workers_output = yes' \
         'decorate_workers_output = no' \
-    > /usr/local/etc/php-fpm.d/zz-crm.conf
-# Официальный образ иногда оставляет listen = 127.0.0.1:9000 в www.conf — перекрываем.
-RUN sed -i 's/^listen = .*/listen = 9000/' /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i 's/^;listen.allowed_clients/listen.allowed_clients/' /usr/local/etc/php-fpm.d/www.conf || true
+    > /usr/local/etc/php-fpm.d/zz-crm.conf \
+    && sed -i 's/^listen = .*/listen = 127.0.0.1:9000/' /usr/local/etc/php-fpm.d/www.conf
+
+COPY docker/app/nginx-app.conf /etc/nginx/sites-available/default
+RUN rm -f /etc/nginx/sites-enabled/default \
+    && ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default \
+    && rm -f /etc/nginx/conf.d/default.conf \
+    && printf '%s\n' \
+        '[supervisord]' \
+        'nodaemon=true' \
+        'user=root' \
+        '' \
+        '[program:php-fpm]' \
+        'command=/usr/local/sbin/php-fpm -F' \
+        'autostart=true' \
+        'autorestart=true' \
+        'priority=10' \
+        'stdout_logfile=/dev/stdout' \
+        'stdout_logfile_maxbytes=0' \
+        'stderr_logfile=/dev/stderr' \
+        'stderr_logfile_maxbytes=0' \
+        '' \
+        '[program:nginx]' \
+        'command=/usr/sbin/nginx -g "daemon off;"' \
+        'autostart=true' \
+        'autorestart=true' \
+        'priority=20' \
+        'stdout_logfile=/dev/stdout' \
+        'stdout_logfile_maxbytes=0' \
+        'stderr_logfile=/dev/stderr' \
+        'stderr_logfile_maxbytes=0' \
+    > /etc/supervisor/conf.d/crm.conf
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -64,8 +91,10 @@ COPY composer.json composer.lock symfony.lock ./
 RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts --no-dev
 
 COPY . .
-# classmap после COPY: иначе новые контроллеры могут не попасть в optimized autoload
 RUN composer dump-autoload --no-interaction --optimize --no-dev \
-    && chown -R www-data:www-data /app/var || true
+    && chown -R www-data:www-data /app/var || true \
+    && chmod +x /app/docker/app/entrypoint.sh
 
-EXPOSE 9000
+EXPOSE 8000
+
+ENTRYPOINT ["/app/docker/app/entrypoint.sh"]
