@@ -36,9 +36,11 @@ ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
 
 RUN printf '%s\n' 'date.timezone=UTC' > /usr/local/etc/php/conf.d/99-timezone.ini
 
-# Несколько воркеров: иначе long-poll шлюза / тяжёлый CRM блокируют ВСЕ mobile API (как на php -S).
+# PHP-FPM должен слушать 0.0.0.0:9000 — иначе nginx в соседнем контейнере получит 502.
 RUN printf '%s\n' \
         '[www]' \
+        'listen = 9000' \
+        'listen.allowed_clients = ' \
         'pm = dynamic' \
         'pm.max_children = 20' \
         'pm.start_servers = 4' \
@@ -47,7 +49,12 @@ RUN printf '%s\n' \
         'pm.max_requests = 500' \
         'request_terminate_timeout = 60' \
         'clear_env = no' \
+        'catch_workers_output = yes' \
+        'decorate_workers_output = no' \
     > /usr/local/etc/php-fpm.d/zz-crm.conf
+# Официальный образ иногда оставляет listen = 127.0.0.1:9000 в www.conf — перекрываем.
+RUN sed -i 's/^listen = .*/listen = 9000/' /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i 's/^;listen.allowed_clients/listen.allowed_clients/' /usr/local/etc/php-fpm.d/www.conf || true
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

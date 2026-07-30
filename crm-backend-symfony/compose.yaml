@@ -17,11 +17,11 @@ services:
       database:
         condition: service_healthy
     command: >
-      sh -c "php bin/console cache:clear --no-interaction
-      && php bin/console doctrine:database:create --if-not-exists --no-interaction
-      && php bin/console doctrine:migrations:migrate --no-interaction
-      && chown -R www-data:www-data /app/var
-      && php-fpm -F"
+      sh -c "php bin/console cache:clear --no-interaction || true;
+      php bin/console doctrine:database:create --if-not-exists --no-interaction || true;
+      php bin/console doctrine:migrations:migrate --no-interaction || true;
+      chown -R www-data:www-data /app/var || true;
+      exec php-fpm -F"
     # Секреты с хоста: var/secrets + APNs .p8 (иначе файл есть на хосте, а в контейнере — нет).
     # Акции: public/uploads/promotions на хосте, иначе при пересоздании контейнера uploads пропадут.
     volumes:
