@@ -13,7 +13,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Ручной запуск обработки отложенных уведомлений (для отладки).
- * В проде напоминания уходят без cron — при HTTP-запросах к API/админке (см. ScheduledNotificationRequestSubscriber).
+ * В проде запускайте по расписанию / в docker-сервисе notifications_worker (не из HTTP).
  */
 #[AsCommand(
     name: 'app:process-scheduled-notifications',

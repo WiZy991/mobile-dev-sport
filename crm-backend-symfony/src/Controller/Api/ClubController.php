@@ -303,7 +303,11 @@ class ClubController extends AbstractController
             ->getQuery()
             ->getSingleScalarResult();
 
-        $subscriptionsCount = \count($this->em->getRepository(SubscriptionPlan::class)->findAll());
+        $subscriptionsCount = (int) $this->em->createQueryBuilder()
+            ->select('COUNT(sp.id)')
+            ->from(SubscriptionPlan::class, 'sp')
+            ->getQuery()
+            ->getSingleScalarResult();
 
         return [
             'tab_order' => $tabOrder,

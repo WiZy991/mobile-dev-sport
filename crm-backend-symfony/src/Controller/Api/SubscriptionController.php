@@ -46,7 +46,17 @@ class SubscriptionController extends AbstractController
             return $this->json([]);
         }
 
-        $subs = $this->em->getRepository(Subscription::class)->findBy(['user' => $user]);
+        $subs = $this->em->createQueryBuilder()
+            ->select('s', 'p', 'c', 'sale')
+            ->from(Subscription::class, 's')
+            ->leftJoin('s.plan', 'p')
+            ->leftJoin('s.club', 'c')
+            ->leftJoin('s.sales', 'sale')
+            ->where('s.user = :user')
+            ->setParameter('user', $user)
+            ->orderBy('s.id', 'DESC')
+            ->getQuery()
+            ->getResult();
 
         $data = array_map(static function (Subscription $s) {
             $plan = $s->getPlan();

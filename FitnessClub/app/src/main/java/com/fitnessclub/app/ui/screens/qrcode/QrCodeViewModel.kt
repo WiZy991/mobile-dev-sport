@@ -9,6 +9,8 @@ import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.data.repository.SubscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,19 +44,42 @@ class QrCodeViewModel @Inject constructor(
 
     private var rotationJob: Job? = null
     private var statusJob: Job? = null
+    private var sheetVisible: Boolean = false
 
-    init {
+    @Volatile
+    private var cachedEntryBlock: String? = null
+    @Volatile
+    private var entryBlockCachedAtMs: Long = 0L
+
+    /** Запускать только когда открыт QR-sheet — иначе фоновый опрос грузит сеть. */
+    fun onSheetOpened() {
+        if (sheetVisible) return
+        sheetVisible = true
         viewModelScope.launch {
-            accessRepository.refreshAccessStatus()
+            coroutineScope {
+                val accessDeferred = async { accessRepository.refreshAccessStatus(force = true) }
+                val blockDeferred = async { entryBlockReason(force = true) }
+                accessDeferred.await()
+                blockDeferred.await()
+            }
             _uiState.update { it.copy(isInsideGym = accessRepository.accessStatus.value.isInside) }
             startQrRotation()
             startAccessStatusPolling()
         }
     }
 
+    fun onSheetClosed() {
+        sheetVisible = false
+        rotationJob?.cancel()
+        statusJob?.cancel()
+        rotationJob = null
+        statusJob = null
+    }
+
     fun refreshQrCode() {
+        if (!sheetVisible) return
         viewModelScope.launch {
-            accessRepository.refreshAccessStatus()
+            accessRepository.refreshAccessStatus(force = true)
             rotationJob?.cancel()
             startQrRotation()
         }
@@ -63,8 +88,10 @@ class QrCodeViewModel @Inject constructor(
     private fun startAccessStatusPolling() {
         statusJob?.cancel()
         statusJob = viewModelScope.launch {
-            while (isActive) {
-                accessRepository.refreshAccessStatus()
+            while (isActive && sheetVisible) {
+                delay(8_000)
+                if (!sheetVisible) return@launch
+                accessRepository.refreshAccessStatus(force = true)
                 val isInside = accessRepository.accessStatus.value.isInside
                 val wasInside = _uiState.value.isInsideGym
                 if (isInside != wasInside) {
@@ -74,13 +101,16 @@ class QrCodeViewModel @Inject constructor(
                 } else {
                     _uiState.update { it.copy(isInsideGym = isInside) }
                 }
-                delay(5_000)
             }
         }
     }
 
-    private suspend fun entryBlockReason(): String? {
-        return when (val result = subscriptionRepository.getMySubscriptions().first { it !is ApiResult.Loading }) {
+    private suspend fun entryBlockReason(force: Boolean = false): String? {
+        val now = System.currentTimeMillis()
+        if (!force && entryBlockCachedAtMs > 0L && now - entryBlockCachedAtMs < ENTRY_BLOCK_TTL_MS) {
+            return cachedEntryBlock
+        }
+        val reason = when (val result = subscriptionRepository.getMySubscriptions().first { it !is ApiResult.Loading }) {
             is ApiResult.Success -> {
                 val active = result.data.filter { it.status == SubscriptionStatus.ACTIVE && !it.isFrozen }
                 when {
@@ -92,8 +122,11 @@ class QrCodeViewModel @Inject constructor(
                     else -> null
                 }
             }
-            else -> null // сеть/ошибка — не блокируем QR, сервер всё равно откажет
+            else -> null
         }
+        cachedEntryBlock = reason
+        entryBlockCachedAtMs = System.currentTimeMillis()
+        return reason
     }
 
     private fun startQrRotation() {
@@ -109,8 +142,6 @@ class QrCodeViewModel @Inject constructor(
             val isInside = accessRepository.accessStatus.value.isInside
             _uiState.update { it.copy(isInsideGym = isInside) }
 
-            // На выходе тот же FITNESSCLUB:ENTRY с окном 15 с — QR должен крутиться и «в зале».
-            // Иначе код протухает и турникет отвечает qr_expired (человек «не может войти/выйти»).
             if (!isInside) {
                 val blocked = entryBlockReason()
                 if (blocked != null) {
@@ -128,10 +159,9 @@ class QrCodeViewModel @Inject constructor(
                 }
             }
 
-            while (isActive) {
+            while (isActive && sheetVisible) {
                 val insideNow = accessRepository.accessStatus.value.isInside
                 if (!insideNow) {
-                    // Перепроверяем лимит на каждом цикле обновления QR.
                     val again = entryBlockReason()
                     if (again != null) {
                         _uiState.update {
@@ -160,7 +190,7 @@ class QrCodeViewModel @Inject constructor(
                 }
                 repeat(15) {
                     delay(1_000)
-                    if (!isActive) return@launch
+                    if (!isActive || !sheetVisible) return@launch
                     _uiState.update { state -> state.copy(secondsRemaining = maxOf(0, state.secondsRemaining - 1)) }
                 }
             }
@@ -168,8 +198,7 @@ class QrCodeViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        rotationJob?.cancel()
-        statusJob?.cancel()
+        onSheetClosed()
         super.onCleared()
     }
 
@@ -193,5 +222,9 @@ class QrCodeViewModel @Inject constructor(
             v /= 62L
         }
         return sb.toString()
+    }
+
+    companion object {
+        private const val ENTRY_BLOCK_TTL_MS = 60_000L
     }
 }

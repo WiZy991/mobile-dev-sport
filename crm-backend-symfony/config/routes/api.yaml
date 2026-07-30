@@ -326,6 +326,11 @@ api_notifications_list:
   controller: App\Controller\Api\NotificationController::list
   methods: [GET]
 
+api_notifications_unread_count:
+  path: /api/v1/notifications/unread-count
+  controller: App\Controller\Api\NotificationController::unreadCount
+  methods: [GET]
+
 api_notifications_mark_all_read:
   path: /api/v1/notifications/read-all
   controller: App\Controller\Api\NotificationController::markAllRead

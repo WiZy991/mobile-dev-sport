@@ -98,11 +98,6 @@ fun ProfileScreen(
         )
         
         Box(modifier = Modifier.fillMaxSize()) {
-            if (uiState.isLoadingSubscriptions) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -169,6 +164,19 @@ fun ProfileScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 8.dp)
                     )
+                }
+
+                if (uiState.isLoadingSubscriptions && activeSubscriptions.isEmpty() && archivedSubscriptions.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
                 }
                 
                 if (activeSubscriptions.isEmpty() && archivedSubscriptions.isEmpty() && !uiState.isLoadingSubscriptions) {

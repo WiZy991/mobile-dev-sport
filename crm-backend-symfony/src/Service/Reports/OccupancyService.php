@@ -28,6 +28,10 @@ final class OccupancyService
 {
     private const CLUB_TIMEZONE = 'Asia/Vladivostok';
     private const STORAGE_TIMEZONE = 'UTC';
+    private const COUNT_CACHE_TTL_SECONDS = 15;
+
+    /** @var array{at: float, clubId: ?int, count: int}|null */
+    private ?array $countCache = null;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -95,10 +99,22 @@ final class OccupancyService
     /** Сколько клиентов сейчас в зале (опционально по клубу; NULL-club считается этим залом). */
     public function countCurrentlyInside(?Club $club = null): int
     {
+        $clubId = $club?->getId();
+        $now = microtime(true);
+        if (
+            $this->countCache !== null
+            && $this->countCache['clubId'] === $clubId
+            && ($now - $this->countCache['at']) < self::COUNT_CACHE_TTL_SECONDS
+        ) {
+            return $this->countCache['count'];
+        }
+
         $sql = $this->buildCurrentlyInsideSql($club, selectColumns: 'COUNT(*) AS cnt');
         $row = $this->connection()->executeQuery($sql['sql'], $sql['params'])->fetchAssociative();
+        $count = (int) ($row['cnt'] ?? 0);
+        $this->countCache = ['at' => $now, 'clubId' => $clubId, 'count' => $count];
 
-        return (int) ($row['cnt'] ?? 0);
+        return $count;
     }
 
     /**
@@ -156,6 +172,7 @@ final class OccupancyService
 
         $this->em->persist($log);
         $this->em->flush();
+        $this->countCache = null;
     }
 
     /**
@@ -183,6 +200,7 @@ final class OccupancyService
         }
         if ($count > 0) {
             $this->em->flush();
+            $this->countCache = null;
         }
 
         return $count;
@@ -273,30 +291,37 @@ final class OccupancyService
             'to' => $window['to'],
         ] + $scope['params'];
 
-        $fetchLast = function (string $eventType) use ($params, $scope): ?\DateTimeImmutable {
-            $sql = 'SELECT created_at
-                    FROM access_logs
-                    WHERE result = \'granted\'
-                      AND user_id = :user_id
-                      AND event_type = :event_type
-                      AND created_at >= :from
-                      AND created_at < :to' . $scope['sql'] . '
-                    ORDER BY created_at DESC, id DESC
-                    LIMIT 1';
-            $queryParams = $params + ['event_type' => $eventType];
-            $row = $this->connection()->executeQuery($sql, $queryParams)->fetchAssociative();
-            if ($row === false) {
-                return null;
+        // Один запрос вместо трёх: last entry / last exit / is_inside.
+        $sql = 'SELECT event_type, created_at
+                FROM access_logs
+                WHERE result = \'granted\'
+                  AND user_id = :user_id
+                  AND created_at >= :from
+                  AND created_at < :to' . $scope['sql'] . '
+                ORDER BY created_at DESC, id DESC
+                LIMIT 200';
+
+        $rows = $this->connection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $isInside = false;
+        $lastEntry = null;
+        $lastExit = null;
+        if ($rows !== []) {
+            $isInside = (($rows[0]['event_type'] ?? '') === 'entry');
+            foreach ($rows as $row) {
+                $type = (string) ($row['event_type'] ?? '');
+                if ($type === 'entry' && $lastEntry === null) {
+                    $lastEntry = new \DateTimeImmutable((string) $row['created_at']);
+                } elseif ($type === 'exit' && $lastExit === null) {
+                    $lastExit = new \DateTimeImmutable((string) $row['created_at']);
+                }
+                if ($lastEntry !== null && $lastExit !== null) {
+                    break;
+                }
             }
-
-            return new \DateTimeImmutable((string) $row['created_at']);
-        };
-
-        $lastEntry = $fetchLast('entry');
-        $lastExit = $fetchLast('exit');
+        }
 
         return [
-            'is_inside' => $this->isUserCurrentlyInside($user, $club),
+            'is_inside' => $isInside,
             'club_id' => $club?->getId(),
             'last_entry_at' => $lastEntry?->format(\DateTimeInterface::ATOM),
             'last_exit_at' => $lastExit?->format(\DateTimeInterface::ATOM),

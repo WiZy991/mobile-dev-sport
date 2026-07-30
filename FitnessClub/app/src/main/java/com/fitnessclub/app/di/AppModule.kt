@@ -14,7 +14,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import kotlinx.coroutines.runBlocking
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -60,16 +59,14 @@ object AppModule {
             .addInterceptor { chain ->
                 val originalRequest = chain.request()
                 val requestBuilder = originalRequest.newBuilder()
-                
-                runBlocking {
-                    // Не подменяем Authorization, если Retrofit уже передал (например refresh в POST /auth/refresh).
-                    if (originalRequest.header("Authorization") == null) {
-                        tokenManager.getAccessToken()?.let { token ->
-                            requestBuilder.header("Authorization", "Bearer $token")
-                        }
+
+                // Токен в памяти — без runBlocking на каждый HTTP-запрос.
+                if (originalRequest.header("Authorization") == null) {
+                    tokenManager.peekAccessToken()?.let { token ->
+                        requestBuilder.header("Authorization", "Bearer $token")
                     }
                 }
-                
+
                 chain.proceed(requestBuilder.build())
             }
             .addInterceptor(MockInterceptor())

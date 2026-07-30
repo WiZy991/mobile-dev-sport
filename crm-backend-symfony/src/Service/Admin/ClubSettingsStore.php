@@ -12,6 +12,9 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class ClubSettingsStore
 {
+    /** @var array<int, array<string, ?string>> request-scoped: orgId => key => value */
+    private array $cacheByOrgId = [];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly ClubSettingRepository $settings,
@@ -26,7 +29,29 @@ final class ClubSettingsStore
             return null;
         }
 
-        return $this->settings->findOneByOrganizationAndKey($organization, $key)?->getSettingValue();
+        $map = $this->allForOrganization($organization);
+
+        return \array_key_exists($key, $map) ? $map[$key] : null;
+    }
+
+    /**
+     * @param list<string> $keys
+     * @return array<string, ?string>
+     */
+    public function getMany(array $keys, ?Organization $organization = null): array
+    {
+        $organization ??= $this->tenantContext->getOrganization();
+        if ($organization === null) {
+            return array_fill_keys($keys, null);
+        }
+
+        $map = $this->allForOrganization($organization);
+        $out = [];
+        foreach ($keys as $key) {
+            $out[$key] = \array_key_exists($key, $map) ? $map[$key] : null;
+        }
+
+        return $out;
     }
 
     public function set(string $key, ?string $value, ?Organization $organization = null): void
@@ -42,5 +67,34 @@ final class ClubSettingsStore
         }
 
         $setting->setSettingValue($value);
+
+        $orgId = $organization->getId();
+        if ($orgId !== null) {
+            $this->cacheByOrgId[$orgId][$key] = $value;
+        }
+    }
+
+    /**
+     * @return array<string, ?string>
+     */
+    private function allForOrganization(Organization $organization): array
+    {
+        $orgId = $organization->getId();
+        if ($orgId === null) {
+            return [];
+        }
+
+        if (isset($this->cacheByOrgId[$orgId])) {
+            return $this->cacheByOrgId[$orgId];
+        }
+
+        /** @var list<ClubSetting> $rows */
+        $rows = $this->settings->findBy(['organization' => $organization]);
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row->getSettingKey()] = $row->getSettingValue();
+        }
+
+        return $this->cacheByOrgId[$orgId] = $map;
     }
 }

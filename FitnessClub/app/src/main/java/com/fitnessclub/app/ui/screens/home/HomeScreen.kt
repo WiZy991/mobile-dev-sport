@@ -130,7 +130,7 @@ fun HomeScreen(
                     max = uiState.occupancyMax,
                     percentage = uiState.occupancyPercentage,
                     status = uiState.occupancyStatus,
-                    onRefresh = { viewModel.loadOccupancy() }
+                    onRefresh = { viewModel.refresh() }
                 )
             }
             

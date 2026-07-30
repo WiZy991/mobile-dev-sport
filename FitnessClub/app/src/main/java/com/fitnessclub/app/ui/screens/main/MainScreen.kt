@@ -33,6 +33,8 @@ import com.fitnessclub.app.ui.screens.mytrainings.MyTrainingsViewModel
 import com.fitnessclub.app.ui.screens.profile.ProfileScreen
 import com.fitnessclub.app.ui.screens.profile.ProfileViewModel
 import com.fitnessclub.app.ui.screens.qrcode.QrCodeViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 // TODO(restore): импорты экрана расписания
 // import com.fitnessclub.app.ui.screens.schedule.ScheduleScreen
 // import com.fitnessclub.app.ui.screens.schedule.ScheduleViewModel
@@ -74,6 +76,14 @@ fun MainScreen(
     var showQrSheet by remember { mutableStateOf(false) }
     val qrViewModel: QrCodeViewModel = hiltViewModel()
     val qrUiState by qrViewModel.uiState.collectAsState()
+
+    LaunchedEffect(showQrSheet) {
+        if (showQrSheet) {
+            qrViewModel.onSheetOpened()
+        } else {
+            qrViewModel.onSheetClosed()
+        }
+    }
 
     StatusBarEffect(
         color = Primary,
@@ -313,10 +323,13 @@ private fun QrQuickAccessContent(
                 )
             }
             uiState.qrCodeData != null -> {
-                val qrBitmap = remember(uiState.qrCodeData) {
-                    generateQrBitmap(uiState.qrCodeData!!, 300)
+                val qrBitmap by produceState<Bitmap?>(initialValue = null, uiState.qrCodeData) {
+                    value = null
+                    value = withContext(Dispatchers.Default) {
+                        generateQrBitmap(uiState.qrCodeData!!, 300)
+                    }
                 }
-                qrBitmap?.let {
+                if (qrBitmap != null) {
                     Card(
                         modifier = Modifier.size(240.dp),
                         shape = RoundedCornerShape(16.dp)
@@ -329,11 +342,18 @@ private fun QrQuickAccessContent(
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
-                                bitmap = it.asImageBitmap(),
+                                bitmap = qrBitmap!!.asImageBitmap(),
                                 contentDescription = "QR код",
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.size(240.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
                 }
             }
@@ -377,13 +397,16 @@ private fun generateQrBitmap(content: String, size: Int): Bitmap? {
     return try {
         val writer = QRCodeWriter()
         val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size)
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
-        for (x in 0 until size) {
-            for (y in 0 until size) {
-                bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
+        val pixels = IntArray(size * size)
+        for (y in 0 until size) {
+            val offset = y * size
+            for (x in 0 until size) {
+                pixels[offset + x] = if (bitMatrix[x, y]) Color.BLACK else Color.WHITE
             }
         }
-        bitmap
+        Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565).also {
+            it.setPixels(pixels, 0, size, 0, 0, size, size)
+        }
     } catch (e: Exception) {
         null
     }

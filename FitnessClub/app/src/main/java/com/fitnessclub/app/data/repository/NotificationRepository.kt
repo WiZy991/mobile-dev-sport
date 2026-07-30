@@ -15,20 +15,24 @@ class NotificationRepository @Inject constructor(
 
     fun getNotifications(): Flow<ApiResult<List<ApiNotification>>> = flow {
         emit(ApiResult.Loading)
-        try {
+        emit(fetchNotifications())
+    }
+
+    suspend fun getNotificationsOnce(): ApiResult<List<ApiNotification>> = fetchNotifications()
+
+    private suspend fun fetchNotifications(): ApiResult<List<ApiNotification>> {
+        return try {
             val response = api.getNotifications()
             if (response.isSuccessful) {
-                emit(ApiResult.Success(response.body() ?: emptyList()))
+                ApiResult.Success(response.body() ?: emptyList())
             } else {
-                emit(
-                    ApiResult.Error(
-                        message = response.message().ifBlank { "Не удалось загрузить уведомления" },
-                        code = response.code(),
-                    )
+                ApiResult.Error(
+                    message = response.message().ifBlank { "Не удалось загрузить уведомления" },
+                    code = response.code(),
                 )
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Не удалось загрузить уведомления"))
+            ApiResult.Error(e.message ?: "Не удалось загрузить уведомления")
         }
     }
 

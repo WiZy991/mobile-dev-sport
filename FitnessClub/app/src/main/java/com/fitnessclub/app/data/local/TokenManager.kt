@@ -9,7 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,7 +31,8 @@ class TokenManager @Inject constructor(
     private val userJson = MutableStateFlow<String?>(null)
 
     init {
-        runBlocking {
+        // Неблокирующая очистка legacy DataStore — иначе DI/старт приложения ждут I/O.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             runCatching { context.legacyFitnessPrefs.edit { it.clear() } }
         }
     }
@@ -46,6 +47,8 @@ class TokenManager @Inject constructor(
     }
 
     suspend fun getAccessToken(): String? = accessToken.value
+
+    fun peekAccessToken(): String? = accessToken.value
 
     suspend fun getRefreshToken(): String? = refreshToken.value
 

@@ -66,7 +66,9 @@ interface FitnessApi {
     
     // Bookings
     @GET("bookings")
-    suspend fun getMyBookings(): Response<List<Booking>>
+    suspend fun getMyBookings(
+        @Query("upcoming") upcoming: Boolean? = null,
+    ): Response<List<Booking>>
     
     @POST("trainings/{id}/book")
     suspend fun bookTraining(@Path("id") trainingId: String): Response<Booking>
@@ -152,6 +154,9 @@ interface FitnessApi {
     // Notifications
     @GET("notifications")
     suspend fun getNotifications(): Response<List<ApiNotification>>
+
+    @GET("notifications/unread-count")
+    suspend fun getUnreadNotificationsCount(): Response<UnreadNotificationsCount>
     
     @POST("notifications/{id}/read")
     suspend fun markNotificationRead(@Path("id") id: String): Response<Unit>
@@ -469,6 +474,11 @@ data class ApiNotification(
     val isRead: Boolean,
     @com.google.gson.annotations.SerializedName("reference_id")
     val referenceId: String? = null
+)
+
+data class UnreadNotificationsCount(
+    @com.google.gson.annotations.SerializedName("unread_count")
+    val unreadCount: Int = 0,
 )
 
 data class GymOccupancy(

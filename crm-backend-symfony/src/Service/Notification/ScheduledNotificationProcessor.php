@@ -9,7 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Отправляет наступившие отложенные уведомления.
- * Вызывается при API-запросах и heartbeat шлюза (без cron).
+ * Только из CLI/worker (`app:process-scheduled-notifications`), не из HTTP request path.
  */
 final class ScheduledNotificationProcessor
 {

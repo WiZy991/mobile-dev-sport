@@ -36,8 +36,28 @@ class BookingController extends AbstractController
             return $this->json(['error' => 'Unauthorized'], 401);
         }
 
-        $bookings = $this->em->getRepository(Booking::class)->findBy(['user' => $user], ['id' => 'DESC']);
+        $upcomingOnly = filter_var($request->query->get('upcoming', false), FILTER_VALIDATE_BOOLEAN);
 
+        $qb = $this->em->createQueryBuilder()
+            ->select('b', 't', 'tr')
+            ->from(Booking::class, 'b')
+            ->leftJoin('b.training', 't')
+            ->leftJoin('t.trainer', 'tr')
+            ->where('b.user = :user')
+            ->setParameter('user', $user)
+            ->orderBy('t.startAt', 'DESC')
+            ->addOrderBy('b.id', 'DESC');
+
+        if ($upcomingOnly) {
+            $qb->andWhere('b.status != :cancelled')
+                ->andWhere('t.startAt >= :from')
+                ->setParameter('cancelled', 'cancelled')
+                ->setParameter('from', new \DateTimeImmutable('today'))
+                ->orderBy('t.startAt', 'ASC')
+                ->setMaxResults(30);
+        }
+
+        $bookings = $qb->getQuery()->getResult();
         $data = array_map(self::serializeBooking(...), $bookings);
 
         return $this->json($data);

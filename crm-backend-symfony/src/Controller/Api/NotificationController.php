@@ -36,6 +36,26 @@ class NotificationController extends AbstractController
         return $this->json($data);
     }
 
+    #[Route('/unread-count', name: 'api_notifications_unread_count', methods: ['GET'], priority: 10)]
+    public function unreadCount(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $count = (int) $this->em->createQueryBuilder()
+            ->select('COUNT(n.id)')
+            ->from(Notification::class, 'n')
+            ->where('n.user = :user')
+            ->andWhere('n.readAt IS NULL')
+            ->setParameter('user', $user)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $this->json(['unread_count' => $count]);
+    }
+
     #[Route('/{id}/read', name: 'api_notifications_mark_read', methods: ['POST'])]
     public function markRead(string $id, Request $request): JsonResponse
     {

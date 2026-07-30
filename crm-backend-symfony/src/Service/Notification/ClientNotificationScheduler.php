@@ -11,11 +11,10 @@ use App\Entity\Subscription;
 use App\Entity\Training;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Планирует отложенные уведомления в момент события (запись, покупка, смена расписания).
- * Отправка — через {@see ScheduledNotificationProcessor} (без cron).
+ * Отправка — через worker `app:process-scheduled-notifications`, не из HTTP.
  */
 final class ClientNotificationScheduler
 {
@@ -27,8 +26,6 @@ final class ClientNotificationScheduler
 
     public function __construct(
         private readonly EntityManagerInterface $em,
-        #[Autowire(lazy: true)]
-        private readonly ScheduledNotificationProcessor $processor,
     ) {
     }
 
@@ -74,7 +71,8 @@ final class ClientNotificationScheduler
         }
 
         $this->em->flush();
-        $this->processor->processDue(10);
+        // Не вызываем processDue() здесь — иначе booking/purchase ждут FCM/SMTP.
+        // Доставку делает worker: app:process-scheduled-notifications.
     }
 
     public function cancelTrainingReminders(User $user, Training $training): void
@@ -145,7 +143,7 @@ final class ClientNotificationScheduler
         }
 
         $this->em->flush();
-        $this->processor->processDue(10);
+        // Не вызываем processDue() здесь — доставку делает worker.
     }
 
     public function cancelSubscriptionExpiryReminders(Subscription $subscription): void

@@ -4,57 +4,30 @@ declare(strict_types=1);
 
 namespace App\EventSubscriber;
 
-use App\Service\Notification\ScheduledNotificationProcessor;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\Contracts\Cache\CacheInterface;
-use Symfony\Contracts\Cache\ItemInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Периодически (не чаще раза в 30 с) обрабатывает отложенные уведомления
- * на фоне обычных HTTP-запросов к API и админке — без отдельного cron.
+ * Раньше на каждом /api/v1 и /admin запросе синхронно слал FCM/SMTP (до 40 шт.),
+ * из‑за cache-lock параллельные запросы home/profile ждали 30–40+ секунд.
+ *
+ * Отправка только через cron/worker: `app:process-scheduled-notifications`
+ * (см. сервис notifications_worker в compose.yaml).
  */
 final class ScheduledNotificationRequestSubscriber implements EventSubscriberInterface
 {
-    private const THROTTLE_SECONDS = 30;
-    private const CACHE_KEY = 'scheduled_notifications_last_process';
-
-    public function __construct(
-        private readonly ScheduledNotificationProcessor $processor,
-        #[Autowire(service: 'cache.app')]
-        private readonly CacheInterface $cache,
-    ) {
-    }
-
     public static function getSubscribedEvents(): array
     {
         return [
+            // Оставляем подписку пустой по смыслу — класс не трогает request path.
+            // (Можно удалить сервис позже; пока no-op, чтобы не ломать DI/документацию.)
             KernelEvents::REQUEST => ['onKernelRequest', -50],
         ];
     }
 
     public function onKernelRequest(RequestEvent $event): void
     {
-        if (!$event->isMainRequest()) {
-            return;
-        }
-
-        $path = $event->getRequest()->getPathInfo();
-        if (!str_starts_with($path, '/api/v1/') && !str_starts_with($path, '/admin')) {
-            return;
-        }
-
-        $this->cache->get(self::CACHE_KEY, function (ItemInterface $item) {
-            $item->expiresAfter(self::THROTTLE_SECONDS);
-            try {
-                $this->processor->processDue();
-            } catch (\Throwable) {
-                // Таблица ещё не мигрирована или временный сбой — не роняем весь сайт.
-            }
-
-            return time();
-        });
+        // no-op: не блокируем API отправкой пушей/писем
     }
 }

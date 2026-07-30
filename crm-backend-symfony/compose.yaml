@@ -27,6 +27,30 @@ services:
     networks:
       - crm_backend_net
 
+  # Доставка отложенных push/email вне HTTP — иначе API тормозит на 30–40с.
+  notifications_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm_backend_notifications
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: UTC
+      APP_TIMEZONE: UTC
+    depends_on:
+      database:
+        condition: service_healthy
+      app:
+        condition: service_started
+    command: sh -c "while true; do php bin/console app:process-scheduled-notifications --no-interaction || true; sleep 20; done"
+    volumes:
+      - ./var/secrets:/app/var/secrets:ro
+      - ./etc/Apns:/app/etc/Apns:ro
+    networks:
+      - crm_backend_net
+
   database:
     image: mysql:8.0
     container_name: crm_backend_db
