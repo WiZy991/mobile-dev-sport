@@ -326,12 +326,12 @@ private fun QrQuickAccessContent(
                 val qrBitmap by produceState<Bitmap?>(initialValue = null, uiState.qrCodeData) {
                     value = null
                     value = withContext(Dispatchers.Default) {
-                        generateQrBitmap(uiState.qrCodeData!!, 300)
+                        generateQrBitmap(uiState.qrCodeData!!, 360)
                     }
                 }
                 if (qrBitmap != null) {
                     Card(
-                        modifier = Modifier.size(240.dp),
+                        modifier = Modifier.size(280.dp),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Box(
@@ -350,7 +350,7 @@ private fun QrQuickAccessContent(
                     }
                 } else {
                     Box(
-                        modifier = Modifier.size(240.dp),
+                        modifier = Modifier.size(280.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()

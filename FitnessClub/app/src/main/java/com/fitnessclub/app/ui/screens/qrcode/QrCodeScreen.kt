@@ -79,7 +79,7 @@ fun QrCodeScreen(
             
             // QR Code
             Card(
-                modifier = Modifier.size(280.dp),
+                modifier = Modifier.size(320.dp),
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
@@ -112,7 +112,7 @@ fun QrCodeScreen(
                         }
                     } else if (uiState.qrCodeData != null) {
                         val qrBitmap = remember(uiState.qrCodeData) {
-                            generateQrCode(uiState.qrCodeData!!, 500)
+                            generateQrCode(uiState.qrCodeData!!, 560)
                         }
                         qrBitmap?.let {
                             Image(
