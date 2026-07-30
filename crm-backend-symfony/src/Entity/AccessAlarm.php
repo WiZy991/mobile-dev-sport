@@ -63,12 +63,7 @@ class AccessAlarm implements TenantAware
 
     public function __construct()
     {
-        $tz = date_default_timezone_get() ?: 'Asia/Vladivostok';
-        try {
-            $this->createdAt = new \DateTimeImmutable('now', new \DateTimeZone($tz));
-        } catch (\Throwable) {
-            $this->createdAt = new \DateTimeImmutable('now', new \DateTimeZone('Asia/Vladivostok'));
-        }
+        $this->createdAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
     }
 
     public function getId(): ?int

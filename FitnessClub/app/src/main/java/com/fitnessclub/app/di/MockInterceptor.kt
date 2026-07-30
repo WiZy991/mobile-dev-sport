@@ -719,8 +719,8 @@ class MockInterceptor : Interceptor {
         "amenities": ["Тренажёрный зал", "Бассейн", "Йога", "Групповые занятия"],
         "latitude": 55.7558,
         "longitude": 37.6173,
-        "promo_title": "СКИДКА 20%!",
-        "promo_subtitle": "на все карты 12 и 6 месяцев",
+        "promo_title": null,
+        "promo_subtitle": null,
         "shop_config": {
             "tab_order": ["subscriptions", "services", "goods"],
             "default_tab": "subscriptions",
@@ -740,8 +740,8 @@ class MockInterceptor : Interceptor {
     [
       {
         "id": "promo-1",
-        "title": "СКИДКА 20%!",
-        "subtitle": "на все карты 12 и 6 месяцев",
+        "title": "Добро пожаловать!",
+        "subtitle": "Акции клуба настраиваются в CRM → Акции",
         "image_url": null,
         "button_text": "Подробнее",
         "action_type": "shop",
@@ -749,18 +749,6 @@ class MockInterceptor : Interceptor {
         "bg_from": "#F97316",
         "bg_to": "#3B82F6",
         "sort_order": 10
-      },
-      {
-        "id": "promo-2",
-        "title": "1+1 на персональные",
-        "subtitle": "Оплатите 5 тренировок — получите 5 в подарок",
-        "image_url": null,
-        "button_text": "Купить",
-        "action_type": "subscriptions",
-        "action_value": null,
-        "bg_from": "#EC4899",
-        "bg_to": "#8B5CF6",
-        "sort_order": 20
       }
     ]
     """.trimIndent()

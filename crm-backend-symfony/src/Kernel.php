@@ -11,12 +11,12 @@ class Kernel extends BaseKernel
 
     public function boot(): void
     {
-        // Клуб / CRM — Владивосток (UTC+10). Без явной TZ Docker/PHP часто в UTC.
-        $timezone = $_ENV['APP_TIMEZONE'] ?? $_SERVER['APP_TIMEZONE'] ?? 'Asia/Vladivostok';
+        // Как раньше: UTC в PHP/БД (naive DATETIME). Смена на Владивосток ломала «сейчас в зале».
+        $timezone = $_ENV['APP_TIMEZONE'] ?? $_SERVER['APP_TIMEZONE'] ?? 'UTC';
         if (\is_string($timezone) && $timezone !== '' && @timezone_open($timezone) !== false) {
             date_default_timezone_set($timezone);
         } else {
-            date_default_timezone_set('Asia/Vladivostok');
+            date_default_timezone_set('UTC');
         }
 
         parent::boot();

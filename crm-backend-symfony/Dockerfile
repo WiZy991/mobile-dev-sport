@@ -31,10 +31,10 @@ RUN apt-get update \
 ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
     REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
-    TZ=Asia/Vladivostok \
-    APP_TIMEZONE=Asia/Vladivostok
+    TZ=UTC \
+    APP_TIMEZONE=UTC
 
-RUN printf '%s\n' 'date.timezone=Asia/Vladivostok' > /usr/local/etc/php/conf.d/99-timezone.ini
+RUN printf '%s\n' 'date.timezone=UTC' > /usr/local/etc/php/conf.d/99-timezone.ini
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

@@ -19,6 +19,8 @@ import javax.inject.Inject
 
 data class HomeUiState(
     val isLoading: Boolean = false,
+    /** Пока false — баннер не рисуем (нет вспышки демо «СКИДКА 20%»). */
+    val promotionsReady: Boolean = false,
     val clubBrandName: String = "Доброзал",
     val promotions: List<ClubPromotion> = emptyList(),
     val unreadNotifications: Int = 0,
@@ -90,21 +92,7 @@ class HomeViewModel @Inject constructor(
             loadClubBrandName()
             accessRepository.refreshAccessStatus()
             _uiState.update { it.copy(isInsideGym = accessRepository.accessStatus.value.isInside) }
-            try {
-                val promosRes = api.getClubPromotions()
-                if (promosRes.isSuccessful) {
-                    val promos = (promosRes.body() ?: emptyList()).sortedBy { it.sortOrder }
-                    if (promos.isNotEmpty()) {
-                        _uiState.update { it.copy(promotions = promos) }
-                    } else {
-                        loadPromoFallbackFromClubInfo()
-                    }
-                } else {
-                    loadPromoFallbackFromClubInfo()
-                }
-            } catch (_: Exception) {
-                loadPromoFallbackFromClubInfo()
-            }
+            loadPromotions()
 
             try {
                 val bookRes = api.getMyBookings()
@@ -135,6 +123,32 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private suspend fun loadPromotions() {
+        try {
+            val promosRes = api.getClubPromotions()
+            if (promosRes.isSuccessful) {
+                val promos = (promosRes.body() ?: emptyList())
+                    .sortedBy { it.sortOrder }
+                    .filterNot { isLegacyDemoPromo(it.title, it.subtitle) }
+                // Только раздел «Акции». Запасной текст из настроек клуба больше не подмешиваем —
+                // иначе до ответа API / при пустом списке снова всплывала «СКИДКА 20%».
+                _uiState.update {
+                    it.copy(promotions = promos, promotionsReady = true)
+                }
+                return
+            }
+        } catch (_: Exception) {
+        }
+        _uiState.update { it.copy(promotions = emptyList(), promotionsReady = true) }
+    }
+
+    private fun isLegacyDemoPromo(title: String?, subtitle: String?): Boolean {
+        val t = title?.trim()?.uppercase().orEmpty()
+        val s = subtitle?.trim()?.lowercase().orEmpty()
+        return t.contains("СКИДКА 20%") ||
+            (t == "СКИДКА 20%!" && s.contains("12 и 6"))
+    }
+
     private suspend fun loadClubBrandName() {
         try {
             when (val result = clubRepository.getClubInfo()) {
@@ -144,38 +158,6 @@ class HomeViewModel @Inject constructor(
                     }
                 }
                 else -> Unit
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    private suspend fun loadPromoFallbackFromClubInfo() {
-        try {
-            val clubRes = api.getClubInfo()
-            if (clubRes.isSuccessful) {
-                clubRes.body()?.let { c ->
-                    _uiState.update {
-                        it.copy(clubBrandName = c.name.ifBlank { "Доброзал" })
-                    }
-                    val title = c.promoTitle?.takeIf { it.isNotBlank() } ?: return
-                    val subtitle = c.promoSubtitle?.takeIf { it.isNotBlank() }
-                    _uiState.update {
-                        it.copy(
-                            promotions = listOf(
-                                ClubPromotion(
-                                    id = "club-info",
-                                    title = title,
-                                    subtitle = subtitle,
-                                    buttonText = "Подробнее",
-                                    actionType = "shop",
-                                    bgFrom = "#F97316",
-                                    bgTo = "#3B82F6",
-                                    sortOrder = 100,
-                                )
-                            ),
-                        )
-                    }
-                }
             }
         } catch (_: Exception) {
         }

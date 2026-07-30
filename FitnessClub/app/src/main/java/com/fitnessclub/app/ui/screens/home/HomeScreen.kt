@@ -107,18 +107,20 @@ fun HomeScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(bottom = 88.dp)
         ) {
-            // Promo banner
+            // Promo banner — не показываем, пока не пришёл ответ API (без вспышки демо-баннера)
             item(key = "promo") {
-                PromoBanner(
-                    promotions = uiState.promotions,
-                    onClick = { promo ->
-                        when (promo.actionType.lowercase()) {
-                            "subscriptions" -> onNavigateToSubscriptionPlans()
-                            "none" -> Unit
-                            else -> onNavigateToShop()
+                if (uiState.promotionsReady) {
+                    PromoBanner(
+                        promotions = uiState.promotions,
+                        onClick = { promo ->
+                            when (promo.actionType.lowercase()) {
+                                "subscriptions" -> onNavigateToSubscriptionPlans()
+                                "none" -> Unit
+                                else -> onNavigateToShop()
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
             
             // Occupancy widget

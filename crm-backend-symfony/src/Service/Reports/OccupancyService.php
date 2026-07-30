@@ -19,7 +19,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * Важно: события с club_id = NULL (legacy / старые логи) считаются тем же залом,
  * что и текущий шлюз. Иначе вход без клуба + выход с club_id оставляют человека «в зале».
  *
- * Клубный день — Asia/Vladivostok (APP_TIMEZONE).
+ * Время в access_logs — UTC wall-clock (как до эксперимента с Asia/Vladivostok).
  */
 final class OccupancyService
 {
@@ -29,42 +29,36 @@ final class OccupancyService
     }
 
     /**
-     * Окно «сегодня» для витрины CRM (клубные сутки).
+     * Окно «сегодня» по часовому поясу приложения (UTC).
      *
      * @return array{from: string, to: string}
      */
     private function todayWindow(): array
     {
-        $tzName = date_default_timezone_get() ?: 'Asia/Vladivostok';
+        $tzName = date_default_timezone_get() ?: 'UTC';
         try {
-            $clubTz = new \DateTimeZone($tzName);
+            $tz = new \DateTimeZone($tzName);
         } catch (\Throwable) {
-            $clubTz = new \DateTimeZone('Asia/Vladivostok');
+            $tz = new \DateTimeZone('UTC');
         }
 
-        $localStart = new \DateTimeImmutable('today', $clubTz);
-        $localEnd = $localStart->modify('+1 day');
+        $start = new \DateTimeImmutable('today', $tz);
+        $end = $start->modify('+1 day');
 
         return [
-            'from' => $localStart->format('Y-m-d H:i:s'),
-            'to' => $localEnd->format('Y-m-d H:i:s'),
+            'from' => $start->format('Y-m-d H:i:s'),
+            'to' => $end->format('Y-m-d H:i:s'),
         ];
     }
 
     /**
-     * Окно для вход↔выход: с полуночи, но не короче 16 ч назад (защита после смены TZ).
+     * То же окно, что и счётчик — вход/выход и «в зале» не расходятся.
      *
      * @return array{from: string, to: string}
      */
     private function presenceWindow(): array
     {
-        $today = $this->todayWindow();
-        $lookback = (new \DateTimeImmutable('-16 hours'))->format('Y-m-d H:i:s');
-
-        return [
-            'from' => min($today['from'], $lookback),
-            'to' => $today['to'],
-        ];
+        return $this->todayWindow();
     }
 
     /**
