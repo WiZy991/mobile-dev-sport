@@ -13,16 +13,13 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * «Сколько людей сейчас в зале» и кто именно.
  *
- * Логика: за текущий клубный день для каждой пары (клиент, клуб) берём ПОСЛЕДНЕЕ событие
- * с result='granted'. Если оно eventType='entry' — клиент сейчас в зале этого клуба.
- * Если eventType='exit' — он уже вышел (для этого клуба).
+ * Логика: за окно присутствия для каждого клиента берём ПОСЛЕДНЕЕ granted-событие.
+ * Если оно entry — клиент в зале; если exit — вышел.
  *
- * Корректно работает в обоих сценариях:
- *  - читаем только entry (нет считывателя на выход) — каждый зашедший считается «в зале»;
- *  - читаем entry/exit (двусторонний турникет) — пара entry→exit убирает клиента из зала.
+ * Важно: события с club_id = NULL (legacy / старые логи) считаются тем же залом,
+ * что и текущий шлюз. Иначе вход без клуба + выход с club_id оставляют человека «в зале».
  *
  * Клубный день — Asia/Vladivostok (APP_TIMEZONE).
- * В БД после миграции Version20260730103000 — клубное wall-clock время (не UTC).
  */
 final class OccupancyService
 {
@@ -32,7 +29,7 @@ final class OccupancyService
     }
 
     /**
-     * Окно «сегодня» для SQL по access_logs (naive DATETIME в TZ клуба).
+     * Окно «сегодня» для витрины CRM (клубные сутки).
      *
      * @return array{from: string, to: string}
      */
@@ -55,9 +52,7 @@ final class OccupancyService
     }
 
     /**
-     * Окно для статуса «сейчас в зале» / переключения вход↔выход.
-     * Берём с полуночи клубного дня, но не короче чем 16 ч назад —
-     * чтобы после смены TZ повторный скан стал выходом, а не вторым входом.
+     * Окно для вход↔выход: с полуночи, но не короче 16 ч назад (защита после смены TZ).
      *
      * @return array{from: string, to: string}
      */
@@ -72,7 +67,24 @@ final class OccupancyService
         ];
     }
 
-    /** Сколько клиентов сейчас в зале (опционально по конкретному клубу). */
+    /**
+     * Фильтр клуба: конкретный клуб ИЛИ legacy NULL (тот же человек / тот же зал).
+     *
+     * @return array{sql: string, params: array<string, mixed>}
+     */
+    private function clubScopeSql(?Club $club, string $column = 'club_id'): array
+    {
+        if (!$club instanceof Club) {
+            return ['sql' => '', 'params' => []];
+        }
+
+        return [
+            'sql' => " AND ({$column} IS NULL OR {$column} = :club_id)",
+            'params' => ['club_id' => $club->getId()],
+        ];
+    }
+
+    /** Сколько клиентов сейчас в зале (опционально по клубу; NULL-club считается этим залом). */
     public function countCurrentlyInside(?Club $club = null): int
     {
         $sql = $this->buildCurrentlyInsideSql($club, selectColumns: 'COUNT(*) AS cnt');
@@ -82,16 +94,13 @@ final class OccupancyService
     }
 
     /**
-     * Полный список клиентов «в зале» с временем последнего входа.
-     *
      * @return list<array{user: User, entered_at: \DateTimeImmutable, club_id: ?int}>
      */
     public function listCurrentlyInside(?Club $club = null, int $limit = 200): array
     {
         $sql = $this->buildCurrentlyInsideSql(
             $club,
-            selectColumns: 'a.user_id AS user_id, MAX(a.created_at) AS entered_at, a.club_id AS club_id',
-            groupBy: 'a.user_id, a.club_id',
+            selectColumns: 't.user_id AS user_id, t.last_at AS entered_at, t.last_club_id AS club_id',
             orderBy: 'entered_at DESC',
             limit: $limit,
         );
@@ -115,19 +124,17 @@ final class OccupancyService
             if (!$user) {
                 continue;
             }
+            $clubRaw = $r['club_id'] ?? null;
             $result[] = [
                 'user' => $user,
                 'entered_at' => new \DateTimeImmutable((string) $r['entered_at']),
-                'club_id' => $r['club_id'] !== null ? (int) $r['club_id'] : null,
+                'club_id' => $clubRaw !== null && $clubRaw !== '' ? (int) $clubRaw : null,
             ];
         }
 
         return $result;
     }
 
-    /**
-     * Принудительный выход (для CRM, если клиент ушёл без скана / залип после смены TZ).
-     */
     public function forceExit(User $user, ?Club $club = null, string $reason = 'admin_force_exit'): void
     {
         $log = (new AccessLog())
@@ -144,8 +151,6 @@ final class OccupancyService
     }
 
     /**
-     * Отметить выход всем, кто сейчас числится в зале.
-     *
      * @return int число созданных exit-событий
      */
     public function forceExitAllCurrentlyInside(?Club $club = null): int
@@ -176,54 +181,39 @@ final class OccupancyService
     }
 
     /**
-     * Сборщик SQL: «последнее за сегодня granted-событие в разрезе (user_id, club_id) — entry».
+     * Последнее событие по user_id (не по паре user+club) — иначе NULL-club «залипает».
      *
      * @return array{sql: string, params: array<string, mixed>}
      */
     private function buildCurrentlyInsideSql(
         ?Club $club,
         string $selectColumns,
-        ?string $groupBy = null,
         ?string $orderBy = null,
         ?int $limit = null,
     ): array {
-        $window = $this->todayWindow();
-
-        $clubFilter = '';
-        $innerClubFilter = '';
+        // То же окно, что у isUserCurrentlyInside — иначе CRM и турникет расходятся.
+        $window = $this->presenceWindow();
+        $scope = $this->clubScopeSql($club);
         $params = [
             'from' => $window['from'],
             'to' => $window['to'],
-        ];
-        if ($club instanceof Club) {
-            $clubFilter = ' AND a.club_id = :club_id';
-            $innerClubFilter = ' AND club_id = :club_id';
-            $params['club_id'] = $club->getId();
-        }
+        ] + $scope['params'];
 
-        $sql = "SELECT $selectColumns
-                FROM access_logs a
-                INNER JOIN (
-                    SELECT user_id, club_id, MAX(created_at) AS max_at
-                    FROM access_logs
-                    WHERE result = 'granted'
-                      AND user_id IS NOT NULL
-                      AND created_at >= :from
-                      AND created_at < :to" . $innerClubFilter . "
-                    GROUP BY user_id, club_id
-                ) last_events
-                  ON last_events.user_id = a.user_id
-                 AND last_events.max_at = a.created_at
-                 AND (last_events.club_id = a.club_id OR (last_events.club_id IS NULL AND a.club_id IS NULL))
-                WHERE a.result = 'granted'
-                  AND a.user_id IS NOT NULL
-                  AND a.event_type = 'entry'
-                  AND a.created_at >= :from
-                  AND a.created_at < :to" . $clubFilter;
+        // GROUP_CONCAT: последнее event_type / created_at / club_id по user_id.
+        $inner = "SELECT user_id,
+                         SUBSTRING_INDEX(GROUP_CONCAT(event_type ORDER BY created_at DESC, id DESC SEPARATOR ','), ',', 1) AS last_type,
+                         SUBSTRING_INDEX(GROUP_CONCAT(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') ORDER BY created_at DESC, id DESC SEPARATOR ','), ',', 1) AS last_at,
+                         SUBSTRING_INDEX(GROUP_CONCAT(IFNULL(club_id, '') ORDER BY created_at DESC, id DESC SEPARATOR ','), ',', 1) AS last_club_id
+                  FROM access_logs
+                  WHERE result = 'granted'
+                    AND user_id IS NOT NULL
+                    AND created_at >= :from
+                    AND created_at < :to" . $scope['sql'] . '
+                  GROUP BY user_id
+                  HAVING last_type = \'entry\'';
 
-        if ($groupBy !== null) {
-            $sql .= "\n                GROUP BY $groupBy";
-        }
+        $sql = "SELECT $selectColumns FROM ($inner) t";
+
         if ($orderBy !== null) {
             $sql .= "\n                ORDER BY $orderBy";
         }
@@ -234,30 +224,25 @@ final class OccupancyService
         return ['sql' => $sql, 'params' => $params];
     }
 
-    /** Сейчас ли указанный клиент в зале (по тому же правилу). */
+    /** Сейчас ли клиент в зале — то же правило, что и счётчик (с учётом NULL club_id). */
     public function isUserCurrentlyInside(User $user, ?Club $club = null): bool
     {
         $window = $this->presenceWindow();
-
+        $scope = $this->clubScopeSql($club);
         $params = [
             'user_id' => $user->getId(),
             'from' => $window['from'],
             'to' => $window['to'],
-        ];
-        $clubFilter = '';
-        if ($club instanceof Club) {
-            $clubFilter = ' AND club_id = :club_id';
-            $params['club_id'] = $club->getId();
-        }
+        ] + $scope['params'];
 
-        $sql = "SELECT event_type
+        $sql = 'SELECT event_type
                 FROM access_logs
-                WHERE result = 'granted'
+                WHERE result = \'granted\'
                   AND user_id = :user_id
                   AND created_at >= :from
-                  AND created_at < :to" . $clubFilter . "
+                  AND created_at < :to' . $scope['sql'] . '
                 ORDER BY created_at DESC, id DESC
-                LIMIT 1";
+                LIMIT 1';
 
         $row = $this->connection()->executeQuery($sql, $params)->fetchAssociative();
         if ($row === false) {
@@ -268,35 +253,28 @@ final class OccupancyService
     }
 
     /**
-     * Статус прохода клиента для мобильного приложения.
-     *
      * @return array{is_inside: bool, club_id: ?int, last_entry_at: ?string, last_exit_at: ?string}
      */
     public function getUserAccessSnapshot(User $user, ?Club $club = null): array
     {
         $window = $this->presenceWindow();
-
+        $scope = $this->clubScopeSql($club);
         $params = [
             'user_id' => $user->getId(),
             'from' => $window['from'],
             'to' => $window['to'],
-        ];
-        $clubFilter = '';
-        if ($club instanceof Club) {
-            $clubFilter = ' AND club_id = :club_id';
-            $params['club_id'] = $club->getId();
-        }
+        ] + $scope['params'];
 
-        $fetchLast = function (string $eventType) use ($params, $clubFilter): ?\DateTimeImmutable {
-            $sql = "SELECT created_at
+        $fetchLast = function (string $eventType) use ($params, $scope): ?\DateTimeImmutable {
+            $sql = 'SELECT created_at
                     FROM access_logs
-                    WHERE result = 'granted'
+                    WHERE result = \'granted\'
                       AND user_id = :user_id
                       AND event_type = :event_type
                       AND created_at >= :from
-                      AND created_at < :to" . $clubFilter . "
+                      AND created_at < :to' . $scope['sql'] . '
                     ORDER BY created_at DESC, id DESC
-                    LIMIT 1";
+                    LIMIT 1';
             $queryParams = $params + ['event_type' => $eventType];
             $row = $this->connection()->executeQuery($sql, $queryParams)->fetchAssociative();
             if ($row === false) {
