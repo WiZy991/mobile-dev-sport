@@ -486,10 +486,13 @@ class AdminController extends AbstractController
     private function buildFilteredClientsList(Request $request, ?int $limit = null, ?int $offset = null): array
     {
         // Сначала только ID — иначе DISTINCT + join tags + LIMIT ломает пагинацию.
+        // MySQL: ORDER BY name несовместим с SELECT DISTINCT id — группируем по id+name.
         $idQb = $this->em->createQueryBuilder()
-            ->select('DISTINCT u.id')
+            ->select('u.id')
             ->from(User::class, 'u')
             ->leftJoin('u.tags', 'tag')
+            ->groupBy('u.id')
+            ->addGroupBy('u.name')
             ->orderBy('u.name', 'ASC')
             ->addOrderBy('u.id', 'ASC');
         $this->applyClientListFilters($idQb, $request);
