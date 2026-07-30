@@ -109,53 +109,48 @@ class QrCodeViewModel @Inject constructor(
             val isInside = accessRepository.accessStatus.value.isInside
             _uiState.update { it.copy(isInsideGym = isInside) }
 
-            if (isInside) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        userName = user.name,
-                        memberId = user.id.takeLast(8).uppercase(),
-                        qrCodeData = generateQrData(user.id, System.currentTimeMillis()),
-                        secondsRemaining = 0,
-                        entryBlockedMessage = null,
-                    )
-                }
-                return@launch
-            }
-
-            val blocked = entryBlockReason()
-            if (blocked != null) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        userName = user.name,
-                        memberId = user.id.takeLast(8).uppercase(),
-                        qrCodeData = null,
-                        secondsRemaining = 0,
-                        entryBlockedMessage = blocked,
-                    )
-                }
-                return@launch
-            }
-
-            while (isActive) {
-                // Перепроверяем лимит на каждом цикле обновления QR.
-                val again = entryBlockReason()
-                if (again != null) {
+            // На выходе тот же FITNESSCLUB:ENTRY с окном 15 с — QR должен крутиться и «в зале».
+            // Иначе код протухает и турникет отвечает qr_expired (человек «не может войти/выйти»).
+            if (!isInside) {
+                val blocked = entryBlockReason()
+                if (blocked != null) {
                     _uiState.update {
                         it.copy(
+                            isLoading = false,
+                            userName = user.name,
+                            memberId = user.id.takeLast(8).uppercase(),
                             qrCodeData = null,
                             secondsRemaining = 0,
-                            entryBlockedMessage = again,
+                            entryBlockedMessage = blocked,
                         )
                     }
                     return@launch
+                }
+            }
+
+            while (isActive) {
+                val insideNow = accessRepository.accessStatus.value.isInside
+                if (!insideNow) {
+                    // Перепроверяем лимит на каждом цикле обновления QR.
+                    val again = entryBlockReason()
+                    if (again != null) {
+                        _uiState.update {
+                            it.copy(
+                                isInsideGym = false,
+                                qrCodeData = null,
+                                secondsRemaining = 0,
+                                entryBlockedMessage = again,
+                            )
+                        }
+                        return@launch
+                    }
                 }
 
                 val ts = System.currentTimeMillis()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        isInsideGym = insideNow,
                         userName = user.name,
                         memberId = user.id.takeLast(8).uppercase(),
                         qrCodeData = generateQrData(user.id, ts),

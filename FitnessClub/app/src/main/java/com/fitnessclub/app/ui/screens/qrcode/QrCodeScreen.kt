@@ -193,8 +193,9 @@ fun QrCodeScreen(
             Text(
                 text = when {
                     uiState.entryBlockedMessage != null -> "Вход недоступен"
-                    uiState.isInsideGym && uiState.qrCodeData != null -> "Код для выхода из зала"
-                    uiState.secondsRemaining > 0 -> "Код обновится через ${uiState.secondsRemaining} сек (действует 15 сек)"
+                    uiState.secondsRemaining > 0 && uiState.qrCodeData != null ->
+                        "Код обновится через ${uiState.secondsRemaining} сек (действует 15 сек)"
+                    uiState.qrCodeData != null -> "Обновление…"
                     else -> "Обновление…"
                 },
                 style = MaterialTheme.typography.bodySmall,

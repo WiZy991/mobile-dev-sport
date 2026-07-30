@@ -344,15 +344,9 @@ private fun QrQuickAccessContent(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        if (uiState.secondsRemaining > 0 && uiState.qrCodeData != null && !uiState.isInsideGym) {
+        if (uiState.secondsRemaining > 0 && uiState.qrCodeData != null) {
             Text(
                 text = "Обновление кода через ${uiState.secondsRemaining} сек",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-        } else if (uiState.isInsideGym && uiState.qrCodeData != null) {
-            Text(
-                text = "Код для выхода из зала",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary
             )
