@@ -38,7 +38,7 @@ class UserController extends AbstractController
             return $this->json(['error' => 'Unauthorized'], 401);
         }
 
-        $snapshot = $this->occupancyService->getUserAccessSnapshot($user, $user->getClub());
+        $snapshot = $this->occupancyService->getUserAccessSnapshot($user, null);
 
         return $this->json($snapshot);
     }

@@ -91,17 +91,6 @@ class AccessController extends AbstractController
             return $this->json($response, 400);
         }
 
-        // Проверка времени (15 секунд — синхронно с мобильным приложением)
-        $nowMs = (int) (microtime(true) * 1000);
-        if (abs($nowMs - $timestamp) > 15 * 1000) {
-            $log->setReason('qr_expired');
-            $response['reason'] = 'qr_expired';
-            $this->em->persist($log);
-            $this->em->flush();
-
-            return $this->json($response, 400);
-        }
-
         // Находим пользователя по внешнему ID user-123 -> 123
         $userId = null;
         if (str_starts_with($userExternalId, 'user-')) {
@@ -132,8 +121,8 @@ class AccessController extends AbstractController
             return $this->json($response, 403);
         }
 
-        // Повторный скан при статусе «уже в зале» = выход (без нового посещения).
-        if ($this->occupancyService->isUserCurrentlyInside($user, $gateClub)) {
+        // Повторный скан = выход. Глобально (как счётчик), без проверки срока QR.
+        if ($this->occupancyService->isUserCurrentlyInside($user, null)) {
             $log->setEventType('exit')
                 ->setResult('granted')
                 ->setReason('ok');
@@ -157,6 +146,17 @@ class AccessController extends AbstractController
                 ],
                 $percoUnlock,
             ));
+        }
+
+        // Проверка времени (15 секунд — только для входа)
+        $nowMs = (int) (microtime(true) * 1000);
+        if (abs($nowMs - $timestamp) > 15 * 1000) {
+            $log->setReason('qr_expired');
+            $response['reason'] = 'qr_expired';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 400);
         }
 
         // Проверяем наличие активного абонемента (календарь + клуб при известном контексте клуба)

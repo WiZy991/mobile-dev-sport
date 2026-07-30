@@ -102,18 +102,6 @@ class GatewayController extends AbstractController
             return $this->denied($log, 'invalid_format', 400);
         }
 
-        // Окно валидности QR — 15 секунд (синхронно с мобильным приложением).
-        $nowMs = (int) (microtime(true) * 1000);
-        $deltaMs = abs($nowMs - $timestamp);
-        if ($deltaMs > 15_000) {
-            return $this->denied($log, 'qr_expired', 400, [
-                'delta_ms' => $deltaMs,
-                'server_now_ms' => $nowMs,
-                'qr_timestamp_ms' => $timestamp,
-                'qr_time_segment' => $parts[3],
-            ]);
-        }
-
         $userId = str_starts_with($userExternalId, 'user-')
             ? (int) substr($userExternalId, 5)
             : (int) $userExternalId;
@@ -130,8 +118,11 @@ class GatewayController extends AbstractController
             return $this->denied($log, 'user_blocked', 403);
         }
 
-        // Один турникет / один скан: если клиент уже в зале — это выход, не второе посещение.
-        if ($this->occupancyService->isUserCurrentlyInside($user, $club)) {
+        // Выход важнее срока QR: один турникет / повторный скан.
+        // Счётчик в приложении — глобальный (club=null); проверка «в зале» должна совпадать,
+        // иначе повторный скан пишется как entry и человек «залипает» в зале.
+        // Срок QR (15 с) на выход не применяем — иначе отказ до записи exit.
+        if ($this->occupancyService->isUserCurrentlyInside($user, null)) {
             $log->setEventType('exit')
                 ->setResult('granted')
                 ->setReason('ok');
@@ -150,6 +141,18 @@ class GatewayController extends AbstractController
                     'phone' => $user->getPhone(),
                 ],
             ]));
+        }
+
+        // Окно валидности QR — 15 секунд (только для входа; синхронно с мобильным приложением).
+        $nowMs = (int) (microtime(true) * 1000);
+        $deltaMs = abs($nowMs - $timestamp);
+        if ($deltaMs > 15_000) {
+            return $this->denied($log, 'qr_expired', 400, [
+                'delta_ms' => $deltaMs,
+                'server_now_ms' => $nowMs,
+                'qr_timestamp_ms' => $timestamp,
+                'qr_time_segment' => $parts[3],
+            ]);
         }
 
         [$activeSub, $deny] = $this->subscriptionGateResolver->resolveForEntry($user, $club);
