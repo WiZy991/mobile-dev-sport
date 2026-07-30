@@ -2,13 +2,13 @@
 
 namespace App\Controller\Api;
 
-use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\Product;
 use App\Entity\Promotion;
 use App\Entity\SubscriptionPlan;
 use App\Service\Admin\ClubSettingsStore;
 use App\Service\Admin\ClubSocialLinks;
+use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,6 +21,7 @@ class ClubController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly ClubSettingsStore $clubSettings,
+        private readonly OccupancyService $occupancy,
     ) {}
 
     #[Route('/occupancy', name: 'api_club_occupancy', methods: ['GET'])]
@@ -32,36 +33,8 @@ class ClubController extends AbstractController
             $maxCapacity = max(10, (int) $capRaw);
         }
 
-        $today = new \DateTimeImmutable('today');
-        $tomorrow = $today->modify('+1 day');
-
-        $entries = (int) $this->em->createQueryBuilder()
-            ->select('COUNT(a.id)')
-            ->from(AccessLog::class, 'a')
-            ->where('a.eventType = :entry')
-            ->andWhere('a.result = :granted')
-            ->andWhere('a.createdAt >= :start')
-            ->andWhere('a.createdAt < :end')
-            ->setParameter('entry', 'entry')
-            ->setParameter('granted', 'granted')
-            ->setParameter('start', $today)
-            ->setParameter('end', $tomorrow)
-            ->getQuery()
-            ->getSingleScalarResult();
-
-        $exits = (int) $this->em->createQueryBuilder()
-            ->select('COUNT(a.id)')
-            ->from(AccessLog::class, 'a')
-            ->where('a.eventType = :exit')
-            ->andWhere('a.createdAt >= :start')
-            ->andWhere('a.createdAt < :end')
-            ->setParameter('exit', 'exit')
-            ->setParameter('start', $today)
-            ->setParameter('end', $tomorrow)
-            ->getQuery()
-            ->getSingleScalarResult();
-
-        $current = max(0, $entries - $exits);
+        // Та же логика, что в CRM: кто сейчас в зале (последнее granted = entry).
+        $current = $this->occupancy->countCurrentlyInside();
         $percentage = $maxCapacity > 0 ? min(100, (int) round($current * 100 / $maxCapacity)) : 0;
 
         return $this->json([
