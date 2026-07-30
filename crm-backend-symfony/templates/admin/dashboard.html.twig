@@ -330,12 +330,14 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small text-secondary">Клиент</label>
-                                <select name="client_id" class="form-select form-select-sm">
-                                    <option value="">— Выберите —</option>
-                                    {% for u in users|default([]) %}
-                                        <option value="{{ u.id }}">{{ u.name }}</option>
-                                    {% endfor %}
-                                </select>
+                                {% include 'admin/partials/_crm_client_picker.html.twig' with {
+                                    id: 'dash-task-client-picker',
+                                    name: 'client_id',
+                                    inputId: 'dash-task-client-q',
+                                    required: false,
+                                    requireSelection: false,
+                                    placeholder: 'Фамилия или телефон…'
+                                } %}
                                 <input type="text" name="client_name" class="form-control form-control-sm mt-1" placeholder="Или введите вручную">
                             </div>
                             <div class="col-md-3">
@@ -379,12 +381,14 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label small text-secondary">Клиент</label>
-                                <select name="user_id" class="form-select form-select-sm" id="saleUserSelect">
-                                    <option value="">— Выберите клиента —</option>
-                                    {% for u in users|default([]) %}
-                                        <option value="{{ u.id }}">{{ u.name }}{% if u.email %} ({{ u.email }}){% endif %}</option>
-                                    {% endfor %}
-                                </select>
+                                {% include 'admin/partials/_crm_client_picker.html.twig' with {
+                                    id: 'dash-sale-client-picker',
+                                    name: 'user_id',
+                                    inputId: 'dash-sale-client-q',
+                                    required: false,
+                                    requireSelection: false,
+                                    placeholder: 'Фамилия или телефон…'
+                                } %}
                                 <input type="text" name="client_name" class="form-control form-control-sm mt-1" id="saleClientName" placeholder="Или введите имя вручную (если клиента нет в списке)">
                             </div>
                             <div class="col-md-6">

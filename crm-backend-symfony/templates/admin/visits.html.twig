@@ -204,5 +204,21 @@
                 </tbody>
             </table>
         </div>
+        {% set visitQuery = {period: visitPeriod.type} %}
+        {% if visitPeriod.month %}{% set visitQuery = visitQuery|merge({month: visitPeriod.month}) %}{% endif %}
+        {% if visitPeriod.year %}{% set visitQuery = visitQuery|merge({year: visitPeriod.year}) %}{% endif %}
+        {% if visitPeriod.quarter %}{% set visitQuery = visitQuery|merge({quarter: visitPeriod.quarter}) %}{% endif %}
+        {% if visitPeriod.type == 'custom' %}
+            {% set visitQuery = visitQuery|merge({date_from: visitPeriod.dateFromYmd, date_to: visitPeriod.dateToYmdInclusive}) %}
+        {% endif %}
+        {% include 'admin/partials/_admin_pagination.html.twig' with {
+            section: 'visits',
+            page: page|default(1),
+            totalPages: totalPages|default(1),
+            totalItems: totalItems|default(visits|length),
+            shown: visits|length,
+            itemLabel: 'визитов',
+            query: visitQuery
+        } %}
     </div>
 {% endblock %}

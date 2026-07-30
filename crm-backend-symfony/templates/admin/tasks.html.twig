@@ -88,7 +88,7 @@
                                     data-id="{{ task.id }}"
                                     data-title="{{ task.title|e }}"
                                     data-client-id="{{ task.client ? task.client.id : '' }}"
-                                    data-client-name="{{ (task.clientName ?? '')|e }}"
+                                    data-client-name="{{ (task.client ? task.client.name : (task.clientName ?? ''))|e('html_attr') }}"
                                     data-due-date="{{ task.dueAt ? task.dueAt|date('Y-m-d') : '' }}"
                                     data-due-time="{{ task.dueAt ? task.dueAt|date('H:i') : '' }}"
                                     data-type="{{ task.type }}"
@@ -113,6 +113,18 @@
                 </tbody>
             </table>
         </div>
+        {% set taskQuery = {status: statusFilter} %}
+        {% if typeFilter %}{% set taskQuery = taskQuery|merge({type: typeFilter}) %}{% endif %}
+        {% if clientId %}{% set taskQuery = taskQuery|merge({client_id: clientId}) %}{% endif %}
+        {% include 'admin/partials/_admin_pagination.html.twig' with {
+            section: 'tasks',
+            page: page|default(1),
+            totalPages: totalPages|default(1),
+            totalItems: totalItems|default(tasks|length),
+            shown: tasks|length,
+            itemLabel: 'задач',
+            query: taskQuery
+        } %}
     </div>
 
     <div class="modal fade" id="modalNewTask" tabindex="-1">
@@ -131,12 +143,14 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small text-secondary">Клиент</label>
-                                <select name="client_id" class="form-select form-select-sm">
-                                    <option value="">— Выберите —</option>
-                                    {% for u in users|default([]) %}
-                                        <option value="{{ u.id }}">{{ u.name }}</option>
-                                    {% endfor %}
-                                </select>
+                                {% include 'admin/partials/_crm_client_picker.html.twig' with {
+                                    id: 'task-new-client-picker',
+                                    name: 'client_id',
+                                    inputId: 'task-new-client-q',
+                                    required: false,
+                                    requireSelection: false,
+                                    placeholder: 'Фамилия или телефон…'
+                                } %}
                                 <input type="text" name="client_name" class="form-control form-control-sm mt-1" placeholder="Или введите вручную">
                             </div>
                             <div class="col-md-3">
@@ -183,12 +197,14 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small text-secondary">Клиент</label>
-                                <select name="client_id" id="editTaskClientId" class="form-select form-select-sm">
-                                    <option value="">— Выберите —</option>
-                                    {% for u in users|default([]) %}
-                                        <option value="{{ u.id }}">{{ u.name }}</option>
-                                    {% endfor %}
-                                </select>
+                                {% include 'admin/partials/_crm_client_picker.html.twig' with {
+                                    id: 'task-edit-client-picker',
+                                    name: 'client_id',
+                                    inputId: 'editTaskClientQ',
+                                    required: false,
+                                    requireSelection: false,
+                                    placeholder: 'Фамилия или телефон…'
+                                } %}
                                 <input type="text" name="client_name" id="editTaskClientName" class="form-control form-control-sm mt-1" placeholder="Или введите вручную">
                             </div>
                             <div class="col-md-3">
@@ -232,7 +248,9 @@
                 var id = this.dataset.id;
                 document.getElementById('formEditTask').action = ('{{ path('admin_task_update', {id: 1}) }}').replace(/\/1\//, '/' + id + '/');
                 document.getElementById('editTaskTitle').value = this.dataset.title;
-                document.getElementById('editTaskClientId').value = this.dataset.clientId || '';
+                if (window.CrmClientPicker) {
+                    CrmClientPicker.set('task-edit-client-picker', this.dataset.clientId || '', this.dataset.clientName || '');
+                }
                 document.getElementById('editTaskClientName').value = this.dataset.clientName || '';
                 document.getElementById('editTaskDueDate').value = this.dataset.dueDate || '';
                 document.getElementById('editTaskDueTime').value = this.dataset.dueTime || '';

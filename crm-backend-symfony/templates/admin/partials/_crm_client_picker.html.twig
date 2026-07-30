@@ -1,0 +1,28 @@
+{#
+  Usage:
+  {% include 'admin/partials/_crm_client_picker.html.twig' with {
+    id: 'sale-client-picker',
+    name: 'user_id',
+    inputId: 'sale-client-q',
+    required: false,
+    requireSelection: false,
+    placeholder: 'Фамилия или телефон…',
+    valueId: '',
+    valueLabel: ''
+  } %}
+#}
+{% set pickerId = id|default('client-picker') %}
+{% set fieldName = name|default('user_id') %}
+{% set qId = inputId|default(pickerId ~ '-q') %}
+{% set isRequired = required|default(false) %}
+{% set mustPick = requireSelection|default(isRequired) %}
+<div class="crm-client-picker" id="{{ pickerId }}"
+     data-search-url="{{ path('admin_clients_search_json') }}"
+     data-require-selection="{{ mustPick ? '1' : '0' }}">
+    <input type="hidden" name="{{ fieldName }}" id="{{ pickerId }}-id" value="{{ valueId|default('') }}"{% if isRequired %} required{% endif %}>
+    <input type="text" id="{{ qId }}" class="form-control form-control-sm crm-client-picker__input"
+           placeholder="{{ placeholder|default('Фамилия или телефон…') }}"
+           value="{{ valueLabel|default('') }}"
+           autocomplete="off"{% if isRequired %} required{% endif %}>
+    <div class="crm-client-picker__menu" hidden></div>
+</div>

@@ -232,5 +232,17 @@
                 </tbody>
             </table>
         </div>
+        {% include 'admin/partials/_admin_pagination.html.twig' with {
+            section: 'leads',
+            page: page|default(1),
+            totalPages: totalPages|default(1),
+            totalItems: totalItems|default(leads|length),
+            shown: leads|length,
+            itemLabel: 'лидов',
+            query: {
+                status: statusFilter|default(''),
+                source: sourceFilter|default('')
+            }
+        } %}
     </div>
 {% endblock %}

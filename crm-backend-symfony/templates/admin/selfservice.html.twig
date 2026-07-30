@@ -77,6 +77,19 @@
                 </tbody>
             </table>
         </div>
+        {% include 'admin/partials/_admin_pagination.html.twig' with {
+            section: 'selfservice',
+            page: page|default(1),
+            totalPages: totalPages|default(1),
+            totalItems: totalItems|default(logs|length),
+            shown: logs|length,
+            itemLabel: 'записей',
+            query: {
+                date_from: dateFrom,
+                date_to: dateTo,
+                result: resultFilter|default('')
+            }
+        } %}
     </div>
 {% endblock %}
 

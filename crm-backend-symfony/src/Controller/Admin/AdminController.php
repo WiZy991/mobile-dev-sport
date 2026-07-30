@@ -48,6 +48,7 @@ use App\Service\Reports\OccupancyService;
 use App\Service\Reports\VisitPeriodResolver;
 use App\Service\Reports\VisitReportService;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -217,8 +218,9 @@ class AdminController extends AbstractController
 
         // Открытые и в работе задачи
         $tasks = $this->em->createQueryBuilder()
-            ->select('t')
+            ->select('t', 'tc')
             ->from(Task::class, 't')
+            ->leftJoin('t.client', 'tc')
             ->where('t.status IN (:statuses)')
             ->setParameter('statuses', ['open', 'in_progress'])
             ->orderBy('t.dueAt', 'ASC')
@@ -239,7 +241,6 @@ class AdminController extends AbstractController
             ->setMaxResults(10)
             ->getQuery()->getResult();
 
-        $users = $this->em->getRepository(User::class)->findBy([], ['name' => 'ASC']);
         $products = $this->em->getRepository(Product::class)->findBy(['isActive' => true], ['name' => 'ASC']);
 
         return $this->render('admin/dashboard.html.twig', [
@@ -257,7 +258,6 @@ class AdminController extends AbstractController
             'funnelLeads' => $funnelLeads,
             'tasks' => $tasks,
             'upcomingTrainings' => $upcomingTrainings,
-            'users' => $users,
             'products' => $products,
         ]);
     }
@@ -2861,13 +2861,24 @@ class AdminController extends AbstractController
             }
 
             $plans = $this->planCatalog->sortForDisplay($planRepo->findAll());
+            $issuedRows = $this->em->createQueryBuilder()
+                ->select('IDENTITY(s.plan) AS planId', 'COUNT(s.id) AS cnt')
+                ->from(Subscription::class, 's')
+                ->groupBy('s.plan')
+                ->getQuery()
+                ->getArrayResult();
             $issuedByPlan = [];
-            $subRepo = $this->em->getRepository(Subscription::class);
-            foreach ($plans as $plan) {
-                $issuedByPlan[$plan->getId()] = $subRepo->count(['plan' => $plan]);
+            foreach ($issuedRows as $row) {
+                $issuedByPlan[(int) $row['planId']] = (int) $row['cnt'];
             }
             $statusFilter = $request->query->get('status', '');
-            $subsQb = $this->em->createQueryBuilder()->select('s')->from(Subscription::class, 's')->orderBy('s.id', 'DESC');
+            $subsQb = $this->em->createQueryBuilder()
+                ->select('s', 'u', 'p', 'c')
+                ->from(Subscription::class, 's')
+                ->leftJoin('s.user', 'u')
+                ->leftJoin('s.plan', 'p')
+                ->leftJoin('s.club', 'c')
+                ->orderBy('s.id', 'DESC');
             if ($statusFilter === 'active' || $statusFilter === 'frozen' || $statusFilter === 'cancelled') {
                 $subsQb->andWhere('s.status = :status')->setParameter('status', $statusFilter);
             } elseif ($statusFilter === 'expired') {
@@ -2876,7 +2887,7 @@ class AdminController extends AbstractController
                     ->andWhere('s.endDate < :today')
                     ->setParameter('today', $today);
             }
-            $subscriptions = $subsQb->getQuery()->getResult();
+            [$subscriptions, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($subsQb, 's', $request);
 
             return $this->render('admin/subscription_plans.html.twig', [
                 'menu' => $menu,
@@ -2888,6 +2899,10 @@ class AdminController extends AbstractController
                 'clubs' => $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']),
                 'subscriptions' => $subscriptions,
                 'statusFilter' => $statusFilter,
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages,
             ]);
         }
 
@@ -2927,10 +2942,9 @@ class AdminController extends AbstractController
             $statusFilter = $request->query->get('status', '');
             $sourceFilter = $request->query->get('source', '');
             $qb = $this->em->createQueryBuilder()
-                ->select('l')
+                ->select('l', 'cu')
                 ->from(Lead::class, 'l')
-                ->leftJoin('l.notes', 'ln')
-                ->addSelect('ln')
+                ->leftJoin('l.convertedUser', 'cu')
                 ->orderBy('l.id', 'DESC');
             if ($statusFilter !== '' && in_array($statusFilter, ['new', 'trial_scheduled', 'trial_visited', 'converted', 'inactive'], true)) {
                 $qb->andWhere('l.status = :status')->setParameter('status', $statusFilter);
@@ -2938,7 +2952,7 @@ class AdminController extends AbstractController
             if ($sourceFilter !== '' && LeadSource::isValid($sourceFilter)) {
                 $qb->andWhere('l.source = :source')->setParameter('source', $sourceFilter);
             }
-            $leads = $qb->getQuery()->getResult();
+            [$leads, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($qb, 'l', $request);
 
             $sourceStats = [];
             foreach (LeadSource::keys() as $srcKey) {
@@ -2961,6 +2975,10 @@ class AdminController extends AbstractController
                 'sourceFilter' => $sourceFilter,
                 'funnel' => $funnel,
                 'sourceStats' => $sourceStats,
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages,
             ]);
         }
 
@@ -2969,9 +2987,11 @@ class AdminController extends AbstractController
             $typeFilter = $request->query->get('type', '');
             $clientId = $request->query->get('client_id') ? (int) $request->query->get('client_id') : null;
             $qb = $this->em->createQueryBuilder()
-                ->select('t')
+                ->select('t', 'tc')
                 ->from(Task::class, 't')
-                ->orderBy('t.id', 'DESC');
+                ->leftJoin('t.client', 'tc')
+                ->orderBy('t.dueAt', 'ASC')
+                ->addOrderBy('t.id', 'DESC');
             if ($statusFilter !== 'all' && in_array($statusFilter, ['open', 'in_progress', 'done'], true)) {
                 $qb->andWhere('t.status = :status')->setParameter('status', $statusFilter);
             }
@@ -2985,16 +3005,7 @@ class AdminController extends AbstractController
                     $qb->andWhere('t.client = :filterClient')->setParameter('filterClient', $filterClient);
                 }
             }
-            $tasks = $qb->getQuery()->getResult();
-            usort($tasks, function (Task $a, Task $b) {
-                $da = $a->getDueAt();
-                $db = $b->getDueAt();
-                if ($da === null && $db === null) return $b->getId() <=> $a->getId();
-                if ($da === null) return 1;
-                if ($db === null) return -1;
-                return $da <=> $db ?: ($b->getId() <=> $a->getId());
-            });
-            $users = $this->em->getRepository(User::class)->findBy([], ['name' => 'ASC']);
+            [$tasks, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($qb, 't', $request);
 
             return $this->render('admin/tasks.html.twig', [
                 'menu' => $menu,
@@ -3004,18 +3015,30 @@ class AdminController extends AbstractController
                 'typeFilter' => $typeFilter,
                 'clientId' => $clientId,
                 'filterClient' => $filterClient,
-                'users' => $users,
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages,
             ]);
         }
 
         if ($section === 'sales') {
+            // По умолчанию — последние 30 дней (пока пользователь сам не отправил фильтр дат).
+            $hasDateQuery = $request->query->has('date_from') || $request->query->has('date_to');
             $dateFromRaw = $request->query->get('date_from');
             $dateToRaw = $request->query->get('date_to');
-            $dateFrom = $dateFromRaw ? new \DateTimeImmutable($dateFromRaw) : null;
-            $dateTo = $dateToRaw ? (new \DateTimeImmutable($dateToRaw))->modify('+1 day') : null;
+            if (!$hasDateQuery) {
+                $dateFromRaw = (new \DateTimeImmutable('-29 days'))->format('Y-m-d');
+                $dateToRaw = (new \DateTimeImmutable('today'))->format('Y-m-d');
+            }
+            $dateFrom = $dateFromRaw ? new \DateTimeImmutable((string) $dateFromRaw) : null;
+            $dateTo = $dateToRaw ? (new \DateTimeImmutable((string) $dateToRaw))->modify('+1 day') : null;
             $qb = $this->em->createQueryBuilder()
-                ->select('s')
+                ->select('s', 'su', 'sp', 'ss')
                 ->from(Sale::class, 's')
+                ->leftJoin('s.user', 'su')
+                ->leftJoin('s.promoCode', 'sp')
+                ->leftJoin('s.subscription', 'ss')
                 ->orderBy('s.createdAt', 'DESC');
             if ($dateFrom) {
                 $qb->andWhere('s.createdAt >= :from')->setParameter('from', $dateFrom);
@@ -3023,40 +3046,55 @@ class AdminController extends AbstractController
             if ($dateTo) {
                 $qb->andWhere('s.createdAt < :to')->setParameter('to', $dateTo);
             }
-            $sales = $qb->getQuery()->getResult();
-            $users = $this->em->getRepository(User::class)->findBy([], ['name' => 'ASC']);
+            [$sales, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($qb, 's', $request);
             $products = $this->em->getRepository(Product::class)->findBy(['isActive' => true], ['name' => 'ASC']);
 
             return $this->render('admin/sales.html.twig', [
                 'menu' => $menu,
                 'current' => $section,
                 'sales' => $sales,
-                'users' => $users,
                 'products' => $products,
                 'dateFrom' => $dateFromRaw,
                 'dateTo' => $dateToRaw,
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages,
             ]);
         }
 
         if ($section === 'bookings') {
-            $bookDate = $request->query->get('date') ? new \DateTimeImmutable($request->query->get('date')) : null;
+            // По умолчанию — сегодня; пустая дата в query = все даты (с пагинацией).
+            $bookDateRaw = $request->query->get('date');
+            if ($bookDateRaw === null) {
+                $bookDate = new \DateTimeImmutable('today');
+            } elseif ($bookDateRaw === '') {
+                $bookDate = null;
+            } else {
+                $bookDate = new \DateTimeImmutable((string) $bookDateRaw);
+            }
             $qb = $this->em->createQueryBuilder()
-                ->select('b')
+                ->select('b', 't', 'bu')
                 ->from(Booking::class, 'b')
                 ->join('b.training', 't')
+                ->leftJoin('b.user', 'bu')
                 ->orderBy('t.startAt', 'DESC');
             if ($bookDate) {
                 $dayEnd = $bookDate->modify('+1 day');
                 $qb->andWhere('t.startAt >= :start')->andWhere('t.startAt < :end')
                     ->setParameter('start', $bookDate)->setParameter('end', $dayEnd);
             }
-            $bookings = $qb->getQuery()->getResult();
+            [$bookings, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($qb, 'b', $request);
 
             return $this->render('admin/bookings.html.twig', [
                 'menu' => $menu,
                 'current' => $section,
                 'bookings' => $bookings,
                 'bookDate' => $bookDate?->format('Y-m-d'),
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages,
             ]);
         }
 
@@ -3064,10 +3102,10 @@ class AdminController extends AbstractController
             $period = $this->visitPeriodResolver->resolve($request->query->all());
             $visitStats = $this->visitReport->countByClub($period->from, $period->toExclusive);
             $qb = $this->em->createQueryBuilder()
-                ->select('a')
+                ->select('a', 'c', 'au')
                 ->from(AccessLog::class, 'a')
                 ->leftJoin('a.club', 'c')
-                ->addSelect('c')
+                ->leftJoin('a.user', 'au')
                 ->where('a.result = :result')
                 ->andWhere('a.eventType = :eventType')
                 ->andWhere('a.createdAt >= :from')
@@ -3077,7 +3115,7 @@ class AdminController extends AbstractController
                 ->setParameter('from', $period->from)
                 ->setParameter('to', $period->toExclusive)
                 ->orderBy('a.createdAt', 'DESC');
-            $accessLogs = $qb->getQuery()->getResult();
+            [$accessLogs, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($qb, 'a', $request, 100);
 
             return $this->render('admin/visits.html.twig', [
                 'menu' => $menu,
@@ -3087,6 +3125,10 @@ class AdminController extends AbstractController
                 'visitStats' => $visitStats,
                 'currentlyInside' => $this->occupancy->countCurrentlyInside(),
                 'currentlyInsideList' => $this->occupancy->listCurrentlyInside(null, 100),
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages,
             ]);
         }
 
@@ -3106,11 +3148,30 @@ class AdminController extends AbstractController
             $trainers = $this->em->getRepository(Trainer::class)->findBy([], ['id' => 'ASC']);
             $bookingsByTraining = [];
             foreach ($trainings as $t) {
-                $all = $this->em->getRepository(Booking::class)->findBy(
-                    ['training' => $t],
-                    ['bookedAt' => 'ASC']
-                );
-                $bookingsByTraining[$t->getId()] = array_values(array_filter($all, fn (Booking $b) => in_array($b->getStatus(), ['confirmed', 'waiting'], true)));
+                $bookingsByTraining[$t->getId()] = [];
+            }
+            if ($trainings !== []) {
+                $trainingIds = array_map(static fn (Training $t) => $t->getId(), $trainings);
+                /** @var list<Booking> $dayBookings */
+                $dayBookings = $this->em->createQueryBuilder()
+                    ->select('b', 'bu', 'bt')
+                    ->from(Booking::class, 'b')
+                    ->join('b.training', 'bt')
+                    ->leftJoin('b.user', 'bu')
+                    ->where('bt.id IN (:ids)')
+                    ->andWhere('b.status IN (:statuses)')
+                    ->setParameter('ids', $trainingIds)
+                    ->setParameter('statuses', ['confirmed', 'waiting'])
+                    ->orderBy('b.bookedAt', 'ASC')
+                    ->getQuery()
+                    ->getResult();
+                foreach ($dayBookings as $booking) {
+                    $tid = $booking->getTraining()?->getId();
+                    if ($tid === null) {
+                        continue;
+                    }
+                    $bookingsByTraining[$tid][] = $booking;
+                }
             }
 
             return $this->render('admin/schedule.html.twig', [
@@ -3139,8 +3200,9 @@ class AdminController extends AbstractController
             $logDateTo = (new \DateTimeImmutable($logDateToRaw))->modify('+1 day');
             $resultFilter = $request->query->get('result', '');
             $qb = $this->em->createQueryBuilder()
-                ->select('a')
+                ->select('a', 'au')
                 ->from(AccessLog::class, 'a')
+                ->leftJoin('a.user', 'au')
                 ->where('a.createdAt >= :from')
                 ->andWhere('a.createdAt < :to')
                 ->setParameter('from', $logDateFrom)
@@ -3149,7 +3211,7 @@ class AdminController extends AbstractController
             if ($resultFilter === 'granted' || $resultFilter === 'denied') {
                 $qb->andWhere('a.result = :result')->setParameter('result', $resultFilter);
             }
-            $logs = $qb->getQuery()->getResult();
+            [$logs, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($qb, 'a', $request, 100);
 
             return $this->render('admin/selfservice.html.twig', [
                 'menu' => $menu,
@@ -3158,6 +3220,10 @@ class AdminController extends AbstractController
                 'dateFrom' => $logDateFrom->format('Y-m-d'),
                 'dateTo' => $logDateToRaw,
                 'resultFilter' => $resultFilter,
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages,
             ]);
         }
 
@@ -3600,6 +3666,29 @@ class AdminController extends AbstractController
             'current' => $section,
             'title' => $menu[$section],
         ]);
+    }
+
+    /**
+     * @return array{0: list<object>, 1: int, 2: int, 3: int, 4: int} [items, page, total, totalPages, perPage]
+     */
+    private function paginateQb(QueryBuilder $qb, string $alias, Request $request, int $perPage = 50): array
+    {
+        $page = max(1, (int) $request->query->get('page', 1));
+        $countQb = clone $qb;
+        $countQb->resetDQLPart('orderBy');
+        $countQb->select('COUNT(DISTINCT ' . $alias . '.id)');
+        $total = (int) $countQb->getQuery()->getSingleScalarResult();
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $items = $qb
+            ->setFirstResult(($page - 1) * $perPage)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getResult();
+
+        return [$items, $page, $total, $totalPages, $perPage];
     }
 
     private function normalizeHexColor(string $value): string

@@ -75,6 +75,18 @@
                 </tbody>
             </table>
         </div>
+        {% include 'admin/partials/_admin_pagination.html.twig' with {
+            section: 'sales',
+            page: page|default(1),
+            totalPages: totalPages|default(1),
+            totalItems: totalItems|default(sales|length),
+            shown: sales|length,
+            itemLabel: 'продаж',
+            query: {
+                date_from: dateFrom|default(''),
+                date_to: dateTo|default('')
+            }
+        } %}
     </div>
 
     {# Модальное окно "Новая продажа" #}
@@ -90,12 +102,14 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label small text-secondary">Клиент</label>
-                                <select name="user_id" class="form-select form-select-sm">
-                                    <option value="">— Выберите клиента —</option>
-                                    {% for u in users|default([]) %}
-                                        <option value="{{ u.id }}">{{ u.name }}{% if u.email %} ({{ u.email }}){% endif %}</option>
-                                    {% endfor %}
-                                </select>
+                                {% include 'admin/partials/_crm_client_picker.html.twig' with {
+                                    id: 'sale-client-picker',
+                                    name: 'user_id',
+                                    inputId: 'sale-client-q',
+                                    required: false,
+                                    requireSelection: false,
+                                    placeholder: 'Фамилия или телефон…'
+                                } %}
                                 <input type="text" name="client_name" class="form-control form-control-sm mt-1" placeholder="Или введите имя вручную">
                             </div>
                             <div class="col-md-6">

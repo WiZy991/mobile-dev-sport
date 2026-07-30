@@ -8,8 +8,9 @@
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <a href="{{ path('admin_section', {section: 'bookings'}) }}?date={{ "now"|date("Y-m-d") }}" class="btn btn-sm {{ (bookDate|default('')) == ("now"|date("Y-m-d")) ? 'btn-primary' : 'btn-outline-secondary' }}">Сегодня</a>
             <a href="{{ path('admin_section', {section: 'bookings'}) }}?date={{ "tomorrow"|date("Y-m-d") }}" class="btn btn-sm {{ (bookDate|default('')) == ("tomorrow"|date("Y-m-d")) ? 'btn-primary' : 'btn-outline-secondary' }}">Завтра</a>
+            <a href="{{ path('admin_section', {section: 'bookings'}) }}?date=" class="btn btn-sm {{ bookDate is null or bookDate == '' ? 'btn-primary' : 'btn-outline-secondary' }}">Все даты</a>
             <form method="get" action="{{ path('admin_section', {section: 'bookings'}) }}" class="d-flex align-items-center gap-2">
-                <input type="date" name="date" class="form-control form-control-sm" value="{{ bookDate|default('') }}" style="width: auto;" placeholder="Все даты">
+                <input type="date" name="date" class="form-control form-control-sm" value="{{ bookDate|default('') }}" style="width: auto;">
                 <button type="submit" class="btn btn-sm btn-outline-secondary">Фильтр</button>
             </form>
         </div>
@@ -72,5 +73,14 @@
                 </tbody>
             </table>
         </div>
+        {% include 'admin/partials/_admin_pagination.html.twig' with {
+            section: 'bookings',
+            page: page|default(1),
+            totalPages: totalPages|default(1),
+            totalItems: totalItems|default(bookings|length),
+            shown: bookings|length,
+            itemLabel: 'записей',
+            query: {date: bookDate|default('')}
+        } %}
     </div>
 {% endblock %}
