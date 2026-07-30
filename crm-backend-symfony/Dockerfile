@@ -1,4 +1,4 @@
-FROM php:8.4-cli
+FROM php:8.4-fpm
 
 # Сертификаты oauth.sber.ru выдаются «Russian Trusted Sub CA» (Минцифры). В международных и старых бандлах этих корней нет —
 # добавляем официальные PEM с gu-st.ru, затем единый /etc/ssl/certs/ca-certificates.crt для curl, PHP openssl и Symfony.
@@ -36,6 +36,19 @@ ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
 
 RUN printf '%s\n' 'date.timezone=UTC' > /usr/local/etc/php/conf.d/99-timezone.ini
 
+# Несколько воркеров: иначе long-poll шлюза / тяжёлый CRM блокируют ВСЕ mobile API (как на php -S).
+RUN printf '%s\n' \
+        '[www]' \
+        'pm = dynamic' \
+        'pm.max_children = 20' \
+        'pm.start_servers = 4' \
+        'pm.min_spare_servers = 2' \
+        'pm.max_spare_servers = 8' \
+        'pm.max_requests = 500' \
+        'request_terminate_timeout = 60' \
+        'clear_env = no' \
+    > /usr/local/etc/php-fpm.d/zz-crm.conf
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
@@ -45,6 +58,7 @@ RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-s
 
 COPY . .
 # classmap после COPY: иначе новые контроллеры могут не попасть в optimized autoload
-RUN composer dump-autoload --no-interaction --optimize --no-dev
+RUN composer dump-autoload --no-interaction --optimize --no-dev \
+    && chown -R www-data:www-data /app/var || true
 
-EXPOSE 8000
+EXPOSE 9000

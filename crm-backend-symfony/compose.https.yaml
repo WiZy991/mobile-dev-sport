@@ -10,12 +10,6 @@
 # или замените volume в этом файле на путь /etc/letsencrypt/live/<домен>/...
 
 services:
-  # Только nginx публикует 80/443 на хост. app доступен снаружи лишь на :8000 (отладка).
-  # Если app мапит 80:8000 (старый прод без nginx) — nginx не стартует: «port is already allocated».
-  app:
-    ports:
-      - "8000:8000"
-
   nginx:
     image: nginx:alpine
     container_name: crm_backend_nginx
@@ -29,6 +23,8 @@ services:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./docker/nginx/certs:/etc/nginx/certs:ro
       - ./docker/nginx/certbot-webroot:/var/www/certbot:ro
+      # Статика (акции и т.п.) — тот же public, что у app.
+      - ./public:/var/www/crm/public:ro
     depends_on:
       app:
         condition: service_started

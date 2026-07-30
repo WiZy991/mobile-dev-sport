@@ -13,6 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_access_logs_club_created', columns: ['club_id', 'created_at'])]
 #[ORM\Index(name: 'idx_access_logs_result_created', columns: ['result', 'created_at'])]
 #[ORM\Index(name: 'idx_access_logs_result_user_created', columns: ['result', 'user_id', 'created_at'])]
+#[ORM\Index(name: 'idx_access_logs_occ_window', columns: ['result', 'created_at', 'user_id', 'id'])]
 class AccessLog implements TenantAware
 {
     use OrganizationOwnedTrait;

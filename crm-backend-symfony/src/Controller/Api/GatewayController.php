@@ -34,8 +34,10 @@ use Symfony\Component\Routing\Annotation\Route;
  *     На входе CRM валидирует QR, проверяет абонемент, пишет AccessLog, возвращает open_device — параметры
  *     команды для локального PERCo. Шлюз сам шлёт команду в LAN PERCo-Web (см. perco_client.py).
  *     На выходе — только фиксация события выхода в журнале (без проверки абонемента), ответ access_granted: true.
- *  2. Шлюз держит постоянный long-poll GET /api/v1/gateway/commands и выполняет приходящие команды
+ *  2. Шлюз опрашивает GET /api/v1/gateway/commands (короткий poll ~2 c) и выполняет приходящие команды
  *     (в т.ч. «Открыть дверь» из админки CRM), затем подтверждает /commands/{id}/ack.
+ *     Важно: CRM работает на PHP-FPM с несколькими воркерами — длинный long-poll на одном
+ *     php -S блокировал бы все mobile/API запросы.
  *  3. Шлюз шлёт heartbeat — POST /api/v1/gateway/heartbeat — для мониторинга связности.
  *
  * Зачем такая схема: облачная CRM не имеет (и не должна иметь) сетевого доступа в LAN
@@ -44,8 +46,8 @@ use Symfony\Component\Routing\Annotation\Route;
 #[Route('/api/v1/gateway')]
 class GatewayController extends AbstractController
 {
-    private const LONG_POLL_SECONDS = 25.0;
-    private const POLL_INTERVAL_US = 1_500_000;
+    private const LONG_POLL_SECONDS = 2.0;
+    private const POLL_INTERVAL_US = 400_000;
     private const COMMAND_BATCH_LIMIT = 5;
     private const ALARM_TYPES = [
         AccessAlarm::TYPE_TAILGATING,

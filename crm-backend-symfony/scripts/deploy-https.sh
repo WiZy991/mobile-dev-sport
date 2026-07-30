@@ -81,5 +81,7 @@ ensure_port_free "${HTTPS_PORT}"
 "${COMPOSE[@]}" up -d --build
 
 echo
-echo "Stack is up:"
+echo "Stack is up (nginx → PHP-FPM workers, не php -S):"
 "${COMPOSE[@]}" ps
+echo
+echo "Проверьте: curl -sS -w 't=%{time_total}\\n' https://worldcashfit.ru/api/v1/club/occupancy"
