@@ -592,7 +592,7 @@ class AdminController extends AbstractController
 
     /**
      * @param list<User> $clients
-     * @return array<int, array{label: string, status: string, plan_name: string, plan_type: string, visits: ?string, end: ?string}>
+     * @return array<int, array{label: string, status: string, plan_name: string, plan_type: string, visits: ?string, start: ?string, end: ?string}>
      */
     private function buildClientSubscriptionSummaries(array $clients): array
     {
@@ -621,17 +621,17 @@ class AdminController extends AbstractController
             ->getResult();
 
         $today = new \DateTimeImmutable('today');
+        /** @var array<int, array{score: int, id: int, data: array{label: string, status: string, plan_name: string, plan_type: string, visits: ?string, start: ?string, end: ?string}}> $byUser */
         $byUser = [];
         foreach ($subs as $sub) {
             if (!$sub instanceof Subscription) {
                 continue;
             }
             $uid = $sub->getUser()->getId();
-            if ($uid === null || isset($byUser[$uid])) {
+            if ($uid === null) {
                 continue;
             }
             $plan = $sub->getPlan();
-            // Название тарифа как в разделе «Абонементы»: «На 12 месяцев», «Разовое посещение» и т.д.
             $planName = $plan->getName();
             $typeLabel = match ($plan->getType()) {
                 'limited' => 'по посещениям',
@@ -648,27 +648,49 @@ class AdminController extends AbstractController
 
             if ($sub->isEffectiveActiveOn($today)) {
                 $status = 'active';
+                $score = 400;
             } elseif ($sub->getStatus() === 'frozen') {
                 $status = 'frozen';
+                $score = 300;
             } elseif ($sub->getStatus() === 'active' && $sub->getStartDate() > $today) {
                 $status = 'pending';
+                $score = 200;
             } elseif ($sub->getStatus() === 'cancelled') {
                 $status = 'cancelled';
+                $score = 50;
             } else {
                 $status = 'expired';
+                $score = 100;
             }
 
-            $byUser[$uid] = [
-                'label' => $planName,
-                'status' => $status,
-                'plan_name' => $planName,
-                'plan_type' => $typeLabel,
-                'visits' => $visitsLabel,
-                'end' => $sub->getEndDate()?->format('d.m.Y'),
+            $subId = $sub->getId() ?? 0;
+            $candidate = [
+                'score' => $score,
+                'id' => $subId,
+                'data' => [
+                    'label' => $planName,
+                    'status' => $status,
+                    'plan_name' => $planName,
+                    'plan_type' => $typeLabel,
+                    'visits' => $visitsLabel,
+                    'start' => $sub->getStartDate()->format('d.m.Y'),
+                    'end' => $sub->getEndDate()?->format('d.m.Y'),
+                ],
             ];
+            if (!isset($byUser[$uid])
+                || $candidate['score'] > $byUser[$uid]['score']
+                || ($candidate['score'] === $byUser[$uid]['score'] && $candidate['id'] > $byUser[$uid]['id'])
+            ) {
+                $byUser[$uid] = $candidate;
+            }
         }
 
-        return $byUser;
+        $out = [];
+        foreach ($byUser as $uid => $row) {
+            $out[$uid] = $row['data'];
+        }
+
+        return $out;
     }
 
     private function countClientsWithoutSubscription(): int

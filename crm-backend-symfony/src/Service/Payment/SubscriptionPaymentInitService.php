@@ -43,6 +43,11 @@ class SubscriptionPaymentInitService
             ];
         }
 
+        $reusable = $this->findReusablePendingPayment($user, $plan, $quote->amountKopecks);
+        if ($reusable !== null) {
+            return ['payment' => $reusable];
+        }
+
         $payment = (new Payment())
             ->setUser($user)
             ->setType(Payment::TYPE_SUBSCRIPTION)
@@ -101,6 +106,36 @@ class SubscriptionPaymentInitService
         $this->em->flush();
 
         return ['payment' => $payment];
+    }
+
+    /**
+     * Повторный «Купить» без оплаты — вернуть тот же pending, не плодить заказы в Альфе.
+     */
+    private function findReusablePendingPayment(User $user, SubscriptionPlan $plan, int $amountKopecks): ?Payment
+    {
+        /** @var Payment|null $existing */
+        $existing = $this->em->createQueryBuilder()
+            ->select('p')
+            ->from(Payment::class, 'p')
+            ->where('p.user = :user')
+            ->andWhere('p.subscriptionPlan = :plan')
+            ->andWhere('p.type = :type')
+            ->andWhere('p.status = :pending')
+            ->andWhere('p.amountKopecks = :amount')
+            ->andWhere('p.paymentUrl IS NOT NULL')
+            ->andWhere('p.expiresAt IS NULL OR p.expiresAt > :now')
+            ->setParameter('user', $user)
+            ->setParameter('plan', $plan)
+            ->setParameter('type', Payment::TYPE_SUBSCRIPTION)
+            ->setParameter('pending', Payment::STATUS_PENDING)
+            ->setParameter('amount', $amountKopecks)
+            ->setParameter('now', new \DateTimeImmutable())
+            ->orderBy('p.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $existing;
     }
 
     /**

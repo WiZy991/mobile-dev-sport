@@ -153,6 +153,9 @@ class SubscriptionPlansViewModel @Inject constructor(
         onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
         onError: (String) -> Unit,
     ) {
+        if (_uiState.value.isLoading) {
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 

@@ -396,7 +396,8 @@ final class ClientImportService
             'статус абонемента' => 'subscription_status',
             'subscription_status' => 'subscription_status',
             'дней до окончания' => '_ignore',
-            'доступное количество' => '_ignore',
+            'доступное количество' => 'available_visits',
+            'available_visits' => 'available_visits',
             'последнее посещение' => '_ignore',
             'всего посещений' => 'visits_total',
             'visits_total' => 'visits_total',
@@ -559,7 +560,7 @@ final class ClientImportService
         $status = $this->normalizeSubscriptionStatus($data['subscription_status'] ?? 'active');
         $plan = $this->resolvePlan($data);
 
-        // Режим «только даты» или строка без тарифа: правим даты активного/замороженного абонемента.
+        // Режим «только даты» или строка без тарифа: даты + тариф по длительности периода.
         if ($datesOnly || !$plan) {
             if ($start === null && $end === null) {
                 throw new \RuntimeException('Нет дат абонемента (нужны «Дата продажи» / «Дата окончания»).');
@@ -582,6 +583,15 @@ final class ClientImportService
             }
             if (array_key_exists('subscription_end', $data)) {
                 $sub->setEndDate($end);
+            }
+            $inferred = $this->resolvePlanByDurationOrHints(
+                $sub->getStartDate(),
+                $sub->getEndDate(),
+                $data,
+                preferDuration: $datesOnly,
+            );
+            if ($inferred !== null) {
+                $this->applyInferredPlanToSubscription($sub, $inferred);
             }
             $this->em->persist($sub);
 
@@ -892,6 +902,109 @@ final class ClientImportService
     }
 
     /**
+     * Тариф по длительности (конец − начало) или по подсказкам из файла.
+     * «Следующая карта» в Fitness365 часто про будущую покупку — в datesOnly не доверяем ей.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function resolvePlanByDurationOrHints(
+        \DateTimeImmutable $start,
+        ?\DateTimeImmutable $end,
+        array $data,
+        bool $preferDuration = true,
+    ): ?SubscriptionPlan {
+        $avail = trim((string) ($data['available_visits'] ?? ''));
+        if ($avail === '1') {
+            $single = $this->findPlanByNameCandidates(['разовое посещение', 'разовое', '1 посещение']);
+            if ($single !== null) {
+                return $single;
+            }
+        }
+
+        if (!$preferDuration) {
+            $byName = $this->resolvePlan($data);
+            if ($byName !== null) {
+                return $byName;
+            }
+        }
+
+        if ($end === null) {
+            return $preferDuration ? null : $this->resolvePlan($data);
+        }
+
+        $days = (int) $start->diff($end)->format('%a');
+        if ($days <= 2) {
+            $single = $this->findPlanByNameCandidates(['разовое посещение', 'разовое', '1 посещение']);
+            if ($single !== null) {
+                return $single;
+            }
+        }
+
+        /** @var list<SubscriptionPlan> $timed */
+        $timed = [];
+        foreach ($this->em->getRepository(SubscriptionPlan::class)->findAll() as $p) {
+            $d = $p->getDurationDays();
+            if ($d !== null && $d > 0) {
+                $timed[] = $p;
+            }
+        }
+        if ($timed === []) {
+            return $preferDuration ? null : $this->resolvePlan($data);
+        }
+
+        $best = null;
+        $bestDist = PHP_INT_MAX;
+        foreach ($timed as $p) {
+            $dist = abs((int) $p->getDurationDays() - $days);
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = $p;
+            } elseif ($dist === $bestDist && $best !== null && (int) $p->getDurationDays() < (int) $best->getDurationDays()) {
+                // при равной дистанции — более короткий тариф (30 ближе к «лишним» дням заморозки, чем 365)
+                $best = $p;
+            }
+        }
+
+        // Слишком далеко от любого тарифа (сотрудники / бессрочное) — не трогаем план.
+        if ($best === null || $bestDist > 75) {
+            return $preferDuration ? null : $this->resolvePlan($data);
+        }
+
+        return $best;
+    }
+
+    /**
+     * @param list<string> $candidates lowercase
+     */
+    private function findPlanByNameCandidates(array $candidates): ?SubscriptionPlan
+    {
+        $want = array_map(static fn (string $c) => mb_strtolower(trim($c)), $candidates);
+        foreach ($this->em->getRepository(SubscriptionPlan::class)->findAll() as $p) {
+            $plow = mb_strtolower($p->getName());
+            foreach ($want as $c) {
+                if ($plow === $c || str_contains($plow, $c)) {
+                    return $p;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function applyInferredPlanToSubscription(Subscription $sub, SubscriptionPlan $plan): void
+    {
+        $sub->setPlan($plan);
+        if ($plan->getVisitsCount() !== null) {
+            $sub->setVisitsTotal($plan->getVisitsCount());
+            if ($sub->getVisitsUsed() === null) {
+                $sub->setVisitsUsed(0);
+            }
+        } else {
+            $sub->setVisitsTotal(null);
+        }
+    }
+
+    /**
      * Синонимы названий тарифов из внешних CRM (Fitness365 и др.) → варианты для поиска в нашей CRM.
      *
      * @return list<string> lowercase candidates
@@ -910,6 +1023,10 @@ final class ClientImportService
             'абонемент на 12 месяцев' => ['на 12 месяцев', 'абонемент на год', '12 месяцев'],
             'абонемент на 6 месяцев' => ['на 6 месяцев', '6 месяцев'],
             'на 6 месяцев' => ['абонемент на 6 месяцев', '6 месяцев'],
+            'абонемент на 4 месяца' => ['на 4 месяца', '4 месяца'],
+            'на 4 месяца' => ['абонемент на 4 месяца', '4 месяца'],
+            'абонемент на 3 месяца' => ['на 3 месяца', '3 месяца'],
+            'на 3 месяца' => ['абонемент на 3 месяца', '3 месяца'],
             'абонемент на 1 месяц' => ['на 1 месяц', '1 месяц', 'месяц'],
             'на 1 месяц' => ['абонемент на 1 месяц', '1 месяц'],
             'разовое посещение' => ['разовое', '1 посещение'],

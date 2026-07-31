@@ -229,20 +229,22 @@ fun SubscriptionPlansScreen(
         showLegalConsentDialog?.let { plan ->
             ClubPurchaseConsentDialog(
                 context = uiState.clubPurchaseContext,
-                onDismiss = { showLegalConsentDialog = null },
+                isLoading = uiState.isLoading,
+                onDismiss = { if (!uiState.isLoading) showLegalConsentDialog = null },
                 onOpenPdf = { pdfOverlay = it },
                 onOpenExternalUrl = { openExternalUrl(context, it) },
                 onConfirm = {
                     purchaseError = null
-                    showLegalConsentDialog = null
                     viewModel.purchasePlan(
                         plan = plan,
                         onPaymentRequired = { paymentId, paymentUrl ->
+                            showLegalConsentDialog = null
                             showPurchaseDialog = null
                             onNavigateToPayment(paymentId)
                             openPaymentUrl(context, paymentUrl)
                         },
                         onVerificationRequired = { url, message ->
+                            showLegalConsentDialog = null
                             showPurchaseDialog = null
                             scope.launch {
                                 snackbarHostState.showSnackbar(message)
@@ -251,6 +253,9 @@ fun SubscriptionPlansScreen(
                         },
                         onError = { msg ->
                             purchaseError = msg
+                            scope.launch {
+                                snackbarHostState.showSnackbar(msg)
+                            }
                         }
                     )
                 }

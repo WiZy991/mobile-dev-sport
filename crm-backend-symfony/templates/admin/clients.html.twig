@@ -132,6 +132,8 @@
                     <th>ID</th>
                     <th>Имя</th>
                     <th>Абонемент</th>
+                    <th>Дата покупки</th>
+                    <th>Дата окончания</th>
                     <th>Клуб</th>
                     <th>Теги</th>
                     <th>Email</th>
@@ -179,13 +181,12 @@
                                 {% else %}
                                     <span class="badge bg-secondary">Истёк</span>
                                 {% endif %}
-                                {% if sub.end %}
-                                    <div class="small text-secondary">до {{ sub.end }}</div>
-                                {% endif %}
                             {% else %}
                                 <span class="text-secondary">Нет</span>
                             {% endif %}
                         </td>
+                        <td>{{ sub.start|default('—') }}</td>
+                        <td>{{ sub.end|default('—') }}</td>
                         <td>{{ client.club ? client.club.name : '—' }}</td>
                         <td>{% for tag in client.tags %}<span class="badge me-1" style="background-color: {{ tag.color ?? '#6c757d' }}">{{ tag.name }}</span>{% else %}—{% endfor %}</td>
                         <td>{{ client.email }}</td>
@@ -202,7 +203,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="{{ admin_can_mutate() ? 11 : 10 }}" class="text-center text-secondary">
+                        <td colspan="{{ admin_can_mutate() ? 13 : 12 }}" class="text-center text-secondary">
                             Клиенты не найдены.
                         </td>
                     </tr>

@@ -48,11 +48,12 @@ fun ClubPurchaseConsentDialog(
     onConfirm: () -> Unit,
     onOpenPdf: (LegalPdfAsset) -> Unit,
     onOpenExternalUrl: (String) -> Unit = {},
+    isLoading: Boolean = false,
 ) {
     var safetyBriefed by remember { mutableStateOf(false) }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isLoading) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Card(
@@ -120,6 +121,7 @@ fun ClubPurchaseConsentDialog(
                         Switch(
                             checked = safetyBriefed,
                             onCheckedChange = { safetyBriefed = it },
+                            enabled = !isLoading,
                         )
                         Text(
                             text = "Я проинструктирован по технике безопасности в Клубе",
@@ -136,19 +138,20 @@ fun ClubPurchaseConsentDialog(
                 ) {
                     Button(
                         onClick = onConfirm,
-                        enabled = safetyBriefed,
+                        enabled = safetyBriefed && !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Primary),
                     ) {
                         Text(
-                            text = "Согласен, приобрести абонемент",
+                            text = if (isLoading) "Оформляем…" else "Согласен, приобрести абонемент",
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
                     OutlinedButton(
                         onClick = onDismiss,
+                        enabled = !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp),

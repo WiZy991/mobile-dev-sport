@@ -30,7 +30,11 @@ class PaymentFulfillmentService
             return $payment->getSubscription();
         }
 
-        if (!$payment->isPending() && !$payment->isPaid()) {
+        // Уже оплачен / не pending — второй параллельный вызов не должен создать ещё один Sale.
+        if (!$payment->isPending()) {
+            if ($payment->isPaid()) {
+                return $payment->getSubscription();
+            }
             throw new \RuntimeException('Payment cannot be fulfilled in status: ' . $payment->getStatus());
         }
 
@@ -41,6 +45,12 @@ class PaymentFulfillmentService
         }
         $promo = $payment->getPromoCode();
         $price = $payment->getAmountKopecks() / 100;
+
+        // Сразу помечаем paid до создания Sale — второй поток (после lock/refresh) увидит не-pending.
+        $payment->setStatus(Payment::STATUS_PAID)
+            ->setPaidAt(new \DateTimeImmutable())
+            ->setPaymentWay($paymentWay);
+        $this->em->flush();
 
         $sub = new Subscription();
         $sub->setUser($user)
@@ -93,15 +103,12 @@ class PaymentFulfillmentService
             $promo->incrementUsedCount();
         }
 
-        $payment->setStatus(Payment::STATUS_PAID)
-            ->setPaidAt(new \DateTimeImmutable())
-            ->setPaymentWay($paymentWay)
-            ->setSubscription($sub)
-            ->setSale($sale);
+        $payment->setSubscription($sub)->setSale($sale);
 
         $this->em->persist($sale);
         $this->em->flush();
 
+        $this->expireSiblingPendingPayments($payment);
         $this->notificationScheduler->scheduleSubscriptionExpiryReminders($sub);
 
         return $sub;
@@ -115,6 +122,11 @@ class PaymentFulfillmentService
         if (!$payment->isPending()) {
             throw new \RuntimeException('Payment cannot be fulfilled in status: ' . $payment->getStatus());
         }
+
+        $payment->setStatus(Payment::STATUS_PAID)
+            ->setPaidAt(new \DateTimeImmutable())
+            ->setPaymentWay($paymentWay);
+        $this->em->flush();
 
         $staff = $payment->getStaffUser();
         if ($staff === null) {
@@ -141,13 +153,45 @@ class PaymentFulfillmentService
             $sale->setOrganization($staff->getOrganization());
         }
 
-        $payment->setStatus(Payment::STATUS_PAID)
-            ->setPaidAt($now)
-            ->setPaymentWay($paymentWay)
-            ->setSale($sale);
+        $payment->setSale($sale);
 
         $this->em->persist($sale);
         $this->em->flush();
+    }
+
+    private function expireSiblingPendingPayments(Payment $paid): void
+    {
+        $user = $paid->getUser();
+        $plan = $paid->getSubscriptionPlan();
+        $paidId = $paid->getId();
+        if ($user === null || $plan === null || $paidId === null) {
+            return;
+        }
+
+        /** @var list<Payment> $siblings */
+        $siblings = $this->em->createQueryBuilder()
+            ->select('p')
+            ->from(Payment::class, 'p')
+            ->where('p.user = :user')
+            ->andWhere('p.subscriptionPlan = :plan')
+            ->andWhere('p.type = :type')
+            ->andWhere('p.status = :pending')
+            ->andWhere('p.id != :id')
+            ->setParameter('user', $user)
+            ->setParameter('plan', $plan)
+            ->setParameter('type', Payment::TYPE_SUBSCRIPTION)
+            ->setParameter('pending', Payment::STATUS_PENDING)
+            ->setParameter('id', $paidId)
+            ->getQuery()
+            ->getResult();
+
+        foreach ($siblings as $sibling) {
+            $sibling->setStatus(Payment::STATUS_EXPIRED)
+                ->setFailureReason('Superseded by payment #' . $paidId);
+        }
+        if ($siblings !== []) {
+            $this->em->flush();
+        }
     }
 
     private function resolvePaymentMethod(?string $paymentWay): string
