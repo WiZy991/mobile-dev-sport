@@ -281,10 +281,27 @@
         <div class="col-md-8">
             <div class="content-card mb-3">
                 <div class="mb-2 text-primary small fw-semibold text-uppercase">Абонементы</div>
+                {% if admin_can_mutate() and subscriptions|length > 0 %}
+                <form method="post" action="{{ path('admin_subscriptions_bulk_delete') }}" id="client-subs-bulk-form"
+                      onsubmit="return clientSubsBulkSubmit();" class="mb-2">
+                    <input type="hidden" name="return_to_client" value="{{ client.id }}">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="small text-secondary">Выбрано: <strong id="client-subs-selected-count" class="text-light">0</strong></span>
+                        <button type="submit" class="btn btn-sm btn-outline-danger" id="client-subs-bulk-delete-btn" disabled>
+                            Удалить выбранные
+                        </button>
+                    </div>
+                </form>
+                {% endif %}
                 <div class="table-responsive">
                     <table class="table table-sm table-dark align-middle mb-0">
                         <thead>
                         <tr>
+                            {% if admin_can_mutate() and subscriptions|length > 0 %}
+                            <th style="width:2rem">
+                                <input type="checkbox" class="form-check-input" id="client-subs-check-all" title="Выбрать все">
+                            </th>
+                            {% endif %}
                             <th>ID</th>
                             <th>План</th>
                             <th>Клуб</th>
@@ -302,6 +319,11 @@
                             {% set subEnd = sub.endDate ? sub.endDate|date('Y-m-d') : null %}
                             {% set inPeriod = ymd >= subStart and (subEnd is null or ymd <= subEnd) %}
                             <tr>
+                                {% if admin_can_mutate() %}
+                                <td>
+                                    <input type="checkbox" class="form-check-input client-sub-row-check" form="client-subs-bulk-form" name="ids[]" value="{{ sub.id }}">
+                                </td>
+                                {% endif %}
                                 <td>{{ sub.id }}</td>
                                 <td>{{ sub.plan.name }}</td>
                                 <td>{% if sub.club %}{{ sub.club.name }}{% else %}<span class="text-secondary">Все</span>{% endif %}</td>
@@ -329,6 +351,9 @@
                                 <td>
                                     {% if sub.visitsTotal is not null %}
                                         {{ sub.visitsUsed ?? 0 }} / {{ sub.visitsTotal }}
+                                        {% if (sub.visitsUsed ?? 0) > 0 %}
+                                            <span class="badge bg-info text-dark ms-1" title="Уже были посещения — скорее всего это рабочий абонемент">был вход</span>
+                                        {% endif %}
                                     {% else %}
                                         —
                                     {% endif %}
@@ -342,7 +367,7 @@
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="8" class="text-center text-secondary">
+                                <td colspan="{{ admin_can_mutate() ? 9 : 8 }}" class="text-center text-secondary">
                                     У клиента пока нет абонементов.
                                 </td>
                             </tr>
@@ -497,5 +522,51 @@
             </table>
         </div>
     </div>
+
+    {% if admin_can_mutate() and subscriptions|length > 0 %}
+    <script>
+        (function () {
+            var all = document.getElementById('client-subs-check-all');
+            var deleteBtn = document.getElementById('client-subs-bulk-delete-btn');
+            var countEl = document.getElementById('client-subs-selected-count');
+
+            function selectedBoxes() {
+                return Array.prototype.slice.call(document.querySelectorAll('.client-sub-row-check:checked'));
+            }
+
+            function refreshSelection() {
+                var n = selectedBoxes().length;
+                if (countEl) countEl.textContent = String(n);
+                if (deleteBtn) deleteBtn.disabled = n === 0;
+            }
+
+            if (all) {
+                all.addEventListener('change', function () {
+                    document.querySelectorAll('.client-sub-row-check').forEach(function (cb) {
+                        cb.checked = all.checked;
+                    });
+                    refreshSelection();
+                });
+            }
+            document.querySelectorAll('.client-sub-row-check').forEach(function (cb) {
+                cb.addEventListener('change', refreshSelection);
+            });
+            refreshSelection();
+
+            window.clientSubsBulkSubmit = function () {
+                var n = selectedBoxes().length;
+                if (n === 0) {
+                    alert('Отметьте абонементы галочкой.');
+                    return false;
+                }
+                return confirm(
+                    'Удалить выбранные абонементы (' + n + ') безвозвратно?\n\n' +
+                    'Правило: оставляйте тот, где уже есть посещения.\n' +
+                    'У Фадеева: 1/1 — рабочий; 0/1 без входов — обычно дубли.'
+                );
+            };
+        })();
+    </script>
+    {% endif %}
 {% endblock %}
 

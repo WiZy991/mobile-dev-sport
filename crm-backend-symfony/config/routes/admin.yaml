@@ -127,6 +127,16 @@ admin_subscription_cancel:
   controller: App\Controller\Admin\AdminController::cancelSubscription
   methods: [POST]
 
+admin_subscription_delete:
+  path: /admin/subscriptions/{id}/delete
+  controller: App\Controller\Admin\AdminController::deleteSubscription
+  methods: [POST]
+
+admin_subscriptions_bulk_delete:
+  path: /admin/subscriptions/bulk-delete
+  controller: App\Controller\Admin\AdminController::bulkDeleteSubscriptions
+  methods: [POST]
+
 admin_subscription_change_plan:
   path: /admin/subscriptions/{id}/change-plan
   controller: App\Controller\Admin\AdminController::changeSubscriptionPlan

@@ -1320,6 +1320,96 @@ class AdminController extends AbstractController
         return $this->redirectAfterSubscriptionFreezeAction($subscription, $request);
     }
 
+    #[Route('/subscriptions/{id}/delete', name: 'admin_subscription_delete', methods: ['POST'])]
+    public function deleteSubscription(int $id, Request $request): Response
+    {
+        $subscription = $this->em->getRepository(Subscription::class)->find($id);
+        if (!$subscription) {
+            $this->addFlash('danger', 'Абонемент не найден');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
+        $clientId = $subscription->getUser()->getId();
+        $this->purgeSubscription($subscription);
+        $this->em->flush();
+        $this->addFlash('success', 'Абонемент удалён.');
+
+        if ($request->request->get('return_to') === 'subscriptions') {
+            $redirect = $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+            $statusFilter = $request->request->get('return_status', '');
+            if ($statusFilter !== '') {
+                $redirect->setTargetUrl($redirect->getTargetUrl() . '?status=' . urlencode((string) $statusFilter));
+            }
+
+            return $redirect;
+        }
+
+        return $this->redirectToRoute('admin_client_show', ['id' => $clientId]);
+    }
+
+    #[Route('/subscriptions/bulk-delete', name: 'admin_subscriptions_bulk_delete', priority: 10, methods: ['POST'])]
+    public function bulkDeleteSubscriptions(Request $request): Response
+    {
+        $idsRaw = $request->request->all('ids');
+        if (!\is_array($idsRaw)) {
+            $idsRaw = [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $idsRaw), static fn (int $id) => $id > 0)));
+        $returnClientId = (int) $request->request->get('return_to_client', 0);
+
+        if ($ids === []) {
+            $this->addFlash('danger', 'Выберите абонементы для удаления.');
+
+            return $returnClientId > 0
+                ? $this->redirectToRoute('admin_client_show', ['id' => $returnClientId])
+                : $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+        }
+
+        /** @var list<Subscription> $subs */
+        $subs = $this->em->createQueryBuilder()
+            ->select('s')
+            ->from(Subscription::class, 's')
+            ->where('s.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
+
+        $deleted = 0;
+        foreach ($subs as $sub) {
+            $this->purgeSubscription($sub);
+            ++$deleted;
+        }
+        $this->em->flush();
+        $this->addFlash('success', 'Удалено абонементов: ' . $deleted . '.');
+
+        if ($returnClientId > 0) {
+            return $this->redirectToRoute('admin_client_show', ['id' => $returnClientId]);
+        }
+        if ($request->request->get('return_to') === 'subscriptions') {
+            $redirect = $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+            $statusFilter = $request->request->get('return_status', '');
+            if ($statusFilter !== '') {
+                $redirect->setTargetUrl($redirect->getTargetUrl() . '?status=' . urlencode((string) $statusFilter));
+            }
+
+            return $redirect;
+        }
+
+        return $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);
+    }
+
+    private function purgeSubscription(Subscription $subscription): void
+    {
+        foreach ($this->em->getRepository(Payment::class)->findBy(['subscription' => $subscription]) as $payment) {
+            $payment->setSubscription(null);
+        }
+        foreach ($this->em->getRepository(Sale::class)->findBy(['subscription' => $subscription]) as $sale) {
+            $sale->setSubscription(null);
+        }
+        $this->em->remove($subscription);
+    }
+
     #[Route('/subscriptions/{id}/change-plan', name: 'admin_subscription_change_plan', methods: ['POST'])]
     public function changeSubscriptionPlan(int $id, Request $request): Response
     {

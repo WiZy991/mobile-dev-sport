@@ -68,6 +68,22 @@
         </form>
     {% endif %}
 
+    {% set _vu = sub.visitsUsed ?? 0 %}
+    {% set _hasSale = (sub.sales|length) > 0 %}
+    <form method="post" action="{{ path('admin_subscription_delete', {id: sub.id}) }}" class="sub-mgmt-actions__row"
+          onsubmit="return confirm({% if _vu > 0 or _hasSale %}'Удалить абонемент #{{ sub.id }}?\n\n⚠ Есть посещения ({{ _vu }}) и/или продажа — это может быть РЕАЛЬНЫЙ абонемент, не дубль. Удалять только если уверены.'{% else %}'Удалить абонемент #{{ sub.id }}?\n\nПосещений не было — похоже на дубль.'{% endif %});">
+        {% if return_to is defined and return_to %}
+            <input type="hidden" name="return_to" value="{{ return_to }}">
+        {% endif %}
+        {% if return_status is defined and return_status %}
+            <input type="hidden" name="return_status" value="{{ return_status }}">
+        {% endif %}
+        <button type="submit" class="btn btn-sm btn-danger sub-mgmt-actions__btn sub-mgmt-actions__btn--wide"
+                title="{% if _vu > 0 or _hasSale %}Осторожно: есть посещения или продажа{% else %}Удалить дубль без посещений{% endif %}">
+            Удалить
+        </button>
+    </form>
+
     <form method="post" action="{{ path('admin_subscription_update_dates', {id: sub.id}) }}" class="sub-mgmt-actions__plan mt-1">
         {% if return_to is defined and return_to %}
             <input type="hidden" name="return_to" value="{{ return_to }}">
