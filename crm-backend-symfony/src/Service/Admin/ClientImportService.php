@@ -20,8 +20,9 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  * Excel: несколько листов — по имени листа («Клиенты», «Абонементы», «Записи») или колонка «тип».
  * CSV: одна таблица — колонка «тип» / record_type: client | subscription | booking (или клиент | абонемент | запись).
  *
- * Экспорт Fitness365 («Абонемент» / «активная карта» + «Дата продажи» / «Дата окончания» в строке клиента):
+ * Экспорт Fitness365 («Абонемент» / «активная карта» / «Следующая карта» + «Дата продажи» / «Дата окончания»):
  * после импорта клиента абонемент создаётся автоматически, без требования паспорта.
+ * Режим datesOnly: только даты у уже существующих абонементов по строкам файла (телефон / email / ФИО).
  */
 final class ClientImportService
 {
@@ -31,7 +32,7 @@ final class ClientImportService
     ) {
     }
 
-    public function import(UploadedFile $file, bool $updateExisting): ClientImportResult
+    public function import(UploadedFile $file, bool $updateExisting, bool $datesOnly = false): ClientImportResult
     {
         $ext = strtolower($file->getClientOriginalExtension() ?: '');
         $mime = (string) $file->getMimeType();
@@ -104,32 +105,35 @@ final class ClientImportService
         $booksUpdated = 0;
         $skipped = 0;
 
-        foreach ($clientJobs as $job) {
-            try {
-                $r = $this->importOneClientRow($job['data'], $updateExisting);
-                if ($r === 'created') {
-                    ++$clientsCreated;
-                } elseif ($r === 'updated') {
-                    ++$clientsUpdated;
-                } else {
+        // Режим «только даты»: не создаём/не правим клиентов и записи — только даты у уже существующих абонементов
+        // по строкам из файла (телефон / email / ФИО).
+        if (!$datesOnly) {
+            foreach ($clientJobs as $job) {
+                try {
+                    $r = $this->importOneClientRow($job['data'], $updateExisting);
+                    if ($r === 'created') {
+                        ++$clientsCreated;
+                    } elseif ($r === 'updated') {
+                        ++$clientsUpdated;
+                    } else {
+                        ++$skipped;
+                    }
+                } catch (\Throwable $e) {
+                    $errors[] = $job['ref'] . ': ' . $e->getMessage();
                     ++$skipped;
                 }
-            } catch (\Throwable $e) {
-                $errors[] = $job['ref'] . ': ' . $e->getMessage();
-                ++$skipped;
             }
+
+            $this->em->flush();
         }
 
-        $this->em->flush();
-
         // Fitness365-style: абонемент в той же строке, что клиент (колонки «Абонемент» + даты).
-        // Паспорт не требуется — в отличие от ручной выдачи в админке.
         foreach ($clientJobs as $job) {
             if (!$this->clientRowHasInlineSubscription($job['data'])) {
                 continue;
             }
             try {
-                $r = $this->importSubscriptionRow($job['data'], $updateExisting);
+                $r = $this->importSubscriptionRow($job['data'], $updateExisting || $datesOnly, $datesOnly);
                 if ($r === 'created') {
                     ++$subsCreated;
                 } elseif ($r === 'updated') {
@@ -145,7 +149,7 @@ final class ClientImportService
 
         foreach ($subJobs as $job) {
             try {
-                $r = $this->importSubscriptionRow($job['data'], $updateExisting);
+                $r = $this->importSubscriptionRow($job['data'], $updateExisting || $datesOnly, $datesOnly);
                 if ($r === 'created') {
                     ++$subsCreated;
                 } elseif ($r === 'updated') {
@@ -159,19 +163,21 @@ final class ClientImportService
             }
         }
 
-        foreach ($bookJobs as $job) {
-            try {
-                $r = $this->importBookingRow($job['data'], $updateExisting);
-                if ($r === 'created') {
-                    ++$booksCreated;
-                } elseif ($r === 'updated') {
-                    ++$booksUpdated;
-                } else {
+        if (!$datesOnly) {
+            foreach ($bookJobs as $job) {
+                try {
+                    $r = $this->importBookingRow($job['data'], $updateExisting);
+                    if ($r === 'created') {
+                        ++$booksCreated;
+                    } elseif ($r === 'updated') {
+                        ++$booksUpdated;
+                    } else {
+                        ++$skipped;
+                    }
+                } catch (\Throwable $e) {
+                    $errors[] = $job['ref'] . ': ' . $e->getMessage();
                     ++$skipped;
                 }
-            } catch (\Throwable $e) {
-                $errors[] = $job['ref'] . ': ' . $e->getMessage();
-                ++$skipped;
             }
         }
 
@@ -376,6 +382,7 @@ final class ClientImportService
             'plan_name' => 'plan_name',
             'абонемент' => 'plan_name',
             'активная карта' => 'plan_name',
+            'следующая карта' => 'plan_name',
             'карта' => 'plan_name',
             'начало абонемента' => 'subscription_start',
             'дата начала абонемента' => 'subscription_start',
@@ -387,6 +394,9 @@ final class ClientImportService
             'subscription_end' => 'subscription_end',
             'статус абонемента' => 'subscription_status',
             'subscription_status' => 'subscription_status',
+            'дней до окончания' => '_ignore',
+            'доступное количество' => '_ignore',
+            'последнее посещение' => '_ignore',
             'всего посещений' => 'visits_total',
             'visits_total' => 'visits_total',
             'использовано посещений' => 'visits_used',
@@ -536,31 +546,59 @@ final class ClientImportService
     /**
      * @param array<string, mixed> $data
      */
-    private function importSubscriptionRow(array $data, bool $updateExisting): string
+    private function importSubscriptionRow(array $data, bool $updateExisting, bool $datesOnly = false): string
     {
         $user = $this->resolveUserForSubBooking($data);
         if (!$user) {
-            throw new \RuntimeException('Клиент не найден (нужен ID клиента, email или телефон).');
-        }
-
-        $plan = $this->resolvePlan($data);
-        if (!$plan) {
-            throw new \RuntimeException('Тариф не найден (колонки «ID тарифа» или «Название тарифа»).');
+            throw new \RuntimeException('Клиент не найден (нужен ID клиента, email, телефон или ФИО).');
         }
 
         $start = $this->parseDateField($data['subscription_start'] ?? null);
+        $end = $this->parseDateField($data['subscription_end'] ?? null);
+        $status = $this->normalizeSubscriptionStatus($data['subscription_status'] ?? 'active');
+        $plan = $this->resolvePlan($data);
+
+        // Режим «только даты» или строка без тарифа: правим даты активного/замороженного абонемента.
+        if ($datesOnly || !$plan) {
+            if ($start === null && $end === null) {
+                throw new \RuntimeException('Нет дат абонемента (нужны «Дата продажи» / «Дата окончания»).');
+            }
+            if (!$updateExisting && !$datesOnly) {
+                return 'skip';
+            }
+            $sub = $this->findActiveSubscriptionForDatesUpdate($user);
+            if (!$sub) {
+                if ($datesOnly) {
+                    throw new \RuntimeException('Нет активного/замороженного абонемента у клиента — даты некуда записать.');
+                }
+                throw new \RuntimeException('Тариф не найден и нет активного абонемента — укажите «Название тарифа» / «Следующая карта».');
+            }
+            if ($this->subscriptionDatesProtectedFromImport($sub)) {
+                return 'skip';
+            }
+            if ($start !== null) {
+                $sub->setStartDate($start);
+            }
+            if (array_key_exists('subscription_end', $data)) {
+                $sub->setEndDate($end);
+            }
+            $this->em->persist($sub);
+
+            return 'updated';
+        }
+
         if ($start === null) {
             throw new \RuntimeException('Не указана дата начала абонемента.');
         }
-
-        $end = $this->parseDateField($data['subscription_end'] ?? null);
-        $status = $this->normalizeSubscriptionStatus($data['subscription_status'] ?? 'active');
 
         $subIdRaw = $data['subscription_id'] ?? null;
         if ($subIdRaw !== null && $subIdRaw !== '' && is_numeric($subIdRaw)) {
             $sub = $this->em->getRepository(Subscription::class)->find((int) $subIdRaw);
             if ($sub && $sub->getUser()->getId() === $user->getId()) {
                 if (!$updateExisting) {
+                    return 'skip';
+                }
+                if ($this->subscriptionDatesProtectedFromImport($sub)) {
                     return 'skip';
                 }
                 $this->applySubscriptionFields($sub, $plan, $start, $end, $status, $data);
@@ -580,10 +618,27 @@ final class ClientImportService
             if (!$updateExisting) {
                 return 'skip';
             }
+            if ($this->subscriptionDatesProtectedFromImport($existing)) {
+                return 'skip';
+            }
             $this->applySubscriptionFields($existing, $plan, $start, $end, $status, $data);
             $this->em->persist($existing);
 
             return 'updated';
+        }
+
+        // Уже есть абонемент того же тарифа — обновить даты, не плодить дубликат.
+        if ($updateExisting) {
+            $active = $this->findActiveSubscriptionForDatesUpdate($user);
+            if ($active !== null && $active->getPlan()->getId() === $plan->getId()) {
+                if ($this->subscriptionDatesProtectedFromImport($active)) {
+                    return 'skip';
+                }
+                $this->applySubscriptionFields($active, $plan, $start, $end, $status, $data);
+                $this->em->persist($active);
+
+                return 'updated';
+            }
         }
 
         $sub = new Subscription();
@@ -705,11 +760,22 @@ final class ClientImportService
         }
         $ph2 = trim((string) ($data['phone'] ?? ''));
         if ($ph2 !== '') {
-            return $this->findUserByLoosePhone($ph2);
+            $u = $this->findUserByLoosePhone($ph2);
+            if ($u) {
+                return $u;
+            }
         }
         $id2 = trim((string) ($data['id'] ?? ''));
         if ($id2 !== '' && ctype_digit($id2)) {
-            return $this->em->getRepository(User::class)->find((int) $id2);
+            $u = $this->em->getRepository(User::class)->find((int) $id2);
+            if ($u) {
+                return $u;
+            }
+        }
+
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name !== '' && $name !== '—') {
+            return $this->findUserByFullName($name);
         }
 
         return null;
@@ -721,8 +787,101 @@ final class ClientImportService
     private function clientRowHasInlineSubscription(array $data): bool
     {
         $planName = trim((string) ($data['plan_name'] ?? ''));
+        if ($planName !== '' && $planName !== '—') {
+            return true;
+        }
 
-        return $planName !== '' && $planName !== '—';
+        return $this->parseDateField($data['subscription_start'] ?? null) !== null
+            || $this->parseDateField($data['subscription_end'] ?? null) !== null;
+    }
+
+    /**
+     * Активный, иначе замороженный абонемент (самый свежий по дате начала).
+     */
+    private function findActiveSubscriptionForDatesUpdate(User $user): ?Subscription
+    {
+        /** @var list<Subscription> $subs */
+        $subs = $this->em->getRepository(Subscription::class)->findBy(
+            ['user' => $user],
+            ['startDate' => 'DESC', 'id' => 'DESC']
+        );
+
+        $active = null;
+        $frozen = null;
+        foreach ($subs as $sub) {
+            $st = $sub->getStatus();
+            if ($st === 'active' && $active === null) {
+                $active = $sub;
+            } elseif ($st === 'frozen' && $frozen === null) {
+                $frozen = $sub;
+            }
+        }
+
+        return $active ?? $frozen;
+    }
+
+    /**
+     * Не перезаписывать абонементы, купленные в CRM за последние 3 дня (сегодня и 2 дня назад).
+     */
+    private function subscriptionDatesProtectedFromImport(Subscription $sub): bool
+    {
+        $start = $sub->getStartDate();
+        if ($start === null) {
+            return false;
+        }
+        $cutoff = (new \DateTimeImmutable('today'))->modify('-2 days');
+
+        return $start >= $cutoff;
+    }
+
+    private function findUserByFullName(string $name): ?User
+    {
+        $needle = $this->normalizePersonName($name);
+        if ($needle === '') {
+            return null;
+        }
+
+        /** @var list<User> $users */
+        $users = $this->em->createQueryBuilder()
+            ->select('u')
+            ->from(User::class, 'u')
+            ->where('LOWER(u.name) = :exact')
+            ->setParameter('exact', mb_strtolower(trim($name)))
+            ->setMaxResults(5)
+            ->getQuery()
+            ->getResult();
+
+        if ($users === []) {
+            /** @var list<User> $candidates */
+            $candidates = $this->em->createQueryBuilder()
+                ->select('u')
+                ->from(User::class, 'u')
+                ->where('u.name LIKE :like')
+                ->setParameter('like', '%' . trim($name) . '%')
+                ->setMaxResults(50)
+                ->getQuery()
+                ->getResult();
+            $users = [];
+            foreach ($candidates as $u) {
+                if ($this->normalizePersonName($u->getName()) === $needle) {
+                    $users[] = $u;
+                }
+            }
+        }
+
+        if (count($users) === 1) {
+            return $users[0];
+        }
+
+        return null;
+    }
+
+    private function normalizePersonName(string $name): string
+    {
+        $n = mb_strtolower(trim($name));
+        $n = preg_replace('/\s+/u', ' ', $n) ?? $n;
+
+        return $n;
     }
 
     /**
@@ -742,6 +901,12 @@ final class ClientImportService
             'абонемент на год' => ['на 12 месяцев', 'абонемент на 12 месяцев', '12 месяцев'],
             'на 12 месяцев' => ['абонемент на год', 'абонемент на 12 месяцев', '12 месяцев'],
             'абонемент на 12 месяцев' => ['на 12 месяцев', 'абонемент на год', '12 месяцев'],
+            'абонемент на 6 месяцев' => ['на 6 месяцев', '6 месяцев'],
+            'на 6 месяцев' => ['абонемент на 6 месяцев', '6 месяцев'],
+            'абонемент на 1 месяц' => ['на 1 месяц', '1 месяц', 'месяц'],
+            'на 1 месяц' => ['абонемент на 1 месяц', '1 месяц'],
+            'разовое посещение' => ['разовое', '1 посещение'],
+            'разовое' => ['разовое посещение', '1 посещение'],
         ];
 
         $out = [$low];

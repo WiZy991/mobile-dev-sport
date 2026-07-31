@@ -363,9 +363,10 @@ class AdminController extends AbstractController
             }
 
             $updateExisting = $request->request->getBoolean('update_existing');
+            $datesOnly = $request->request->getBoolean('dates_only');
 
             try {
-                $result = $this->clientImportService->import($file, $updateExisting);
+                $result = $this->clientImportService->import($file, $updateExisting, $datesOnly);
             } catch (\InvalidArgumentException $e) {
                 $this->addFlash('danger', $e->getMessage());
 
