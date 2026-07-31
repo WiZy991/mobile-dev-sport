@@ -197,6 +197,11 @@ admin_sale_new:
   controller: App\Controller\Admin\AdminController::createSale
   methods: [POST]
 
+admin_sales_bulk_delete:
+  path: /admin/sales/bulk-delete
+  controller: App\Controller\Admin\AdminController::bulkDeleteSales
+  methods: [POST]
+
 admin_training_new:
   path: /admin/trainings/new
   controller: App\Controller\Admin\AdminController::createTraining

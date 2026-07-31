@@ -1575,6 +1575,96 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_section', ['section' => 'tasks']);
     }
 
+    #[Route('/sales/bulk-delete', name: 'admin_sales_bulk_delete', priority: 10, methods: ['POST'])]
+    public function bulkDeleteSales(Request $request): Response
+    {
+        $idsRaw = $request->request->all('ids');
+        if (!\is_array($idsRaw)) {
+            $idsRaw = [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $idsRaw), static fn (int $id) => $id > 0)));
+        $deleteSubscriptions = $request->request->getBoolean('delete_subscriptions');
+
+        $redirectParams = [
+            'section' => 'sales',
+            'date_from' => (string) $request->request->get('date_from', ''),
+            'date_to' => (string) $request->request->get('date_to', ''),
+        ];
+
+        if ($ids === []) {
+            $this->addFlash('danger', 'Выберите продажи для удаления.');
+
+            return $this->redirectToRoute('admin_section', $redirectParams);
+        }
+
+        /** @var list<Sale> $sales */
+        $sales = $this->em->createQueryBuilder()
+            ->select('s')
+            ->from(Sale::class, 's')
+            ->leftJoin('s.subscription', 'sub')->addSelect('sub')
+            ->where('s.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
+
+        $deletedSales = 0;
+        $deletedSubs = 0;
+        /** @var array<int, Subscription> $subsToDelete */
+        $subsToDelete = [];
+
+        foreach ($sales as $sale) {
+            $saleId = $sale->getId();
+            if ($saleId === null) {
+                continue;
+            }
+
+            /** @var list<Payment> $payments */
+            $payments = $this->em->getRepository(Payment::class)->findBy(['sale' => $sale]);
+            foreach ($payments as $payment) {
+                $payment->setSale(null);
+            }
+
+            if ($deleteSubscriptions) {
+                $sub = $sale->getSubscription();
+                if ($sub !== null && $sub->getId() !== null) {
+                    $subsToDelete[$sub->getId()] = $sub;
+                }
+            }
+
+            $sale->setSubscription(null);
+            $this->em->remove($sale);
+            ++$deletedSales;
+        }
+
+        $this->em->flush();
+
+        if ($deleteSubscriptions && $subsToDelete !== []) {
+            foreach ($subsToDelete as $sub) {
+                /** @var list<Payment> $subPayments */
+                $subPayments = $this->em->getRepository(Payment::class)->findBy(['subscription' => $sub]);
+                foreach ($subPayments as $payment) {
+                    $payment->setSubscription(null);
+                }
+                // Другие продажи на этот абонемент уже отвязаны или удалены выше.
+                $remainingSales = $this->em->getRepository(Sale::class)->findBy(['subscription' => $sub]);
+                foreach ($remainingSales as $otherSale) {
+                    $otherSale->setSubscription(null);
+                }
+                $this->em->remove($sub);
+                ++$deletedSubs;
+            }
+            $this->em->flush();
+        }
+
+        $msg = 'Удалено продаж: ' . $deletedSales . '.';
+        if ($deleteSubscriptions) {
+            $msg .= ' Удалено абонементов: ' . $deletedSubs . '.';
+        }
+        $this->addFlash('success', $msg);
+
+        return $this->redirectToRoute('admin_section', $redirectParams);
+    }
+
     #[Route('/sales/new', name: 'admin_sale_new', methods: ['POST'])]
     public function createSale(Request $request): Response
     {

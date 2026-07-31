@@ -7,9 +7,11 @@
         <h1 class="h4 mb-0">Продажи</h1>
         <div>
             <a href="{{ path('admin_sales_export') }}?date_from={{ dateFrom|default('') }}&date_to={{ dateTo|default('') }}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
+            {% if admin_can_mutate() %}
             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNewSale">
                 + Новая продажа
             </button>
+            {% endif %}
         </div>
     </div>
 
@@ -29,11 +31,38 @@
         </form>
     </div>
 
+    {% if admin_can_mutate() %}
+    <div class="content-card mb-3 sales-bulk-toolbar">
+        <form method="post" action="{{ path('admin_sales_bulk_delete') }}" id="sales-bulk-form"
+              onsubmit="return salesBulkSubmit(event);">
+            <input type="hidden" name="date_from" value="{{ dateFrom|default('') }}">
+            <input type="hidden" name="date_to" value="{{ dateTo|default('') }}">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="small text-secondary">Выбрано: <strong id="sales-selected-count" class="text-light">0</strong></span>
+                <button type="submit" class="btn btn-sm btn-outline-danger" id="sales-bulk-delete-btn" disabled>
+                    Удалить выбранные
+                </button>
+                <div class="form-check mb-0 ms-1">
+                    <input class="form-check-input" type="checkbox" name="delete_subscriptions" value="1" id="sales-delete-subs" checked>
+                    <label class="form-check-label small text-secondary" for="sales-delete-subs">
+                        Также удалить связанные абонементы
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
     <div class="content-card">
         <div class="table-responsive">
             <table class="table table-sm table-dark align-middle mb-0">
                 <thead>
                 <tr>
+                    {% if admin_can_mutate() %}
+                        <th style="width:2rem">
+                            <input type="checkbox" class="form-check-input" id="sales-check-all" title="Выбрать все на странице">
+                        </th>
+                    {% endif %}
                     <th>ID</th>
                     <th>Клиент</th>
                     <th>Товар / услуга</th>
@@ -49,6 +78,11 @@
                 <tbody>
                 {% for sale in sales %}
                     <tr>
+                        {% if admin_can_mutate() %}
+                            <td>
+                                <input type="checkbox" class="form-check-input sale-row-check" form="sales-bulk-form" name="ids[]" value="{{ sale.id }}">
+                            </td>
+                        {% endif %}
                         <td>{{ sale.id }}</td>
                         <td>{{ sale.user ? sale.user.name : sale.clientName }}</td>
                         <td>{{ sale.productName }}</td>
@@ -67,7 +101,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="10" class="text-center text-secondary">
+                        <td colspan="{{ admin_can_mutate() ? 11 : 10 }}" class="text-center text-secondary">
                             Пока нет ни одной продажи.
                         </td>
                     </tr>
@@ -89,6 +123,7 @@
         } %}
     </div>
 
+    {% if admin_can_mutate() %}
     {# Модальное окно "Новая продажа" #}
     <div class="modal fade" id="modalNewSale" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -167,6 +202,48 @@
                 nameInput.setAttribute('required', 'required');
             }
         });
-    </script>
-{% endblock %}
 
+        (function () {
+            var all = document.getElementById('sales-check-all');
+            var deleteBtn = document.getElementById('sales-bulk-delete-btn');
+            var countEl = document.getElementById('sales-selected-count');
+
+            function selectedBoxes() {
+                return Array.prototype.slice.call(document.querySelectorAll('.sale-row-check:checked'));
+            }
+
+            function refreshSelection() {
+                var n = selectedBoxes().length;
+                if (countEl) countEl.textContent = String(n);
+                if (deleteBtn) deleteBtn.disabled = n === 0;
+            }
+
+            if (all) {
+                all.addEventListener('change', function () {
+                    document.querySelectorAll('.sale-row-check').forEach(function (cb) {
+                        cb.checked = all.checked;
+                    });
+                    refreshSelection();
+                });
+            }
+            document.querySelectorAll('.sale-row-check').forEach(function (cb) {
+                cb.addEventListener('change', refreshSelection);
+            });
+            refreshSelection();
+
+            window.salesBulkSubmit = function () {
+                var n = selectedBoxes().length;
+                if (n === 0) {
+                    alert('Отметьте продажи галочкой.');
+                    return false;
+                }
+                var withSubs = document.getElementById('sales-delete-subs');
+                var extra = withSubs && withSubs.checked
+                    ? ' Вместе с ними будут удалены связанные абонементы.'
+                    : '';
+                return confirm('Удалить выбранные продажи (' + n + ')?' + extra);
+            };
+        })();
+    </script>
+    {% endif %}
+{% endblock %}
