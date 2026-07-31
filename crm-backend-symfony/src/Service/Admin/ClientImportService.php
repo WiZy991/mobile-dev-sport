@@ -236,7 +236,8 @@ final class ClientImportService
             $sheet = $spreadsheet->getSheet($si);
             $title = $sheet->getTitle();
             $lower = mb_strtolower($title);
-            $rows = $sheet->toArray('', true, true, false);
+            // formatData=false: даты остаются Excel-serial (число), а не строкой в локали en_US (m/d/Y).
+            $rows = $sheet->toArray('', true, false, false);
             $out = [];
             foreach ($rows as $row) {
                 $out[] = array_map(fn ($c) => is_string($c) ? trim($c) : $c, $row);
@@ -822,6 +823,7 @@ final class ClientImportService
 
     /**
      * Не перезаписывать абонементы, купленные в CRM за последние 3 дня (сегодня и 2 дня назад).
+     * Кривые периоды (конец раньше начала) и «будущие» даты от кривого импорта — не защищаем.
      */
     private function subscriptionDatesProtectedFromImport(Subscription $sub): bool
     {
@@ -829,9 +831,14 @@ final class ClientImportService
         if ($start === null) {
             return false;
         }
-        $cutoff = (new \DateTimeImmutable('today'))->modify('-2 days');
+        $end = $sub->getEndDate();
+        if ($end !== null && $end < $start) {
+            return false;
+        }
+        $today = new \DateTimeImmutable('today');
+        $from = $today->modify('-2 days');
 
-        return $start >= $cutoff;
+        return $start >= $from && $start <= $today;
     }
 
     private function findUserByFullName(string $name): ?User
@@ -1078,12 +1085,18 @@ final class ClientImportService
         if ($value === null || $value === '') {
             return null;
         }
-        if (is_numeric($value)) {
-            try {
-                $dt = ExcelDate::excelToDateTimeObject((float) $value);
+        if ($value instanceof \DateTimeInterface) {
+            return \DateTimeImmutable::createFromInterface($value);
+        }
+        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value) && !preg_match('/[.\-\/]/', (string) $value))) {
+            $num = (float) $value;
+            if ($num >= 20000 && $num < 1000000) {
+                try {
+                    $dt = ExcelDate::excelToDateTimeObject($num);
 
-                return \DateTimeImmutable::createFromMutable($dt);
-            } catch (\Throwable) {
+                    return \DateTimeImmutable::createFromMutable($dt);
+                } catch (\Throwable) {
+                }
             }
         }
         $v = trim((string) $value);
@@ -1102,7 +1115,10 @@ final class ClientImportService
         ) {
             $dt = \DateTimeImmutable::createFromFormat('!' . $fmt, $v);
             if ($dt instanceof \DateTimeImmutable) {
-                return $dt;
+                $errors = \DateTimeImmutable::getLastErrors();
+                if (($errors['warning_count'] ?? 0) === 0 && ($errors['error_count'] ?? 0) === 0) {
+                    return $dt;
+                }
             }
         }
 
@@ -1258,29 +1274,62 @@ final class ClientImportService
         if ($value === null || $value === '') {
             return null;
         }
-        if (is_numeric($value)) {
-            try {
-                $dt = ExcelDate::excelToDateTimeObject((float) $value);
+        if ($value instanceof \DateTimeInterface) {
+            return \DateTimeImmutable::createFromInterface($value)->setTime(0, 0);
+        }
+        // Excel serial (после toArray с formatData=false). Не путать с годом «2026».
+        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value) && !preg_match('/[.\-\/]/', (string) $value))) {
+            $num = (float) $value;
+            if ($num >= 20000 && $num < 1000000) {
+                try {
+                    $dt = ExcelDate::excelToDateTimeObject($num);
 
-                return \DateTimeImmutable::createFromMutable($dt);
-            } catch (\Throwable) {
+                    return \DateTimeImmutable::createFromMutable($dt)->setTime(0, 0);
+                } catch (\Throwable) {
+                }
             }
         }
         $v = trim((string) $value);
         if ($v === '' || $v === '—') {
             return null;
         }
-        foreach (['Y-m-d', 'd.m.Y', 'd/m/Y', 'm/d/Y'] as $fmt) {
-            $dt = \DateTimeImmutable::createFromFormat('!' . $fmt, $v);
-            if ($dt instanceof \DateTimeImmutable) {
-                return $dt;
-            }
+        // Обрезать время, если пришло «13.07.2026 00:00:00»
+        if (preg_match('/^(\d{1,4}[.\-\/]\d{1,2}[.\-\/]\d{1,4})\b/', $v, $onlyDate)) {
+            $v = $onlyDate[1];
         }
-        try {
-            return new \DateTimeImmutable($v);
-        } catch (\Throwable) {
+
+        // Российский формат ДД.ММ.ГГГГ (Fitness365 и т.п.) — только так, без overflow month=13.
+        if (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/', $v, $m)) {
+            return $this->dateFromParts((int) $m[3], (int) $m[2], (int) $m[1]);
+        }
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $v, $m)) {
+            return $this->dateFromParts((int) $m[1], (int) $m[2], (int) $m[3]);
+        }
+        // Слэши: если одно из чисел > 12 — однозначно; иначе предпочитаем ДД/ММ/ГГГГ (не US).
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $v, $m)) {
+            $a = (int) $m[1];
+            $b = (int) $m[2];
+            $y = (int) $m[3];
+            if ($a > 12) {
+                return $this->dateFromParts($y, $b, $a); // d/m/Y
+            }
+            if ($b > 12) {
+                return $this->dateFromParts($y, $a, $b); // m/d/Y
+            }
+
+            return $this->dateFromParts($y, $b, $a); // ambiguous → EU
+        }
+
+        return null;
+    }
+
+    private function dateFromParts(int $year, int $month, int $day): ?\DateTimeImmutable
+    {
+        if (!checkdate($month, $day, $year)) {
             return null;
         }
+
+        return (new \DateTimeImmutable())->setDate($year, $month, $day)->setTime(0, 0);
     }
 
     private function formatPhoneForDb(string $raw): string
