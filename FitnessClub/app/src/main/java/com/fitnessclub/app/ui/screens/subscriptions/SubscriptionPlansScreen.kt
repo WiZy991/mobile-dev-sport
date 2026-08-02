@@ -134,10 +134,11 @@ fun SubscriptionPlansScreen(
                         key = { it.safeId }
                     ) { plan ->
                         val discountedPrice = viewModel.discountedPrice(plan)
-                        val hasDiscount = uiState.appliedPromoCode != null && discountedPrice < plan.price
+                        val strikePrice = viewModel.strikeThroughPrice(plan)
                         SubscriptionPlanCard(
                             plan = plan,
-                            finalPrice = if (hasDiscount) discountedPrice else null,
+                            finalPrice = if (strikePrice != null) discountedPrice else null,
+                            listPrice = strikePrice,
                             onPurchase = { showPurchaseDialog = plan }
                         )
                     }
@@ -207,10 +208,12 @@ fun SubscriptionPlansScreen(
     if (pdfOverlay == null && showLegalConsentDialog == null) {
         showPurchaseDialog?.let { plan ->
             val discountedPrice = viewModel.discountedPrice(plan)
+            val strikePrice = viewModel.strikeThroughPrice(plan)
             SubscriptionPurchaseConfirmDialog(
                 plan = plan,
                 finalPrice = discountedPrice,
-                hasDiscount = uiState.appliedPromoCode != null && discountedPrice < plan.price,
+                listPrice = strikePrice,
+                hasDiscount = strikePrice != null,
                 isLoading = uiState.isLoading,
                 error = purchaseError,
                 onDismiss = { showPurchaseDialog = null; purchaseError = null },
@@ -346,6 +349,7 @@ private fun PromoCodeAppliedCard(
 private fun SubscriptionPlanCard(
     plan: SubscriptionPlan,
     finalPrice: Double?,
+    listPrice: Double? = null,
     onPurchase: () -> Unit
 ) {
     val isPopular = plan.isPopular
@@ -456,9 +460,9 @@ private fun SubscriptionPlanCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        if (finalPrice != null) {
+                        if (finalPrice != null && listPrice != null) {
                             Text(
-                                text = "${plan.price.toInt()} ₽",
+                                text = "${listPrice.toInt()} ₽",
                                 style = MaterialTheme.typography.bodyMedium,
                                 textDecoration = TextDecoration.LineThrough,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

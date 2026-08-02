@@ -15,6 +15,7 @@ final class SubscriptionPurchaseQuote
         public readonly float $discountAmount,
         public readonly int $amountKopecks,
         public readonly ?PromoCode $promo,
+        public readonly ?float $groupDiscountPercent = null,
     ) {}
 }
 
@@ -43,26 +44,46 @@ class SubscriptionPurchaseQuoteService
         return $this->em->getRepository(SubscriptionPlan::class)->find($planId);
     }
 
-    public function quote(SubscriptionPlan $plan, string $promoCodeRaw, bool $reservePromo = false): SubscriptionPurchaseQuote
-    {
-        $price = $plan->getPrice();
+    /**
+     * Цена с учётом скидки группы клиента, затем промокода.
+     */
+    public function quote(
+        SubscriptionPlan $plan,
+        string $promoCodeRaw,
+        bool $reservePromo = false,
+        ?User $user = null,
+    ): SubscriptionPurchaseQuote {
+        $listPrice = $plan->getPrice();
+        $price = $listPrice;
         $discountAmount = 0.0;
         $promo = null;
+        $groupDiscountPercent = null;
+
+        if ($user !== null) {
+            $group = $user->getClientGroup();
+            if ($group !== null && $group->getDiscountPercent() > 0) {
+                $groupDiscountPercent = $group->getDiscountPercent();
+                $groupDisc = round($listPrice * $groupDiscountPercent / 100, 2);
+                $discountAmount += $groupDisc;
+                $price = max(0.0, $listPrice - $groupDisc);
+            }
+        }
 
         if ($promoCodeRaw !== '') {
             $promo = $this->em->getRepository(PromoCode::class)->findOneBy([
                 'code' => strtoupper($promoCodeRaw),
             ]);
             if ($promo && $promo->isValid()) {
+                $promoDisc = 0.0;
                 if ($promo->getDiscountPercent() !== null) {
-                    $discountAmount = round($price * $promo->getDiscountPercent() / 100, 2);
+                    $promoDisc = round($price * $promo->getDiscountPercent() / 100, 2);
                 } elseif ($promo->getDiscountAmount() !== null) {
-                    $discountAmount = min($promo->getDiscountAmount(), $price);
+                    $promoDisc = min($promo->getDiscountAmount(), $price);
                 }
-                $price = max(0, $price - $discountAmount);
+                $discountAmount += $promoDisc;
+                $price = max(0.0, $price - $promoDisc);
             } else {
                 $promo = null;
-                $discountAmount = 0.0;
             }
         }
 
@@ -71,11 +92,12 @@ class SubscriptionPurchaseQuoteService
         }
 
         return new SubscriptionPurchaseQuote(
-            originalPrice: $plan->getPrice(),
+            originalPrice: $listPrice,
             finalPrice: $price,
             discountAmount: $discountAmount,
             amountKopecks: (int) round($price * 100),
             promo: $promo,
+            groupDiscountPercent: $groupDiscountPercent,
         );
     }
 

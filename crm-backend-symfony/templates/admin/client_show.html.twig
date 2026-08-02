@@ -9,6 +9,9 @@
     <div class="content-header">
         <h1 class="h4 mb-0">Клиент: {{ client.name }}</h1>
         <div class="d-flex gap-2 align-items-center flex-wrap">
+            {% if client.clientGroup %}
+                <span class="badge bg-success">{{ client.clientGroup.name }} (−{{ client.clientGroup.discountPercent }}%)</span>
+            {% endif %}
             {% for tag in client.tags %}
                 <span class="badge" style="background-color: {{ tag.color ?? '#6c757d' }}">{{ tag.name }}</span>
             {% endfor %}
@@ -117,6 +120,18 @@
                                 <option value="{{ c.id }}" {{ client.club and client.club.id == c.id ? 'selected' : '' }}>{{ c.name }}</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Группа</label>
+                        <select name="client_group_id" class="form-select form-select-sm">
+                            <option value="">— без группы —</option>
+                            {% for g in allClientGroups|default([]) %}
+                                <option value="{{ g.id }}" {{ client.clientGroup and client.clientGroup.id == g.id ? 'selected' : '' }}>{{ g.name }} (−{{ g.discountPercent }}%)</option>
+                            {% endfor %}
+                        </select>
+                        {% if allClientGroups|default([]) is empty %}
+                            <div class="form-text"><a href="{{ path('admin_section', {section: 'client_groups'}) }}">Создать группу</a></div>
+                        {% endif %}
                     </div>
                     <div class="col-12">
                         <label class="form-label small">Теги</label>

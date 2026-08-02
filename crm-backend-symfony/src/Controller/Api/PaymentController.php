@@ -91,7 +91,7 @@ class PaymentController extends AbstractController
             return $this->json(['error' => 'Plan not found'], 404);
         }
 
-        $quote = $this->quoteService->quote($plan, $promoCodeRaw);
+        $quote = $this->quoteService->quote($plan, $promoCodeRaw, false, $auth['user']);
 
         $response = [
             'plan_id' => 'plan-' . $plan->getId(),
@@ -100,6 +100,7 @@ class PaymentController extends AbstractController
             'discount_amount' => $quote->discountAmount,
             'amount_kopecks' => $quote->amountKopecks,
             'promo_valid' => $promoCodeRaw !== '' && $quote->promo !== null,
+            'group_discount_percent' => $quote->groupDiscountPercent,
         ];
 
         if ($promoCodeRaw !== '' && $quote->promo === null) {

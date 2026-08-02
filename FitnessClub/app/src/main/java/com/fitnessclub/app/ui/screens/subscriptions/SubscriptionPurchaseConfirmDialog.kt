@@ -24,6 +24,7 @@ fun SubscriptionPurchaseConfirmDialog(
     plan: SubscriptionPlan,
     finalPrice: Double,
     hasDiscount: Boolean,
+    listPrice: Double? = null,
     isLoading: Boolean = false,
     error: String? = null,
     onDismiss: () -> Unit,
@@ -62,9 +63,9 @@ fun SubscriptionPurchaseConfirmDialog(
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                if (hasDiscount) {
+                if (hasDiscount && listPrice != null) {
                     Text(
-                        text = "Было: ${plan.price.toInt()} ₽",
+                        text = "Было: ${listPrice.toInt()} ₽",
                         style = MaterialTheme.typography.bodyMedium,
                         textDecoration = TextDecoration.LineThrough,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

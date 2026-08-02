@@ -95,6 +95,13 @@ data class SubscriptionPlan(
     
     @SerializedName("price")
     val price: Double,
+
+    /** Каталожная цена до скидки группы (если цена уже со скидкой). */
+    @SerializedName("original_price")
+    val originalPrice: Double? = null,
+
+    @SerializedName("group_discount_percent")
+    val groupDiscountPercent: Double? = null,
     
     @SerializedName("duration_days")
     val durationDays: Int? = null,
@@ -116,4 +123,6 @@ data class SubscriptionPlan(
     val safeDescription: String get() = description ?: ""
     val safeDurationDays: Int get() = durationDays ?: 0
     val safeFeatures: List<String> get() = features ?: emptyList()
+    /** Цена для зачёркивания: каталог или текущая до промокода. */
+    val catalogPrice: Double get() = originalPrice ?: price
 }

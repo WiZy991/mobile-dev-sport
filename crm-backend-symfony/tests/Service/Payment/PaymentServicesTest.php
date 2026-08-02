@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Service\Payment;
 
+use App\Entity\ClientGroup;
 use App\Entity\Payment;
 use App\Entity\PromoCode;
 use App\Entity\Subscription;
@@ -61,6 +62,68 @@ final class SubscriptionPurchaseQuoteServiceTest extends TestCase
 
         self::assertSame(500.0, $quote->finalPrice);
         self::assertNull($quote->promo);
+    }
+
+    public function testQuoteAppliesClientGroupDiscount(): void
+    {
+        $plan = (new SubscriptionPlan())
+            ->setName('Test')
+            ->setPrice(1000.0)
+            ->setType('unlimited');
+
+        $group = (new ClientGroup())
+            ->setName('VIP')
+            ->setDiscountPercent(20.0);
+
+        $user = (new User())
+            ->setEmail('vip@test.ru')
+            ->setPhone('+79990000001')
+            ->setName('VIP')
+            ->setClientGroup($group);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $service = new SubscriptionPurchaseQuoteService($em);
+        $quote = $service->quote($plan, '', false, $user);
+
+        self::assertSame(1000.0, $quote->originalPrice);
+        self::assertSame(800.0, $quote->finalPrice);
+        self::assertSame(200.0, $quote->discountAmount);
+        self::assertSame(20.0, $quote->groupDiscountPercent);
+    }
+
+    public function testQuoteStacksGroupThenPromoPercent(): void
+    {
+        $plan = (new SubscriptionPlan())
+            ->setName('Test')
+            ->setPrice(1000.0)
+            ->setType('unlimited');
+
+        $group = (new ClientGroup())
+            ->setName('VIP')
+            ->setDiscountPercent(20.0);
+
+        $user = (new User())
+            ->setEmail('vip@test.ru')
+            ->setPhone('+79990000001')
+            ->setName('VIP')
+            ->setClientGroup($group);
+
+        $promo = (new PromoCode())
+            ->setCode('EXTRA10')
+            ->setDiscountPercent(10.0)
+            ->setIsActive(true);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $repo = $this->createMock(EntityRepository::class);
+        $repo->method('findOneBy')->willReturn($promo);
+        $em->method('getRepository')->willReturn($repo);
+
+        $service = new SubscriptionPurchaseQuoteService($em);
+        $quote = $service->quote($plan, 'extra10', false, $user);
+
+        // 1000 − 20% = 800; 800 − 10% = 720
+        self::assertSame(720.0, $quote->finalPrice);
+        self::assertSame(280.0, $quote->discountAmount);
     }
 }
 

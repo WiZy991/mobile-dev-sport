@@ -379,6 +379,21 @@ admin_tag_delete:
   controller: App\Controller\Admin\AdminController::deleteTag
   methods: [POST]
 
+admin_client_group_new:
+  path: /admin/client-groups/new
+  controller: App\Controller\Admin\AdminController::createClientGroup
+  methods: [POST]
+
+admin_client_group_update:
+  path: /admin/client-groups/{id}/update
+  controller: App\Controller\Admin\AdminController::updateClientGroup
+  methods: [POST]
+
+admin_client_group_delete:
+  path: /admin/client-groups/{id}/delete
+  controller: App\Controller\Admin\AdminController::deleteClientGroup
+  methods: [POST]
+
 admin_lead_note_new:
   path: /admin/leads/{id}/notes
   controller: App\Controller\Admin\AdminController::addLeadNote

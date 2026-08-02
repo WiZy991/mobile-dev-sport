@@ -34,7 +34,7 @@ class SubscriptionPaymentInitService
             return $sberGate;
         }
 
-        $quote = $this->quoteService->quote($plan, $promoCodeRaw);
+        $quote = $this->quoteService->quote($plan, $promoCodeRaw, false, $user);
 
         if ($quote->amountKopecks <= 0) {
             return [

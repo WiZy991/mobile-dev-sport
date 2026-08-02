@@ -53,6 +53,15 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Группа</label>
+                    <select name="client_group_id" class="form-select form-select-sm">
+                        <option value="">— без группы —</option>
+                        {% for g in allClientGroups|default([]) %}
+                            <option value="{{ g.id }}" {{ (formData.client_group_id|default('') == g.id) ? 'selected' : '' }}>{{ g.name }} (−{{ g.discountPercent }}%)</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 {% if allTags|default([])|length > 0 %}
                 <div class="col-12">
                     <label class="form-label small">Теги</label>

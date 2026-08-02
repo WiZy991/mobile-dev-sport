@@ -306,6 +306,7 @@ private fun SubscriptionPlan.toShopSubscriptionItem(): ShopItem {
         name = safeName.ifBlank { "Абонемент" },
         description = details,
         price = price,
+        oldPrice = originalPrice?.takeIf { it > price },
         category = ShopCategory.SUBSCRIPTIONS,
         isPromo = isPopular,
         promoText = if (isPopular) "Популярный выбор" else null,

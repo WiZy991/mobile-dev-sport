@@ -154,7 +154,7 @@ class SubscriptionController extends AbstractController
             return $sberGate;
         }
 
-        $quote = $this->quoteService->quote($plan, $promoCodeRaw);
+        $quote = $this->quoteService->quote($plan, $promoCodeRaw, false, $user);
         $price = $quote->finalPrice;
         $discountAmount = $quote->discountAmount;
         $promo = $quote->promo;
@@ -222,19 +222,22 @@ class SubscriptionController extends AbstractController
     }
 
     #[Route('/plans', name: 'api_subscriptions_plans', methods: ['GET'])]
-    public function plans(): JsonResponse
+    public function plans(Request $request): JsonResponse
     {
+        $user = $this->userResolver->resolve($request);
         $plans = $this->planCatalog->sortForDisplay(
             $this->em->getRepository(SubscriptionPlan::class)->findAll(),
         );
 
         $freezePolicy = $this->freezePolicy;
-        $data = array_map(static function (SubscriptionPlan $p) use ($freezePolicy) {
-            return [
+        $quoteService = $this->quoteService;
+        $data = array_map(static function (SubscriptionPlan $p) use ($freezePolicy, $quoteService, $user) {
+            $quote = $quoteService->quote($p, '', false, $user);
+            $row = [
                 'id' => 'plan-' . $p->getId(),
                 'name' => $p->getName(),
                 'description' => $p->getDescription(),
-                'price' => $p->getPrice(),
+                'price' => $quote->finalPrice,
                 'duration_days' => $p->getDurationDays(),
                 'visits_count' => $p->getVisitsCount(),
                 'type' => $p->getType(),
@@ -242,6 +245,12 @@ class SubscriptionController extends AbstractController
                 'is_popular' => $p->isPopular(),
                 'freeze_days_total' => $freezePolicy->freezeDaysTotalForPlan($p),
             ];
+            if ($quote->groupDiscountPercent !== null && $quote->discountAmount > 0) {
+                $row['original_price'] = $quote->originalPrice;
+                $row['group_discount_percent'] = $quote->groupDiscountPercent;
+            }
+
+            return $row;
         }, $plans);
 
         return $this->json($data);

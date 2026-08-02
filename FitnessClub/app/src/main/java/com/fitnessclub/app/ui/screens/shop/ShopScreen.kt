@@ -188,10 +188,12 @@ fun ShopScreen(
 
     if (pdfOverlay == null && showLegalConsentForPlan == null) {
         showPurchasePlan?.let { plan ->
+            val listPrice = plan.originalPrice?.takeIf { it > plan.price }
             SubscriptionPurchaseConfirmDialog(
                 plan = plan,
                 finalPrice = plan.price,
-                hasDiscount = false,
+                listPrice = listPrice,
+                hasDiscount = listPrice != null,
                 isLoading = uiState.isPurchasing,
                 error = purchaseError,
                 onDismiss = {

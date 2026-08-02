@@ -47,6 +47,7 @@ final class AdminMenuBuilder
         'promocodes' => 'Промокоды',
         'promotions' => 'Акции',
         'tags' => 'Теги',
+        'client_groups' => 'Группы',
         'settings' => 'Настройки',
         'platform' => 'Организации',
     ];
@@ -62,13 +63,13 @@ final class AdminMenuBuilder
         /** Операционный блок: лиды, записи, документы, тренеры зала и т.д. */
         'ROLE_MANAGER' => [
             'onboarding', 'dashboard', 'tasks', 'clients', 'schedule', 'bookings', 'subscriptions', 'visits',
-            'leads', 'deals', 'comments', 'services', 'mobileapps', 'app_support', 'documents', 'tags', 'settings', 'selfservice', 'promotions',
+            'leads', 'deals', 'comments', 'services', 'mobileapps', 'app_support', 'documents', 'tags', 'client_groups', 'settings', 'selfservice', 'promotions',
             'trainers', 'analytics',
         ],
         /** Касса, склад, отчёты по деньгам */
         'ROLE_FINANCE' => [
             'onboarding', 'dashboard', 'sales', 'cashdesk', 'warehouse', 'finance', 'analytics',
-            'subscriptions', 'clients', 'promocodes', 'promotions', 'visits', 'services', 'app_support',
+            'subscriptions', 'clients', 'promocodes', 'promotions', 'visits', 'services', 'app_support', 'client_groups',
         ],
         /** Тренер зала: расписание (создание/перенос/удаление), записи, абонементы, клиенты, своя карточка в «Тренеры». */
         'ROLE_TRAINER' => [

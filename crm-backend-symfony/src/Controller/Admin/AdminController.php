@@ -21,6 +21,7 @@ use App\Entity\Feedback;
 use App\Entity\Payment;
 use App\Entity\PushToken;
 use App\Entity\Tag;
+use App\Entity\ClientGroup;
 use App\Entity\Club;
 use App\Entity\LeadNote;
 use App\Entity\Expense;
@@ -338,11 +339,13 @@ class AdminController extends AbstractController
 
         $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
         $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+        $allClientGroups = $this->em->getRepository(ClientGroup::class)->findBy([], ['name' => 'ASC']);
         return $this->render('admin/client_new.html.twig', [
             'menu' => $menu,
             'current' => 'clients',
             'allTags' => $allTags,
             'allClubs' => $allClubs,
+            'allClientGroups' => $allClientGroups,
         ]);
     }
 
@@ -444,6 +447,19 @@ class AdminController extends AbstractController
             }
         } catch (\Throwable $e) {
             // Таблицы тегов могут отсутствовать — пропускаем
+        }
+
+        try {
+            $groupIdRaw = $request->request->get('client_group_id');
+            $groupId = ($groupIdRaw !== null && $groupIdRaw !== '') ? (int) $groupIdRaw : 0;
+            if ($groupId > 0) {
+                $group = $this->em->getRepository(ClientGroup::class)->find($groupId);
+                $user->setClientGroup($group instanceof ClientGroup ? $group : null);
+            } else {
+                $user->setClientGroup(null);
+            }
+        } catch (\Throwable $e) {
+            // Таблица групп может отсутствовать до миграции
         }
 
         $clubIdRaw = $request->request->get('club_id');
@@ -809,6 +825,7 @@ class AdminController extends AbstractController
 
         $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
         $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+        $allClientGroups = $this->em->getRepository(ClientGroup::class)->findBy([], ['name' => 'ASC']);
         $subscriptionPlans = $this->planCatalog->sortForDisplay(
             $this->em->getRepository(SubscriptionPlan::class)->findAll()
         );
@@ -830,6 +847,7 @@ class AdminController extends AbstractController
             'activities' => $activities,
             'allTags' => $allTags,
             'allClubs' => $allClubs,
+            'allClientGroups' => $allClientGroups,
             'isCurrentlyInside' => $this->occupancy->isUserCurrentlyInside($client),
         ]);
     }
@@ -899,6 +917,54 @@ class AdminController extends AbstractController
             $this->em->flush();
         }
         return $this->redirectToRoute('admin_section', ['section' => 'tags']);
+    }
+
+    #[Route('/client-groups/new', name: 'admin_client_group_new', methods: ['POST'])]
+    public function createClientGroup(Request $request): Response
+    {
+        $name = trim((string) $request->request->get('name'));
+        $discount = (float) $request->request->get('discount_percent', 0);
+        if ($name !== '') {
+            $group = (new ClientGroup())
+                ->setName($name)
+                ->setDiscountPercent($discount);
+            $this->em->persist($group);
+            $this->em->flush();
+            $this->addFlash('success', 'Группа «' . $name . '» создана.');
+        }
+
+        return $this->redirectToRoute('admin_section', ['section' => 'client_groups']);
+    }
+
+    #[Route('/client-groups/{id}/update', name: 'admin_client_group_update', methods: ['POST'])]
+    public function updateClientGroup(int $id, Request $request): Response
+    {
+        $group = $this->em->getRepository(ClientGroup::class)->find($id);
+        if (!$group) {
+            throw $this->createNotFoundException();
+        }
+        $name = trim((string) $request->request->get('name'));
+        if ($name !== '') {
+            $group->setName($name);
+        }
+        $group->setDiscountPercent((float) $request->request->get('discount_percent', 0));
+        $this->em->flush();
+        $this->addFlash('success', 'Группа сохранена.');
+
+        return $this->redirectToRoute('admin_section', ['section' => 'client_groups']);
+    }
+
+    #[Route('/client-groups/{id}/delete', name: 'admin_client_group_delete', methods: ['POST'])]
+    public function deleteClientGroup(int $id): Response
+    {
+        $group = $this->em->getRepository(ClientGroup::class)->find($id);
+        if ($group) {
+            $this->em->remove($group);
+            $this->em->flush();
+            $this->addFlash('success', 'Группа удалена.');
+        }
+
+        return $this->redirectToRoute('admin_section', ['section' => 'client_groups']);
     }
 
     #[Route('/leads/new', name: 'admin_lead_new', methods: ['POST'])]
@@ -3828,6 +3894,16 @@ class AdminController extends AbstractController
                 'menu' => $menu,
                 'current' => $section,
                 'tags' => $tags,
+            ]);
+        }
+
+        if ($section === 'client_groups') {
+            $groups = $this->em->getRepository(ClientGroup::class)->findBy([], ['name' => 'ASC']);
+
+            return $this->render('admin/client_groups.html.twig', [
+                'menu' => $menu,
+                'current' => $section,
+                'groups' => $groups,
             ]);
         }
 

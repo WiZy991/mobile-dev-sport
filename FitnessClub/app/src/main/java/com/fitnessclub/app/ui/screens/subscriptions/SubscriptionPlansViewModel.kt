@@ -146,6 +146,13 @@ class SubscriptionPlansViewModel @Inject constructor(
         }
         return base
     }
+
+    /** Каталожная цена для зачёркивания, если есть скидка группы и/или промокода. */
+    fun strikeThroughPrice(plan: SubscriptionPlan): Double? {
+        val final = discountedPrice(plan)
+        val catalog = plan.catalogPrice
+        return if (final < catalog) catalog else null
+    }
     
     fun purchasePlan(
         plan: SubscriptionPlan,

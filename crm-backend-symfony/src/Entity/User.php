@@ -140,6 +140,11 @@ class User implements TenantAware
     #[ORM\JoinTable(name: 'user_tags')]
     private Collection $tags;
 
+    /** Группа клиента со скидкой на абонементы. */
+    #[ORM\ManyToOne(targetEntity: ClientGroup::class, inversedBy: 'users')]
+    #[ORM\JoinColumn(name: 'client_group_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?ClientGroup $clientGroup = null;
+
     /** Предпочитаемый / основной клуб (фильтр и выгрузка в CRM). */
     #[ORM\ManyToOne(targetEntity: Club::class)]
     #[ORM\JoinColumn(name: 'club_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
@@ -174,6 +179,18 @@ class User implements TenantAware
     public function clearTags(): self
     {
         $this->tags->clear();
+        return $this;
+    }
+
+    public function getClientGroup(): ?ClientGroup
+    {
+        return $this->clientGroup;
+    }
+
+    public function setClientGroup(?ClientGroup $clientGroup): self
+    {
+        $this->clientGroup = $clientGroup;
+
         return $this;
     }
 
