@@ -1086,6 +1086,33 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_client_show', ['id' => $id]);
     }
 
+    #[Route('/clients/{id}/group', name: 'admin_client_set_group', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function setClientGroup(int $id, Request $request): Response
+    {
+        $user = $this->em->getRepository(User::class)->find($id);
+        if (!$user) {
+            throw $this->createNotFoundException();
+        }
+
+        $groupIdRaw = $request->request->get('client_group_id');
+        $groupId = ($groupIdRaw !== null && $groupIdRaw !== '') ? (int) $groupIdRaw : 0;
+        if ($groupId > 0) {
+            $group = $this->em->getRepository(ClientGroup::class)->find($groupId);
+            $user->setClientGroup($group instanceof ClientGroup ? $group : null);
+        } else {
+            $user->setClientGroup(null);
+        }
+        $this->em->flush();
+
+        if ($user->getClientGroup()) {
+            $this->addFlash('success', 'Клиент добавлен в группу «' . $user->getClientGroup()->getName() . '».');
+        } else {
+            $this->addFlash('success', 'Группа снята с клиента.');
+        }
+
+        return $this->redirectToRoute('admin_client_show', ['id' => $id]);
+    }
+
     #[Route('/clients/{id}/block', name: 'admin_client_block', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function blockClient(int $id): Response
     {

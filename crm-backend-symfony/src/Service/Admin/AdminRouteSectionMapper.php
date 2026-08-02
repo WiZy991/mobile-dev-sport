@@ -72,6 +72,7 @@ final class AdminRouteSectionMapper
         'admin_selfservice_export' => 'selfservice',
         'admin_tag_new' => 'tags',
         'admin_tag_delete' => 'tags',
+        'admin_client_set_group' => 'clients',
         'admin_client_group_new' => 'client_groups',
         'admin_client_group_update' => 'client_groups',
         'admin_client_group_delete' => 'client_groups',

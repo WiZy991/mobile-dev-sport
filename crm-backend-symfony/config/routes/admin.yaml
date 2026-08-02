@@ -379,6 +379,13 @@ admin_tag_delete:
   controller: App\Controller\Admin\AdminController::deleteTag
   methods: [POST]
 
+admin_client_set_group:
+  path: /admin/clients/{id}/group
+  controller: App\Controller\Admin\AdminController::setClientGroup
+  methods: [POST]
+  requirements:
+    id: '\d+'
+
 admin_client_group_new:
   path: /admin/client-groups/new
   controller: App\Controller\Admin\AdminController::createClientGroup

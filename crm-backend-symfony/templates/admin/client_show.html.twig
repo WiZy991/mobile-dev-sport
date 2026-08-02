@@ -264,6 +264,30 @@
                 <p class="text-secondary small mb-0 mt-1">Что видит клиент в мобильном приложении</p>
             </div>
             <div class="content-card mb-3">
+                <div class="text-secondary small mb-2">Группа</div>
+                {% if admin_can_mutate() %}
+                <form method="post" action="{{ path('admin_client_set_group', {id: client.id}) }}">
+                    <select name="client_group_id" class="form-select form-select-sm mb-2" onchange="this.form.submit()">
+                        <option value="">— без группы —</option>
+                        {% for g in allClientGroups|default([]) %}
+                            <option value="{{ g.id }}" {{ client.clientGroup and client.clientGroup.id == g.id ? 'selected' : '' }}>{{ g.name }} (−{{ g.discountPercent }}%)</option>
+                        {% endfor %}
+                    </select>
+                </form>
+                {% if allClientGroups|default([]) is empty %}
+                    <div class="form-text mb-0"><a href="{{ path('admin_section', {section: 'client_groups'}) }}">Создать группу</a></div>
+                {% else %}
+                    <p class="text-secondary small mb-0">Скидка на абонементы в приложении</p>
+                {% endif %}
+                {% else %}
+                    {% if client.clientGroup %}
+                        <span class="badge bg-success">{{ client.clientGroup.name }} (−{{ client.clientGroup.discountPercent }}%)</span>
+                    {% else %}
+                        <span class="text-secondary">не назначена</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <div class="content-card mb-3">
                 <div class="text-secondary small mb-2">Заметки</div>
                 {% if admin_can_mutate() %}
                 <form method="post" action="{{ path('admin_note_new', {id: client.id}) }}">
