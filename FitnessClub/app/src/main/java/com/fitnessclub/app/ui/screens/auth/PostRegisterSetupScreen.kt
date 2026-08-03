@@ -55,9 +55,16 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+private const val STEP_NOTIFICATIONS = 0
+private const val STEP_BIOMETRIC = 1
+
 /**
- * После успешной регистрации — системный запрос уведомлений (Android 13+)
- * и предложение сразу включить вход по биометрии (как на iOS).
+ * После успешной регистрации:
+ * 1) системный запрос уведомлений (Android 13+),
+ * 2) предложение включить биометрию (системный BiometricPrompt).
+ *
+ * Не пропускаем биометрию молча: даже если отпечаток уже был
+ * настроен ранее — показываем шаг (можно пропустить).
  */
 @Composable
 fun PostRegisterSetupScreen(
@@ -74,14 +81,18 @@ fun PostRegisterSetupScreen(
     val biometricStore = entryPoint.biometricLoginStore()
     val tokenManager = entryPoint.tokenManager()
 
-    // 0 = экран уведомлений / ожидание системного диалога, 1 = биометрия
-    var step by remember { mutableIntStateOf(0) }
+    var step by remember { mutableIntStateOf(STEP_NOTIFICATIONS) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
-    val canBiometric = remember { biometricStore.canUseDeviceBiometric() }
+    var biometricPromptShown by remember { mutableStateOf(false) }
 
-    fun advanceAfterNotifications() {
+    val canBiometric = remember { biometricStore.canUseDeviceBiometric() }
+    val alreadyEnabled = remember { biometricStore.hasStoredCredential() }
+
+    fun goToBiometricOrFinish() {
+        // Биометрию всегда показываем отдельным шагом, если железо есть.
+        // Уже включённый вход — тоже показываем («уже настроено»), не прыгаем на Home молча.
         if (canBiometric) {
-            step = 1
+            step = STEP_BIOMETRIC
         } else {
             onFinished()
         }
@@ -90,12 +101,12 @@ fun PostRegisterSetupScreen(
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) {
-        advanceAfterNotifications()
+        goToBiometricOrFinish()
     }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            advanceAfterNotifications()
+            goToBiometricOrFinish()
             return@LaunchedEffect
         }
         val granted = ContextCompat.checkSelfPermission(
@@ -103,15 +114,44 @@ fun PostRegisterSetupScreen(
             Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
         if (granted) {
-            advanceAfterNotifications()
+            // Уведомления уже разрешены (часто так, если раньше заходили в приложение) —
+            // сразу к биометрии, без лишнего экрана.
+            goToBiometricOrFinish()
         } else {
-            // Сразу системный диалог; UI «Разрешить» — запасной путь, если диалог закрыли.
             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
+    // Как на iOS: системный диалог биометрии поднимаем сразу на шаге.
+    LaunchedEffect(step) {
+        if (step != STEP_BIOMETRIC || biometricPromptShown) return@LaunchedEffect
+        if (alreadyEnabled) return@LaunchedEffect // уже включено — только UI «готово»
+        if (!canBiometric) return@LaunchedEffect
+        val activity = context as? FragmentActivity ?: return@LaunchedEffect
+        biometricPromptShown = true
+        val rt = tokenManager.getRefreshToken()
+        if (rt.isNullOrBlank()) {
+            statusMessage = "Сессия не готова — настройте позже в профиле → Настройки"
+            return@LaunchedEffect
+        }
+        val userId = tokenManager.getUser().first()?.id
+        BiometricLoginCoordinator.startEncryptPrompt(
+            activity,
+            biometricStore,
+            rt,
+            userId = userId,
+        ) { ok, err ->
+            if (ok) {
+                onFinished()
+            } else if (!err.isNullOrBlank()) {
+                statusMessage = err
+            }
+            // Отмена системного окна — остаёмся на экране, можно нажать «Настроить» / «Пропустить»
+        }
+    }
+
     Column(
-        modifier = Modifier
+        Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
@@ -120,35 +160,34 @@ fun PostRegisterSetupScreen(
         verticalArrangement = Arrangement.Center,
     ) {
         when (step) {
-            0 -> {
+            STEP_NOTIFICATIONS -> {
                 Icon(
                     Icons.Default.NotificationsActive,
                     contentDescription = null,
                     tint = Primary,
                     modifier = Modifier.size(64.dp),
                 )
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(Modifier.height(20.dp))
                 Text(
                     "Разрешить уведомления?",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    "Мы пришлём напоминания о тренировках и важные сообщения клуба. " +
-                        "Разрешение можно изменить позже в настройках телефона.",
+                    "Мы пришлём напоминания о тренировках и важные сообщения клуба.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(Modifier.height(28.dp))
                 Button(
                     onClick = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         } else {
-                            advanceAfterNotifications()
+                            goToBiometricOrFinish()
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -157,7 +196,7 @@ fun PostRegisterSetupScreen(
                 ) {
                     Text("Разрешить")
                 }
-                TextButton(onClick = { advanceAfterNotifications() }) {
+                TextButton(onClick = { goToBiometricOrFinish() }) {
                     Text("Не сейчас")
                 }
             }
@@ -171,7 +210,7 @@ fun PostRegisterSetupScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
+                        Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
@@ -180,22 +219,26 @@ fun PostRegisterSetupScreen(
                             tint = Primary,
                             modifier = Modifier.size(64.dp),
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(Modifier.height(16.dp))
                         Text(
-                            "Вход по отпечатку",
+                            if (alreadyEnabled) "Вход по отпечатку уже включён" else "Вход по отпечатку",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(Modifier.height(8.dp))
                         Text(
-                            "Настройте биометрию сейчас — в следующий раз сможете войти без пароля.",
+                            if (alreadyEnabled) {
+                                "Можно продолжить — в следующий раз войдёте без пароля."
+                            } else {
+                                "Подтвердите отпечаток в системном окне — в следующий раз войдёте без пароля."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         statusMessage?.let {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(Modifier.height(12.dp))
                             Text(
                                 it,
                                 color = MaterialTheme.colorScheme.error,
@@ -203,49 +246,60 @@ fun PostRegisterSetupScreen(
                                 textAlign = TextAlign.Center,
                             )
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Button(
-                            onClick = {
-                                val activity = context as? FragmentActivity
-                                if (activity == null) {
-                                    statusMessage = "Не удалось открыть окно биометрии"
-                                    return@Button
-                                }
-                                scope.launch {
-                                    val rt = tokenManager.getRefreshToken()
-                                    if (rt.isNullOrBlank()) {
-                                        statusMessage =
-                                            "Сессия не готова — настройте позже в профиле"
-                                        return@launch
+                        Spacer(Modifier.height(24.dp))
+                        if (alreadyEnabled) {
+                            Button(
+                                onClick = onFinished,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Text("Продолжить")
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    val activity = context as? FragmentActivity
+                                    if (activity == null) {
+                                        statusMessage = "Не удалось открыть окно биометрии"
+                                        return@Button
                                     }
-                                    val userId = tokenManager.getUser().first()?.id
-                                    BiometricLoginCoordinator.startEncryptPrompt(
-                                        activity,
-                                        biometricStore,
-                                        rt,
-                                        userId = userId,
-                                    ) { ok, err ->
-                                        if (ok) {
-                                            onFinished()
-                                        } else if (!err.isNullOrBlank()) {
-                                            statusMessage = err
+                                    scope.launch {
+                                        val rt = tokenManager.getRefreshToken()
+                                        if (rt.isNullOrBlank()) {
+                                            statusMessage =
+                                                "Сессия не готова — настройте позже в профиле"
+                                            return@launch
+                                        }
+                                        val userId = tokenManager.getUser().first()?.id
+                                        BiometricLoginCoordinator.startEncryptPrompt(
+                                            activity,
+                                            biometricStore,
+                                            rt,
+                                            userId = userId,
+                                        ) { ok, err ->
+                                            if (ok) {
+                                                onFinished()
+                                            } else if (!err.isNullOrBlank()) {
+                                                statusMessage = err
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                            shape = RoundedCornerShape(12.dp),
-                        ) {
-                            Text("Настроить")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = onFinished,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                        ) {
-                            Text("Пропустить")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Text("Настроить")
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = onFinished,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Text("Пропустить")
+                            }
                         }
                     }
                 }

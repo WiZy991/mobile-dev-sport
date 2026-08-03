@@ -1,17 +1,14 @@
 package com.fitnessclub.app.ui.screens.club
 
-import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Directions
@@ -38,16 +36,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.fitnessclub.app.ui.theme.Primary
 import kotlin.math.abs
 
 /**
- * Превью точки клуба (Yandex Map Widget в WebView) + кнопки маршрута
- * в Яндекс.Карты / 2ГИС / системный geo:.
+ * Превью точки клуба (статичная карта Яндекс / OSM) + кнопки маршрута.
+ * WebView+iframe часто даёт пустой экран — поэтому картинка через Coil.
  */
 @Composable
 fun ClubMapPreview(
@@ -57,9 +61,30 @@ fun ClubMapPreview(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val hasCoords = abs(latitude) > 0.01 || abs(longitude) > 0.01
-    val mapHtml = remember(latitude, longitude, address, hasCoords) {
-        buildClubMapHtml(latitude, longitude, address, hasCoords)
+    val density = LocalDensity.current
+    val (lat, lon, hasCoords) = remember(latitude, longitude, address) {
+        resolveClubCoords(latitude, longitude, address)
+    }
+    val mapWidthPx = with(density) { 720.dp.roundToPx().coerceIn(300, 1280) }
+    val mapHeightPx = with(density) { 400.dp.roundToPx().coerceIn(200, 720) }
+    val primaryMapUrl = remember(lat, lon, mapWidthPx, mapHeightPx) {
+        // Legacy Static API 1.x — без ключа, надёжно для превью
+        "https://static-maps.yandex.ru/1.x/" +
+            "?lang=ru_RU" +
+            "&ll=$lon,$lat" +
+            "&size=${mapWidthPx.coerceAtMost(650)},${mapHeightPx.coerceAtMost(450)}" +
+            "&z=16" +
+            "&l=map" +
+            "&pt=$lon,$lat,pm2rdm"
+    }
+    val fallbackMapUrl = remember(lat, lon, mapWidthPx, mapHeightPx) {
+        // OSM static fallback
+        "https://staticmap.openstreetmap.de/staticmap.php" +
+            "?center=$lat,$lon" +
+            "&zoom=16" +
+            "&size=${mapWidthPx.coerceAtMost(800)}x${mapHeightPx.coerceAtMost(600)}" +
+            "&maptype=mapnik" +
+            "&markers=$lat,$lon,red-pushpin"
     }
 
     Column(modifier.fillMaxWidth()) {
@@ -67,143 +92,175 @@ fun ClubMapPreview(
             Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .clip(RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp))
-                .background(Primary.copy(alpha = 0.12f)),
+                .background(Color(0xFFE8EEF4)),
         ) {
-            ClubMapWebView(html = mapHtml, modifier = Modifier.fillMaxSize())
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(primaryMapUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Карта клуба",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            color = Primary,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                },
+                error = {
+                    Box(Modifier.fillMaxSize()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(fallbackMapUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Карта клуба",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Icon(
+                            Icons.Default.Place,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(42.dp),
+                        )
+                    }
+                },
+            )
+
+            // Мягкий градиент снизу под подписью
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.28f)),
+                        ),
+                    ),
+            )
+
             Surface(
                 Modifier
                     .align(Alignment.BottomStart)
                     .padding(12.dp),
                 shape = RoundedCornerShape(20.dp),
-                color = Color.White.copy(alpha = 0.94f),
+                color = Color.White.copy(alpha = 0.95f),
                 shadowElevation = 4.dp,
             ) {
                 Row(
                     Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        Icons.Default.Place,
-                        contentDescription = null,
-                        tint = Primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Primary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Place,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        text = if (address.isNotBlank()) address else "Клуб на карте",
+                        text = address.ifBlank { "Клуб на карте" },
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF1F2937),
                         maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
         }
 
-        Row(
+        Column(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(
                 onClick = {
-                    openRouteChooser(context, latitude, longitude, address, hasCoords)
+                    openRouteChooser(context, lat, lon, address, hasCoords = true)
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Primary),
                 shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
             ) {
-                Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Маршрут")
+                Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Проложить маршрут",
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 15.sp,
+                )
             }
-            FilledTonalButton(
-                onClick = {
-                    openExternalMaps(context, latitude, longitude, address, hasCoords, prefer = MapApp.YANDEX)
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Яндекс")
-            }
-            FilledTonalButton(
-                onClick = {
-                    openExternalMaps(context, latitude, longitude, address, hasCoords, prefer = MapApp.DGIS)
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("2ГИС")
+                FilledTonalButton(
+                    onClick = {
+                        openExternalMaps(context, lat, lon, address, hasCoords = true, prefer = MapApp.YANDEX)
+                    },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp),
+                ) {
+                    Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Яндекс", maxLines = 1, softWrap = false)
+                }
+                FilledTonalButton(
+                    onClick = {
+                        openExternalMaps(context, lat, lon, address, hasCoords = true, prefer = MapApp.DGIS)
+                    },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp),
+                ) {
+                    Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("2ГИС", maxLines = 1, softWrap = false)
+                }
             }
         }
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-private fun ClubMapWebView(html: String, modifier: Modifier = Modifier) {
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            WebView(ctx).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.cacheMode = WebSettings.LOAD_DEFAULT
-                settings.loadWithOverviewMode = true
-                settings.useWideViewPort = true
-                webViewClient = WebViewClient()
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            }
-        },
-        update = { webView ->
-            webView.loadDataWithBaseURL(
-                "https://yandex.ru",
-                html,
-                "text/html",
-                "UTF-8",
-                null,
-            )
-        },
-    )
-}
-
-private fun buildClubMapHtml(
-    lat: Double,
-    lon: Double,
+/**
+ * Если в CRM нет координат — мягкий fallback по городу/адресу,
+ * чтобы превью не было пустым.
+ */
+private fun resolveClubCoords(
+    latitude: Double,
+    longitude: Double,
     address: String,
-    hasCoords: Boolean,
-): String {
-    return if (hasCoords) {
-        """
-        <!DOCTYPE html><html><head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
-        <style>
-          html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#FFE8D6;}
-          iframe{border:0;width:100%;height:100%;display:block;}
-        </style></head><body>
-        <iframe src="https://yandex.ru/map-widget/v1/?ll=$lon,$lat&z=16&pt=$lon,$lat,pm2rdm&l=map"
-          allowfullscreen loading="lazy"></iframe>
-        </body></html>
-        """.trimIndent()
-    } else {
-        val q = Uri.encode(address.ifBlank { "Владивосток" })
-        """
-        <!DOCTYPE html><html><head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
-        <style>
-          html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#FFE8D6;}
-          iframe{border:0;width:100%;height:100%;display:block;}
-        </style></head><body>
-        <iframe src="https://yandex.ru/map-widget/v1/?text=$q&z=15&l=map"
-          allowfullscreen loading="lazy"></iframe>
-        </body></html>
-        """.trimIndent()
+): Triple<Double, Double, Boolean> {
+    if (abs(latitude) > 0.01 || abs(longitude) > 0.01) {
+        return Triple(latitude, longitude, true)
+    }
+    val a = address.lowercase()
+    return when {
+        "владивосток" in a || "де фриз" in a || "купера" in a ->
+            Triple(43.1286, 131.9238, false) // ТЦ «Новый де Фриз» (приблизительно)
+        else -> Triple(55.7558, 37.6173, false)
     }
 }
 
@@ -230,7 +287,7 @@ private fun openRouteChooser(
     try {
         context.startActivity(chooser)
     } catch (_: ActivityNotFoundException) {
-        openBrowserFallback(context, lat, lon, address, hasCoords)
+        openYandexWeb(context, lat, lon, address, hasCoords)
     }
 }
 
@@ -336,14 +393,4 @@ private fun openDgisWeb(
         "https://2gis.ru/search/${Uri.encode(address)}"
     }
     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-}
-
-private fun openBrowserFallback(
-    context: Context,
-    lat: Double,
-    lon: Double,
-    address: String,
-    hasCoords: Boolean,
-) {
-    openYandexWeb(context, lat, lon, address, hasCoords)
 }
