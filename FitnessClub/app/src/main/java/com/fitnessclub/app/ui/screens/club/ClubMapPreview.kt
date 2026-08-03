@@ -14,6 +14,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -54,7 +55,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.fitnessclub.app.R
 import com.fitnessclub.app.ui.theme.Primary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -140,6 +146,7 @@ fun ClubMapPreview(
         val you = Marker(map).apply {
             position = from
             title = "Вы здесь"
+            icon = ContextCompat.getDrawable(map.context, R.drawable.ic_map_pin_user)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
         }
         val line = Polyline().apply {
@@ -223,25 +230,50 @@ fun ClubMapPreview(
         }
     }
 
+    // Жесты на карте не отдаём LazyColumn (иначе тянется вся страница вместо карты)
+    val mapNestedScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset = available
+        }
+    }
+
     Column(modifier.fillMaxWidth()) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .height(300.dp)
+                .nestedScroll(mapNestedScroll)
                 .background(Color(0xFFE8EEF4)),
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
-                    MapView(ctx).apply {
+                    object : MapView(ctx) {
+                        override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+                            when (ev.actionMasked) {
+                                MotionEvent.ACTION_DOWN,
+                                MotionEvent.ACTION_POINTER_DOWN,
+                                MotionEvent.ACTION_MOVE,
+                                -> parent?.requestDisallowInterceptTouchEvent(true)
+                                MotionEvent.ACTION_UP,
+                                MotionEvent.ACTION_CANCEL,
+                                -> parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            return super.dispatchTouchEvent(ev)
+                        }
+                    }.apply {
                         setTileSource(cartoTiles)
                         setMultiTouchControls(true)
-                        controller.setZoom(15.0)
+                        isTilesScaledToDpi = true
+                        isClickable = true
+                        isFocusable = true
+                        controller.setZoom(15.5)
                         controller.setCenter(clubPoint)
                         overlays.add(
                             Marker(this).apply {
                                 position = clubPoint
                                 title = address.ifBlank { "Клуб" }
+                                icon = ContextCompat.getDrawable(ctx, R.drawable.ic_map_pin_yandex)
                                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                             },
                         )

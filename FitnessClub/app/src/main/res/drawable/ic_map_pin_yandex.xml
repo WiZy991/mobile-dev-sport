@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Классический пин в стиле Яндекс.Карт (капля + белый кружок). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="52dp"
+    android:viewportWidth="40"
+    android:viewportHeight="52">
+    <path
+        android:fillColor="#FC3F1D"
+        android:pathData="M20,0C11.16,0 4,7.16 4,16c0,12 16,36 16,36s16,-24 16,-36C36,7.16 28.84,0 20,0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,9.5c-3.59,0 -6.5,2.91 -6.5,6.5s2.91,6.5 6.5,6.5 6.5,-2.91 6.5,-6.5 -2.91,-6.5 -6.5,-6.5z" />
+</vector>
