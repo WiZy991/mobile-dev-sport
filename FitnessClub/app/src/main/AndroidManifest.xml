@@ -81,4 +81,21 @@
             android:resource="@color/primary" />
     </application>
 
+    <!-- Видимость пакетов карт для «Проложить маршрут» (Android 11+) -->
+    <queries>
+        <package android:name="ru.yandex.yandexmaps" />
+        <package android:name="ru.dublgis.dgismobile" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="yandexmaps" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="dgis" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+    </queries>
 </manifest>

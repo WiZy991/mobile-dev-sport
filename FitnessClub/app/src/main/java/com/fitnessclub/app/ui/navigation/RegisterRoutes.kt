@@ -5,4 +5,5 @@ object RegisterRoutes {
     const val FORM = "register_form"
     const val PASSPORT = "register_passport"
     const val SURVEY = "register_survey"
+    const val SETUP = "register_setup"
 }

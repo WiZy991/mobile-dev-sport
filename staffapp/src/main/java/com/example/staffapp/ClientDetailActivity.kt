@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.staffapp.ui.client.ClientBookingTab
 import com.example.staffapp.ui.client.ClientDetailScreen
 import com.example.staffapp.ui.client.ClientDetailUi
 import com.example.staffapp.ui.theme.StaffTheme
@@ -33,6 +34,9 @@ class ClientDetailActivity : ComponentActivity() {
                 ClientDetailScreen(
                     state = uiState,
                     onBack = { finish() },
+                    onBookingTabSelected = { tab ->
+                        uiState = uiState.copy(bookingTab = tab)
+                    },
                     onRetry = {
                         val clientId = intent.getIntExtra(EXTRA_CLIENT_ID, 0)
                         if (clientId > 0) loadClient(clientId)
@@ -79,6 +83,12 @@ class ClientDetailActivity : ComponentActivity() {
                 if (sub.visitsTotal > 0) append("\nВизиты: ${sub.visitsUsed}/${sub.visitsTotal}")
             }
         }
+        val active = client.recentBookings.filter { it.isUpcoming }.map {
+            ListCardUi(title = it.title, meta = it.meta)
+        }
+        val completed = client.recentBookings.filterNot { it.isUpcoming }.map {
+            ListCardUi(title = it.title, meta = it.meta)
+        }
         uiState = ClientDetailUi(
             title = client.name,
             name = client.name,
@@ -87,9 +97,9 @@ class ClientDetailActivity : ComponentActivity() {
             isBlocked = client.isBlocked,
             subscriptionTitle = subTitle,
             subscriptionMeta = subMeta,
-            bookings = client.recentBookings.map {
-                ListCardUi(title = it.title, meta = it.meta)
-            },
+            activeBookings = active,
+            completedBookings = completed,
+            bookingTab = if (active.isNotEmpty()) ClientBookingTab.ACTIVE else ClientBookingTab.COMPLETED,
             tickets = client.recentTickets.map {
                 ListCardUi(title = it.title, meta = it.meta)
             },

@@ -630,6 +630,7 @@ private fun JSONArray?.toDetailRows(): List<ClientDetailRow> {
         out += ClientDetailRow(
             title = row.optString("title"),
             meta = row.optString("meta"),
+            isUpcoming = row.optBoolean("isUpcoming", false),
         )
     }
     return out

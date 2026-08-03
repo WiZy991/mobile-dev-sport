@@ -34,11 +34,33 @@ final class StaffClientsController extends AbstractController
         }
 
         $q = mb_strtolower(trim((string) $request->query->get('q', '')));
-        $qb = $this->em->createQueryBuilder()
-            ->select('u')
-            ->from(User::class, 'u')
-            ->orderBy('u.name', 'ASC')
-            ->setMaxResults(80);
+
+        // Пункт 29 репорта: тренер видит только клиентов, которые хотя бы раз
+        // записывались к нему; админы/менеджеры — полный поиск по базе.
+        if (!$this->isPrivileged($user)) {
+            $linkedTrainer = $user->getTrainer();
+            if ($linkedTrainer === null) {
+                return $this->json(['items' => []]);
+            }
+
+            $qb = $this->em->createQueryBuilder()
+                ->select('DISTINCT u')
+                ->from(User::class, 'u')
+                ->join(Booking::class, 'b', 'WITH', 'b.user = u')
+                ->join('b.training', 't')
+                ->where('t.trainer = :trainer')
+                ->andWhere('b.status != :cancelled')
+                ->setParameter('trainer', $linkedTrainer)
+                ->setParameter('cancelled', 'cancelled')
+                ->orderBy('u.name', 'ASC')
+                ->setMaxResults(80);
+        } else {
+            $qb = $this->em->createQueryBuilder()
+                ->select('u')
+                ->from(User::class, 'u')
+                ->orderBy('u.name', 'ASC')
+                ->setMaxResults(80);
+        }
 
         if ($q !== '') {
             $qb->andWhere('LOWER(u.name) LIKE :q OR LOWER(u.email) LIKE :q OR u.phone LIKE :qPhone')
@@ -145,7 +167,7 @@ final class StaffClientsController extends AbstractController
             ->setParameter('user', $client)
             ->setParameter('cancelled', 'cancelled')
             ->orderBy('t.startAt', 'DESC')
-            ->setMaxResults(10);
+            ->setMaxResults(40);
 
         // Тренер видит только записи клиента к себе (включая завершённые),
         // но не записи к другим тренерам (пункт 47 репорта).
@@ -163,17 +185,22 @@ final class StaffClientsController extends AbstractController
             }
         }
 
+        $now = new \DateTimeImmutable();
         $bookingRows = [];
         foreach ($bookings as $booking) {
             if (!$booking instanceof Booking) {
                 continue;
             }
             $training = $booking->getTraining();
+            $startAt = $training->getStartAt();
             // Технический статус (confirmed и т.п.) не показываем, пока нет
             // реальной механики подтверждения записи (пункт 55 репорта).
+            // Пункт 60: isUpcoming для вкладок «Активные» / «Завершённые».
             $bookingRows[] = [
                 'title' => $training->getName(),
-                'meta' => $training->getStartAt()->format('d.m.Y H:i'),
+                'meta' => $startAt->format('d.m.Y H:i'),
+                'startAt' => $startAt->format(\DateTimeInterface::ATOM),
+                'isUpcoming' => $startAt >= $now,
             ];
         }
 

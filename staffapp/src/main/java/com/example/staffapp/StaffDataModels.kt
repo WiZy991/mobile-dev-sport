@@ -133,6 +133,7 @@ data class ClientSubscription(
 data class ClientDetailRow(
     val title: String,
     val meta: String,
+    val isUpcoming: Boolean = false,
 )
 
 data class ClientDetail(

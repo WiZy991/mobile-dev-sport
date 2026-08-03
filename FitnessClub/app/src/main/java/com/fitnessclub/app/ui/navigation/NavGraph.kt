@@ -19,6 +19,7 @@ import androidx.navigation.navArgument
 import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
 import com.fitnessclub.app.ui.screens.auth.LoginScreen
 import com.fitnessclub.app.ui.screens.auth.LoginViewModel
+import com.fitnessclub.app.ui.screens.auth.PostRegisterSetupScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterClubPickScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterPassportScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterScreen
@@ -179,13 +180,23 @@ fun NavGraph(
                     },
                     onOpenLegalPdf = openLegalPdf,
                     onRegisterSuccess = {
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(navController.graph.id) { inclusive = true }
+                        navController.navigate(RegisterRoutes.SETUP) {
+                            popUpTo(RegisterRoutes.FORM) { inclusive = true }
                             launchSingleTop = true
                         }
                     },
                     onChangeClub = {
                         navController.popBackStack(RegisterRoutes.CLUB_PICK, inclusive = false)
+                    },
+                )
+            }
+            composable(RegisterRoutes.SETUP) {
+                PostRegisterSetupScreen(
+                    onFinished = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     },
                 )
             }

@@ -3,8 +3,10 @@ package com.example.staffapp.ui.client
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -38,6 +41,8 @@ import com.example.staffapp.ui.theme.StaffPrimary
 import com.example.staffapp.ui.work.BadgeColor
 import com.example.staffapp.ui.work.ListCardUi
 
+enum class ClientBookingTab { ACTIVE, COMPLETED }
+
 data class ClientDetailUi(
     val title: String = "Клиент",
     val name: String = "",
@@ -46,7 +51,9 @@ data class ClientDetailUi(
     val isBlocked: Boolean = false,
     val subscriptionTitle: String = "",
     val subscriptionMeta: String = "",
-    val bookings: List<ListCardUi> = emptyList(),
+    val activeBookings: List<ListCardUi> = emptyList(),
+    val completedBookings: List<ListCardUi> = emptyList(),
+    val bookingTab: ClientBookingTab = ClientBookingTab.ACTIVE,
     val tickets: List<ListCardUi> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
@@ -59,6 +66,7 @@ fun ClientDetailScreen(
     state: ClientDetailUi,
     onBack: () -> Unit,
     onCall: () -> Unit,
+    onBookingTabSelected: (ClientBookingTab) -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
     Scaffold(
@@ -80,59 +88,99 @@ fun ClientDetailScreen(
     ) { padding ->
         when {
             state.loading -> Column(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                Modifier.fillMaxSize().padding(padding),
                 verticalArrangement = Arrangement.Center,
             ) {
                 StaffLoadingState("Загрузка карточки...")
             }
-            state.error != null -> Column(Modifier.padding(padding).padding(16.dp)) {
+            state.error != null -> Column(
+                Modifier.padding(padding).padding(16.dp),
+            ) {
                 StaffErrorState(state.error, onRetry)
             }
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item {
-                    StaffHeroCard(
-                        title = state.name,
-                        subtitle = listOf(state.email, state.phone).filter { it.isNotBlank() }.joinToString("\n"),
-                    )
+            else -> {
+                val bookings = when (state.bookingTab) {
+                    ClientBookingTab.ACTIVE -> state.activeBookings
+                    ClientBookingTab.COMPLETED -> state.completedBookings
                 }
-                if (state.isBlocked) {
+                LazyColumn(
+                    Modifier.fillMaxSize().padding(padding),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     item {
-                        StaffInfoBanner("Клиент заблокирован", color = StaffError)
+                        StaffHeroCard(
+                            title = state.name,
+                            subtitle = listOf(state.email, state.phone)
+                                .filter { it.isNotBlank() }
+                                .joinToString("\n"),
+                        )
                     }
-                }
-                item { StaffSectionTitle("Абонемент") }
-                item {
-                    StaffListCard(
-                        ListCardUi(
-                            title = state.subscriptionTitle.ifBlank { "Нет активного абонемента" },
-                            subtitle = state.subscriptionMeta,
-                            badge = "Абонемент",
-                            badgeColor = BadgeColor.PRIMARY,
-                        ),
-                    )
-                }
-                if (state.showCallButton) {
+                    if (state.isBlocked) {
+                        item {
+                            StaffInfoBanner("Клиент заблокирован", color = StaffError)
+                        }
+                    }
+                    item { StaffSectionTitle("Абонемент") }
                     item {
-                        StaffPrimaryButton(text = "Позвонить", onClick = onCall)
+                        StaffListCard(
+                            ListCardUi(
+                                title = state.subscriptionTitle.ifBlank { "Нет активного абонемента" },
+                                subtitle = state.subscriptionMeta,
+                                badge = "Абонемент",
+                                badgeColor = BadgeColor.PRIMARY,
+                            ),
+                        )
                     }
+                    if (state.showCallButton) {
+                        item {
+                            StaffPrimaryButton(text = "Позвонить", onClick = onCall)
+                        }
+                    }
+                    item { StaffSectionTitle("Записи") }
+                    item {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilterChip(
+                                selected = state.bookingTab == ClientBookingTab.ACTIVE,
+                                onClick = { onBookingTabSelected(ClientBookingTab.ACTIVE) },
+                                label = {
+                                    Text("Активные (${state.activeBookings.size})")
+                                },
+                            )
+                            FilterChip(
+                                selected = state.bookingTab == ClientBookingTab.COMPLETED,
+                                onClick = { onBookingTabSelected(ClientBookingTab.COMPLETED) },
+                                label = {
+                                    Text("Завершённые (${state.completedBookings.size})")
+                                },
+                            )
+                        }
+                    }
+                    if (bookings.isEmpty()) {
+                        item {
+                            StaffEmptyState(
+                                if (state.bookingTab == ClientBookingTab.ACTIVE) {
+                                    "Нет активных записей"
+                                } else {
+                                    "Нет завершённых записей"
+                                },
+                                icon = Icons.Default.Event,
+                            )
+                        }
+                    } else {
+                        items(bookings) { StaffListCard(it) }
+                    }
+                    item { StaffSectionTitle("Обращения") }
+                    if (state.tickets.isEmpty()) {
+                        item { StaffEmptyState("Нет обращений", icon = Icons.Default.SupportAgent) }
+                    } else {
+                        items(state.tickets) { StaffListCard(it) }
+                    }
+                    item { Spacer(Modifier.height(16.dp)) }
                 }
-                item { StaffSectionTitle("Последние записи") }
-                if (state.bookings.isEmpty()) {
-                    item { StaffEmptyState("Нет записей", icon = Icons.Default.Event) }
-                } else {
-                    items(state.bookings) { StaffListCard(it) }
-                }
-                item { StaffSectionTitle("Обращения") }
-                if (state.tickets.isEmpty()) {
-                    item { StaffEmptyState("Нет обращений", icon = Icons.Default.SupportAgent) }
-                } else {
-                    items(state.tickets) { StaffListCard(it) }
-                }
-                item { Spacer(modifier = Modifier.height(16.dp)) }
             }
         }
     }

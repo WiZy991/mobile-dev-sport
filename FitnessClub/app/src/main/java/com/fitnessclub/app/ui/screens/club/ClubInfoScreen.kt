@@ -79,48 +79,13 @@ fun ClubInfoScreen(
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-            // Club image placeholder
+            // Карта клуба + маршрут (Яндекс / 2ГИС)
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(Primary.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.FitnessCenter,
-                        contentDescription = null,
-                        modifier = Modifier.size(80.dp),
-                        tint = Primary
-                    )
-                }
-            }
-            
-            // Rating
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Primary)
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    repeat(4) {
-                        Icon(
-                            Icons.Default.Star,
-                            contentDescription = null,
-                            tint = AccentOrange,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                    Icon(
-                        Icons.Default.StarHalf,
-                        contentDescription = null,
-                        tint = AccentOrange,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+                ClubMapPreview(
+                    latitude = club?.latitude ?: 0.0,
+                    longitude = club?.longitude ?: 0.0,
+                    address = club?.address.orEmpty(),
+                )
             }
             
             // Status message
@@ -152,9 +117,16 @@ fun ClubInfoScreen(
                             text = club?.address ?: "г. Москва, ул. Примерная, д. 123",
                             iconColor = Primary,
                             onClick = {
-                                val addr = club?.address ?: "Москва ул Примерная 123"
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(addr)}"))
-                                context.startActivity(intent)
+                                val lat = club?.latitude ?: 0.0
+                                val lon = club?.longitude ?: 0.0
+                                val addr = club?.address ?: "Москва"
+                                val hasCoords = kotlin.math.abs(lat) > 0.01 || kotlin.math.abs(lon) > 0.01
+                                val uri = if (hasCoords) {
+                                    Uri.parse("geo:$lat,$lon?q=$lat,$lon(${Uri.encode(addr)})")
+                                } else {
+                                    Uri.parse("geo:0,0?q=${Uri.encode(addr)}")
+                                }
+                                context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                             }
                         )
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
