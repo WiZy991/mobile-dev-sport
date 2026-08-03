@@ -18,18 +18,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fitnessclub.app.R
 
+/**
+ * Шапка под бренд сети. Не показывает адрес/название площадки —
+ * они живут в плашке заполненности и на странице клуба.
+ */
 @Composable
 fun BrandHeader(
-    clubName: String,
+    brandName: String = "Доброзал",
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     textColor: Color = Color.White,
     showLogo: Boolean = true,
+    /** @deprecated Используйте [brandName]. */
+    clubName: String? = null,
 ) {
+    val title = brandName.ifBlank { clubName?.takeIf { it.isNotBlank() } ?: "Доброзал" }
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -50,19 +58,23 @@ fun BrandHeader(
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    text = clubName.ifBlank { "Доброзал" },
+                    text = title,
                     color = textColor,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     fontSize = 26.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         } else {
             Text(
-                text = clubName.ifBlank { "Доброзал" },
+                text = title,
                 color = textColor,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         subtitle?.let {
@@ -70,6 +82,8 @@ fun BrandHeader(
                 text = it,
                 color = textColor.copy(alpha = 0.9f),
                 style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

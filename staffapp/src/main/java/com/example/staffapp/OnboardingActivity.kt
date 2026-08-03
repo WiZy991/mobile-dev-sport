@@ -85,8 +85,9 @@ class OnboardingActivity : ComponentActivity() {
         runAsync(if (silent) null else "Обновляем статус...") {
             val onboarding = executeWithRefresh { apiClient.loadOnboarding(it) }
             applyOnboarding(onboarding)
-            if (onboarding.status == "active") {
-                openWork()
+            when (onboarding.status) {
+                "active" -> openWork()
+                "needs_profile" -> openProfileSetup()
             }
             "Готово"
         }
@@ -130,12 +131,23 @@ class OnboardingActivity : ComponentActivity() {
         runAsync("Проверяем оплату...") {
             val status = executeWithRefresh { apiClient.rentalPaymentStatus(it, paymentId) }
             applyOnboarding(status.onboarding)
-            if (status.status == "paid" || status.onboarding.status == "active") {
-                lastPaymentId = null
-                openWork()
-                "Оплата прошла"
-            } else {
-                "Статус: ${status.status}"
+            when {
+                status.status == "paid" && status.onboarding.status == "needs_profile" -> {
+                    lastPaymentId = null
+                    openProfileSetup()
+                    "Оплата прошла — заполните профиль"
+                }
+                status.status == "paid" || status.onboarding.status == "active" -> {
+                    lastPaymentId = null
+                    openWork()
+                    "Оплата прошла"
+                }
+                status.onboarding.status == "needs_profile" -> {
+                    lastPaymentId = null
+                    openProfileSetup()
+                    "Заполните профиль"
+                }
+                else -> "Статус: ${status.status}"
             }
         }
     }
@@ -149,6 +161,16 @@ class OnboardingActivity : ComponentActivity() {
                 rentalPaidUntil = onboarding.rentalPaidUntil,
                 errorMessage = null,
             )
+        }
+    }
+
+    private fun openProfileSetup() {
+        runOnUiThread {
+            startActivity(
+                Intent(this, TrainerProfileActivity::class.java)
+                    .putExtra(TrainerProfileActivity.EXTRA_REQUIRED, true),
+            )
+            finish()
         }
     }
 

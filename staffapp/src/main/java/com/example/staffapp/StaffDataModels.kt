@@ -12,10 +12,13 @@ data class TrainerPublicProfile(
     val id: String?,
     val name: String,
     val specialization: String,
+    val specializations: List<String> = emptyList(),
+    val specializationsCatalog: List<String> = TrainerSpecializationCatalog.DEFAULT,
     val description: String,
     val phone: String = "",
     val rating: Float,
     val photoUrl: String?,
+    val profileComplete: Boolean = true,
 )
 
 data class StaffAdminData(
@@ -69,8 +72,13 @@ data class StaffOnboarding(
     val requiresRental: Boolean,
     val rentalPaidUntil: String?,
     val offerUrl: String,
+    val privacyUrl: String = "https://dobrozal.ru/doc/privacy",
+    val docsUrl: String = "https://dobrozal.ru/doc",
     val rentalAmountKopecks: Int,
     val rentalAmountRub: Double,
+    val profileComplete: Boolean = true,
+    val profileMissing: List<String> = emptyList(),
+    val specializationsCatalog: List<String> = TrainerSpecializationCatalog.DEFAULT,
 )
 
 data class RentalPaymentResult(
@@ -111,6 +119,7 @@ data class ClientSummary(
     val name: String,
     val email: String,
     val phone: String,
+    val hasActiveBooking: Boolean = false,
 )
 
 data class ClientSubscription(

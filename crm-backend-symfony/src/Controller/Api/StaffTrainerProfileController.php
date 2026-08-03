@@ -66,9 +66,17 @@ final class StaffTrainerProfileController extends AbstractController
             $trainer->setName($name);
             $staff->setName($name);
         }
-        if (array_key_exists('specialization', $data)) {
-            $spec = trim((string) $data['specialization']);
-            $trainer->setSpecialization($spec !== '' ? $spec : null);
+        if (array_key_exists('specialization', $data) || array_key_exists('specializations', $data)) {
+            $raw = $data['specializations'] ?? $data['specialization'];
+            $normalized = $this->onboarding->normalizeSpecializationInput($raw);
+            if ($normalized === '') {
+                return $this->json([
+                    'error' => 'Выберите хотя бы одну специализацию из списка',
+                    'code' => 'invalid_specialization',
+                    'specializations_catalog' => StaffOnboardingService::specializationCatalog(),
+                ], 400);
+            }
+            $trainer->setSpecialization($normalized);
         }
         if (array_key_exists('description', $data)) {
             $desc = trim((string) $data['description']);
@@ -76,7 +84,14 @@ final class StaffTrainerProfileController extends AbstractController
         }
         if (array_key_exists('phone', $data)) {
             $phone = trim((string) $data['phone']);
-            $trainer->setPhone($phone !== '' ? $phone : null);
+            $digits = preg_replace('/\D+/', '', $phone) ?? '';
+            if ($digits === '') {
+                return $this->json(['error' => 'Укажите телефон', 'code' => 'invalid_phone'], 400);
+            }
+            if (!(\strlen($digits) === 10 || (\strlen($digits) === 11 && ($digits[0] === '7' || $digits[0] === '8')))) {
+                return $this->json(['error' => 'Введите корректный номер телефона', 'code' => 'invalid_phone'], 400);
+            }
+            $trainer->setPhone($phone);
         }
         if (array_key_exists('photo_url', $data)) {
             $url = trim((string) $data['photo_url']);
@@ -85,7 +100,10 @@ final class StaffTrainerProfileController extends AbstractController
 
         $this->em->flush();
 
-        return $this->json($this->serialize($trainer, $request));
+        return $this->json($this->serialize($trainer, $request) + [
+            'profile_complete' => $this->onboarding->isTrainerProfileComplete($staff),
+            'onboarding' => $this->onboarding->serialize($staff),
+        ]);
     }
 
     #[Route('/photo', name: 'api_staff_trainer_profile_photo', methods: ['POST'])]
@@ -142,10 +160,16 @@ final class StaffTrainerProfileController extends AbstractController
     /** @return array<string, mixed> */
     private function serialize(Trainer $trainer, Request $request): array
     {
+        $rawSpec = (string) ($trainer->getSpecialization() ?? '');
+        $specs = $this->onboarding->parseSpecializations($rawSpec);
+
         return [
             'id' => $trainer->getId() !== null ? 'trainer-' . $trainer->getId() : null,
             'name' => $trainer->getName(),
-            'specialization' => $trainer->getSpecialization(),
+            'specialization' => $specs !== [] ? implode(', ', $specs) : $rawSpec,
+            'specializations' => $specs,
+            'specializations_catalog' => StaffOnboardingService::specializationCatalog(),
+            'specializations_max' => StaffOnboardingService::MAX_SPECIALIZATIONS,
             'description' => $trainer->getDescription(),
             'phone' => $trainer->getPhone(),
             'rating' => $trainer->getRating() ?? 0.0,

@@ -53,6 +53,9 @@ object UiLabels {
     fun metricTitle(key: String): String = when (key) {
         "clients" -> "Клиенты"
         "bookings" -> "Записи"
+        "my_bookings_today" -> "Записи сегодня"
+        "my_bookings_week" -> "Записи на 7 дней"
+        "my_clients_active" -> "Клиенты с записью"
         "subscriptions" -> "Абонементы"
         "tasks_open" -> "Открытые задачи"
         "tasks_done" -> "Закрытые задачи"
@@ -100,6 +103,15 @@ object UiLabels {
         "new" -> "Новое"
         "in_progress" -> "В работе"
         "done" -> "Закрыто"
+        else -> status
+    }
+
+    fun subscriptionStatus(status: String): String = when (status) {
+        "active" -> "Активен"
+        "expired" -> "Истёк"
+        "frozen" -> "Заморожен"
+        "cancelled" -> "Отменён"
+        "pending" -> "Ожидает оплаты"
         else -> status
     }
 

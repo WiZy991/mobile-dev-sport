@@ -67,6 +67,7 @@ fun OnboardingScreen(
                 text = when (state.status) {
                     "pending_approval" -> "Ожидание одобрения"
                     "needs_offer_payment" -> "Оплата аренды клуба"
+                    "needs_profile" -> "Заполнение профиля"
                     "rejected" -> "Регистрация отклонена"
                     else -> "Доступ"
                 },
@@ -125,6 +126,18 @@ fun OnboardingScreen(
                             )
                             StaffSecondaryButton(
                                 text = "Проверить оплату",
+                                onClick = onRefresh,
+                                enabled = !state.isLoading,
+                            )
+                        }
+                        "needs_profile" -> {
+                            Text(
+                                "Осталось заполнить карточку тренера: телефон и специализацию. " +
+                                    "Без этого клиенты не увидят вас в приложении.",
+                                color = StaffOnSurfaceVariant,
+                            )
+                            StaffPrimaryButton(
+                                text = if (state.isLoading) "Открываем..." else "Заполнить профиль",
                                 onClick = onRefresh,
                                 enabled = !state.isLoading,
                             )

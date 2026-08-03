@@ -22,6 +22,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Room
@@ -32,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.staffapp.ui.components.StaffEmptyState
@@ -54,6 +58,8 @@ fun StaffScheduleTabContent(
     schedule: ScheduleTabUi,
     onDaySelected: (String) -> Unit,
     onTypeFilterSelected: (String?) -> Unit,
+    onPrevPeriod: () -> Unit = {},
+    onNextPeriod: () -> Unit = {},
     onSessionClick: (ScheduleSessionUi) -> Unit = {},
 ) {
     if (schedule.denied) {
@@ -65,6 +71,11 @@ fun StaffScheduleTabContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (schedule.days.isNotEmpty()) {
+            StaffScheduleMonthHeader(
+                monthLabel = schedule.monthLabel,
+                onPrevPeriod = onPrevPeriod,
+                onNextPeriod = onNextPeriod,
+            )
             StaffScheduleDateSelector(
                 days = schedule.days,
                 onDaySelected = onDaySelected,
@@ -111,7 +122,8 @@ fun StaffScheduleTabContent(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(schedule.sessions, key = { "${it.trainingId}_${it.startTime}_${it.title}" }) { session ->
+                    // Без key: trainingId может быть null, а дубликат ключа роняет LazyColumn.
+                    items(schedule.sessions) { session ->
                         StaffScheduleSessionCard(
                             session = session,
                             onClick = { onSessionClick(session) },
@@ -119,6 +131,43 @@ fun StaffScheduleTabContent(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StaffScheduleMonthHeader(
+    monthLabel: String,
+    onPrevPeriod: () -> Unit,
+    onNextPeriod: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onPrevPeriod) {
+            Icon(
+                imageVector = Icons.Default.ChevronLeft,
+                contentDescription = "Предыдущая неделя",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = monthLabel,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+        IconButton(onClick = onNextPeriod) {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Следующая неделя",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

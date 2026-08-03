@@ -38,6 +38,8 @@ data class LoginUiState(
     val selectedRole: RoleOptionUi? = null,
     val roles: List<RoleOptionUi> = emptyList(),
     val configSummary: String = "",
+    val offerAccepted: Boolean = false,
+    val privacyAccepted: Boolean = false,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
     val isLoading: Boolean = false,
@@ -49,6 +51,8 @@ fun LoginScreen(
     onEmailChange: (String) -> Unit,
     onNameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
+    onOfferAcceptedChange: (Boolean) -> Unit = {},
+    onPrivacyAcceptedChange: (Boolean) -> Unit = {},
     onRoleSelected: (RoleOptionUi) -> Unit,
     onLogin: () -> Unit,
     onRegister: () -> Unit,
@@ -110,10 +114,34 @@ fun LoginScreen(
                         shape = RoundedCornerShape(14.dp),
                     )
                     Text(
-                        text = "Регистрация доступна только для тренеров. После заявки администратор одобрит доступ.",
+                        text = "Регистрация доступна только для тренеров. После заявки администратор одобрит доступ, затем нужно будет оплатить аренду и заполнить карточку профиля.",
                         style = MaterialTheme.typography.bodySmall,
                         color = StaffOnSurfaceVariant,
                     )
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = state.offerAccepted,
+                            onCheckedChange = onOfferAcceptedChange,
+                        )
+                        Text(
+                            "Принимаю публичную оферту Доброзал",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = state.privacyAccepted,
+                            onCheckedChange = onPrivacyAcceptedChange,
+                        )
+                        Text(
+                            "Согласен на обработку персональных данных",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                     if (state.configSummary.isNotBlank()) {
                         Text(
                             text = state.configSummary,
@@ -129,7 +157,7 @@ fun LoginScreen(
                     StaffSecondaryButton(
                         text = "Зарегистрироваться",
                         onClick = onRegister,
-                        enabled = !state.isLoading,
+                        enabled = !state.isLoading && state.offerAccepted && state.privacyAccepted,
                     )
                     if (state.isLoading && state.statusMessage != null) {
                         Text(

@@ -85,6 +85,30 @@ class StaffApiClient(private val baseUrl: String) {
         return parseScheduleItem(training)
     }
 
+    fun updateTraining(
+        token: String,
+        trainingId: String,
+        name: String,
+        startAtIso: String,
+        endAtIso: String,
+        room: String?,
+    ): ScheduleItem {
+        val conn = openConnection("/api/v1/staff/trainings/$trainingId", "PUT")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        val payload = JSONObject()
+            .put("name", name)
+            .put("start_at", startAtIso)
+            .put("end_at", endAtIso)
+            .put("room", room ?: "")
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+        val json = requireJson(execute(conn))
+        val training = json.optJSONObject("training")
+            ?: throw IllegalStateException("Сервер не вернул обновлённое занятие")
+        return parseScheduleItem(training)
+    }
+
     fun bookClientOnTraining(token: String, trainingId: String, clientId: Int): Boolean {
         val conn = openConnection("/api/v1/staff/trainings/$trainingId/book", "POST")
         conn.setRequestProperty("Authorization", "Bearer $token")
@@ -150,14 +174,23 @@ class StaffApiClient(private val baseUrl: String) {
     }
 
     private fun parseTrainerProfile(json: JSONObject): TrainerPublicProfile {
+        val catalog = json.optJSONArray("specializations_catalog").toStringList()
+            .ifEmpty { TrainerSpecializationCatalog.DEFAULT }
+        val specsFromArray = json.optJSONArray("specializations").toStringList()
+        val specs = specsFromArray.ifEmpty {
+            TrainerSpecializationCatalog.parseSelected(json.optString("specialization"), catalog)
+        }
         return TrainerPublicProfile(
             id = json.optString("id").takeIf { it.isNotBlank() },
             name = json.optString("name"),
-            specialization = json.optString("specialization"),
+            specialization = specs.joinToString(", ").ifBlank { json.optString("specialization") },
+            specializations = specs,
+            specializationsCatalog = catalog,
             description = json.optString("description"),
             phone = json.optString("phone"),
             rating = json.optDouble("rating", 0.0).toFloat(),
             photoUrl = json.optString("photo_url").takeIf { it.isNotBlank() },
+            profileComplete = json.optBoolean("profile_complete", true),
         )
     }
 
@@ -240,8 +273,13 @@ class StaffApiClient(private val baseUrl: String) {
         )
     }
 
-    fun loadSchedule(token: String): ScheduleData {
-        val conn = openConnection("/api/v1/staff/schedule", "GET")
+    fun loadSchedule(token: String, from: String? = null): ScheduleData {
+        val path = if (from.isNullOrBlank()) {
+            "/api/v1/staff/schedule"
+        } else {
+            "/api/v1/staff/schedule?from=$from"
+        }
+        val conn = openConnection(path, "GET")
         conn.setRequestProperty("Authorization", "Bearer $token")
         val json = requireJson(execute(conn))
         val dayRows = json.optJSONArray("days") ?: JSONArray()
@@ -364,6 +402,7 @@ class StaffApiClient(private val baseUrl: String) {
                 name = row.optString("name"),
                 email = row.optString("email"),
                 phone = row.optString("phone"),
+                hasActiveBooking = row.optBoolean("hasActiveBooking", false),
             )
         }
         return out
@@ -622,13 +661,27 @@ data class AuthResult(
 )
 
 private fun parseOnboarding(json: JSONObject): StaffOnboarding {
+    val missing = mutableListOf<String>()
+    val missingArr = json.optJSONArray("profile_missing")
+    if (missingArr != null) {
+        for (i in 0 until missingArr.length()) {
+            missingArr.optString(i).takeIf { it.isNotBlank() }?.let { missing += it }
+        }
+    }
+    val catalog = json.optJSONArray("specializations_catalog").toStringList()
+        .ifEmpty { TrainerSpecializationCatalog.DEFAULT }
     return StaffOnboarding(
         status = json.optString("status", "active"),
         registrationStatus = json.optString("registration_status", "approved"),
         requiresRental = json.optBoolean("requires_rental", false),
         rentalPaidUntil = json.optString("rental_paid_until").takeIf { it.isNotBlank() },
         offerUrl = json.optString("offer_url", "https://dobrozal.ru/doc/offer"),
+        privacyUrl = json.optString("privacy_url", "https://dobrozal.ru/doc/privacy"),
+        docsUrl = json.optString("docs_url", "https://dobrozal.ru/doc"),
         rentalAmountKopecks = json.optInt("rental_amount_kopecks", 0),
         rentalAmountRub = json.optDouble("rental_amount_rub", 0.0),
+        profileComplete = json.optBoolean("profile_complete", true),
+        profileMissing = missing,
+        specializationsCatalog = catalog,
     )
 }

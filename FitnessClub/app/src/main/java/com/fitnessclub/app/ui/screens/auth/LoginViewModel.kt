@@ -57,8 +57,10 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = clubRepository.getClubInfo()) {
                 is ApiResult.Success -> {
-                    val name = result.data.name.ifBlank { "Доброзал" }
-                    _uiState.value = _uiState.value.copy(clubBrandName = name)
+                    val brand = result.data.brandName?.trim().orEmpty()
+                        .ifBlank { "Доброзал" }
+                        .let { if (it == "FitnessClub") "Доброзал" else it }
+                    _uiState.value = _uiState.value.copy(clubBrandName = brand)
                 }
                 else -> Unit
             }

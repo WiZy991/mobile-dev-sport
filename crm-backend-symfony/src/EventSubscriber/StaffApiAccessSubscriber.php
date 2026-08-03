@@ -57,6 +57,7 @@ final class StaffApiAccessSubscriber implements EventSubscriberInterface
             StaffOnboardingService::GATE_PENDING => 'pending_approval',
             StaffOnboardingService::GATE_REJECTED => 'registration_rejected',
             StaffOnboardingService::GATE_NEEDS_PAYMENT => 'rental_required',
+            StaffOnboardingService::GATE_NEEDS_PROFILE => 'profile_required',
             default => 'access_restricted',
         };
 
@@ -76,6 +77,8 @@ final class StaffApiAccessSubscriber implements EventSubscriberInterface
             '/api/v1/staff/config',
             '/api/v1/staff/push-token',
             '/api/v1/staff/notifications',
+            // Пока идёт онбординг карточки — разрешаем читать/писать профиль тренера.
+            '/api/v1/staff/trainer-profile',
         ];
         foreach ($exemptPrefixes as $prefix) {
             if (str_starts_with($path, $prefix) || $path === rtrim($prefix, '/')) {

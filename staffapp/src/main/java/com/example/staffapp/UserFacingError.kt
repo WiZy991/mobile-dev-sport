@@ -27,8 +27,11 @@ object UserFacingError {
                 "Сервер вернул техническую ошибку. Проверьте, что backend запущен."
             lower.contains("json parse") || lower.contains("empty response") ->
                 "Не удалось прочитать ответ CRM. Запустите backend:\ncd crm-backend-symfony\nphp -S 0.0.0.0:8000 -t public public/index.php"
-            raw.startsWith("HTTP ") ->
-                "Ошибка CRM: $raw"
+            raw.startsWith("HTTP ") -> {
+                // Если сервер прислал человекочитаемое сообщение — показываем его как есть.
+                val detail = raw.substringAfter(": ", "")
+                if (Regex("\\p{IsCyrillic}").containsMatchIn(detail)) detail else "Ошибка CRM: $raw"
+            }
             raw.isBlank() -> "Не удалось выполнить запрос. Повторите попытку."
             Regex("\\p{IsCyrillic}").containsMatchIn(raw) -> raw
             else -> "Не удалось загрузить данные. Повторите попытку."

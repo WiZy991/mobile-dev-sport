@@ -209,8 +209,26 @@ class ClubController extends AbstractController
         $contactEmail = trim($get('contact_email', ''));
         $socialLinks = $this->socialLinksForApi();
 
+        $brandName = trim($get('brand_name', 'Доброзал'));
+        if ($brandName === '' || $brandName === 'FitnessClub') {
+            $brandName = 'Доброзал';
+        }
+
+        $minVersionCode = max(0, (int) ($this->clubSettings->get('android_min_version_code') ?? 0));
+        $forceUpdate = \in_array(
+            strtolower(trim((string) ($this->clubSettings->get('android_force_update') ?? '0'))),
+            ['1', 'true', 'yes'],
+            true,
+        );
+        $updateMessage = trim((string) ($this->clubSettings->get('android_update_message') ?? ''));
+        if ($updateMessage === '') {
+            $updateMessage = 'Доступна новая версия приложения. Обновите её, чтобы продолжить пользоваться сервисом.';
+        }
+
         return $this->json([
+            // name — название зала/площадки (может быть длинным); brand_name — бренд сети в шапке.
             'name' => $clubName,
+            'brand_name' => $brandName,
             'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
             'phone' => $contactPhone !== '' ? $contactPhone : $get('phone', '+7 (495) 123-45-67'),
             'email' => $contactEmail !== '' ? $contactEmail : $get('email', 'info@fitnessclub.ru'),
@@ -225,6 +243,11 @@ class ClubController extends AbstractController
                 ? (string) $this->clubSettings->get('promo_home_subtitle')
                 : null,
             'shop_config' => $this->shopConfigForApi(),
+            'app_update' => [
+                'android_min_version_code' => $minVersionCode,
+                'force' => $forceUpdate,
+                'message' => $updateMessage,
+            ],
             'network' => [
                 'about' => $get('network_about', '') ?: null,
                 'social_links' => $socialLinks,

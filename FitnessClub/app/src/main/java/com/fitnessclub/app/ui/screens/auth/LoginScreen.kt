@@ -163,7 +163,7 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(8.dp))
             BrandHeader(
-                clubName = uiState.clubBrandName,
+                brandName = uiState.clubBrandName,
                 subtitle = if (uiState.hasCompletedRegistration) {
                     "Вход в аккаунт"
                 } else {

@@ -1,8 +1,10 @@
 package com.fitnessclub.app.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -19,11 +21,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.ui.theme.AccentBlue
 import com.fitnessclub.app.ui.theme.AppShapes
 import com.fitnessclub.app.ui.theme.AccentOrange
 import com.fitnessclub.app.ui.theme.Primary
+
+private const val CLUB_NAME_MAX_CHARS = 36
 
 @Composable
 fun OccupancyCard(
@@ -31,7 +36,9 @@ fun OccupancyCard(
     max: Int?,
     percentage: Int?,
     status: String?,
-    onRefresh: () -> Unit
+    clubName: String? = null,
+    onRefresh: () -> Unit,
+    onClick: (() -> Unit)? = null,
 ) {
     val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
     val progressColor = when (status) {
@@ -40,11 +47,18 @@ fun OccupancyCard(
         else -> Primary
     }
     val strokeWidthPx = with(LocalDensity.current) { 8.dp.toPx() }
+    val displayName = clubName
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { truncateClubName(it, CLUB_NAME_MAX_CHARS) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+            ),
         shape = AppShapes.medium,
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
@@ -89,6 +103,17 @@ fun OccupancyCard(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
+                if (displayName != null) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                }
                 Text(
                     text = "Заполненность зала",
                     style = MaterialTheme.typography.titleMedium,
@@ -112,6 +137,18 @@ fun OccupancyCard(
             IconButton(onClick = onRefresh) {
                 Icon(Icons.Default.Refresh, contentDescription = "Обновить")
             }
+            if (onClick != null) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Открыть клуб",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
+}
+
+private fun truncateClubName(name: String, maxChars: Int): String {
+    if (name.length <= maxChars) return name
+    return name.take(maxChars - 1).trimEnd() + "…"
 }

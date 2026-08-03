@@ -90,6 +90,34 @@ final class StaffBookingController extends AbstractController
             return $this->json(['error' => 'Нет карточки тренера', 'code' => 'trainer_missing'], 400);
         }
 
+        // Защита от наложения: у одного тренера не может быть двух занятий,
+        // пересекающихся по времени (пункт 39 репорта).
+        if ($trainer !== null) {
+            $overlap = $this->em->createQueryBuilder()
+                ->select('t')
+                ->from(Training::class, 't')
+                ->where('t.trainer = :trainer')
+                ->andWhere('t.startAt < :endAt')
+                ->andWhere('t.endAt > :startAt')
+                ->setParameter('trainer', $trainer)
+                ->setParameter('startAt', $startAt)
+                ->setParameter('endAt', $endAt)
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getOneOrNullResult();
+            if ($overlap instanceof Training) {
+                return $this->json([
+                    'error' => sprintf(
+                        'На это время уже есть занятие «%s» (%s–%s). Выберите другое время.',
+                        $overlap->getName(),
+                        $overlap->getStartAt()->format('H:i'),
+                        $overlap->getEndAt()->format('H:i')
+                    ),
+                    'code' => 'time_conflict',
+                ], 409);
+            }
+        }
+
         $training = (new Training())
             ->setName($name)
             ->setDescription(match ($type) {
@@ -152,6 +180,87 @@ final class StaffBookingController extends AbstractController
             'training' => $this->serializeTraining($training),
             'booking' => $bookingPayload,
         ], 201);
+    }
+
+    #[Route('/trainings/{id}', name: 'api_staff_training_update', methods: ['PUT'])]
+    public function update(string $id, Request $request): JsonResponse
+    {
+        $staff = $this->staffResolver->resolve($request);
+        if (!$staff instanceof StaffUser) {
+            return $this->json(['error' => 'Unauthorized', 'code' => 'unauthorized'], 401);
+        }
+
+        $numericId = str_starts_with($id, 'training-') ? (int) substr($id, 9) : (int) $id;
+        $training = $this->em->getRepository(Training::class)->find($numericId);
+        if (!$training instanceof Training) {
+            return $this->json(['error' => 'Training not found'], 404);
+        }
+        if (!$this->canManageTraining($staff, $training)) {
+            return $this->json(['error' => 'Можно изменять только свои занятия', 'code' => 'forbidden_training'], 403);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        $startAt = $training->getStartAt();
+        $endAt = $training->getEndAt();
+        if (isset($data['start_at']) || isset($data['end_at'])) {
+            try {
+                $startAt = isset($data['start_at']) ? new \DateTimeImmutable((string) $data['start_at']) : $startAt;
+                $endAt = isset($data['end_at']) ? new \DateTimeImmutable((string) $data['end_at']) : $endAt;
+            } catch (\Exception) {
+                return $this->json(['error' => 'Укажите корректные start_at / end_at', 'code' => 'invalid_datetime'], 400);
+            }
+            if ($endAt <= $startAt) {
+                return $this->json(['error' => 'Время окончания должно быть позже начала', 'code' => 'invalid_range'], 400);
+            }
+        }
+
+        // Проверка наложения с другими занятиями этого тренера (кроме самого себя).
+        $trainer = $training->getTrainer();
+        if ($trainer !== null) {
+            $overlap = $this->em->createQueryBuilder()
+                ->select('t')
+                ->from(Training::class, 't')
+                ->where('t.trainer = :trainer')
+                ->andWhere('t.id != :selfId')
+                ->andWhere('t.startAt < :endAt')
+                ->andWhere('t.endAt > :startAt')
+                ->setParameter('trainer', $trainer)
+                ->setParameter('selfId', $training->getId())
+                ->setParameter('startAt', $startAt)
+                ->setParameter('endAt', $endAt)
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getOneOrNullResult();
+            if ($overlap instanceof Training) {
+                return $this->json([
+                    'error' => sprintf(
+                        'На это время уже есть занятие «%s» (%s–%s). Выберите другое время.',
+                        $overlap->getName(),
+                        $overlap->getStartAt()->format('H:i'),
+                        $overlap->getEndAt()->format('H:i')
+                    ),
+                    'code' => 'time_conflict',
+                ], 409);
+            }
+        }
+
+        $training->setStartAt($startAt)->setEndAt($endAt);
+
+        if (isset($data['name'])) {
+            $name = trim((string) $data['name']);
+            if ($name !== '') {
+                $training->setName($name);
+            }
+        }
+        if (array_key_exists('room', $data)) {
+            $room = trim((string) $data['room']);
+            $training->setRoom($room !== '' ? $room : null);
+        }
+
+        $this->em->flush();
+
+        return $this->json(['training' => $this->serializeTraining($training)]);
     }
 
     #[Route('/trainings/{id}/book', name: 'api_staff_training_book', methods: ['POST'])]

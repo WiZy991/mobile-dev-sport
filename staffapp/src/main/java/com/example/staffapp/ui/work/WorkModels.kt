@@ -12,9 +12,12 @@ data class ListCardUi(
     val ticketId: Int? = null,
     val refType: String? = null,
     val feedId: Int? = null,
+    val trainingId: String? = null,
+    val trainingDate: String? = null,
 ) {
     val isClickable: Boolean
-        get() = clientId != null || ticketId != null || refType == "client" || refType == "ticket"
+        get() = clientId != null || ticketId != null || trainingId != null ||
+            refType == "client" || refType == "ticket"
 }
 
 data class ProfileSectionUi(
@@ -29,16 +32,20 @@ data class ActionUi(val id: String, val label: String)
 
 data class DayChipUi(val date: String, val label: String, val count: Int, val selected: Boolean)
 
+data class HomeSectionUi(
+    val title: String,
+    val items: List<ListCardUi> = emptyList(),
+    val emptyMessage: String? = null,
+)
+
 data class HomeTabUi(
     val greeting: String = "",
     val roleTitle: String = "",
     val metrics: List<MetricUi> = emptyList(),
     val showAdminButton: Boolean = false,
-    val sectionTitle: String? = null,
-    val items: List<ListCardUi> = emptyList(),
+    val sections: List<HomeSectionUi> = emptyList(),
     val actions: List<ActionUi> = emptyList(),
     val loading: Boolean = false,
-    val emptyMessage: String? = null,
     val needNotificationsPermission: Boolean = false,
 )
 
@@ -53,6 +60,7 @@ data class ScheduleDayUi(
 
 data class ScheduleSessionUi(
     val trainingId: String? = null,
+    val date: String = "",
     val title: String,
     val type: String,
     val typeLabel: String,
@@ -76,6 +84,7 @@ data class ScheduleBookingUi(
 data class ScheduleTabUi(
     val days: List<ScheduleDayUi> = emptyList(),
     val sessions: List<ScheduleSessionUi> = emptyList(),
+    val monthLabel: String = "",
     val selectedTypeFilter: String? = null,
     val denied: Boolean = false,
     val deniedMessage: String = "",
@@ -86,6 +95,8 @@ data class ClientsTabUi(
     val query: String = "",
     val summary: String = "",
     val items: List<ListCardUi> = emptyList(),
+    /** Фильтр «только с активной записью» (пункт 31 репорта). */
+    val onlyActiveBooking: Boolean = false,
     val denied: Boolean = false,
     val deniedMessage: String = "",
     val loading: Boolean = false,
@@ -108,6 +119,16 @@ data class ProfileTabUi(
     val name: String = "",
     val email: String = "",
     val roleTitle: String = "",
+    val phone: String = "",
+    val specialization: String = "",
+    val description: String = "",
+    val photoUrl: String? = null,
+    /** Действующая аренда клуба (п.25). */
+    val rentalPaidUntilLabel: String? = null,
+    /** Ссылки на документы (п.26). */
+    val offerUrl: String = "https://dobrozal.ru/doc/offer",
+    val privacyUrl: String = "https://dobrozal.ru/doc/privacy",
+    val docsUrl: String = "https://dobrozal.ru/doc",
     val sections: List<ProfileSectionUi> = emptyList(),
     val adminAvailable: Boolean = false,
     val showAdminButton: Boolean = false,

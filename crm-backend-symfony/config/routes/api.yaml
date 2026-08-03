@@ -423,6 +423,11 @@ api_staff_training_create:
   controller: App\Controller\Api\StaffBookingController::create
   methods: [POST]
 
+api_staff_training_update:
+  path: /api/v1/staff/trainings/{id}
+  controller: App\Controller\Api\StaffBookingController::update
+  methods: [PUT]
+
 api_staff_trainer_profile_get:
   path: /api/v1/staff/trainer-profile
   controller: App\Controller\Api\StaffTrainerProfileController::get

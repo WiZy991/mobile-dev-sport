@@ -116,30 +116,42 @@ fun StaffHeroCard(
 @Composable
 fun StaffMetricsRow(metrics: List<MetricUi>, modifier: Modifier = Modifier) {
     if (metrics.isEmpty()) return
-    LazyRow(
+    // Сетка 2×N вместо горизонтального скролла: все метрики видны сразу,
+    // и тени карточек не обрезаются краями LazyRow (пункты 11/15 репорта).
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        items(metrics) { metric ->
-            Card(
-                modifier = Modifier.width(140.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        metrics.chunked(2).forEach { rowMetrics ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = metric.value,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = StaffPrimary,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = metric.label,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StaffOnSurfaceVariant,
-                    )
+                rowMetrics.forEach { metric ->
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = metric.value,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = StaffPrimary,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = metric.label,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = StaffOnSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (rowMetrics.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }

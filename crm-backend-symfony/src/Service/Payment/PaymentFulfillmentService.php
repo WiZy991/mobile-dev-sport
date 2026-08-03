@@ -7,7 +7,9 @@ use App\Entity\Payment;
 use App\Entity\Sale;
 use App\Entity\Subscription;
 use App\Service\Api\SubscriptionFreezePolicy;
+use App\Service\Notification\ClientEmailNotifier;
 use App\Service\Notification\ClientNotificationScheduler;
+use App\Service\Notification\ClientNotificationService;
 use Doctrine\ORM\EntityManagerInterface;
 
 class PaymentFulfillmentService
@@ -16,6 +18,8 @@ class PaymentFulfillmentService
         private readonly EntityManagerInterface $em,
         private readonly SubscriptionFreezePolicy $freezePolicy,
         private readonly ClientNotificationScheduler $notificationScheduler,
+        private readonly ClientNotificationService $clientNotifications,
+        private readonly ClientEmailNotifier $emailNotifier,
     ) {}
 
     public function fulfill(Payment $payment, ?string $paymentWay = null): ?Subscription
@@ -110,8 +114,51 @@ class PaymentFulfillmentService
 
         $this->expireSiblingPendingPayments($payment);
         $this->notificationScheduler->scheduleSubscriptionExpiryReminders($sub);
+        $this->sendSubscriptionPaidConfirmation($payment, $sub);
 
         return $sub;
+    }
+
+    /**
+     * Письмо-подтверждение после оплаты (пункт 8 репорта): клиент должен получить
+     * касание от нас, а не только чек банка.
+     */
+    private function sendSubscriptionPaidConfirmation(Payment $payment, Subscription $sub): void
+    {
+        $user = $payment->getUser();
+        $plan = $payment->getSubscriptionPlan();
+        if ($user === null || $plan === null) {
+            return;
+        }
+
+        $lines = ['Оплата прошла успешно, абонемент «' . $plan->getName() . '» активирован.'];
+        $start = $sub->getStartDate();
+        $end = $sub->getEndDate();
+        if ($start !== null && $end !== null) {
+            $lines[] = 'Срок действия: с ' . $start->format('d.m.Y') . ' по ' . $end->format('d.m.Y') . '.';
+        } elseif ($end !== null) {
+            $lines[] = 'Действует до ' . $end->format('d.m.Y') . '.';
+        }
+        if ($sub->getVisitsTotal() !== null && $sub->getVisitsTotal() > 0) {
+            $lines[] = 'Посещений по абонементу: ' . $sub->getVisitsTotal() . '.';
+        }
+        $lines[] = 'Сумма: ' . number_format($payment->getAmountKopecks() / 100, 2, ',', ' ') . ' ₽.';
+        $lines[] = '';
+        $lines[] = 'Абонемент уже доступен в приложении. Если возникнут вопросы — просто ответьте на это письмо или создайте обращение в приложении.';
+
+        try {
+            $this->clientNotifications->notify(
+                $user,
+                'payment',
+                'Оплата прошла успешно',
+                implode("\n", $lines),
+                $payment->getId() !== null ? 'payment-' . $payment->getId() : null,
+                force: true,
+                forceEmail: true,
+            );
+        } catch (\Throwable) {
+            // Подтверждение — вторичное действие; оно не должно ломать зачисление оплаты.
+        }
     }
 
     private function fulfillTrainerRental(Payment $payment, ?string $paymentWay): void
@@ -157,6 +204,27 @@ class PaymentFulfillmentService
 
         $this->em->persist($sale);
         $this->em->flush();
+
+        // Письмо тренеру об успешной оплате аренды (пункт 8 репорта).
+        $staffEmail = $staff->getEmail();
+        if ($staffEmail !== '') {
+            $paidUntil = $staff->getRentalPaidUntil();
+            try {
+                $this->emailNotifier->send(
+                    $staffEmail,
+                    'Оплата аренды прошла успешно',
+                    implode("\n", array_filter([
+                        'Оплата аренды клуба прошла успешно.',
+                        'Сумма: ' . number_format($payment->getAmountKopecks() / 100, 2, ',', ' ') . ' ₽.',
+                        $paidUntil !== null ? 'Доступ активен до ' . $paidUntil->format('d.m.Y') . '.' : null,
+                        '',
+                        'Приложение для тренеров уже доступно. Если возникнут вопросы — ответьте на это письмо.',
+                    ])),
+                );
+            } catch (\Throwable) {
+                // Письмо — вторичное действие; не должно ломать зачисление оплаты.
+            }
+        }
     }
 
     private function expireSiblingPendingPayments(Payment $paid): void

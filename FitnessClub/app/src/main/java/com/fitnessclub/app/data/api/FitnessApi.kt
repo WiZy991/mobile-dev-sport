@@ -528,6 +528,15 @@ data class ClubItem(
     val maxCapacity: Int? = null
 )
 
+data class AppUpdateInfo(
+    @com.google.gson.annotations.SerializedName("android_min_version_code")
+    val androidMinVersionCode: Int = 0,
+    @com.google.gson.annotations.SerializedName("force")
+    val force: Boolean = false,
+    @com.google.gson.annotations.SerializedName("message")
+    val message: String? = null,
+)
+
 data class ClubInfo(
     @com.google.gson.annotations.SerializedName("id")
     val id: String? = null,
@@ -535,8 +544,12 @@ data class ClubInfo(
     val promoTitle: String? = null,
     @com.google.gson.annotations.SerializedName("promo_subtitle")
     val promoSubtitle: String? = null,
+    /** Название зала/площадки (может быть длинным). */
     @com.google.gson.annotations.SerializedName("name")
     val name: String,
+    /** Бренд сети для шапки («Доброзал»). */
+    @com.google.gson.annotations.SerializedName("brand_name")
+    val brandName: String? = null,
     @com.google.gson.annotations.SerializedName("address")
     val address: String,
     @com.google.gson.annotations.SerializedName("phone")
@@ -561,6 +574,8 @@ data class ClubInfo(
     val safetyRulesUrl: String? = null,
     @com.google.gson.annotations.SerializedName("shop_config")
     val shopConfig: com.fitnessclub.app.data.model.ClubShopConfig? = null,
+    @com.google.gson.annotations.SerializedName("app_update")
+    val appUpdate: AppUpdateInfo? = null,
     @com.google.gson.annotations.SerializedName("network")
     val network: com.fitnessclub.app.data.model.ClubNetworkInfo? = null,
 )

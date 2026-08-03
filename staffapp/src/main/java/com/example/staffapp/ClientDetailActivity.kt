@@ -74,7 +74,7 @@ class ClientDetailActivity : ComponentActivity() {
         val subTitle = sub?.plan.orEmpty()
         val subMeta = buildString {
             if (sub != null) {
-                append("${sub.status}")
+                append(UiLabels.subscriptionStatus(sub.status))
                 if (!sub.endDate.isNullOrBlank()) append(" · до ${sub.endDate}")
                 if (sub.visitsTotal > 0) append("\nВизиты: ${sub.visitsUsed}/${sub.visitsTotal}")
             }
@@ -84,7 +84,6 @@ class ClientDetailActivity : ComponentActivity() {
             name = client.name,
             email = client.email,
             phone = client.phone,
-            bonusPoints = client.bonusPoints,
             isBlocked = client.isBlocked,
             subscriptionTitle = subTitle,
             subscriptionMeta = subMeta,

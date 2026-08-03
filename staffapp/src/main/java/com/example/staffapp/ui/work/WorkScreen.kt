@@ -1,14 +1,23 @@
 package com.example.staffapp.ui.work
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
@@ -22,10 +31,14 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -34,11 +47,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.staffapp.RequestNotificationPermission
 import com.example.staffapp.ui.components.StaffActionButtons
 import com.example.staffapp.ui.components.StaffChipRow
@@ -51,6 +68,7 @@ import com.example.staffapp.ui.components.StaffLoadingState
 import com.example.staffapp.ui.components.StaffMenuCard
 import com.example.staffapp.ui.components.StaffMetricsRow
 import com.example.staffapp.ui.components.StaffPrimaryButton
+import com.example.staffapp.ui.components.StaffSecondaryButton
 import com.example.staffapp.ui.components.StaffSearchBar
 import com.example.staffapp.ui.components.StaffSectionTitle
 import com.example.staffapp.ui.theme.StaffOnSurfaceVariant
@@ -72,9 +90,12 @@ fun WorkScreen(
     onAction: (String) -> Unit,
     onScheduleDaySelected: (String) -> Unit,
     onScheduleTypeFilterSelected: (String?) -> Unit,
+    onSchedulePrevPeriod: () -> Unit = {},
+    onScheduleNextPeriod: () -> Unit = {},
     onSupportFilterSelected: (String) -> Unit,
     onClientSearchQueryChange: (String) -> Unit,
     onClientSearch: () -> Unit,
+    onClientsActiveFilterToggle: () -> Unit = {},
     onListCardClick: (ListCardUi) -> Unit,
     onProfileSectionClick: (String) -> Unit,
     onScheduleSessionClick: (ScheduleSessionUi) -> Unit = {},
@@ -82,11 +103,14 @@ fun WorkScreen(
     onAssignSearch: () -> Unit = {},
     onAssignBook: (Int) -> Unit = {},
     onAssignCancelBooking: (String) -> Unit = {},
+    onAssignOpenClient: (Int) -> Unit = {},
+    onAssignEditSession: () -> Unit = {},
     onAssignDismiss: () -> Unit = {},
     onCreateSessionClick: () -> Unit = {},
     onCreateNameChange: (String) -> Unit = {},
+    onCreateDateChange: (String) -> Unit = {},
     onCreateStartTimeChange: (String) -> Unit = {},
-    onCreateEndTimeChange: (String) -> Unit = {},
+    onCreateDurationChange: (Int) -> Unit = {},
     onCreateRoomChange: (String) -> Unit = {},
     onCreateConfirm: () -> Unit = {},
     onCreateDismiss: () -> Unit = {},
@@ -95,6 +119,11 @@ fun WorkScreen(
     // Системный диалог Android 13+ — сразу при открытии рабочего экрана (как в клиентском приложении).
     RequestNotificationPermission(onResult = onNotificationPermissionResult)
 
+    // «Назад» с любой вкладки возвращает на Главную, и только с Главной закрывает приложение.
+    BackHandler(enabled = state.selectedTab != WorkUiState.TAB_HOME) {
+        onTabSelected(WorkUiState.TAB_HOME)
+    }
+
     state.assignDialog?.let { dialog ->
         AssignClientDialog(
             state = dialog,
@@ -102,6 +131,8 @@ fun WorkScreen(
             onSearch = onAssignSearch,
             onBookClient = onAssignBook,
             onCancelBooking = onAssignCancelBooking,
+            onOpenClient = onAssignOpenClient,
+            onEditSession = onAssignEditSession,
             onDismiss = onAssignDismiss,
         )
     }
@@ -109,8 +140,9 @@ fun WorkScreen(
         CreateSessionDialog(
             state = dialog,
             onNameChange = onCreateNameChange,
+            onDateChange = onCreateDateChange,
             onStartTimeChange = onCreateStartTimeChange,
-            onEndTimeChange = onCreateEndTimeChange,
+            onDurationChange = onCreateDurationChange,
             onRoomChange = onCreateRoomChange,
             onCreate = onCreateConfirm,
             onDismiss = onCreateDismiss,
@@ -134,10 +166,18 @@ fun WorkScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        state.screenTitle,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Column {
+                        Text(
+                            "Сотрудник",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.85f),
+                        )
+                        Text(
+                            state.screenTitle,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                        )
+                    }
                 },
                 actions = {
                     IconButton(onClick = onLogout) {
@@ -146,8 +186,8 @@ fun WorkScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = StaffPrimary,
-                    titleContentColor = androidx.compose.ui.graphics.Color.White,
-                    actionIconContentColor = androidx.compose.ui.graphics.Color.White,
+                    titleContentColor = Color.White,
+                    actionIconContentColor = Color.White,
                 ),
             )
         },
@@ -198,12 +238,15 @@ fun WorkScreen(
                     schedule = state.schedule,
                     onDaySelected = onScheduleDaySelected,
                     onTypeFilterSelected = onScheduleTypeFilterSelected,
+                    onPrevPeriod = onSchedulePrevPeriod,
+                    onNextPeriod = onScheduleNextPeriod,
                     onSessionClick = onScheduleSessionClick,
                 )
                 WorkUiState.TAB_CLIENTS -> ClientsTabContent(
                     state.clients,
                     onClientSearchQueryChange,
                     onClientSearch,
+                    onClientsActiveFilterToggle,
                     onListCardClick,
                 )
                 WorkUiState.TAB_SUPPORT -> SupportTabContent(
@@ -272,19 +315,21 @@ private fun HomeTabContent(
                 )
             }
         }
-        home.sectionTitle?.let { title ->
-            item { StaffSectionTitle(title) }
-        }
         if (home.loading) {
             item { StaffLoadingState() }
-        } else if (home.items.isEmpty() && home.emptyMessage != null) {
-            item { StaffEmptyState(home.emptyMessage) }
         } else {
-            items(home.items) { item ->
-                StaffListCard(
-                    item = item,
-                    onClick = if (item.isClickable) {{ onListCardClick(item) }} else null,
-                )
+            home.sections.forEach { section ->
+                item { StaffSectionTitle(section.title) }
+                if (section.items.isEmpty() && section.emptyMessage != null) {
+                    item { StaffEmptyState(section.emptyMessage) }
+                } else {
+                    items(section.items) { item ->
+                        StaffListCard(
+                            item = item,
+                            onClick = if (item.isClickable) {{ onListCardClick(item) }} else null,
+                        )
+                    }
+                }
             }
         }
         if (home.actions.isNotEmpty()) {
@@ -298,6 +343,7 @@ private fun ClientsTabContent(
     clients: ClientsTabUi,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onActiveFilterToggle: () -> Unit,
     onListCardClick: (ListCardUi) -> Unit,
 ) {
     if (clients.denied) {
@@ -312,6 +358,23 @@ private fun ClientsTabContent(
             onQueryChange = onQueryChange,
             onSearch = onSearch,
         )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                selected = !clients.onlyActiveBooking,
+                onClick = { if (clients.onlyActiveBooking) onActiveFilterToggle() },
+                label = { Text("Все") },
+            )
+            FilterChip(
+                selected = clients.onlyActiveBooking,
+                onClick = { if (!clients.onlyActiveBooking) onActiveFilterToggle() },
+                label = { Text("С активной записью") },
+            )
+        }
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -405,16 +468,18 @@ private fun ProfileTabContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Пункт 27 репорта: раздел «Профиль» показывает карточку сотрудника
+        // (фото и данные), а не дублирует нижнее меню.
+        item { ProfileHeaderCard(profile) }
         item {
-            StaffHeroCard(
-                title = profile.name.ifBlank { "Сотрудник" },
-                subtitle = profile.roleTitle,
+            StaffInfoBanner(
+                "Email и пароль для входа можно изменить только через администратора клуба — " +
+                    "обратитесь на ресепшн.",
+                color = StaffOnSurfaceVariant,
             )
         }
-        if (profile.email.isNotBlank()) {
-            item {
-                StaffInfoBanner(profile.email, color = StaffOnSurfaceVariant)
-            }
+        profile.rentalPaidUntilLabel?.let { rental ->
+            item { StaffInfoBanner(rental, color = StaffPrimary) }
         }
         if (profile.showTrainerProfileEdit) {
             item {
@@ -424,26 +489,34 @@ private fun ProfileTabContent(
                 )
             }
         }
+        item { StaffSectionTitle("Документы") }
+        item {
+            StaffPrimaryButton(
+                text = "Публичная оферта",
+                onClick = { onAction("open_offer") },
+            )
+        }
+        item {
+            StaffSecondaryButton(
+                text = "Политика конфиденциальности",
+                onClick = { onAction("open_privacy") },
+            )
+        }
+        item {
+            StaffSecondaryButton(
+                text = "Все документы клуба",
+                onClick = { onAction("open_docs") },
+            )
+        }
         if (profile.showAdminButton) {
             item {
                 StaffPrimaryButton(text = "Открыть админку", onClick = { onAction("open_admin") })
             }
         }
-        if (profile.sections.isNotEmpty()) {
-            item {
-                StaffMenuCard(
-                    title = "Доступные разделы",
-                    items = profile.sections.map { section ->
-                        SectionIcons.forSection(section.key) to (section.title to section.hint)
-                    },
-                    onItemClick = { index -> onProfileSectionClick(profile.sections[index].key) },
-                )
-            }
-        }
-        item {
-            StaffInfoBanner(
-                if (profile.adminAvailable) "Админка CRM доступна" else "Админка для вашей должности недоступна",
-            )
+        // Тренеру не показываем упоминание админки вовсе, чтобы не создавать
+        // впечатление, что доступ нужно как-то «разблокировать».
+        if (profile.adminAvailable) {
+            item { StaffInfoBanner("Админка CRM доступна") }
         }
         profile.sectionTitle?.let { title ->
             item { StaffSectionTitle(title) }
@@ -458,6 +531,98 @@ private fun ProfileTabContent(
                 )
             }
         }
+        if (profile.sections.isNotEmpty()) {
+            item {
+                StaffMenuCard(
+                    title = "Доступные разделы",
+                    items = profile.sections.map { section ->
+                        SectionIcons.forSection(section.key) to (section.title to section.hint)
+                    },
+                    onItemClick = { index -> onProfileSectionClick(profile.sections[index].key) },
+                )
+            }
+        }
         item { Spacer(modifier = Modifier.height(16.dp)) }
+    }
+}
+
+@Composable
+private fun ProfileHeaderCard(profile: ProfileTabUi) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(StaffPrimary.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (!profile.photoUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = profile.photoUrl,
+                            contentDescription = "Фото профиля",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Person,
+                            contentDescription = null,
+                            tint = StaffPrimary,
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = profile.name.ifBlank { "Сотрудник" },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (profile.roleTitle.isNotBlank()) {
+                        Text(
+                            text = profile.roleTitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = StaffOnSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            ProfileInfoRow(label = "Email", value = profile.email)
+            ProfileInfoRow(label = "Телефон", value = profile.phone)
+            ProfileInfoRow(label = "Специализация", value = profile.specialization)
+            if (profile.description.isNotBlank()) {
+                Text(
+                    text = profile.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = StaffOnSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileInfoRow(label: String, value: String) {
+    if (value.isBlank()) return
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = StaffOnSurfaceVariant,
+            modifier = Modifier.width(130.dp),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Доброзал</string>
+    <string name="app_name">Сотрудник</string>
     <!-- Как в FitnessClub: прод CRM. Локально (php/docker на :8000) — http://10.0.2.2:8000 -->
     <string name="base_api_url">https://worldcashfit.ru</string>
     <string name="base_api_url_device">https://worldcashfit.ru</string>

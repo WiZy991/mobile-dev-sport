@@ -23,7 +23,10 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     /** Пока false — баннер не рисуем (нет вспышки демо «СКИДКА 20%»). */
     val promotionsReady: Boolean = false,
-    val clubBrandName: String = "Доброзал",
+    /** Бренд сети в шапке (не название площадки). */
+    val brandName: String = "Доброзал",
+    /** Название зала для плашки заполненности. */
+    val clubHallName: String = "",
     val promotions: List<ClubPromotion> = emptyList(),
     val unreadNotifications: Int = 0,
     val upcomingTrainings: List<UpcomingTraining> = emptyList(),
@@ -54,7 +57,7 @@ class HomeViewModel @Inject constructor(
             coroutineScope {
                 val occupancyJob = async { loadOccupancySuspend() }
                 val unreadJob = async { loadUnreadCountSuspend() }
-                val clubJob = async { loadClubBrandName() }
+                val clubJob = async { loadClubInfo() }
                 val accessJob = async {
                     accessRepository.refreshAccessStatus()
                     _uiState.update { it.copy(isInsideGym = accessRepository.accessStatus.value.isInside) }
@@ -202,12 +205,20 @@ class HomeViewModel @Inject constructor(
             (t == "СКИДКА 20%!" && s.contains("12 и 6"))
     }
 
-    private suspend fun loadClubBrandName() {
+    private suspend fun loadClubInfo() {
         try {
             when (val result = clubRepository.getClubInfo()) {
                 is ApiResult.Success -> {
+                    val info = result.data
+                    val brand = info.brandName?.trim().orEmpty()
+                        .ifBlank { "Доброзал" }
+                        .let { if (it == "FitnessClub") "Доброзал" else it }
+                    val hall = info.name.trim().ifBlank { brand }
                     _uiState.update {
-                        it.copy(clubBrandName = result.data.name.ifBlank { "Доброзал" })
+                        it.copy(
+                            brandName = brand,
+                            clubHallName = hall,
+                        )
                     }
                 }
                 else -> Unit

@@ -43,7 +43,6 @@ data class ClientDetailUi(
     val name: String = "",
     val email: String = "",
     val phone: String = "",
-    val bonusPoints: Int = 0,
     val isBlocked: Boolean = false,
     val subscriptionTitle: String = "",
     val subscriptionMeta: String = "",
@@ -104,14 +103,6 @@ fun ClientDetailScreen(
                     item {
                         StaffInfoBanner("Клиент заблокирован", color = StaffError)
                     }
-                }
-                item {
-                    StaffListCard(
-                        ListCardUi(
-                            title = "Бонусы",
-                            subtitle = "${state.bonusPoints} баллов",
-                        ),
-                    )
                 }
                 item { StaffSectionTitle("Абонемент") }
                 item {

@@ -23,8 +23,10 @@ import com.fitnessclub.app.data.local.ThemeMode
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.LaunchedEffect
 import com.fitnessclub.app.data.repository.AuthRepository
+import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.push.PushTokenRegistrar
 import com.fitnessclub.app.push.RequestNotificationPermission
+import com.fitnessclub.app.ui.components.ForceUpdateGate
 import com.fitnessclub.app.ui.navigation.NavGraph
 import com.fitnessclub.app.ui.theme.FitnessClubTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -41,6 +43,9 @@ class MainActivity : FragmentActivity() {
 
     @Inject
     lateinit var pushTokenRegistrar: PushTokenRegistrar
+
+    @Inject
+    lateinit var clubRepository: ClubRepository
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,6 +94,7 @@ class MainActivity : FragmentActivity() {
                         navController = navController,
                         isLoggedIn = isLoggedIn
                     )
+                    ForceUpdateGate(clubRepository = clubRepository)
                 }
             }
         }

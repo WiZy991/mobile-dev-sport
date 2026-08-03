@@ -107,7 +107,7 @@ fun RegisterClubPickScreen(
                 }
             }
             BrandHeader(
-                clubName = "Доброзал",
+                brandName = "Доброзал",
                 subtitle = "Выберите зал",
                 modifier = Modifier
                     .fillMaxWidth()

@@ -1,5 +1,6 @@
 package com.example.staffapp.ui.work
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +13,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.example.staffapp.ui.components.StaffListCard
 import com.example.staffapp.ui.components.StaffPrimaryButton
@@ -34,6 +37,8 @@ fun AssignClientDialog(
     onSearch: () -> Unit,
     onBookClient: (Int) -> Unit,
     onCancelBooking: (String) -> Unit,
+    onOpenClient: (Int) -> Unit = {},
+    onEditSession: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -41,14 +46,29 @@ fun AssignClientDialog(
         title = { Text("Запись: ${state.sessionTitle}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onEditSession) {
+                    Text("Изменить время или зал")
+                }
                 if (state.booked.isNotEmpty()) {
                     Text("Уже записаны")
                     state.booked.forEach { row ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(row.title, modifier = Modifier.weight(1f))
+                            // Имя записанного клиента кликабельно и открывает карточку.
+                            Text(
+                                row.title,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .let { m ->
+                                        row.clientId?.let { id ->
+                                            m.clickable { onOpenClient(id) }
+                                        } ?: m
+                                    },
+                                textDecoration = if (row.clientId != null) TextDecoration.Underline else null,
+                            )
                             if (row.meta.isNotBlank()) {
                                 TextButton(onClick = { onCancelBooking(row.meta) }) {
                                     Text("Снять")

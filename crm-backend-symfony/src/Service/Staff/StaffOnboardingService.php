@@ -15,7 +15,38 @@ final class StaffOnboardingService
     public const GATE_PENDING = 'pending_approval';
     public const GATE_REJECTED = 'rejected';
     public const GATE_NEEDS_PAYMENT = 'needs_offer_payment';
+    /** Одобрен и оплатил аренду, но не заполнил обязательные поля карточки (п.16 репорта). */
+    public const GATE_NEEDS_PROFILE = 'needs_profile';
     public const GATE_ACTIVE = 'active';
+
+    /** Максимум специализаций в карточке тренера. */
+    public const MAX_SPECIALIZATIONS = 5;
+
+    /**
+     * Справочник специализаций для мультивыбора (п.17 репорта).
+     *
+     * @return list<string>
+     */
+    public static function specializationCatalog(): array
+    {
+        return [
+            'Персональный тренер',
+            'Силовые тренировки',
+            'Функциональный тренинг',
+            'Кроссфит',
+            'Йога',
+            'Пилатес',
+            'Стретчинг',
+            'Кардио',
+            'Бокс / единоборства',
+            'Реабилитация',
+            'Похудение',
+            'Набор массы',
+            'Подготовка к соревнованиям',
+            'Детский фитнес',
+            'Групповые программы',
+        ];
+    }
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -28,10 +59,79 @@ final class StaffOnboardingService
         return match ($user->getRegistrationStatus()) {
             StaffUser::REGISTRATION_PENDING => self::GATE_PENDING,
             StaffUser::REGISTRATION_REJECTED => self::GATE_REJECTED,
-            default => $user->requiresTrainerRental() && !$user->hasValidRental()
-                ? self::GATE_NEEDS_PAYMENT
-                : self::GATE_ACTIVE,
+            default => $this->resolveApprovedGate($user),
         };
+    }
+
+    private function resolveApprovedGate(StaffUser $user): string
+    {
+        if ($user->requiresTrainerRental() && !$user->hasValidRental()) {
+            return self::GATE_NEEDS_PAYMENT;
+        }
+        if ($user->isTrainerRole() && !$this->isTrainerProfileComplete($user)) {
+            return self::GATE_NEEDS_PROFILE;
+        }
+
+        return self::GATE_ACTIVE;
+    }
+
+    /**
+     * Обязательные поля карточки: телефон + хотя бы одна специализация из справочника.
+     */
+    public function isTrainerProfileComplete(StaffUser $user): bool
+    {
+        $trainer = $user->getTrainer();
+        if ($trainer === null) {
+            return false;
+        }
+        $phone = preg_replace('/\D+/', '', (string) ($trainer->getPhone() ?? '')) ?? '';
+        // Российский мобильный: 10 цифр или 11 с ведущей 7/8.
+        $phoneOk = (\strlen($phone) === 10)
+            || (\strlen($phone) === 11 && ($phone[0] === '7' || $phone[0] === '8'));
+        $specs = $this->parseSpecializations((string) ($trainer->getSpecialization() ?? ''));
+
+        return $phoneOk && $specs !== [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function parseSpecializations(string $raw): array
+    {
+        $catalog = array_map('mb_strtolower', self::specializationCatalog());
+        $parts = preg_split('/[,;|]+/u', $raw) ?: [];
+        $out = [];
+        foreach ($parts as $part) {
+            $label = trim($part);
+            if ($label === '') {
+                continue;
+            }
+            $idx = array_search(mb_strtolower($label), $catalog, true);
+            if ($idx === false) {
+                continue;
+            }
+            $canonical = self::specializationCatalog()[$idx];
+            if (!\in_array($canonical, $out, true)) {
+                $out[] = $canonical;
+            }
+            if (\count($out) >= self::MAX_SPECIALIZATIONS) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    public function normalizeSpecializationInput(mixed $raw): string
+    {
+        if (\is_array($raw)) {
+            $joined = implode(', ', array_map('strval', $raw));
+        } else {
+            $joined = (string) $raw;
+        }
+        $parsed = $this->parseSpecializations($joined);
+
+        return implode(', ', $parsed);
     }
 
     /** @return array<string, mixed> */
@@ -43,6 +143,25 @@ final class StaffOnboardingService
         if ($offerUrl === '') {
             $offerUrl = 'https://dobrozal.ru/doc/offer';
         }
+        $privacyUrl = trim((string) ($this->clubSettings->get('privacy_url') ?? ''));
+        if ($privacyUrl === '') {
+            $privacyUrl = 'https://dobrozal.ru/doc/privacy';
+        }
+        $docsUrl = trim((string) ($this->clubSettings->get('legal_docs_url') ?? ''));
+        if ($docsUrl === '') {
+            $docsUrl = 'https://dobrozal.ru/doc';
+        }
+
+        $trainer = $user->getTrainer();
+        $missing = [];
+        if ($user->isTrainerRole()) {
+            if ($trainer === null || trim((string) ($trainer->getPhone() ?? '')) === '') {
+                $missing[] = 'phone';
+            }
+            if ($trainer === null || $this->parseSpecializations((string) ($trainer->getSpecialization() ?? '')) === []) {
+                $missing[] = 'specialization';
+            }
+        }
 
         return [
             'status' => $gate,
@@ -51,11 +170,17 @@ final class StaffOnboardingService
             'rental_paid_until' => $user->getRentalPaidUntil()?->format('Y-m-d\TH:i:s'),
             'offer_accepted_at' => $user->getOfferAcceptedAt()?->format('Y-m-d\TH:i:s'),
             'offer_url' => $offerUrl,
+            'privacy_url' => $privacyUrl,
+            'docs_url' => $docsUrl,
             'rental_amount_kopecks' => $amount,
             'rental_amount_rub' => round($amount / 100, 2),
-            'trainer_id' => $user->getTrainer()?->getId() !== null
-                ? 'trainer-' . $user->getTrainer()->getId()
+            'trainer_id' => $trainer?->getId() !== null
+                ? 'trainer-' . $trainer->getId()
                 : null,
+            'profile_complete' => $this->isTrainerProfileComplete($user),
+            'profile_missing' => $missing,
+            'specializations_catalog' => self::specializationCatalog(),
+            'specializations_max' => self::MAX_SPECIALIZATIONS,
         ];
     }
 
@@ -87,7 +212,7 @@ final class StaffOnboardingService
 
         $trainer = (new Trainer())
             ->setName($user->getName() !== '' ? $user->getName() : $user->getEmail())
-            ->setSpecialization('Персональный тренер')
+            ->setSpecialization('') // пусто — пока тренер не выберет из справочника (п.16/17)
             ->setOrganization($org);
         $this->em->persist($trainer);
         $user->setTrainer($trainer);

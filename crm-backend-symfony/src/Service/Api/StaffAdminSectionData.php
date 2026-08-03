@@ -33,8 +33,22 @@ final class StaffAdminSectionData
     }
 
     /** @return list<array{key: string, value: int|float}> */
-    public function cards(string $section): array
+    public function cards(string $section, ?StaffUser $user = null): array
     {
+        [$scoped, $trainer] = $this->trainerScope($user);
+
+        if ($scoped && $section === 'bookings') {
+            return [
+                ['key' => 'all_bookings', 'value' => $trainer !== null ? $this->countTrainerBookings($trainer) : 0],
+            ];
+        }
+        if ($scoped && $section === 'schedule') {
+            return [
+                ['key' => 'schedule_today', 'value' => $this->countTrainingsInDays(0, $trainer, $scoped)],
+                ['key' => 'schedule_week', 'value' => $this->countTrainingsThisWeek($trainer, $scoped)],
+            ];
+        }
+
         return match ($section) {
             'dashboard' => [
                 ['key' => 'all_clients', 'value' => $this->em->getRepository(User::class)->count([])],
@@ -107,13 +121,19 @@ final class StaffAdminSectionData
     }
 
     /** @return list<array{title: string, subtitle: string, meta: string, id?: int, refType?: string}> */
-    public function items(string $section): array
+    public function items(string $section, ?StaffUser $user = null): array
     {
+        [$scoped, $trainer] = $this->trainerScope($user);
+
+        if ($scoped && $section === 'bookings') {
+            return $this->trainerBookingsItems($trainer);
+        }
+
         return match ($section) {
             'dashboard' => array_slice(array_merge(
                 $this->items('tasks'),
                 $this->items('leads'),
-                $this->items('bookings'),
+                $this->items('bookings', $user),
             ), 0, 20),
             'clients' => array_map(fn (User $client) => $this->row(
                 $client->getName(),
@@ -364,36 +384,117 @@ final class StaffAdminSectionData
             ->getSingleScalarResult();
     }
 
-    private function countTrainingsInDays(int $offsetDays): int
+    private function countTrainingsInDays(int $offsetDays, ?Trainer $trainer = null, bool $scoped = false): int
     {
         $start = (new \DateTimeImmutable('today'))->modify('+' . $offsetDays . ' day');
         $end = $start->modify('+1 day');
 
-        return (int) $this->em->createQueryBuilder()
+        return $this->countTrainingsBetween($start, $end, $trainer, $scoped);
+    }
+
+    private function countTrainingsThisWeek(?Trainer $trainer = null, bool $scoped = false): int
+    {
+        $monday = new \DateTimeImmutable('monday this week');
+        $nextMonday = $monday->modify('+1 week');
+
+        return $this->countTrainingsBetween($monday, $nextMonday, $trainer, $scoped);
+    }
+
+    private function countTrainingsBetween(
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+        ?Trainer $trainer,
+        bool $scoped,
+    ): int {
+        if ($scoped && $trainer === null) {
+            return 0;
+        }
+
+        $qb = $this->em->createQueryBuilder()
             ->select('COUNT(t.id)')
             ->from(Training::class, 't')
             ->where('t.startAt >= :start')
             ->andWhere('t.startAt < :end')
             ->setParameter('start', $start)
-            ->setParameter('end', $end)
+            ->setParameter('end', $end);
+        if ($scoped) {
+            $qb->andWhere('t.trainer = :trainer')->setParameter('trainer', $trainer);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Ограничение видимости тренера: непривилегированный тренер видит только свои
+     * данные. [false, null] — без ограничений; [true, Trainer|null] — ограничить
+     * (null = профиль тренера ещё не создан, показывать пусто).
+     *
+     * @return array{0: bool, 1: ?Trainer}
+     */
+    private function trainerScope(?StaffUser $user): array
+    {
+        if ($user === null || !\in_array('ROLE_TRAINER', $user->getRoles(), true)) {
+            return [false, null];
+        }
+        foreach (['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_MANAGER'] as $role) {
+            if (\in_array($role, $user->getRoles(), true)) {
+                return [false, null];
+            }
+        }
+
+        return [true, $user->getTrainer()];
+    }
+
+    private function countTrainerBookings(Trainer $trainer): int
+    {
+        return (int) $this->em->createQueryBuilder()
+            ->select('COUNT(b.id)')
+            ->from(Booking::class, 'b')
+            ->join('b.training', 't')
+            ->where('b.status != :cancelled')
+            ->andWhere('t.trainer = :trainer')
+            ->setParameter('cancelled', 'cancelled')
+            ->setParameter('trainer', $trainer)
             ->getQuery()
             ->getSingleScalarResult();
     }
 
-    private function countTrainingsThisWeek(): int
+    /** @return list<array{title: string, subtitle: string, meta: string, id?: int, refType?: string}> */
+    private function trainerBookingsItems(?Trainer $trainer): array
     {
-        $monday = new \DateTimeImmutable('monday this week');
-        $nextMonday = $monday->modify('+1 week');
+        if ($trainer === null) {
+            return [];
+        }
 
-        return (int) $this->em->createQueryBuilder()
-            ->select('COUNT(t.id)')
-            ->from(Training::class, 't')
-            ->where('t.startAt >= :start')
-            ->andWhere('t.startAt < :end')
-            ->setParameter('start', $monday)
-            ->setParameter('end', $nextMonday)
+        $bookings = $this->em->createQueryBuilder()
+            ->select('b')
+            ->from(Booking::class, 'b')
+            ->join('b.training', 't')
+            ->where('b.status != :cancelled')
+            ->andWhere('t.trainer = :trainer')
+            ->setParameter('cancelled', 'cancelled')
+            ->setParameter('trainer', $trainer)
+            ->orderBy('t.startAt', 'DESC')
+            ->setMaxResults(50)
             ->getQuery()
-            ->getSingleScalarResult();
+            ->getResult();
+
+        $rows = [];
+        foreach ($bookings as $booking) {
+            if (!$booking instanceof Booking) {
+                continue;
+            }
+            $training = $booking->getTraining();
+            $rows[] = $this->row(
+                $booking->getClientName(),
+                $training->getName(),
+                $training->getStartAt()->format('d.m.Y H:i'),
+                $booking->getUser()?->getId(),
+                $booking->getUser() !== null ? 'client' : null,
+            );
+        }
+
+        return $rows;
     }
 
     private function leadStatusLabel(string $status): string

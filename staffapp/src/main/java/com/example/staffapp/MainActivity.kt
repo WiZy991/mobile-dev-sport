@@ -32,6 +32,8 @@ class MainActivity : ComponentActivity() {
                     onEmailChange = { uiState = uiState.copy(email = it) },
                     onNameChange = { uiState = uiState.copy(name = it) },
                     onPasswordChange = { uiState = uiState.copy(password = it) },
+                    onOfferAcceptedChange = { uiState = uiState.copy(offerAccepted = it) },
+                    onPrivacyAcceptedChange = { uiState = uiState.copy(privacyAccepted = it) },
                     onRoleSelected = {},
                     onLogin = { runLogin() },
                     onRegister = { runRegister() },
@@ -50,6 +52,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun runRegister() {
+        if (!uiState.offerAccepted || !uiState.privacyAccepted) {
+            uiState = uiState.copy(
+                errorMessage = "Чтобы зарегистрироваться, примите оферту и согласие на обработку ПД",
+            )
+            return
+        }
+        if (uiState.name.isBlank()) {
+            uiState = uiState.copy(errorMessage = "Укажите имя")
+            return
+        }
         runAsync("Регистрация...") {
             val result = apiClient.register(
                 email = uiState.email.trim(),
@@ -86,6 +98,8 @@ class MainActivity : ComponentActivity() {
             val config = executeWithRefresh { token -> apiClient.loadConfig(token) }
             store.saveConfig(config)
             openWorkScreen()
+        } else if (onboarding.status == "needs_profile") {
+            openProfileSetup()
         } else {
             openOnboardingScreen()
         }
@@ -128,6 +142,16 @@ class MainActivity : ComponentActivity() {
     private fun openWorkScreen() {
         runOnUiThread {
             startActivity(Intent(this, WorkActivity::class.java))
+            finish()
+        }
+    }
+
+    private fun openProfileSetup() {
+        runOnUiThread {
+            startActivity(
+                Intent(this, TrainerProfileActivity::class.java)
+                    .putExtra(TrainerProfileActivity.EXTRA_REQUIRED, true),
+            )
             finish()
         }
     }

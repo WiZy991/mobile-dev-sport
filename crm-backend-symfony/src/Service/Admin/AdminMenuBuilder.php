@@ -71,9 +71,13 @@ final class AdminMenuBuilder
             'onboarding', 'dashboard', 'sales', 'cashdesk', 'warehouse', 'finance', 'analytics',
             'subscriptions', 'clients', 'promocodes', 'promotions', 'visits', 'services', 'app_support', 'client_groups',
         ],
-        /** Тренер зала: расписание (создание/перенос/удаление), записи, абонементы, клиенты, своя карточка в «Тренеры». */
+        /**
+         * Тренер зала: расписание (создание/перенос/удаление), записи, абонементы, клиенты,
+         * своя карточка в «Тренеры». Без «Дашборда»: он агрегирует лиды, задачи CRM
+         * и обращения, которые тренеру видеть нельзя.
+         */
         'ROLE_TRAINER' => [
-            'onboarding', 'dashboard', 'schedule', 'bookings', 'subscriptions', 'clients', 'visits', 'trainers',
+            'onboarding', 'schedule', 'bookings', 'subscriptions', 'clients', 'visits', 'trainers',
         ],
         /** Широкий просмотр без изменений (POST блокируется подписчиком). */
         'ROLE_VIEWER' => [

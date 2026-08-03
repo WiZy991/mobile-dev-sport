@@ -185,7 +185,7 @@ fun RegisterScreen(
             }
             RegisterStepIndicator(current = uiState.formStep)
             BrandHeader(
-                clubName = uiState.selectedClub?.name ?: "Доброзал",
+                brandName = "Доброзал",
                 subtitle = uiState.formStep.title,
                 modifier = Modifier
                     .fillMaxWidth()

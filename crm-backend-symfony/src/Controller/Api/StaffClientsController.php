@@ -46,14 +46,71 @@ final class StaffClientsController extends AbstractController
                 ->setParameter('qPhone', '%' . $q . '%');
         }
 
-        $items = [];
+        $clients = [];
         foreach ($qb->getQuery()->getResult() as $client) {
             if ($client instanceof User) {
-                $items[] = $this->serializeSummary($client);
+                $clients[] = $client;
             }
         }
 
+        $activeIds = $this->clientIdsWithActiveBooking($user, $clients);
+
+        $items = [];
+        foreach ($clients as $client) {
+            $items[] = $this->serializeSummary($client) + [
+                'hasActiveBooking' => \in_array($client->getId(), $activeIds, true),
+            ];
+        }
+
         return $this->json(['items' => $items]);
+    }
+
+    /**
+     * Клиенты с предстоящей неотменённой записью; для тренера — только записи к нему
+     * (та же логика видимости, что в detail(), пункт 47 репорта).
+     *
+     * @param list<User> $clients
+     * @return list<int>
+     */
+    private function clientIdsWithActiveBooking(StaffUser $user, array $clients): array
+    {
+        if ($clients === []) {
+            return [];
+        }
+
+        $qb = $this->em->createQueryBuilder()
+            ->select('DISTINCT IDENTITY(b.user) AS uid')
+            ->from(Booking::class, 'b')
+            ->join('b.training', 't')
+            ->where('b.user IN (:users)')
+            ->andWhere('b.status != :cancelled')
+            ->andWhere('t.startAt >= :now')
+            ->setParameter('users', $clients)
+            ->setParameter('cancelled', 'cancelled')
+            ->setParameter('now', new \DateTimeImmutable());
+
+        if (!$this->isPrivileged($user)) {
+            $linkedTrainer = $user->getTrainer();
+            if ($linkedTrainer === null) {
+                return [];
+            }
+            $qb->andWhere('t.trainer = :trainer')
+                ->setParameter('trainer', $linkedTrainer);
+        }
+
+        $ids = [];
+        foreach ($qb->getQuery()->getScalarResult() as $row) {
+            $ids[] = (int) $row['uid'];
+        }
+
+        return $ids;
+    }
+
+    private function isPrivileged(StaffUser $user): bool
+    {
+        return \in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true)
+            || \in_array('ROLE_ADMIN', $user->getRoles(), true)
+            || \in_array('ROLE_MANAGER', $user->getRoles(), true);
     }
 
     #[Route('/clients/{id}', name: 'api_staff_client_detail', methods: ['GET'], requirements: ['id' => '\\d+'])]
@@ -79,7 +136,7 @@ final class StaffClientsController extends AbstractController
             ->getQuery()
             ->getOneOrNullResult();
 
-        $bookings = $this->em->createQueryBuilder()
+        $bookingsQb = $this->em->createQueryBuilder()
             ->select('b', 't')
             ->from(Booking::class, 'b')
             ->join('b.training', 't')
@@ -88,9 +145,23 @@ final class StaffClientsController extends AbstractController
             ->setParameter('user', $client)
             ->setParameter('cancelled', 'cancelled')
             ->orderBy('t.startAt', 'DESC')
-            ->setMaxResults(10)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults(10);
+
+        // Тренер видит только записи клиента к себе (включая завершённые),
+        // но не записи к другим тренерам (пункт 47 репорта).
+        $bookings = [];
+        if ($this->isPrivileged($user)) {
+            $bookings = $bookingsQb->getQuery()->getResult();
+        } else {
+            $linkedTrainer = $user->getTrainer();
+            if ($linkedTrainer !== null) {
+                $bookings = $bookingsQb
+                    ->andWhere('t.trainer = :trainer')
+                    ->setParameter('trainer', $linkedTrainer)
+                    ->getQuery()
+                    ->getResult();
+            }
+        }
 
         $bookingRows = [];
         foreach ($bookings as $booking) {
@@ -98,9 +169,11 @@ final class StaffClientsController extends AbstractController
                 continue;
             }
             $training = $booking->getTraining();
+            // Технический статус (confirmed и т.п.) не показываем, пока нет
+            // реальной механики подтверждения записи (пункт 55 репорта).
             $bookingRows[] = [
                 'title' => $training->getName(),
-                'meta' => $training->getStartAt()->format('d.m.Y H:i') . ' · ' . $booking->getStatus(),
+                'meta' => $training->getStartAt()->format('d.m.Y H:i'),
             ];
         }
 

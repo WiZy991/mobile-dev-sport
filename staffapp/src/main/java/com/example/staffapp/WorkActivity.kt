@@ -9,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.staffapp.ui.phone.formatRussianPhoneMask
+import com.example.staffapp.ui.phone.normalizeRussianNationalDigits
 import com.example.staffapp.ui.theme.StaffTheme
 import com.example.staffapp.ui.work.ActionUi
 import com.example.staffapp.ui.work.AssignClientDialogUi
@@ -18,6 +20,7 @@ import com.example.staffapp.ui.work.SectionHints
 import com.example.staffapp.ui.work.BadgeColor
 import com.example.staffapp.ui.work.ClientsTabUi
 import com.example.staffapp.ui.work.DayChipUi
+import com.example.staffapp.ui.work.HomeSectionUi
 import com.example.staffapp.ui.work.HomeTabUi
 import com.example.staffapp.ui.work.ListCardUi
 import com.example.staffapp.ui.work.MetricUi
@@ -30,6 +33,7 @@ import com.example.staffapp.ui.work.SupportTabUi
 import com.example.staffapp.ui.work.WorkScreen
 import com.example.staffapp.ui.work.WorkUiState
 import kotlin.concurrent.thread
+import java.time.LocalDate
 import java.util.Calendar
 import java.util.Locale
 
@@ -42,10 +46,15 @@ class WorkActivity : ComponentActivity() {
     private var allowedSections: List<String> = emptyList()
     private var config: RoleConfig? = null
     private var scheduleData: ScheduleData? = null
+    private var scheduleDataFrom: String? = null
+    private var scheduleFromDate: String? = null // null = окно от сегодняшнего дня
     private var selectedScheduleDate: String? = null
     private var selectedScheduleTypeFilter: String? = null
     private var selectedSupportFilter: String? = null
     private var clientsSearchQuery: String = ""
+    private var clientsData: List<ClientSummary> = emptyList()
+    private var assignDialogSession: ScheduleSessionUi? = null
+    private var lastOnboarding: StaffOnboarding? = null
 
     private val requestNotifications = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -57,6 +66,7 @@ class WorkActivity : ComponentActivity() {
     }
 
     private var loadGeneration = 0
+    private var profileLoadGeneration = 0
     private var initialDataLoaded = false
     private val sessionLock = Any()
 
@@ -91,6 +101,8 @@ class WorkActivity : ComponentActivity() {
                         selectedScheduleTypeFilter = if (filter == "group") null else filter
                         scheduleData?.let { renderSchedule(it) }
                     },
+                    onSchedulePrevPeriod = { shiftSchedulePeriod(-7) },
+                    onScheduleNextPeriod = { shiftSchedulePeriod(7) },
                     onSupportFilterSelected = { filter ->
                         selectedSupportFilter = filter.ifBlank { null }
                         showSupportTab()
@@ -103,6 +115,7 @@ class WorkActivity : ComponentActivity() {
                         clientsSearchQuery = uiState.clients.query
                         loadClientsList(clientsSearchQuery)
                     },
+                    onClientsActiveFilterToggle = { toggleClientsActiveFilter() },
                     onListCardClick = { handleListCardClick(it) },
                     onProfileSectionClick = { handleProfileSectionClick(it) },
                     onScheduleSessionClick = { openAssignDialog(it) },
@@ -114,6 +127,8 @@ class WorkActivity : ComponentActivity() {
                     onAssignSearch = { searchAssignClients() },
                     onAssignBook = { bookAssignClient(it) },
                     onAssignCancelBooking = { cancelAssignBooking(it) },
+                    onAssignOpenClient = { openClientCard(it) },
+                    onAssignEditSession = { openEditSessionDialog() },
                     onAssignDismiss = { uiState = uiState.copy(assignDialog = null) },
                     onCreateSessionClick = { openCreateSessionDialog() },
                     onCreateNameChange = { v ->
@@ -121,14 +136,19 @@ class WorkActivity : ComponentActivity() {
                             uiState = uiState.copy(createSessionDialog = it.copy(name = v))
                         }
                     },
-                    onCreateStartTimeChange = { v ->
+                    onCreateDateChange = { v ->
                         uiState.createSessionDialog?.let {
-                            uiState = uiState.copy(createSessionDialog = it.copy(startTime = v))
+                            uiState = uiState.copy(createSessionDialog = it.copy(date = v, errorMessage = null))
                         }
                     },
-                    onCreateEndTimeChange = { v ->
+                    onCreateStartTimeChange = { v ->
                         uiState.createSessionDialog?.let {
-                            uiState = uiState.copy(createSessionDialog = it.copy(endTime = v))
+                            uiState = uiState.copy(createSessionDialog = it.copy(startTime = v, errorMessage = null))
+                        }
+                    },
+                    onCreateDurationChange = { v ->
+                        uiState.createSessionDialog?.let {
+                            uiState = uiState.copy(createSessionDialog = it.copy(durationMinutes = v, errorMessage = null))
                         }
                     },
                     onCreateRoomChange = { v ->
@@ -153,6 +173,16 @@ class WorkActivity : ComponentActivity() {
         thread {
             try {
                 val onboarding = withRefresh { apiClient.loadOnboarding(it) }
+                if (onboarding.status == "needs_profile") {
+                    runOnUiThread {
+                        startActivity(
+                            Intent(this, TrainerProfileActivity::class.java)
+                                .putExtra(TrainerProfileActivity.EXTRA_REQUIRED, true),
+                        )
+                        finish()
+                    }
+                    return@thread
+                }
                 if (onboarding.status != "active") {
                     runOnUiThread {
                         startActivity(Intent(this, OnboardingActivity::class.java))
@@ -161,6 +191,7 @@ class WorkActivity : ComponentActivity() {
                     return@thread
                 }
                 runOnUiThread {
+                    lastOnboarding = onboarding
                     selectTab(requestedTab)
                     loadData()
                 }
@@ -174,6 +205,21 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun handleListCardClick(card: ListCardUi) {
+        // Клик по записи открывает саму запись в расписании,
+        // а не карточку клиента (пункты 54/59 репорта).
+        card.trainingId?.let { trainingId ->
+            card.trainingDate?.takeIf { it.isNotBlank() }?.let { selectedScheduleDate = it }
+            // Если расписание было пролистано на другую неделю — возвращаем окно
+            // к дате занятия, иначе выбранный день не попадёт в видимый диапазон.
+            ensureScheduleWindowContains(selectedScheduleDate)
+            if (uiState.showScheduleNav) {
+                selectTab(WorkUiState.TAB_SCHEDULE)
+            }
+            scheduleData?.items?.firstOrNull { it.id == trainingId }?.let {
+                openAssignDialog(scheduleToSession(it))
+            }
+            return
+        }
         card.clientId?.let {
             openClientCard(it)
             return
@@ -206,6 +252,9 @@ class WorkActivity : ComponentActivity() {
         when {
             actionId == "open_admin" -> startActivity(Intent(this, AdminActivity::class.java))
             actionId == "edit_trainer_profile" -> startActivity(Intent(this, TrainerProfileActivity::class.java))
+            actionId == "open_offer" -> openExternalUrl(uiState.profile.offerUrl)
+            actionId == "open_privacy" -> openExternalUrl(uiState.profile.privacyUrl)
+            actionId == "open_docs" -> openExternalUrl(uiState.profile.docsUrl)
             actionId == "enable_notifications" -> requestOrOpenNotificationSettings()
             actionId == "retry" -> selectTab(uiState.selectedTab)
             actionId == "mark_notifications_read" -> {
@@ -371,9 +420,13 @@ class WorkActivity : ComponentActivity() {
                 runOnUiThread {
                     uiState = uiState.copy(
                         home = uiState.home.copy(
-                            sectionTitle = "Новые обращения: ${tickets.newCount}",
-                            items = items,
-                            emptyMessage = if (items.isEmpty()) "Новых обращений нет" else null,
+                            sections = listOf(
+                                HomeSectionUi(
+                                    title = "Новые обращения: ${tickets.newCount}",
+                                    items = items,
+                                    emptyMessage = if (items.isEmpty()) "Новых обращений нет" else null,
+                                ),
+                            ),
                             loading = false,
                         ),
                     )
@@ -385,17 +438,10 @@ class WorkActivity : ComponentActivity() {
                 if (role == "ROLE_TRAINER" && sectionAllowed("schedule")) {
                     val schedule = loadScheduleCached()
                     if (uiState.selectedTab != WorkUiState.TAB_HOME) return@runAsyncForTab ""
-                    val items = schedule.items.filter { it.date == todayDate() }.ifEmpty {
-                        schedule.items.take(5)
-                    }.map { scheduleToCard(it) }
+                    val sections = trainerHomeSections(schedule)
                     runOnUiThread {
                         uiState = uiState.copy(
-                            home = uiState.home.copy(
-                                sectionTitle = "Ваши тренировки сегодня",
-                                items = items,
-                                emptyMessage = if (items.isEmpty()) "Нет тренировок" else null,
-                                loading = false,
-                            ),
+                            home = uiState.home.copy(sections = sections, loading = false),
                         )
                     }
                 } else {
@@ -404,9 +450,13 @@ class WorkActivity : ComponentActivity() {
                     runOnUiThread {
                         uiState = uiState.copy(
                             home = uiState.home.copy(
-                                sectionTitle = UiLabels.sectionTitle(homeSection),
-                                items = items.take(8).map { feedToCard(it) },
-                                emptyMessage = if (items.isEmpty()) "Нет данных" else null,
+                                sections = listOf(
+                                    HomeSectionUi(
+                                        title = UiLabels.sectionTitle(homeSection),
+                                        items = items.take(8).map { feedToCard(it) },
+                                        emptyMessage = if (items.isEmpty()) "Нет данных" else null,
+                                    ),
+                                ),
                                 loading = false,
                             ),
                         )
@@ -418,13 +468,17 @@ class WorkActivity : ComponentActivity() {
             runAsyncForTab(WorkUiState.TAB_HOME, "Загрузка...") {
                 val schedule = loadScheduleCached(forceRefresh = false)
                 if (uiState.selectedTab != WorkUiState.TAB_HOME) return@runAsyncForTab ""
-                val items = schedule.items.take(5).map { scheduleToCard(it) }
+                val items = schedule.items.take(5).map { scheduleToCard(it, includeDate = true) }
                 runOnUiThread {
                     uiState = uiState.copy(
                         home = uiState.home.copy(
-                            sectionTitle = "Ближайшие тренировки",
-                            items = items,
-                            emptyMessage = if (items.isEmpty()) "Нет тренировок" else null,
+                            sections = listOf(
+                                HomeSectionUi(
+                                    title = "Ближайшие тренировки",
+                                    items = items,
+                                    emptyMessage = if (items.isEmpty()) "Нет тренировок" else null,
+                                ),
+                            ),
                             loading = false,
                         ),
                     )
@@ -434,6 +488,37 @@ class WorkActivity : ComponentActivity() {
         } else {
             uiState = uiState.copy(home = uiState.home.copy(loading = false))
         }
+    }
+
+    /**
+     * Дашборд тренера (пункт 53 репорта): всегда показываем «сегодня», при наличии —
+     * «завтра», а если пусто и там и там — ближайшие записи с датой.
+     */
+    private fun trainerHomeSections(schedule: ScheduleData): List<HomeSectionUi> {
+        val today = todayDate()
+        val tomorrow = LocalDate.now().plusDays(1).toString()
+        val todayItems = schedule.items.filter { it.date == today }.map { scheduleToCard(it) }
+        val tomorrowItems = schedule.items.filter { it.date == tomorrow }.map { scheduleToCard(it) }
+        val sections = mutableListOf(
+            HomeSectionUi(
+                title = "Записи на сегодня",
+                items = todayItems,
+                emptyMessage = if (todayItems.isEmpty()) "На сегодня записей нет — можно отдохнуть" else null,
+            ),
+        )
+        if (tomorrowItems.isNotEmpty()) {
+            sections += HomeSectionUi(title = "Записи на завтра", items = tomorrowItems)
+        }
+        if (todayItems.isEmpty() && tomorrowItems.isEmpty()) {
+            val upcoming = schedule.items
+                .filter { it.date > today }
+                .take(5)
+                .map { scheduleToCard(it, includeDate = true) }
+            if (upcoming.isNotEmpty()) {
+                sections += HomeSectionUi(title = "Ближайшие записи", items = upcoming)
+            }
+        }
+        return sections
     }
 
     private fun showScheduleTab() {
@@ -457,16 +542,39 @@ class WorkActivity : ComponentActivity() {
             return
         }
         runAsyncForTab(WorkUiState.TAB_SCHEDULE, "Загрузка расписания...") {
-            val schedule = loadScheduleCached(forceRefresh = true)
-            if (selectedScheduleDate == null) {
-                selectedScheduleDate = schedule.days.firstOrNull { it.date == todayDate() }?.date
-                    ?: schedule.days.firstOrNull()?.date
+            val schedule = loadScheduleCached(forceRefresh = true, from = scheduleFromDate)
+            val dates = schedule.days.map { it.date }
+            if (selectedScheduleDate == null || selectedScheduleDate !in dates) {
+                selectedScheduleDate = dates.firstOrNull { it == todayDate() } ?: dates.firstOrNull()
             }
             scheduleData = schedule
             if (uiState.selectedTab != WorkUiState.TAB_SCHEDULE) return@runAsyncForTab ""
             runOnUiThread { renderSchedule(schedule) }
             ""
         }
+    }
+
+    /**
+     * Сдвигает окно расписания так, чтобы указанная дата попадала в его 14 дней —
+     * иначе созданное/перенесённое занятие «исчезает» из вида.
+     */
+    private fun ensureScheduleWindowContains(dateIso: String?) {
+        val target = dateIso?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return
+        val windowStart = scheduleFromDate
+            ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            ?: LocalDate.now()
+        if (target.isBefore(windowStart) || !target.isBefore(windowStart.plusDays(14))) {
+            scheduleFromDate = if (target == LocalDate.now()) null else target.toString()
+        }
+    }
+
+    private fun shiftSchedulePeriod(days: Int) {
+        val current = scheduleFromDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            ?: LocalDate.now()
+        val newFrom = current.plusDays(days.toLong())
+        scheduleFromDate = if (newFrom == LocalDate.now()) null else newFrom.toString()
+        selectedScheduleDate = null
+        showScheduleTab()
     }
 
     private fun renderSchedule(schedule: ScheduleData) {
@@ -492,10 +600,23 @@ class WorkActivity : ComponentActivity() {
             schedule = ScheduleTabUi(
                 days = days,
                 sessions = dayItems.map { scheduleToSession(it) },
+                monthLabel = scheduleMonthLabel(schedule.days.map { it.date }),
                 selectedTypeFilter = typeFilter,
                 loading = false,
             ),
         )
+    }
+
+    private fun scheduleMonthLabel(dates: List<String>): String {
+        val first = dates.firstOrNull()?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return ""
+        val last = dates.lastOrNull()?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: first
+        val firstMonth = MONTH_NAMES[first.monthValue - 1]
+        val lastMonth = MONTH_NAMES[last.monthValue - 1]
+        return when {
+            first.month == last.month && first.year == last.year -> "$firstMonth ${first.year}"
+            first.year == last.year -> "$firstMonth — $lastMonth ${first.year}"
+            else -> "$firstMonth ${first.year} — $lastMonth ${last.year}"
+        }
     }
 
     private fun showSupportTab() {
@@ -592,24 +713,42 @@ class WorkActivity : ComponentActivity() {
             val clients = withRefresh { token -> apiClient.loadClients(token, query) }
             if (uiState.selectedTab != WorkUiState.TAB_CLIENTS) return@runAsyncForTab ""
             runOnUiThread {
-                uiState = uiState.copy(
-                    clients = ClientsTabUi(
-                        query = query,
-                        summary = if (clients.isEmpty()) "" else "Найдено: ${clients.size}",
-                        items = clients.map { client ->
-                            ListCardUi(
-                                title = client.name.ifBlank { "Клиент #${client.id}" },
-                                subtitle = listOf(client.email, client.phone).filter { it.isNotBlank() }.joinToString("\n"),
-                                meta = "Открыть карточку",
-                                clientId = client.id,
-                            )
-                        },
-                        loading = false,
-                    ),
-                )
+                clientsData = clients
+                renderClientsList()
             }
             ""
         }
+    }
+
+    private fun renderClientsList() {
+        val onlyActive = uiState.clients.onlyActiveBooking
+        // Сначала клиенты с активной записью, внутри групп — по имени (пункт 31 репорта).
+        val visible = clientsData
+            .filter { !onlyActive || it.hasActiveBooking }
+            .sortedWith(compareByDescending<ClientSummary> { it.hasActiveBooking }.thenBy { it.name.lowercase() })
+        uiState = uiState.copy(
+            clients = uiState.clients.copy(
+                summary = if (visible.isEmpty()) "" else "Найдено: ${visible.size}",
+                items = visible.map { client ->
+                    ListCardUi(
+                        title = client.name.ifBlank { "Клиент #${client.id}" },
+                        // Контакты не выносим в список — они внутри карточки клиента.
+                        meta = "Открыть карточку",
+                        badge = if (client.hasActiveBooking) "Есть запись" else null,
+                        badgeColor = BadgeColor.SUCCESS,
+                        clientId = client.id,
+                    )
+                },
+                loading = false,
+            ),
+        )
+    }
+
+    private fun toggleClientsActiveFilter() {
+        uiState = uiState.copy(
+            clients = uiState.clients.copy(onlyActiveBooking = !uiState.clients.onlyActiveBooking),
+        )
+        renderClientsList()
     }
 
     private fun showProfileTab() {
@@ -626,6 +765,17 @@ class WorkActivity : ComponentActivity() {
                 name = data?.employeeName ?: session?.userEmail.orEmpty(),
                 email = data?.employeeEmail ?: "",
                 roleTitle = UiLabels.roleTitle(primaryRole()),
+                // Данные тренера из прошлой загрузки не сбрасываем, чтобы карточка
+                // не «мигала» пустой при каждом заходе на вкладку.
+                phone = uiState.profile.phone,
+                specialization = uiState.profile.specialization,
+                description = uiState.profile.description,
+                photoUrl = uiState.profile.photoUrl,
+                rentalPaidUntilLabel = formatRentalUntil(lastOnboarding?.rentalPaidUntil)
+                    ?: uiState.profile.rentalPaidUntilLabel,
+                offerUrl = lastOnboarding?.offerUrl ?: uiState.profile.offerUrl,
+                privacyUrl = lastOnboarding?.privacyUrl ?: uiState.profile.privacyUrl,
+                docsUrl = lastOnboarding?.docsUrl ?: uiState.profile.docsUrl,
                 sections = sections
                     .distinct()
                     .filterNot {
@@ -645,6 +795,41 @@ class WorkActivity : ComponentActivity() {
             ),
             errorMessage = null,
         )
+
+        // Карточка тренера: подтягиваем публичный профиль (фото, специализация,
+        // телефон), чтобы раздел показывал данные, а не дублировал меню (пункт 27).
+        if (showTrainerEdit) {
+            val generation = ++profileLoadGeneration
+            thread {
+                try {
+                    val onboarding = withRefresh { token -> apiClient.loadOnboarding(token) }
+                    lastOnboarding = onboarding
+                    val trainerProfile = withRefresh { token -> apiClient.loadTrainerProfile(token) }
+                    runOnUiThread {
+                        if (generation != profileLoadGeneration ||
+                            uiState.selectedTab != WorkUiState.TAB_PROFILE
+                        ) {
+                            return@runOnUiThread
+                        }
+                        uiState = uiState.copy(
+                            profile = uiState.profile.copy(
+                                name = trainerProfile.name.ifBlank { uiState.profile.name },
+                                phone = formatPhoneForDisplay(trainerProfile.phone),
+                                specialization = trainerProfile.specialization,
+                                description = trainerProfile.description,
+                                photoUrl = trainerProfile.photoUrl,
+                                rentalPaidUntilLabel = formatRentalUntil(onboarding.rentalPaidUntil),
+                                offerUrl = onboarding.offerUrl,
+                                privacyUrl = onboarding.privacyUrl,
+                                docsUrl = onboarding.docsUrl,
+                            ),
+                        )
+                    }
+                } catch (_: Exception) {
+                    // Карточка тренера — дополнение; ошибки загрузки не блокируют раздел.
+                }
+            }
+        }
 
         val extraSections = sections.filter {
             it !in setOf("home", "profile", "schedule", "dashboard", "admin", "clients", "app_support")
@@ -668,6 +853,31 @@ class WorkActivity : ComponentActivity() {
             }
         } else if (data != null) {
             uiState = uiState.copy(profile = uiState.profile.copy(loading = false))
+        }
+    }
+
+    private fun formatPhoneForDisplay(phone: String): String {
+        val national = normalizeRussianNationalDigits(phone)
+        return if (national.length == 10) formatRussianPhoneMask(national) else phone
+    }
+
+    private fun formatRentalUntil(iso: String?): String? {
+        if (iso.isNullOrBlank()) return null
+        val date = runCatching {
+            java.time.LocalDateTime.parse(iso.replace(' ', 'T').take(19))
+        }.getOrNull()?.toLocalDate()
+            ?: runCatching { LocalDate.parse(iso.take(10)) }.getOrNull()
+            ?: return null
+        return "Аренда оплачена до ${date.dayOfMonth.toString().padStart(2, '0')}." +
+            "${date.monthValue.toString().padStart(2, '0')}.${date.year}"
+    }
+
+    private fun openExternalUrl(url: String) {
+        if (url.isBlank()) return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (_: Exception) {
+            uiState = uiState.copy(errorMessage = "Не удалось открыть ссылку")
         }
     }
 
@@ -708,16 +918,23 @@ class WorkActivity : ComponentActivity() {
         else -> BadgeColor.NEUTRAL
     }
 
-    private fun scheduleToCard(item: ScheduleItem): ListCardUi {
+    private fun scheduleToCard(item: ScheduleItem, includeDate: Boolean = false): ListCardUi {
         val clients = if (item.clientNames.isNotEmpty()) {
             item.clientNames.joinToString(", ")
         } else {
             item.participants.ifBlank { "нет записей" }
         }
+        val datePrefix = if (includeDate) {
+            item.dayLabel.ifBlank { item.date }.let { "$it · " }
+        } else {
+            ""
+        }
         return ListCardUi(
-            title = "${item.startTime}–${item.endTime}  ${item.title}",
+            title = "$datePrefix${item.startTime}–${item.endTime}  ${item.title}",
             subtitle = "Клиенты: $clients",
             meta = "${UiLabels.trainingType(item.type)} · ${item.trainer} · ${item.room}",
+            trainingId = item.id,
+            trainingDate = item.date,
         )
     }
 
@@ -725,6 +942,7 @@ class WorkActivity : ComponentActivity() {
         val (booked, max) = parseParticipants(item.participants)
         return ScheduleSessionUi(
             trainingId = item.id,
+            date = item.date,
             title = item.title,
             type = item.type,
             typeLabel = UiLabels.trainingType(item.type),
@@ -744,16 +962,37 @@ class WorkActivity : ComponentActivity() {
 
     private fun openAssignDialog(session: ScheduleSessionUi) {
         val trainingId = session.trainingId ?: return
+        assignDialogSession = session
         uiState = uiState.copy(
             assignDialog = AssignClientDialogUi(
                 trainingId = trainingId,
                 sessionTitle = "${session.startTime} ${session.title}",
                 booked = session.bookings.map {
-                    ListCardUi(title = it.clientName, meta = it.id)
+                    ListCardUi(
+                        title = it.clientName,
+                        meta = it.id,
+                        clientId = it.clientId?.removePrefix("user-")?.toIntOrNull(),
+                    )
                 },
             ),
         )
         searchAssignClients()
+    }
+
+    private fun openEditSessionDialog() {
+        val session = assignDialogSession ?: return
+        val trainingId = session.trainingId ?: return
+        uiState = uiState.copy(
+            assignDialog = null,
+            createSessionDialog = CreateSessionDialogUi(
+                date = session.date.ifBlank { selectedScheduleDate ?: todayDate() },
+                name = session.title,
+                startTime = session.startTime,
+                durationMinutes = session.durationMinutes,
+                room = session.room.takeIf { it.isNotBlank() && it != "—" }.orEmpty(),
+                editingTrainingId = trainingId,
+            ),
+        )
     }
 
     private fun openCreateSessionDialog() {
@@ -765,21 +1004,64 @@ class WorkActivity : ComponentActivity() {
 
     private fun createSession() {
         val dialog = uiState.createSessionDialog ?: return
-        val startTime = normalizeTime(dialog.startTime) ?: run {
-            uiState = uiState.copy(
-                createSessionDialog = dialog.copy(errorMessage = "Укажите время начала в формате ЧЧ:ММ"),
-            )
+        fun showError(message: String) {
+            uiState = uiState.copy(createSessionDialog = dialog.copy(errorMessage = message))
+        }
+
+        val date = runCatching { LocalDate.parse(dialog.date) }.getOrNull() ?: run {
+            showError("Выберите дату занятия")
             return
         }
-        val endTime = normalizeTime(dialog.endTime) ?: run {
-            uiState = uiState.copy(
-                createSessionDialog = dialog.copy(errorMessage = "Укажите время окончания в формате ЧЧ:ММ"),
-            )
+        val start = normalizeTime(dialog.startTime)?.let {
+            runCatching { java.time.LocalTime.parse(it) }.getOrNull()
+        } ?: run {
+            showError("Выберите время начала")
             return
         }
+        if (dialog.durationMinutes <= 0) {
+            showError("Выберите длительность занятия")
+            return
+        }
+        val startDateTime = date.atTime(start)
+        // Для редактирования прошлое не блокируем: тренер может поправить
+        // название или зал уже прошедшего занятия.
+        if (!dialog.isEditing && startDateTime.isBefore(java.time.LocalDateTime.now())) {
+            showError("Нельзя создать занятие в прошлом. Проверьте дату и время.")
+            return
+        }
+        val end = start.plusMinutes(dialog.durationMinutes.toLong())
+        if (!end.isAfter(start)) {
+            showError("Занятие должно заканчиваться в тот же день. Уменьшите длительность или измените время начала.")
+            return
+        }
+        val startTime = "%02d:%02d".format(start.hour, start.minute)
+        val endTime = "%02d:%02d".format(end.hour, end.minute)
         uiState = uiState.copy(createSessionDialog = dialog.copy(loading = true, errorMessage = null))
         thread {
             try {
+                val editingId = dialog.editingTrainingId
+                if (editingId != null) {
+                    val updated = withRefresh { token ->
+                        apiClient.updateTraining(
+                            token = token,
+                            trainingId = editingId,
+                            name = dialog.name.trim().ifBlank { "Персональная тренировка" },
+                            startAtIso = "${dialog.date}T$startTime:00",
+                            endAtIso = "${dialog.date}T$endTime:00",
+                            room = dialog.room.trim().ifBlank { null },
+                        )
+                    }
+                    runOnUiThread {
+                        uiState = uiState.copy(
+                            createSessionDialog = null,
+                            statusMessage = "Занятие обновлено",
+                        )
+                        selectedScheduleDate = updated.date.ifBlank { dialog.date }
+                        ensureScheduleWindowContains(selectedScheduleDate)
+                        showScheduleTab()
+                    }
+                    return@thread
+                }
                 val created = withRefresh { token ->
                     apiClient.createTraining(
                         token = token,
@@ -797,6 +1079,7 @@ class WorkActivity : ComponentActivity() {
                         statusMessage = "Занятие создано",
                     )
                     selectedScheduleDate = created.date.ifBlank { dialog.date }
+                    ensureScheduleWindowContains(selectedScheduleDate)
                     showScheduleTab()
                     scheduleToSession(created).let { openAssignDialog(it) }
                 }
@@ -1010,9 +1293,12 @@ class WorkActivity : ComponentActivity() {
         return String.format(Locale.US, "%04d-%02d-%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
     }
 
-    private fun loadScheduleCached(forceRefresh: Boolean = false): ScheduleData {
-        if (!forceRefresh) scheduleData?.let { return it }
-        return withRefresh { token -> apiClient.loadSchedule(token) }.also { scheduleData = it }
+    private fun loadScheduleCached(forceRefresh: Boolean = false, from: String? = null): ScheduleData {
+        if (!forceRefresh && scheduleDataFrom == from) scheduleData?.let { return it }
+        return withRefresh { token -> apiClient.loadSchedule(token, from) }.also {
+            scheduleData = it
+            scheduleDataFrom = from
+        }
     }
 
     private fun <T> withRefresh(action: (String) -> T): T {
@@ -1059,5 +1345,9 @@ class WorkActivity : ComponentActivity() {
         const val EXTRA_INITIAL_TAB = "extra_initial_tab"
         private val HOME_SECTIONS = setOf("bookings", "clients", "tasks", "schedule", "app_support")
         private val HIDDEN_APP_SECTIONS = setOf("visits", "subscriptions")
+        private val MONTH_NAMES = listOf(
+            "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+            "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+        )
     }
 }

@@ -23,6 +23,10 @@ final class ClientNotificationService
     ) {
     }
 
+    /**
+     * @param bool $force      создать in-app уведомление даже при выключенной настройке типа
+     * @param bool $forceEmail отправить письмо независимо от настроек (транзакционные письма — чеки об оплате)
+     */
     public function notify(
         User $user,
         string $type,
@@ -30,6 +34,7 @@ final class ClientNotificationService
         string $body,
         ?string $referenceId = null,
         bool $force = false,
+        bool $forceEmail = false,
     ): void {
         if (!$force && !$this->preferences->allowsInApp($user, $type)) {
             return;
@@ -57,8 +62,9 @@ final class ClientNotificationService
 
         $userId = $user->getId();
         $sendPush = $this->preferences->allowsPush($user, $type) || ($force && $user->isNotifyPushEnabled());
-        $sendEmail = $this->preferences->allowsEmail($user, $type) || ($force && $user->isNotifyEmailEnabled());
         $email = $user->getEmail();
+        $sendEmail = $email !== ''
+            && ($forceEmail || $this->preferences->allowsEmail($user, $type) || ($force && $user->isNotifyEmailEnabled()));
 
         // Не держим HTTP-ответ на FCM/SMTP — отправляем после flush ответа.
         if (($sendPush && $userId !== null) || $sendEmail) {

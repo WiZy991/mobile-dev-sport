@@ -76,7 +76,7 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     BrandHeader(
-                        clubName = uiState.clubBrandName,
+                        brandName = uiState.brandName,
                         showLogo = true,
                         textColor = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.fillMaxWidth(),
@@ -138,7 +138,9 @@ fun HomeScreen(
                     max = uiState.occupancyMax,
                     percentage = uiState.occupancyPercentage,
                     status = uiState.occupancyStatus,
-                    onRefresh = { viewModel.refresh() }
+                    clubName = uiState.clubHallName,
+                    onRefresh = { viewModel.refresh() },
+                    onClick = onNavigateToClubInfo,
                 )
             }
             

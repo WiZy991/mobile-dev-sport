@@ -44,12 +44,25 @@ final class StaffDataController extends AbstractController
             $this->adminMenuBuilder->allowedSections($user)
         );
 
-        $metrics = [
-            'clients' => $this->em->getRepository(User::class)->count([]),
-            'bookings' => $this->em->getRepository(Booking::class)->count([]),
-            'subscriptions' => $this->em->getRepository(Subscription::class)->count([]),
-            'tasks_open' => $this->em->getRepository(Task::class)->count(['status' => 'open']),
-        ];
+        $isPrivileged = (bool) array_intersect(
+            $user->getRoles(),
+            ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_MANAGER'],
+        );
+
+        if ($user->isTrainerRole() && !$isPrivileged) {
+            // Тренер видит только собственные показатели — без глобальных счётчиков
+            // CRM (клиенты всей базы, задачи, лиды).
+            $metrics = $this->trainerMetrics($user->getTrainer());
+        } else {
+            $metrics = [
+                'clients' => $this->em->getRepository(User::class)->count([]),
+                'bookings' => $this->em->getRepository(Booking::class)->count([]),
+                'subscriptions' => $this->em->getRepository(Subscription::class)->count([]),
+            ];
+            if ($this->adminMenuBuilder->isSectionAllowed($user, 'tasks')) {
+                $metrics['tasks_open'] = $this->em->getRepository(Task::class)->count(['status' => 'open']);
+            }
+        }
         if ($this->adminMenuBuilder->isSectionAllowed($user, 'app_support')) {
             $metrics['support_new'] = $this->em->getRepository(SupportTicket::class)->count(['status' => SupportTicket::STATUS_NEW]);
             $metrics['notifications_unread'] = (int) $this->em->createQueryBuilder()
@@ -122,7 +135,7 @@ final class StaffDataController extends AbstractController
         return $this->json([
             'mode' => $mode,
             'section' => $section,
-            'cards' => $this->sectionCards($section),
+            'cards' => $this->sectionCards($section, $user),
         ]);
     }
 
@@ -138,7 +151,17 @@ final class StaffDataController extends AbstractController
             return $this->json(['error' => 'Forbidden section', 'code' => 'forbidden_section'], 403);
         }
 
+        // Опциональный ?from=YYYY-MM-DD позволяет листать расписание за пределами
+        // ближайших двух недель — как в прошлое, так и в будущее (пункт 34 репорта).
+        $fromParam = trim((string) $request->query->get('from', ''));
         $from = new \DateTimeImmutable('today');
+        if ($fromParam !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromParam) === 1) {
+            try {
+                $from = (new \DateTimeImmutable($fromParam))->setTime(0, 0);
+            } catch (\Exception) {
+                // некорректная дата — остаёмся на сегодняшнем окне
+            }
+        }
         $to = $from->modify('+14 days');
 
         $qb = $this->em->createQueryBuilder()
@@ -151,13 +174,18 @@ final class StaffDataController extends AbstractController
             ->orderBy('t.startAt', 'ASC');
 
         if ($user->requiresTrainerRental() || $user->isTrainerRole()) {
-            $linkedTrainer = $user->getTrainer();
-            if ($linkedTrainer !== null
-                && !\in_array('ROLE_ADMIN', $user->getRoles(), true)
-                && !\in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true)
-                && !\in_array('ROLE_MANAGER', $user->getRoles(), true)
-            ) {
-                $qb->andWhere('t.trainer = :trainer')->setParameter('trainer', $linkedTrainer);
+            $isPrivileged = \in_array('ROLE_ADMIN', $user->getRoles(), true)
+                || \in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true)
+                || \in_array('ROLE_MANAGER', $user->getRoles(), true);
+            if (!$isPrivileged) {
+                $linkedTrainer = $user->getTrainer();
+                if ($linkedTrainer !== null) {
+                    $qb->andWhere('t.trainer = :trainer')->setParameter('trainer', $linkedTrainer);
+                } else {
+                    // У тренера ещё нет профиля Trainer (создаётся при первой записи) —
+                    // чужие занятия показывать нельзя, отдаём пустое расписание.
+                    $qb->andWhere('t.id IS NULL');
+                }
             }
         }
 
@@ -301,14 +329,14 @@ final class StaffDataController extends AbstractController
 
         return $this->json([
             'section' => $section,
-            'items' => $this->staffAdminSectionData->items($section),
+            'items' => $this->staffAdminSectionData->items($section, $user),
         ]);
     }
 
     /** @return list<array{key: string, value: int}> */
-    private function sectionCards(string $section): array
+    private function sectionCards(string $section, ?StaffUser $user = null): array
     {
-        $cards = $this->staffAdminSectionData->cards($section);
+        $cards = $this->staffAdminSectionData->cards($section, $user);
         $out = [];
         foreach ($cards as $card) {
             $out[] = [
@@ -318,6 +346,60 @@ final class StaffDataController extends AbstractController
         }
 
         return $out;
+    }
+
+    /**
+     * Метрики главной для тренера: только его записи и клиенты.
+     *
+     * @return array<string, int>
+     */
+    private function trainerMetrics(?Trainer $trainer): array
+    {
+        if ($trainer === null) {
+            return ['my_bookings_today' => 0, 'my_bookings_week' => 0, 'my_clients_active' => 0];
+        }
+
+        $today = new \DateTimeImmutable('today');
+
+        return [
+            'my_bookings_today' => $this->countTrainerBookingsBetween($trainer, $today, $today->modify('+1 day')),
+            'my_bookings_week' => $this->countTrainerBookingsBetween($trainer, $today, $today->modify('+7 days')),
+            'my_clients_active' => $this->countTrainerActiveClients($trainer),
+        ];
+    }
+
+    private function countTrainerBookingsBetween(Trainer $trainer, \DateTimeImmutable $from, \DateTimeImmutable $to): int
+    {
+        return (int) $this->em->createQueryBuilder()
+            ->select('COUNT(b.id)')
+            ->from(Booking::class, 'b')
+            ->join('b.training', 't')
+            ->where('b.status != :cancelled')
+            ->andWhere('t.trainer = :trainer')
+            ->andWhere('t.startAt >= :from')
+            ->andWhere('t.startAt < :to')
+            ->setParameter('cancelled', 'cancelled')
+            ->setParameter('trainer', $trainer)
+            ->setParameter('from', $from)
+            ->setParameter('to', $to)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    private function countTrainerActiveClients(Trainer $trainer): int
+    {
+        return (int) $this->em->createQueryBuilder()
+            ->select('COUNT(DISTINCT IDENTITY(b.user))')
+            ->from(Booking::class, 'b')
+            ->join('b.training', 't')
+            ->where('b.status != :cancelled')
+            ->andWhere('t.trainer = :trainer')
+            ->andWhere('t.startAt >= :now')
+            ->setParameter('cancelled', 'cancelled')
+            ->setParameter('trainer', $trainer)
+            ->setParameter('now', new \DateTimeImmutable())
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     private function formatDayLabel(\DateTimeImmutable $date): string
