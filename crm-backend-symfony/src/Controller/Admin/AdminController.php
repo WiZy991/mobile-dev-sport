@@ -311,19 +311,21 @@ class AdminController extends AbstractController
         $menu = $this->buildMenu();
 
         if ($request->isMethod('POST')) {
-            $email = trim((string) $request->request->get('email', ''));
-            $existing = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
+            $email = mb_strtolower(trim((string) $request->request->get('email', '')));
+            $request->request->set('email', $email);
+            $existing = $this->findOtherUserByEmail($email);
             if ($existing) {
-                $this->addFlash('danger', 'Клиент с таким email уже существует.');
+                $this->addFlash('danger', 'Клиент с таким email уже существует (ID ' . $existing->getId() . ').');
                 $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
-
                 $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+                $allClientGroups = $this->em->getRepository(ClientGroup::class)->findBy([], ['name' => 'ASC']);
 
                 return $this->render('admin/client_new.html.twig', [
                     'menu' => $menu,
                     'current' => 'clients',
                     'allTags' => $allTags,
                     'allClubs' => $allClubs,
+                    'allClientGroups' => $allClientGroups,
                     'formData' => $request->request->all(),
                 ]);
             }
@@ -413,11 +415,39 @@ class AdminController extends AbstractController
         ]);
     }
 
+    /**
+     * Другой клиент с тем же email (без учёта регистра), либо null.
+     */
+    private function findOtherUserByEmail(string $email, ?int $excludeUserId = null): ?User
+    {
+        $email = mb_strtolower(trim($email));
+        if ($email === '') {
+            return null;
+        }
+
+        $qb = $this->em->createQueryBuilder()
+            ->select('u')
+            ->from(User::class, 'u')
+            ->where('LOWER(u.email) = :email')
+            ->setParameter('email', $email)
+            ->setMaxResults(1);
+
+        if ($excludeUserId !== null && $excludeUserId > 0) {
+            $qb->andWhere('u.id != :excludeId')->setParameter('excludeId', $excludeUserId);
+        }
+
+        /** @var User|null $found */
+        $found = $qb->getQuery()->getOneOrNullResult();
+
+        return $found;
+    }
+
     private function createOrUpdateUserFromRequest(User $user, Request $request): User
     {
-        $user->setName((string) $request->request->get('name'))
-            ->setPhone((string) $request->request->get('phone'))
-            ->setEmail((string) $request->request->get('email'))
+        $email = mb_strtolower(trim((string) $request->request->get('email')));
+        $user->setName(trim((string) $request->request->get('name')))
+            ->setPhone(trim((string) $request->request->get('phone')))
+            ->setEmail($email)
             ->setBonusPoints(max(0, (int) $request->request->get('bonus_points', 0)))
             ->setGender($request->request->get('gender') ?: null);
 
@@ -1080,8 +1110,30 @@ class AdminController extends AbstractController
             throw $this->createNotFoundException();
         }
 
+        $email = mb_strtolower(trim((string) $request->request->get('email', '')));
+        $request->request->set('email', $email);
+        $duplicate = $this->findOtherUserByEmail($email, $id);
+        if ($duplicate !== null) {
+            $this->addFlash(
+                'danger',
+                'Не удалось сохранить: email «' . $email . '» уже занят клиентом ID ' . $duplicate->getId()
+                . ' (' . $duplicate->getName() . '). Укажите другой email или откройте того клиента.'
+            );
+
+            return $this->redirectToRoute('admin_client_show', ['id' => $id]);
+        }
+
         $this->createOrUpdateUserFromRequest($user, $request);
-        $this->em->flush();
+        try {
+            $this->em->flush();
+            $this->addFlash('success', 'Профиль клиента сохранён.');
+        } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
+            $this->em->clear();
+            $this->addFlash(
+                'danger',
+                'Не удалось сохранить: такой email уже есть у другого клиента в этой организации.'
+            );
+        }
 
         return $this->redirectToRoute('admin_client_show', ['id' => $id]);
     }
