@@ -85,6 +85,7 @@ fun ClubInfoScreen(
                     latitude = club?.latitude ?: 0.0,
                     longitude = club?.longitude ?: 0.0,
                     address = club?.address.orEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             

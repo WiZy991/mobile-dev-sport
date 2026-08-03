@@ -15,6 +15,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -57,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -83,6 +86,8 @@ import org.osmdroid.views.overlay.Polyline
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.abs
+
+private const val MAP_VIEWPORT_HEIGHT_DP = 300
 
 /** АТЦ «Новый Де-Фриз», ул. Купера 2. */
 private const val DE_FRIES_LAT = 43.313906
@@ -238,17 +243,32 @@ fun ClubMapPreview(
     }
 
     Column(modifier.fillMaxWidth()) {
+        // Жёсткий viewport: MapView при зуме/маршруте иначе раздувает item на весь экран
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(300.dp)
+                .height(MAP_VIEWPORT_HEIGHT_DP.dp)
+                .clip(RectangleShape)
                 .nestedScroll(mapNestedScroll)
                 .background(Color(0xFFE8EEF4)),
         ) {
             AndroidView(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(MAP_VIEWPORT_HEIGHT_DP.dp)
+                    .clip(RectangleShape),
                 factory = { ctx ->
-                    object : MapView(ctx) {
+                    val map = object : MapView(ctx) {
+                        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                            // osmdroid при зуме запрашивает огромный размер — игнорируем
+                            val w = MeasureSpec.getSize(widthMeasureSpec)
+                            val h = MeasureSpec.getSize(heightMeasureSpec)
+                            val exactW = MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY)
+                            val exactH = MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY)
+                            super.onMeasure(exactW, exactH)
+                            setMeasuredDimension(w, h)
+                        }
+
                         override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
                             when (ev.actionMasked) {
                                 MotionEvent.ACTION_DOWN,
@@ -278,11 +298,27 @@ fun ClubMapPreview(
                             },
                         )
                         onResume()
-                        mapViewRef = this
+                    }
+                    mapViewRef = map
+                    FrameLayout(ctx).apply {
+                        clipChildren = true
+                        clipToPadding = true
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                        )
+                        addView(
+                            map,
+                            FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                            ),
+                        )
                     }
                 },
-                update = { map ->
-                    if (mapViewRef !== map) mapViewRef = map
+                update = { frame ->
+                    val map = frame.getChildAt(0) as? MapView
+                    if (map != null && mapViewRef !== map) mapViewRef = map
                 },
             )
             DisposableEffect(Unit) {
