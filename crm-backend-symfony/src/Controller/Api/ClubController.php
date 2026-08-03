@@ -146,15 +146,22 @@ class ClubController extends AbstractController
             $clubName = 'Доброзал';
         }
 
+        $address = $get('address', 'г. Москва, ул. Примерная, д. 1');
+        [$lat, $lon] = $this->resolveClubCoordinates(
+            (float) $get('latitude', '55.7558'),
+            (float) $get('longitude', '37.6173'),
+            $address,
+        );
+
         return [
             'id' => 'default',
             'name' => $clubName,
-            'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
+            'address' => $address,
             'phone' => $get('phone', '+7 (495) 123-45-67'),
             'email' => $get('email', 'info@fitnessclub.ru'),
             'working_hours' => $get('working_hours', 'Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00'),
-            'latitude' => (float) $get('latitude', '55.7558'),
-            'longitude' => (float) $get('longitude', '37.6173'),
+            'latitude' => $lat,
+            'longitude' => $lon,
             'amenities' => $amenities,
             'max_capacity' => $maxCapacity,
             ...$this->legalUrlsFromSettings(),
@@ -225,17 +232,24 @@ class ClubController extends AbstractController
             $updateMessage = 'Доступна новая версия приложения. Обновите её, чтобы продолжить пользоваться сервисом.';
         }
 
+        $address = $get('address', 'г. Москва, ул. Примерная, д. 1');
+        [$lat, $lon] = $this->resolveClubCoordinates(
+            (float) $get('latitude', '55.7558'),
+            (float) $get('longitude', '37.6173'),
+            $address,
+        );
+
         return $this->json([
             // name — название зала/площадки (может быть длинным); brand_name — бренд сети в шапке.
             'name' => $clubName,
             'brand_name' => $brandName,
-            'address' => $get('address', 'г. Москва, ул. Примерная, д. 1'),
+            'address' => $address,
             'phone' => $contactPhone !== '' ? $contactPhone : $get('phone', '+7 (495) 123-45-67'),
             'email' => $contactEmail !== '' ? $contactEmail : $get('email', 'info@fitnessclub.ru'),
             'working_hours' => $get('working_hours', 'Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00'),
             'amenities' => $amenities,
-            'latitude' => (float) $get('latitude', '55.7558'),
-            'longitude' => (float) $get('longitude', '37.6173'),
+            'latitude' => $lat,
+            'longitude' => $lon,
             'promo_title' => ($this->clubSettings->get('promo_home_title') ?? '') !== ''
                 ? (string) $this->clubSettings->get('promo_home_title')
                 : null,
@@ -381,5 +395,32 @@ class ClubController extends AbstractController
         $base = $request->getSchemeAndHttpHost();
 
         return str_starts_with($path, '/') ? $base . $path : $base . '/' . $path;
+    }
+
+    /**
+     * Если в CRM остался плейсхолдер Москвы, а адрес — Владивосток / Де-Фриз,
+     * отдаём координаты клуба, чтобы карта в приложении не показывала Красную площадь.
+     *
+     * @return array{0: float, 1: float}
+     */
+    private function resolveClubCoordinates(float $lat, float $lon, string $address): array
+    {
+        $a = mb_strtolower($address);
+        $looksVladivostok =
+            str_contains($a, 'владивосток')
+            || str_contains($a, 'де фриз')
+            || str_contains($a, 'де-фриз')
+            || str_contains($a, 'купера')
+            || str_contains($a, 'надеждин');
+
+        $isMoscowPlaceholder = abs($lat - 55.7558) < 0.05 && abs($lon - 37.6173) < 0.05;
+        $missing = abs($lat) < 0.01 && abs($lon) < 0.01;
+
+        if ($looksVladivostok && ($isMoscowPlaceholder || $missing || $lon < 100.0)) {
+            // АТЦ «Новый Де-Фриз», ул. Купера 2
+            return [43.313906, 131.999418];
+        }
+
+        return [$lat, $lon];
     }
 }
