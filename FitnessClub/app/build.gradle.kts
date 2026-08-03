@@ -134,6 +134,9 @@ dependencies {
 
     // Coil for images
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Native map (WebView+OSM tiles часто пустые в эмуляторе/WebView)
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
     
     // ZXing for QR codes
     implementation("com.google.zxing:core:3.5.2")

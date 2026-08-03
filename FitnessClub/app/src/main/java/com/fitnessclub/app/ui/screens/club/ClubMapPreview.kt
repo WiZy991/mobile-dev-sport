@@ -6,14 +6,14 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color as AndroidColor
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
 import android.net.Uri
-import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,9 +45,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +63,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.fitnessclub.app.ui.theme.Primary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.math.abs
 
 /** АТЦ «Новый Де-Фриз», ул. Купера 2. */
@@ -70,13 +85,27 @@ private const val DE_FRIES_LON = 131.999418
 private const val MOSCOW_DEFAULT_LAT = 55.7558
 private const val MOSCOW_DEFAULT_LON = 37.6173
 
+/** Маршрут дальше этого — почти наверняка чужой город / дефолт эмулятора. */
+private const val MAX_ROUTE_KM = 250.0
+
+/** CartoCDN — стабильнее OSM.org (часто 403 в WebView/эмуляторе). */
+private val cartoTiles: OnlineTileSourceBase = XYTileSource(
+    "CartoVoyager",
+    1,
+    19,
+    256,
+    ".png",
+    arrayOf(
+        "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://c.basemaps.cartocdn.com/rastertiles/voyager/",
+    ),
+)
+
 /**
- * Интерактивная карта (Leaflet) с точкой клуба.
- * «Маршрут» строит путь от геолокации пользователя до клуба прямо на карте.
- * Кнопки Яндекс / 2ГИС открывают навигацию во внешнем приложении/браузере.
- *
- * Почему не map-widget Яндекса: в Android WebView он часто отдаёт пустой белый экран
- * (блокировки / cookie / UA). Leaflet+OSM стабильно работает без API-ключа.
+ * Нативная карта (osmdroid) с точкой клуба.
+ * «Маршрут на карте» — линия от вашей геолокации до клуба.
+ * Яндекс / 2ГИС — внешняя навигация.
  */
 @Composable
 fun ClubMapPreview(
@@ -86,25 +115,80 @@ fun ClubMapPreview(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val (lat, lon) = remember(latitude, longitude, address) {
         resolveClubCoords(latitude, longitude, address)
     }
-    val mapHtml = remember(lat, lon, address) {
-        buildInteractiveMapHtml(lat, lon, address)
+    val clubPoint = remember(lat, lon) { GeoPoint(lat, lon) }
+
+    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+    var routing by remember { mutableStateOf(false) }
+    var statusText by remember { mutableStateOf<String?>(null) }
+    var routeOverlay by remember { mutableStateOf<Polyline?>(null) }
+    var userMarker by remember { mutableStateOf<Marker?>(null) }
+
+    fun clearRoute(map: MapView) {
+        routeOverlay?.let { map.overlays.remove(it) }
+        userMarker?.let { map.overlays.remove(it) }
+        routeOverlay = null
+        userMarker = null
+        map.invalidate()
     }
 
-    var mapLoading by remember { mutableStateOf(true) }
-    var routing by remember { mutableStateOf(false) }
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    var statusText by remember { mutableStateOf<String?>(null) }
+    fun drawRoute(map: MapView, from: GeoPoint, points: List<GeoPoint>, km: Double, minutes: Int) {
+        clearRoute(map)
+        val you = Marker(map).apply {
+            position = from
+            title = "Вы здесь"
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        }
+        val line = Polyline().apply {
+            outlinePaint.color = AndroidColor.parseColor("#F97316")
+            outlinePaint.strokeWidth = 12f
+            setPoints(points)
+        }
+        map.overlays.add(line)
+        map.overlays.add(you)
+        routeOverlay = line
+        userMarker = you
+        val box = BoundingBox.fromGeoPoints(ArrayList(points + listOf(clubPoint, from)))
+        map.zoomToBoundingBox(box, true, 80)
+        map.invalidate()
+        statusText = "Маршрут: ~${"%.1f".format(km)} км, ~$minutes мин"
+    }
 
-    fun buildRouteFrom(userLat: Double, userLon: Double) {
+    fun fetchAndDraw(from: GeoPoint) {
+        val map = mapViewRef ?: return
+        val distKm = from.distanceToAsDouble(clubPoint) / 1000.0
+        if (distKm > MAX_ROUTE_KM) {
+            routing = false
+            statusText =
+                "Геолокация далеко от клуба (~${distKm.toInt()} км). " +
+                    "На эмуляторе задайте точку у Владивостока (Extended controls → Location)."
+            Toast.makeText(
+                context,
+                "GPS не у клуба (сейчас ~${distKm.toInt()} км). Задайте локацию рядом с Де-Фриз.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
         routing = true
         statusText = "Строим маршрут…"
-        webViewRef?.evaluateJavascript(
-            "window.buildRoute($userLat, $userLon, $lat, $lon);",
-            null,
-        )
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                fetchOsrmRoute(from.longitude, from.latitude, lon, lat)
+            }
+            routing = false
+            result.fold(
+                onSuccess = { data ->
+                    drawRoute(map, from, data.points, data.distanceKm, data.durationMin)
+                },
+                onFailure = { e ->
+                    statusText = e.message ?: "Не удалось построить маршрут"
+                    Toast.makeText(context, statusText, Toast.LENGTH_SHORT).show()
+                },
+            )
+        }
     }
 
     fun startInAppRoute() {
@@ -114,13 +198,17 @@ fun ClubMapPreview(
             statusText = "Нужен доступ к геолокации"
             return
         }
-        val loc = readBestLocation(context)
-        if (loc == null) {
-            statusText = "Не удалось определить ваше местоположение. Включите GPS."
-            Toast.makeText(context, "Включите геолокацию и попробуйте снова", Toast.LENGTH_SHORT).show()
-            return
+        routing = true
+        statusText = "Определяем ваше местоположение…"
+        requestFreshLocation(context) { loc ->
+            if (loc == null) {
+                routing = false
+                statusText = "Не удалось определить местоположение. Включите GPS."
+                Toast.makeText(context, statusText, Toast.LENGTH_SHORT).show()
+                return@requestFreshLocation
+            }
+            fetchAndDraw(GeoPoint(loc.latitude, loc.longitude))
         }
-        buildRouteFrom(loc.latitude, loc.longitude)
     }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -128,11 +216,10 @@ fun ClubMapPreview(
     ) { result ->
         val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) {
-            startInAppRoute()
-        } else {
-            statusText = "Без геолокации маршрут на карте недоступен"
-            Toast.makeText(context, "Разрешите геолокацию для маршрута", Toast.LENGTH_SHORT).show()
+        if (granted) startInAppRoute()
+        else {
+            statusText = "Без геолокации маршрут недоступен"
+            Toast.makeText(context, statusText, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -141,29 +228,35 @@ fun ClubMapPreview(
             Modifier
                 .fillMaxWidth()
                 .height(280.dp)
-                .clip(RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp))
                 .background(Color(0xFFE8EEF4)),
         ) {
-            ClubLeafletWebView(
-                html = mapHtml,
-                onReady = { webViewRef = it; mapLoading = false },
-                onRouteResult = { ok, message ->
-                    routing = false
-                    statusText = message
-                    if (!ok) {
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    MapView(ctx).apply {
+                        setTileSource(cartoTiles)
+                        setMultiTouchControls(true)
+                        controller.setZoom(15.0)
+                        controller.setCenter(clubPoint)
+                        overlays.add(
+                            Marker(this).apply {
+                                position = clubPoint
+                                title = address.ifBlank { "Клуб" }
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            },
+                        )
+                        onResume()
+                        mapViewRef = this
                     }
                 },
-                modifier = Modifier.fillMaxSize(),
+                update = { map ->
+                    if (mapViewRef !== map) mapViewRef = map
+                },
             )
-            if (mapLoading) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFFE8EEF4)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = Primary, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+            DisposableEffect(Unit) {
+                mapViewRef?.onResume()
+                onDispose {
+                    mapViewRef?.onPause()
                 }
             }
             Surface(
@@ -235,7 +328,7 @@ fun ClubMapPreview(
                         )
                     }
                 },
-                enabled = !routing && !mapLoading,
+                enabled = !routing,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Primary),
                 shape = RoundedCornerShape(12.dp),
@@ -290,168 +383,136 @@ fun ClubMapPreview(
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
-@Composable
-private fun ClubLeafletWebView(
-    html: String,
-    onReady: (WebView) -> Unit,
-    onRouteResult: (ok: Boolean, message: String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mainHandler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
-    val routeCallback = remember { mutableStateOf(onRouteResult) }
-    routeCallback.value = onRouteResult
+private data class OsrmRoute(
+    val points: List<GeoPoint>,
+    val distanceKm: Double,
+    val durationMin: Int,
+)
 
-    val bridge = remember {
-        object {
-            @JavascriptInterface
-            fun onRouteOk(distanceKm: String, durationMin: String) {
-                mainHandler.post {
-                    routeCallback.value(true, "Маршрут: ~$distanceKm км, ~$durationMin мин")
-                }
-            }
-
-            @JavascriptInterface
-            fun onRouteError(message: String) {
-                mainHandler.post {
-                    routeCallback.value(false, message.ifBlank { "Не удалось построить маршрут" })
-                }
+private fun fetchOsrmRoute(
+    fromLon: Double,
+    fromLat: Double,
+    toLon: Double,
+    toLat: Double,
+): Result<OsrmRoute> = runCatching {
+    val url =
+        "https://router.project-osrm.org/route/v1/driving/" +
+            "$fromLon,$fromLat;$toLon,$toLat?overview=full&geometries=geojson"
+    val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        connectTimeout = 12_000
+        readTimeout = 12_000
+        requestMethod = "GET"
+        setRequestProperty("User-Agent", "FitnessClub/1.0")
+    }
+    try {
+        val code = conn.responseCode
+        val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
+            .bufferedReader().use { it.readText() }
+        if (code !in 200..299) error("Сервис маршрутов недоступен ($code)")
+        val json = JSONObject(body)
+        if (json.optString("code") != "Ok") error("Маршрут не найден")
+        val route = json.getJSONArray("routes").getJSONObject(0)
+        val coords = route.getJSONObject("geometry").getJSONArray("coordinates")
+        val points = buildList {
+            for (i in 0 until coords.length()) {
+                val c = coords.getJSONArray(i)
+                add(GeoPoint(c.getDouble(1), c.getDouble(0)))
             }
         }
+        if (points.isEmpty()) error("Пустой маршрут")
+        OsrmRoute(
+            points = points,
+            distanceKm = route.getDouble("distance") / 1000.0,
+            durationMin = maxOf(1, (route.getDouble("duration") / 60.0).toInt()),
+        )
+    } finally {
+        conn.disconnect()
     }
-
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            WebView(ctx).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.cacheMode = WebSettings.LOAD_DEFAULT
-                settings.loadWithOverviewMode = true
-                settings.useWideViewPort = true
-                settings.setSupportZoom(false)
-                settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                settings.userAgentString =
-                    "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 " +
-                        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                addJavascriptInterface(bridge, "AndroidBridge")
-                setOnTouchListener { v, event ->
-                    when (event.actionMasked) {
-                        android.view.MotionEvent.ACTION_DOWN,
-                        android.view.MotionEvent.ACTION_MOVE,
-                        -> v.parent?.requestDisallowInterceptTouchEvent(true)
-                        android.view.MotionEvent.ACTION_UP,
-                        android.view.MotionEvent.ACTION_CANCEL,
-                        -> v.parent?.requestDisallowInterceptTouchEvent(false)
-                    }
-                    false
-                }
-                webChromeClient = WebChromeClient()
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        if (view != null) {
-                            mainHandler.post { onReady(view) }
-                        }
-                    }
-                }
-                setBackgroundColor(android.graphics.Color.rgb(232, 238, 244))
-                tag = html.hashCode()
-                loadDataWithBaseURL(
-                    "https://unpkg.com/",
-                    html,
-                    "text/html",
-                    "UTF-8",
-                    null,
-                )
-            }
-        },
-        update = { webView ->
-            val key = html.hashCode()
-            if (webView.tag != key) {
-                webView.tag = key
-                webView.loadDataWithBaseURL(
-                    "https://unpkg.com/",
-                    html,
-                    "text/html",
-                    "UTF-8",
-                    null,
-                )
-            }
-        },
-    )
 }
 
-private fun buildInteractiveMapHtml(lat: Double, lon: Double, address: String): String {
-    val safeTitle = address
-        .replace("\\", "\\\\")
-        .replace("'", "\\'")
-        .replace("\n", " ")
-        .ifBlank { "Клуб" }
-    return """
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>
-  html, body, #map { margin:0; padding:0; width:100%; height:100%; background:#e8eef4; }
-  .leaflet-control-attribution { font-size:9px; }
-</style>
-</head>
-<body>
-<div id="map"></div>
-<script>
-  var clubLat = $lat, clubLon = $lon;
-  var map = L.map('map', { zoomControl: true, attributionControl: true })
-    .setView([clubLat, clubLon], 15);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
-  var clubMarker = L.marker([clubLat, clubLon]).addTo(map)
-    .bindPopup('$safeTitle');
-  var userMarker = null;
-  var routeLine = null;
-
-  window.buildRoute = function(fromLat, fromLon, toLat, toLon) {
-    try {
-      if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-      if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
-      userMarker = L.circleMarker([fromLat, fromLon], {
-        radius: 8, color: '#2563EB', fillColor: '#3B82F6', fillOpacity: 1, weight: 2
-      }).addTo(map).bindPopup('Вы здесь');
-
-      var url = 'https://router.project-osrm.org/route/v1/driving/'
-        + fromLon + ',' + fromLat + ';' + toLon + ',' + toLat
-        + '?overview=full&geometries=geojson';
-      fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-        if (!data || data.code !== 'Ok' || !data.routes || !data.routes.length) {
-          if (window.AndroidBridge) AndroidBridge.onRouteError('Маршрут не найден');
-          return;
-        }
-        var route = data.routes[0];
-        var coords = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
-        routeLine = L.polyline(coords, { color: '#F97316', weight: 5, opacity: 0.9 }).addTo(map);
-        map.fitBounds(routeLine.getBounds(), { padding: [28, 28] });
-        var km = (route.distance / 1000).toFixed(1);
-        var min = Math.max(1, Math.round(route.duration / 60));
-        if (window.AndroidBridge) AndroidBridge.onRouteOk(String(km), String(min));
-      }).catch(function(e) {
-        if (window.AndroidBridge) AndroidBridge.onRouteError('Нет сети для построения маршрута');
-      });
-    } catch (e) {
-      if (window.AndroidBridge) AndroidBridge.onRouteError('Ошибка карты');
+@SuppressLint("MissingPermission")
+private fun requestFreshLocation(context: Context, onResult: (Location?) -> Unit) {
+    val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+    if (lm == null) {
+        onResult(null)
+        return
     }
-  };
+    val last = readBestLocation(context)
+    // Если lastKnown уже рядом с клубом — берём сразу
+    if (last != null) {
+        val club = Location("club").apply {
+            latitude = DE_FRIES_LAT
+            longitude = DE_FRIES_LON
+        }
+        if (last.distanceTo(club) / 1000f <= MAX_ROUTE_KM) {
+            onResult(last)
+            return
+        }
+    }
 
-  setTimeout(function() { map.invalidateSize(true); }, 200);
-  setTimeout(function() { map.invalidateSize(true); }, 600);
-</script>
-</body>
-</html>
-    """.trimIndent()
+    val main = Handler(Looper.getMainLooper())
+    var done = false
+    fun finish(loc: Location?) {
+        if (done) return
+        done = true
+        main.post { onResult(loc) }
+    }
+
+    val listener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            try {
+                lm.removeUpdates(this)
+            } catch (_: Exception) {
+            }
+            finish(location)
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+        override fun onProviderEnabled(provider: String) = Unit
+        override fun onProviderDisabled(provider: String) = Unit
+    }
+
+    try {
+        val provider = when {
+            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            else -> null
+        }
+        if (provider == null) {
+            finish(last) // может быть Москва — дальше отфильтруем по дистанции
+            return
+        }
+        lm.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper())
+        // Таймаут 8 сек
+        main.postDelayed({
+            try {
+                lm.removeUpdates(listener)
+            } catch (_: Exception) {
+            }
+            finish(last)
+        }, 8_000)
+    } catch (_: Exception) {
+        finish(last)
+    }
+}
+
+@SuppressLint("MissingPermission")
+private fun readBestLocation(context: Context): Location? {
+    val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
+    var best: Location? = null
+    for (p in listOf(
+        LocationManager.GPS_PROVIDER,
+        LocationManager.NETWORK_PROVIDER,
+        LocationManager.PASSIVE_PROVIDER,
+    )) {
+        try {
+            val loc = lm.getLastKnownLocation(p) ?: continue
+            if (best == null || loc.time > best.time) best = loc
+        } catch (_: Exception) {
+        }
+    }
+    return best
 }
 
 internal fun resolveClubCoords(
@@ -479,31 +540,6 @@ internal fun resolveClubCoords(
         hasRealCoords -> latitude to longitude
         else -> MOSCOW_DEFAULT_LAT to MOSCOW_DEFAULT_LON
     }
-}
-
-@SuppressLint("MissingPermission")
-private fun readBestLocation(context: Context): Location? {
-    val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
-    val providers = listOf(
-        LocationManager.GPS_PROVIDER,
-        LocationManager.NETWORK_PROVIDER,
-        LocationManager.PASSIVE_PROVIDER,
-    )
-    var best: Location? = null
-    for (p in providers) {
-        try {
-            if (!lm.isProviderEnabled(p) && p != LocationManager.PASSIVE_PROVIDER) continue
-            val loc = lm.getLastKnownLocation(p) ?: continue
-            if (best == null || (loc.accuracy > 0 && loc.accuracy < best.accuracy) ||
-                loc.time > best.time
-            ) {
-                best = loc
-            }
-        } catch (_: Exception) {
-            // ignore provider
-        }
-    }
-    return best
 }
 
 private fun openInYandex(context: Context, lat: Double, lon: Double, address: String) {
@@ -539,9 +575,7 @@ private fun startFirstAvailable(context: Context, intents: List<Intent>) {
             context.startActivity(intent)
             return
         } catch (_: ActivityNotFoundException) {
-            // next
         } catch (_: Exception) {
-            // next
         }
     }
     Toast.makeText(context, "Не удалось открыть карты", Toast.LENGTH_SHORT).show()
