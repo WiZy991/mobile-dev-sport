@@ -147,25 +147,40 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
     )
     _row(exdev, "open_time (мс)", ttk.Entry(exdev, textvariable=app.var_open_time), 5)
     app.var_entry_reader_n = tk.StringVar(value="")
+    app.var_entry_reader_d = tk.StringVar(value="")
     app.var_exit_reader_n = tk.StringVar(value="")
+    app.var_exit_reader_d = tk.StringVar(value="")
     _row(
         exdev,
-        "Считыватель вход (number)",
+        "Вход: number",
         ttk.Entry(exdev, textvariable=app.var_entry_reader_n, width=8),
         6,
     )
     _row(
         exdev,
-        "Считыватель выход (number)",
-        ttk.Entry(exdev, textvariable=app.var_exit_reader_n, width=8),
+        "Вход: direction",
+        ttk.Entry(exdev, textvariable=app.var_entry_reader_d, width=8),
         7,
+    )
+    _row(
+        exdev,
+        "Выход: number",
+        ttk.Entry(exdev, textvariable=app.var_exit_reader_n, width=8),
+        8,
+    )
+    _row(
+        exdev,
+        "Выход: direction",
+        ttk.Entry(exdev, textvariable=app.var_exit_reader_d, width=8),
+        9,
     )
     ttk.Label(
         exdev,
-        text="Номера из события C01 (card.number). Пусто = не задано. Если оба пустые — работает «Роль точки» (один считыватель).",
+        text="Из события C01 (card.number / card.direction). При 1 ИУ + 2 считывателях обычно один number "
+        "и разные direction (вход d=0, выход d=1). Пустое поле не сравнивается. Смотрите лог при скане.",
         foreground="gray",
         wraplength=560,
-    ).grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
+    ).grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
     app.var_gate_role = tk.StringVar(value="entry")
     _row(
         exdev,
@@ -177,14 +192,14 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
             width=14,
             state="readonly",
         ),
-        9,
+        11,
     )
     ttk.Label(
         exdev,
-        text="Fallback, если номера считывателей не заданы: entry → /access/entry, exit → /access/exit.",
+        text="Fallback, если вход/выход не заданы: entry → /access/entry, exit → /access/exit.",
         foreground="gray",
         wraplength=560,
-    ).grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
+    ).grid(row=12, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
 
     relay = ttk.LabelFrame(right, text="5а. Реле / выход после допуска CRM", padding=8)
     relay.pack(fill=tk.X, pady=(0, 8))

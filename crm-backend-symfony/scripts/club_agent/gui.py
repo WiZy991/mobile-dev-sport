@@ -380,9 +380,13 @@ class AgentApp(tk.Tk):
         self.var_access_mode.set(eq.access_mode)
         self.var_open_time.set(str(eq.open_time_ms))
         ern = getattr(eq, "entry_reader_number", None)
+        erd = getattr(eq, "entry_reader_direction", None)
         xrn = getattr(eq, "exit_reader_number", None)
+        xrd = getattr(eq, "exit_reader_direction", None)
         self.var_entry_reader_n.set("" if ern is None else str(ern))
+        self.var_entry_reader_d.set("" if erd is None else str(erd))
         self.var_exit_reader_n.set("" if xrn is None else str(xrn))
+        self.var_exit_reader_d.set("" if xrd is None else str(xrd))
         self.var_gate_role.set(getattr(eq, "gate_role", "entry") or "entry")
         self.var_relay_after.set(bool(eq.relay_after_grant) and not bool(eq.relay_use_cross_reference))
         self.var_relay_out_n.set(str(eq.relay_output_number))
@@ -424,7 +428,9 @@ class AgentApp(tk.Tk):
             access_mode=self.var_access_mode.get().strip() or "control",
             open_time_ms=int(self.var_open_time.get().strip()),
             entry_reader_number=self._optional_form_int(self.var_entry_reader_n.get()),
+            entry_reader_direction=self._optional_form_int(self.var_entry_reader_d.get()),
             exit_reader_number=self._optional_form_int(self.var_exit_reader_n.get()),
+            exit_reader_direction=self._optional_form_int(self.var_exit_reader_d.get()),
             gate_role=(
                 gr
                 if (gr := self.var_gate_role.get().strip().lower()) in ("entry", "exit")
@@ -643,7 +649,10 @@ class AgentApp(tk.Tk):
         try:
             self.cfg.save()
             if self.agent:
-                self.agent.cfg = self.cfg
+                if hasattr(self.agent, "update_config"):
+                    self.agent.update_config(self.cfg)
+                else:
+                    self.agent.cfg = self.cfg
             messagebox.showinfo("Сохранено", "Настройки CRM и оборудования записаны.")
             self._append_log("info", "Конфиг сохранён")
         except Exception as e:
@@ -795,31 +804,33 @@ class AgentApp(tk.Tk):
         eid = self._selected_eq_id
         label = {"entry": "вход", "exit": "выход"}.get(side or "", "ИУ")
         number = None
-        direction = 0
+        direction = None
         if side in ("entry", "exit"):
             try:
                 eq = self._form_to_equipment()
             except ValueError as e:
                 messagebox.showerror("Ошибка", str(e))
                 return
-            number = eq.open_number_for_side(side)
-            if number is None:
+            if not eq._side_configured(side):
                 messagebox.showwarning(
                     "Считыватель",
-                    f"Укажите номер считывателя «{label}» в полях оборудования "
-                    "(и сохраните настройки для постоянной работы сканов).",
+                    f"Укажите number и/или direction для «{label}» в полях оборудования "
+                    "(смотрите значения в логе при скане) и сохраните.",
                 )
                 return
-            direction = int(eq.exdev_direction or 0)
+            number = eq.open_number_for_side(side)
+            direction = eq.open_direction_for_side(side)
+            if number is None:
+                number = int(eq.exdev_number or 0)
+            if direction is None:
+                direction = int(eq.exdev_direction or 0)
         if self.agent.open_door(eid, side=side, number=number, direction=direction):
             self._append_log(
                 "info",
-                f"Команда open ({label}"
-                + (f", number={number}" if number is not None else "")
-                + ") отправлена",
+                f"Команда open ({label}, number={number}, direction={direction}) отправлена",
             )
         else:
-            messagebox.showwarning("C01", "Устройство не подключено или номер считывателя не задан.")
+            messagebox.showwarning("C01", "Устройство не подключено или считыватель не задан.")
 
     def _open_door_entry(self) -> None:
         self._open_door("entry")

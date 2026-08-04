@@ -159,8 +159,29 @@ class ClubAgent:
         self._emit("info", f"────── C01 команда ({label}) ──────")
         self._emit("info", f"→ {json.dumps(cmd, ensure_ascii=False)}")
 
+    def update_config(self, cfg: AgentConfig) -> None:
+        """Применить сохранённый конфиг без перезапуска (номера/direction считывателей)."""
+        self.cfg = cfg
+        for eq in cfg.equipment:
+            ep = self._endpoints.get(eq.id)
+            if ep is None:
+                continue
+            ep.equipment = eq
+            if getattr(ep, "session", None) is not None:
+                ep.session.equipment = eq
+        self._emit(
+            "info",
+            "Конфиг оборудования применён к работающему агенту "
+            "(вход/выход: number + direction из сохранённых настроек).",
+        )
+
+    def _live_equipment(self, equipment: EquipmentItem) -> EquipmentItem:
+        live = self.cfg.get_equipment(equipment.id)
+        return live if live is not None else equipment
+
     async def _handle_card(self, qr: str, number: int, direction: int, equipment: EquipmentItem) -> bool:
-        passage, passage_err = equipment.resolve_passage(number)
+        equipment = self._live_equipment(equipment)
+        passage, passage_err = equipment.resolve_passage(number, direction)
         if passage is None:
             self._emit("warning", f"══════ ОТКАЗ: {passage_err} ══════")
             return False
@@ -176,8 +197,16 @@ class ClubAgent:
         if equipment.readers_configured():
             self._emit(
                 "info",
-                f"Считыватель: number={number} → {passage} "
-                f"(вход={equipment.entry_reader_number!r}, выход={equipment.exit_reader_number!r})",
+                f"Считыватель: number={number} direction={direction} → {passage} "
+                f"(вход n={equipment.entry_reader_number!r}/d={equipment.entry_reader_direction!r}, "
+                f"выход n={equipment.exit_reader_number!r}/d={equipment.exit_reader_direction!r}); "
+                f"toggle вход↔выход выключен",
+            )
+        else:
+            self._emit(
+                "warning",
+                "Считыватели вход/выход не заданы (number/direction) — CRM может перепутать вход и выход. "
+                "Укажите в Оборудование пары для входа и выхода → Сохранить всё.",
             )
 
         if self.cfg.only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
@@ -673,18 +702,27 @@ class ClubAgent:
 
         open_n = number
         open_d = direction
-        if open_n is None and side and eq is not None:
-            open_n = eq.open_number_for_side(side)
-            if open_n is None:
+        if side and eq is not None and (open_n is None or open_d is None):
+            if not eq._side_configured(side):
                 self._emit(
                     "warning",
-                    f"Номер считывателя «{side}» не задан в настройках оборудования — открытие отменено.",
+                    f"Считыватель «{side}» не задан (number/direction) в настройках — открытие отменено.",
                 )
                 return False
-            open_d = int(getattr(eq, "exdev_direction", 0) or 0)
+            if open_n is None:
+                open_n = eq.open_number_for_side(side)
+            if open_d is None:
+                open_d = eq.open_direction_for_side(side)
+            if open_n is None:
+                open_n = int(getattr(eq, "exdev_number", 0) or 0)
+            if open_d is None:
+                open_d = int(getattr(eq, "exdev_direction", 0) or 0)
 
         if open_n is not None:
-            return ep.open_door_sync(number=int(open_n), direction=int(open_d if open_d is not None else 0))
+            return ep.open_door_sync(
+                number=int(open_n),
+                direction=int(open_d if open_d is not None else 0),
+            )
         return ep.open_door_sync()
 
     def preflight_readiness(self) -> tuple[bool, list[tuple[str, bool, str]]]:

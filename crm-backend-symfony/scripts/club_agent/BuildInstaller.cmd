@@ -1,5 +1,5 @@
 @echo off
-title FitnessClub Agent - build installer 1.0.2
+title FitnessClub Agent - build installer 1.0.3
 cd /d "%~dp0"
 echo.
 echo Building FitnessClubAgent.exe + Setup ZIP...

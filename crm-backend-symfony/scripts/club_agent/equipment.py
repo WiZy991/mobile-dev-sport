@@ -78,19 +78,47 @@ class EquipmentItem:
     relay_use_cross_reference: bool = False
     relay_cross_number: int = 0
 
-    # Роль точки: fallback, если entry_reader_number / exit_reader_number не заданы
+    # Роль точки: fallback, если пары number/direction для вход/выход не заданы
     gate_role: str = "entry"
 
-    # Номера считывателей PERCo (поле number в card/pass_personal). Пусто = не задано.
+    # Идентификация стороны в событии C01 (card.number + card.direction).
+    # 1 ИУ + 2 считывателя: обычно один number (ИУ) и разные direction (0=вход, 1=выход).
+    # Пустое поле не сравнивается. Сторона настроена, если задан number и/или direction.
     entry_reader_number: Optional[int] = None
+    entry_reader_direction: Optional[int] = None
     exit_reader_number: Optional[int] = None
+    exit_reader_direction: Optional[int] = None
 
     notes: str = ""
 
-    def readers_configured(self) -> bool:
-        return self.entry_reader_number is not None or self.exit_reader_number is not None
+    def _side_configured(self, side: str) -> bool:
+        if side == "entry":
+            return self.entry_reader_number is not None or self.entry_reader_direction is not None
+        if side == "exit":
+            return self.exit_reader_number is not None or self.exit_reader_direction is not None
+        return False
 
-    def resolve_passage(self, event_number: int) -> tuple[Optional[str], Optional[str]]:
+    def readers_configured(self) -> bool:
+        return self._side_configured("entry") or self._side_configured("exit")
+
+    def _side_matches(self, side: str, event_number: int, event_direction: int) -> bool:
+        if not self._side_configured(side):
+            return False
+        if side == "entry":
+            n, d = self.entry_reader_number, self.entry_reader_direction
+        else:
+            n, d = self.exit_reader_number, self.exit_reader_direction
+        if n is not None and int(event_number) != int(n):
+            return False
+        if d is not None and int(event_direction) != int(d):
+            return False
+        return True
+
+    def resolve_passage(
+        self,
+        event_number: int,
+        event_direction: int = 0,
+    ) -> tuple[Optional[str], Optional[str]]:
         """
         (passage, error).
         passage: entry | exit; error — текст отказа, если считыватель неизвестен.
@@ -99,13 +127,21 @@ class EquipmentItem:
             role = (self.gate_role or "entry").lower()
             return (role if role in ("entry", "exit") else "entry"), None
 
-        if self.entry_reader_number is not None and event_number == self.entry_reader_number:
+        entry_ok = self._side_matches("entry", event_number, event_direction)
+        exit_ok = self._side_matches("exit", event_number, event_direction)
+        if entry_ok and not exit_ok:
             return "entry", None
-        if self.exit_reader_number is not None and event_number == self.exit_reader_number:
+        if exit_ok and not entry_ok:
             return "exit", None
+        if entry_ok and exit_ok:
+            return None, (
+                f"конфликт настроек: number={event_number} direction={event_direction} "
+                "подходит и под вход, и под выход — уточните number/direction"
+            )
         return None, (
-            f"считыватель number={event_number} не совпадает с настроенными "
-            f"вход={self.entry_reader_number!r} / выход={self.exit_reader_number!r}"
+            f"считыватель number={event_number} direction={event_direction} не совпадает с настроенными "
+            f"вход(n={self.entry_reader_number!r},d={self.entry_reader_direction!r}) / "
+            f"выход(n={self.exit_reader_number!r},d={self.exit_reader_direction!r})"
         )
 
     def open_number_for_side(self, side: str) -> Optional[int]:
@@ -114,6 +150,14 @@ class EquipmentItem:
             return self.entry_reader_number
         if side == "exit":
             return self.exit_reader_number
+        return None
+
+    def open_direction_for_side(self, side: str) -> Optional[int]:
+        side = (side or "").lower()
+        if side == "entry":
+            return self.entry_reader_direction
+        if side == "exit":
+            return self.exit_reader_direction
         return None
 
     @classmethod
@@ -126,8 +170,13 @@ class EquipmentItem:
             filtered["connection_mode"] = "listen"
         if filtered.get("gate_role") not in ("entry", "exit"):
             filtered["gate_role"] = "entry"
-        filtered["entry_reader_number"] = _optional_int(filtered.get("entry_reader_number"))
-        filtered["exit_reader_number"] = _optional_int(filtered.get("exit_reader_number"))
+        for key in (
+            "entry_reader_number",
+            "entry_reader_direction",
+            "exit_reader_number",
+            "exit_reader_direction",
+        ):
+            filtered[key] = _optional_int(filtered.get(key))
         return cls(**filtered)
 
     def to_dict(self) -> dict[str, Any]:
