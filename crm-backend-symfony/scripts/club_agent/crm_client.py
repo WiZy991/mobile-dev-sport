@@ -67,17 +67,23 @@ class CrmClient:
             self.on_exchange(method, path, json_body, status, parsed)
         return status, parsed
 
-    def submit_qr(self, qr: str, *, passage: str = "entry") -> tuple[int, dict]:
+    def submit_qr(
+        self,
+        qr: str,
+        *,
+        passage: str = "entry",
+        allow_exit_toggle: bool = True,
+    ) -> tuple[int, dict]:
         path = (
             "/api/v1/gateway/access/exit"
             if (passage or "entry").lower() == "exit"
             else "/api/v1/gateway/access/entry"
         )
-        return self._request(
-            "POST",
-            path,
-            json_body={"qr": qr, "device_id": self.cfg.device_id},
-        )
+        body: dict[str, Any] = {"qr": qr, "device_id": self.cfg.device_id}
+        # Раздельные считыватели: вход не должен превращаться в выход на CRM.
+        if (passage or "entry").lower() == "entry" and not allow_exit_toggle:
+            body["allow_exit_toggle"] = False
+        return self._request("POST", path, json_body=body)
 
     def submit_alarm(
         self,

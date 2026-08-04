@@ -79,6 +79,9 @@ class GatewayController extends AbstractController
         $data = json_decode($request->getContent(), true) ?? [];
         $qr = (string) ($data['qr'] ?? '');
         $deviceId = isset($data['device_id']) ? (string) $data['device_id'] : ('club-' . $club->getId());
+        // false — раздельные считыватели: повторный скан на входе не пишет exit.
+        $allowExitToggle = !\array_key_exists('allow_exit_toggle', $data)
+            || filter_var($data['allow_exit_toggle'], \FILTER_VALIDATE_BOOLEAN);
 
         $log = (new AccessLog())
             ->setRawData($qr)
@@ -141,9 +144,13 @@ class GatewayController extends AbstractController
             ]));
         }
 
-        // Выход: повторный скан с НОВЫМ QR, если человек уже в зале.
-        // Grace после входа — защита от мгновенного exit из эха считывателя с другим timestamp.
+        // Выход: повторный скан с НОВЫМ QR, если человек уже в зале (один считыватель).
+        // При allow_exit_toggle=false (раздельные вход/выход) — отказ already_inside, не exit.
         if ($this->occupancyService->isUserCurrentlyInside($user, null)) {
+            if (!$allowExitToggle) {
+                return $this->denied($log, 'already_inside', 403);
+            }
+
             $sinceEntry = $this->occupancyService->secondsSinceLastGrantedEntry($user, null);
             if ($sinceEntry !== null && $sinceEntry < self::EXIT_GRACE_SECONDS) {
                 return $this->json($this->grantedPayload($club, [
@@ -546,6 +553,7 @@ class GatewayController extends AbstractController
                 'subscription_wrong_club' => 'Абонемент оформлен на другой клуб',
                 'user_blocked' => 'Клиент заблокирован',
                 'qr_expired' => 'QR-код устарел, обновите в приложении',
+                'already_inside' => 'Клиент уже в зале — используйте считыватель выхода',
                 default => null,
             },
         ], $extra), $status);

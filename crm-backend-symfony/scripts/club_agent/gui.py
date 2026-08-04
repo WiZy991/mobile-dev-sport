@@ -379,6 +379,10 @@ class AgentApp(tk.Tk):
         self.var_wait_cmd.set(str(eq.wait_command_time))
         self.var_access_mode.set(eq.access_mode)
         self.var_open_time.set(str(eq.open_time_ms))
+        ern = getattr(eq, "entry_reader_number", None)
+        xrn = getattr(eq, "exit_reader_number", None)
+        self.var_entry_reader_n.set("" if ern is None else str(ern))
+        self.var_exit_reader_n.set("" if xrn is None else str(xrn))
         self.var_gate_role.set(getattr(eq, "gate_role", "entry") or "entry")
         self.var_relay_after.set(bool(eq.relay_after_grant) and not bool(eq.relay_use_cross_reference))
         self.var_relay_out_n.set(str(eq.relay_output_number))
@@ -419,6 +423,8 @@ class AgentApp(tk.Tk):
             wait_command_time=int(self.var_wait_cmd.get().strip()),
             access_mode=self.var_access_mode.get().strip() or "control",
             open_time_ms=int(self.var_open_time.get().strip()),
+            entry_reader_number=self._optional_form_int(self.var_entry_reader_n.get()),
+            exit_reader_number=self._optional_form_int(self.var_exit_reader_n.get()),
             gate_role=(
                 gr
                 if (gr := self.var_gate_role.get().strip().lower()) in ("entry", "exit")
@@ -432,6 +438,12 @@ class AgentApp(tk.Tk):
             notes=self.var_eq_notes.get().strip(),
             open_type="open once",
         )
+
+    @staticmethod
+    def _optional_form_int(raw: str):
+        from equipment import _optional_int
+
+        return _optional_int(raw)
 
     def _fill_lan_server(self) -> None:
         self.var_net_server.set(get_lan_ip())
@@ -776,15 +788,44 @@ class AgentApp(tk.Tk):
         self.log.delete("1.0", tk.END)
         self.log.configure(state=tk.DISABLED)
 
-    def _open_door(self) -> None:
+    def _open_door(self, side: str | None = None) -> None:
         if not self.agent or not self._running:
             messagebox.showwarning("Агент", "Сначала запустите агент.")
             return
         eid = self._selected_eq_id
-        if self.agent.open_door(eid):
-            self._append_log("info", "Команда open отправлена")
+        label = {"entry": "вход", "exit": "выход"}.get(side or "", "ИУ")
+        number = None
+        direction = 0
+        if side in ("entry", "exit"):
+            try:
+                eq = self._form_to_equipment()
+            except ValueError as e:
+                messagebox.showerror("Ошибка", str(e))
+                return
+            number = eq.open_number_for_side(side)
+            if number is None:
+                messagebox.showwarning(
+                    "Считыватель",
+                    f"Укажите номер считывателя «{label}» в полях оборудования "
+                    "(и сохраните настройки для постоянной работы сканов).",
+                )
+                return
+            direction = int(eq.exdev_direction or 0)
+        if self.agent.open_door(eid, side=side, number=number, direction=direction):
+            self._append_log(
+                "info",
+                f"Команда open ({label}"
+                + (f", number={number}" if number is not None else "")
+                + ") отправлена",
+            )
         else:
-            messagebox.showwarning("C01", "Устройство не подключено (C01 или симулятор).")
+            messagebox.showwarning("C01", "Устройство не подключено или номер считывателя не задан.")
+
+    def _open_door_entry(self) -> None:
+        self._open_door("entry")
+
+    def _open_door_exit(self) -> None:
+        self._open_door("exit")
 
     def _test_crm(self) -> None:
         self._crm_from_fields()

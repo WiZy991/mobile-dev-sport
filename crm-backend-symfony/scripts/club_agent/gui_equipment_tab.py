@@ -146,10 +146,30 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
         4,
     )
     _row(exdev, "open_time (мс)", ttk.Entry(exdev, textvariable=app.var_open_time), 5)
+    app.var_entry_reader_n = tk.StringVar(value="")
+    app.var_exit_reader_n = tk.StringVar(value="")
+    _row(
+        exdev,
+        "Считыватель вход (number)",
+        ttk.Entry(exdev, textvariable=app.var_entry_reader_n, width=8),
+        6,
+    )
+    _row(
+        exdev,
+        "Считыватель выход (number)",
+        ttk.Entry(exdev, textvariable=app.var_exit_reader_n, width=8),
+        7,
+    )
+    ttk.Label(
+        exdev,
+        text="Номера из события C01 (card.number). Пусто = не задано. Если оба пустые — работает «Роль точки» (один считыватель).",
+        foreground="gray",
+        wraplength=560,
+    ).grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
     app.var_gate_role = tk.StringVar(value="entry")
     _row(
         exdev,
-        "Роль точки",
+        "Роль точки (fallback)",
         ttk.Combobox(
             exdev,
             textvariable=app.var_gate_role,
@@ -157,14 +177,14 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
             width=14,
             state="readonly",
         ),
-        6,
+        9,
     )
     ttk.Label(
         exdev,
-        text="entry — CRM /gateway/access/entry (абонемент, QR < 15 с). exit — выход тем же QR FITNESSCLUB:ENTRY:… → /gateway/access/exit (без абонемента).",
+        text="Fallback, если номера считывателей не заданы: entry → /access/entry, exit → /access/exit.",
         foreground="gray",
         wraplength=560,
-    ).grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
+    ).grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(0, 4))
 
     relay = ttk.LabelFrame(right, text="5а. Реле / выход после допуска CRM", padding=8)
     relay.pack(fill=tk.X, pady=(0, 8))
@@ -202,7 +222,9 @@ def build_equipment_tab(app: "AgentApp", parent: ttk.Frame) -> None:
         side=tk.LEFT, padx=(0, 6), pady=2
     )
     ttk.Button(cf, text="Состояние (get state)", command=app._proto_read_state).pack(side=tk.LEFT, padx=4, pady=2)
-    ttk.Button(cf, text="Открыть", command=app._open_door).pack(side=tk.LEFT, padx=4, pady=2)
+    ttk.Button(cf, text="Открыть вход", command=app._open_door_entry).pack(side=tk.LEFT, padx=4, pady=2)
+    ttk.Button(cf, text="Открыть выход", command=app._open_door_exit).pack(side=tk.LEFT, padx=4, pady=2)
+    ttk.Button(cf, text="Открыть (ИУ number)", command=app._open_door).pack(side=tk.LEFT, padx=4, pady=2)
     ttk.Button(cf, text="Закрыть", command=app._proto_close).pack(side=tk.LEFT, padx=4, pady=2)
     ttk.Button(ctrl, text="Применить поля → список", command=app._apply_equipment_form).pack(
         anchor=tk.W, pady=6

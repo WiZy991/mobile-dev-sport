@@ -42,7 +42,8 @@ def build_passage_tab(app: "AgentApp", parent: ttk.Frame) -> None:
     bf.pack(anchor=tk.W, pady=6)
     ttk.Button(bf, text="Обновить timestamp", command=app._qr_refresh_ts_passage).pack(side=tk.LEFT, padx=(0, 8))
     ttk.Button(bf, text="Проверить проход", command=app._run_passage_test).pack(side=tk.LEFT, padx=4)
-    ttk.Button(bf, text="Только открыть дверь", command=app._open_door).pack(side=tk.LEFT, padx=4)
+    ttk.Button(bf, text="Открыть вход", command=app._open_door_entry).pack(side=tk.LEFT, padx=4)
+    ttk.Button(bf, text="Открыть выход", command=app._open_door_exit).pack(side=tk.LEFT, padx=4)
 
     app.lbl_passage_result = ttk.Label(parent, text="", wraplength=700, font=("", 10))
     app.lbl_passage_result.pack(anchor=tk.W, pady=8)

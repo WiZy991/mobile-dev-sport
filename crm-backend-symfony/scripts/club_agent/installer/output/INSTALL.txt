@@ -1,28 +1,26 @@
-FitnessClub Agent - install guide
+FitnessClub Agent 1.0.2 - install
 =================================
 
-OPTION A - Setup.cmd (recommended)
-  1. Put Setup.cmd and FitnessClubAgent-Setup-1.0.1.zip in the same folder
-  2. Double-click Setup.cmd
-  3. Follow install.bat (firewall + launch)
+OPTION A - one click (recommended)
+  1. Put Setup.cmd and FitnessClubAgent-Setup-1.0.2.zip in the same folder
+  2. Install Python 3 from python.org (check "Add python.exe to PATH") — once
+  3. Double-click Setup.cmd
+     It will build FitnessClubAgent.exe, then install to %LOCALAPPDATA%\FitnessClubAgent
 
-OPTION B - ZIP package
-  1. Extract FitnessClubAgent-Setup-1.0.1.zip
+OPTION B - ZIP only
+  1. Extract FitnessClubAgent-Setup-1.0.2.zip
   2. Double-click install.bat
-  3. Agent installs to %LOCALAPPDATA%\FitnessClubAgent
+     (if exe is missing, install.bat builds it first — Python required)
 
 After install
-  1. Open "FitnessClub Agent"
-  2. CRM tab: base URL (no /admin), gateway_token, Save all
-  3. Equipment: listen 0.0.0.0:8765, configure PERCo net.server
-  4. Camera tab: IP, password, enable IVS control if needed
-  5. Preflight check, then Start agent
+  1. Open FitnessClub Agent
+  2. CRM: URL + gateway_token → Save
+  3. Equipment: set entry/exit reader numbers → Apply → Save → restart agent
 
-Config file
+Config
   %LOCALAPPDATA%\FitnessClubAgent\config\agent_config.json
 
-Uninstall
-  Start menu -> FitnessClub Agent -> Uninstall
-  or Settings -> Apps -> FitnessClub Agent
-
-Version: 1.0.1
+Changelog 1.0.2
+  - Separate entry/exit reader numbers (C01 card.number)
+  - Open entry / Open exit buttons use those numbers
+  - Entry scan does not count as exit when already inside (needs updated CRM)

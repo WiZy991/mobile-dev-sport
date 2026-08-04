@@ -109,7 +109,11 @@ class C01Server:
         if self._loop and self._stop:
             self._loop.call_soon_threadsafe(self._stop.set)
 
-    def open_door_sync(self) -> bool:
+    def open_door_sync(
+        self,
+        number: Optional[int] = None,
+        direction: Optional[int] = None,
+    ) -> bool:
         if not self.session.connected or not self._loop:
             return False
         pulse_ms = 0
@@ -118,11 +122,11 @@ class C01Server:
         ):
             pulse_ms = max(pulse_ms, int(getattr(self.equipment, "relay_pulse_ms", 0)))
 
+        n = self.equipment.exdev_number if number is None else int(number)
+        d = self.equipment.exdev_direction if direction is None else int(direction)
+
         async def send() -> None:
-            await self.session.send_access_granted_actions(
-                self.equipment.exdev_number,
-                self.equipment.exdev_direction,
-            )
+            await self.session.send_access_granted_actions(n, d)
 
         timeout = max(5.0, pulse_ms / 1000.0 + 2.0)
         try:

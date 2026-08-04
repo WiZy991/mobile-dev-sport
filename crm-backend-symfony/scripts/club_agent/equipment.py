@@ -3,9 +3,21 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 ConnectionMode = Literal["listen", "connect"]
+
+
+def _optional_int(value: Any) -> Optional[int]:
+    """Пустая строка / None → не задано; иначе int."""
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @dataclass
@@ -66,10 +78,43 @@ class EquipmentItem:
     relay_use_cross_reference: bool = False
     relay_cross_number: int = 0
 
-    # Роль точки: вход (абонемент) или выход (тот же QR ENTRY без проверки абонемента → gateway/access/exit)
+    # Роль точки: fallback, если entry_reader_number / exit_reader_number не заданы
     gate_role: str = "entry"
 
+    # Номера считывателей PERCo (поле number в card/pass_personal). Пусто = не задано.
+    entry_reader_number: Optional[int] = None
+    exit_reader_number: Optional[int] = None
+
     notes: str = ""
+
+    def readers_configured(self) -> bool:
+        return self.entry_reader_number is not None or self.exit_reader_number is not None
+
+    def resolve_passage(self, event_number: int) -> tuple[Optional[str], Optional[str]]:
+        """
+        (passage, error).
+        passage: entry | exit; error — текст отказа, если считыватель неизвестен.
+        """
+        if not self.readers_configured():
+            role = (self.gate_role or "entry").lower()
+            return (role if role in ("entry", "exit") else "entry"), None
+
+        if self.entry_reader_number is not None and event_number == self.entry_reader_number:
+            return "entry", None
+        if self.exit_reader_number is not None and event_number == self.exit_reader_number:
+            return "exit", None
+        return None, (
+            f"считыватель number={event_number} не совпадает с настроенными "
+            f"вход={self.entry_reader_number!r} / выход={self.exit_reader_number!r}"
+        )
+
+    def open_number_for_side(self, side: str) -> Optional[int]:
+        side = (side or "").lower()
+        if side == "entry":
+            return self.entry_reader_number
+        if side == "exit":
+            return self.exit_reader_number
+        return None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "EquipmentItem":
@@ -81,6 +126,8 @@ class EquipmentItem:
             filtered["connection_mode"] = "listen"
         if filtered.get("gate_role") not in ("entry", "exit"):
             filtered["gate_role"] = "entry"
+        filtered["entry_reader_number"] = _optional_int(filtered.get("entry_reader_number"))
+        filtered["exit_reader_number"] = _optional_int(filtered.get("exit_reader_number"))
         return cls(**filtered)
 
     def to_dict(self) -> dict[str, Any]:

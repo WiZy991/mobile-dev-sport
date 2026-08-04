@@ -160,16 +160,25 @@ class ClubAgent:
         self._emit("info", f"→ {json.dumps(cmd, ensure_ascii=False)}")
 
     async def _handle_card(self, qr: str, number: int, direction: int, equipment: EquipmentItem) -> bool:
-        passage = (getattr(equipment, "gate_role", None) or "entry").lower()
-        if passage not in ("entry", "exit"):
-            passage = "entry"
+        passage, passage_err = equipment.resolve_passage(number)
+        if passage is None:
+            self._emit("warning", f"══════ ОТКАЗ: {passage_err} ══════")
+            return False
+
         title = "ВЫХОД" if passage == "exit" else "ВХОД"
         self._emit("info", f"══════ {title}: скан QR ══════")
         prev = qr[:200] + ("…" if len(qr) > 200 else "")
         self._emit(
             "info",
-            f"← C01 → CRM: строка доступа {len(qr)} симв. (превью до 200 для журнала; в HTTP уходит полностью): {prev}",
+            f"← C01 number={number} direction={direction} → CRM: "
+            f"строка доступа {len(qr)} симв. (превью до 200 для журнала; в HTTP уходит полностью): {prev}",
         )
+        if equipment.readers_configured():
+            self._emit(
+                "info",
+                f"Считыватель: number={number} → {passage} "
+                f"(вход={equipment.entry_reader_number!r}, выход={equipment.exit_reader_number!r})",
+            )
 
         if self.cfg.only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
             self._emit(
@@ -193,9 +202,15 @@ class ClubAgent:
 
         import asyncio
 
+        # Раздельные считыватели: на входе CRM не должен сам писать exit.
+        allow_toggle = not equipment.readers_configured()
         try:
             code, body = await asyncio.to_thread(
-                lambda: self._crm_client().submit_qr(qr, passage=passage)
+                lambda: self._crm_client().submit_qr(
+                    qr,
+                    passage=passage,
+                    allow_exit_toggle=allow_toggle,
+                )
             )
         except urllib.error.URLError as e:
             self._emit("error", f"CRM сеть (нет ответа): {e}")
@@ -226,6 +241,12 @@ class ClubAgent:
                     "info",
                     "CRM: абонемент есть, но привязан к другому клубу (или в БД не тот club). "
                     "В админке → Абонементы укажите клуб как у шлюза (gateway_token этого ПК), либо перевыдайте абонемент с выбором клуба.",
+                )
+            if reason == "already_inside":
+                self._emit(
+                    "info",
+                    "CRM: клиент уже в зале — считыватель входа не засчитывает выход. "
+                    "Для выхода нужен скан на считывателе выхода.",
                 )
             if reason == "qr_expired":
                 tail = _fitnessclub_entry_timestamp_tail(qr)
@@ -627,12 +648,44 @@ class ClubAgent:
             summary += f", клиент={name}"
         return granted, summary
 
-    def open_door(self, equipment_id: Optional[str] = None) -> bool:
+    def open_door(
+        self,
+        equipment_id: Optional[str] = None,
+        *,
+        side: Optional[str] = None,
+        number: Optional[int] = None,
+        direction: Optional[int] = None,
+    ) -> bool:
+        """
+        Ручное открытие.
+        number/direction — явный ИУ; иначе side=entry|exit из настроек; иначе exdev_number.
+        """
+        eq: Optional[EquipmentItem] = None
         if equipment_id:
+            eq = self.cfg.get_equipment(equipment_id)
             ep = self._endpoints.get(equipment_id)
-            return ep.open_door_sync() if ep else False
-        ep = self._pick_endpoint()
-        return ep.open_door_sync() if ep else False
+        else:
+            ep = self._pick_endpoint()
+            eq = ep.equipment if ep else None
+
+        if ep is None:
+            return False
+
+        open_n = number
+        open_d = direction
+        if open_n is None and side and eq is not None:
+            open_n = eq.open_number_for_side(side)
+            if open_n is None:
+                self._emit(
+                    "warning",
+                    f"Номер считывателя «{side}» не задан в настройках оборудования — открытие отменено.",
+                )
+                return False
+            open_d = int(getattr(eq, "exdev_direction", 0) or 0)
+
+        if open_n is not None:
+            return ep.open_door_sync(number=int(open_n), direction=int(open_d if open_d is not None else 0))
+        return ep.open_door_sync()
 
     def preflight_readiness(self) -> tuple[bool, list[tuple[str, bool, str]]]:
         """Проверка готовности ПО без запуска прохода с реальным оборудованием."""
