@@ -1,5 +1,5 @@
-# Сборка FitnessClubAgent.exe (если нет) и подготовка папки для install.ps1.
-# Запускается из распакованного Setup-пакета на Windows.
+﻿# Build FitnessClubAgent.exe (if missing) and prepare folder for install.ps1.
+# Runs from extracted Setup package on Windows.
 $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 Set-Location $Root
@@ -12,20 +12,21 @@ if (-not (Test-Path $exe)) {
         throw "Missing build.ps1 next to install scripts. Broken package."
     }
     & $buildPs1
-    $built = Join-Path $Root "dist\FitnessClubAgent.exe"
+    $built = Join-Path $Root (Join-Path "dist" "FitnessClubAgent.exe")
     if (-not (Test-Path $built)) {
         throw "Build finished but dist\FitnessClubAgent.exe not found."
     }
     Copy-Item -Force $built $exe
     Write-Host "EXE ready: $exe" -ForegroundColor Green
 } else {
-    Write-Host "FitnessClubAgent.exe already present — skip build." -ForegroundColor Gray
+    Write-Host "FitnessClubAgent.exe already present - skip build." -ForegroundColor Gray
 }
 
-if (-not (Test-Path (Join-Path $Root "config\agent_config.json"))) {
+$configPath = Join-Path $Root (Join-Path "config" "agent_config.json")
+if (-not (Test-Path $configPath)) {
     $example = Join-Path $Root "agent_config.example.json"
     if (Test-Path $example) {
         New-Item -ItemType Directory -Force -Path (Join-Path $Root "config") | Out-Null
-        Copy-Item -Force $example (Join-Path $Root "config\agent_config.json")
+        Copy-Item -Force $example $configPath
     }
 }
