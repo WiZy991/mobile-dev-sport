@@ -222,14 +222,28 @@ class ClubController extends AbstractController
         }
 
         $minVersionCode = max(0, (int) ($this->clubSettings->get('android_min_version_code') ?? 0));
+        $iosMinVersionCode = max(0, (int) ($this->clubSettings->get('ios_min_version_code') ?? 0));
         $forceUpdate = \in_array(
             strtolower(trim((string) ($this->clubSettings->get('android_force_update') ?? '0'))),
             ['1', 'true', 'yes'],
             true,
         );
+        $iosForceUpdate = \in_array(
+            strtolower(trim((string) ($this->clubSettings->get('ios_force_update') ?? ''))),
+            ['1', 'true', 'yes'],
+            true,
+        );
+        // Если ios_force_update не задан — наследуем общий/android флаг.
+        if (trim((string) ($this->clubSettings->get('ios_force_update') ?? '')) === '') {
+            $iosForceUpdate = $forceUpdate;
+        }
         $updateMessage = trim((string) ($this->clubSettings->get('android_update_message') ?? ''));
+        $iosUpdateMessage = trim((string) ($this->clubSettings->get('ios_update_message') ?? ''));
         if ($updateMessage === '') {
             $updateMessage = 'Доступна новая версия приложения. Обновите её, чтобы продолжить пользоваться сервисом.';
+        }
+        if ($iosUpdateMessage === '') {
+            $iosUpdateMessage = $updateMessage;
         }
 
         $address = $get('address', 'г. Москва, ул. Примерная, д. 1');
@@ -259,8 +273,11 @@ class ClubController extends AbstractController
             'shop_config' => $this->shopConfigForApi(),
             'app_update' => [
                 'android_min_version_code' => $minVersionCode,
+                'ios_min_version_code' => $iosMinVersionCode,
                 'force' => $forceUpdate,
+                'ios_force' => $iosForceUpdate,
                 'message' => $updateMessage,
+                'ios_message' => $iosUpdateMessage,
             ],
             'network' => [
                 'about' => $get('network_about', '') ?: null,
