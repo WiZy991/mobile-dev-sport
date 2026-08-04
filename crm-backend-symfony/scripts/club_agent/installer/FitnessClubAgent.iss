@@ -4,7 +4,7 @@
 #define MyAppName "FitnessClub Agent"
 #define MyAppPublisher "FitnessClub"
 #define MyAppExeName "FitnessClubAgent.exe"
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "1.0.4"
 
 [Setup]
 AppId={{A7B3C9D1-4E2F-5A6B-8C9D-0E1F2A3B4C5D}

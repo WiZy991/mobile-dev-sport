@@ -93,26 +93,33 @@ class ClubAgent:
         self._last_standalone_alarm_mono: float = 0.0
         self._standalone_thread: Optional[threading.Thread] = None
         # Один QR не должен уходить в CRM дважды (card + pass_personal / эхо C01).
+        # Значение: (monotonic_ts, granted) — повтор эха после отказа не должен открывать турникет.
         self._qr_dedupe_lock = threading.Lock()
-        self._recent_qrs: dict[str, float] = {}
+        self._recent_qrs: dict[str, tuple[float, bool]] = {}
 
     QR_DEDUPE_SECONDS = 90.0
 
-    def _claim_qr_or_duplicate(self, qr: str) -> bool:
-        """True = уже видели этот QR недавно (пропустить). False = первый раз, можно слать в CRM."""
+    def _qr_dedupe_lookup(self, qr: str) -> Optional[bool]:
+        """Если QR уже обрабатывали недавно — вернуть прежний granted; иначе None (слать в CRM)."""
         q = (qr or "").strip()
         if not q:
-            return False
+            return None
         now = time.monotonic()
         with self._qr_dedupe_lock:
             if len(self._recent_qrs) > 500:
                 cutoff = now - self.QR_DEDUPE_SECONDS
-                self._recent_qrs = {k: t for k, t in self._recent_qrs.items() if t >= cutoff}
-            last = self._recent_qrs.get(q)
-            if last is not None and (now - last) < self.QR_DEDUPE_SECONDS:
-                return True
-            self._recent_qrs[q] = now
-            return False
+                self._recent_qrs = {k: v for k, v in self._recent_qrs.items() if v[0] >= cutoff}
+            prev = self._recent_qrs.get(q)
+            if prev is not None and (now - prev[0]) < self.QR_DEDUPE_SECONDS:
+                return prev[1]
+            return None
+
+    def _qr_dedupe_store(self, qr: str, granted: bool) -> None:
+        q = (qr or "").strip()
+        if not q:
+            return
+        with self._qr_dedupe_lock:
+            self._recent_qrs[q] = (time.monotonic(), bool(granted))
 
     def _emit(self, level: str, msg: str) -> None:
         self.on_log(level, msg)
@@ -222,12 +229,14 @@ class ClubAgent:
             self._emit("error", "CRM не настроен (URL / gateway_token) — проход запрещён")
             return False
 
-        if self._claim_qr_or_duplicate(qr):
+        cached = self._qr_dedupe_lookup(qr)
+        if cached is not None:
             self._emit(
                 "info",
-                f"QR dedupe: повтор того же кода за {self.QR_DEDUPE_SECONDS:.0f} с — в CRM не шлём (эхо C01).",
+                f"QR dedupe: повтор того же кода за {self.QR_DEDUPE_SECONDS:.0f} с — в CRM не шлём "
+                f"(эхо C01 → {'открыть' if cached else 'отказ'}, как в предыдущем ответе).",
             )
-            return True
+            return cached
 
         import asyncio
 
@@ -249,6 +258,7 @@ class ClubAgent:
             code, body = 0, {}
 
         granted = code == 200 and bool(body.get("access_granted"))
+        self._qr_dedupe_store(qr, granted)
         if not granted and isinstance(body, dict):
             reason = body.get("reason", "")
             if reason and code != 0:
