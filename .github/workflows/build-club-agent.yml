@@ -1,0 +1,97 @@
+name: Build FitnessClub Agent
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "crm-backend-symfony/scripts/club_agent/**"
+      - ".github/workflows/build-club-agent.yml"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: crm-backend-symfony/scripts/club_agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build EXE
+        shell: pwsh
+        run: |
+          python -m pip install -q -r requirements.txt pyinstaller
+          if (Test-Path dist) { Remove-Item -Recurse -Force dist }
+          if (Test-Path build) { Remove-Item -Recurse -Force build }
+          python -m PyInstaller --noconfirm --clean club_agent.spec
+          if (-not (Test-Path "dist\FitnessClubAgent.exe")) {
+            throw "dist\FitnessClubAgent.exe missing after PyInstaller"
+          }
+
+      - name: Pack Setup zip (exe included, no Python needed)
+        shell: pwsh
+        run: |
+          $ver = (Get-Content installer\VERSION.txt -Raw).Trim()
+          $stage = Join-Path $env:RUNNER_TEMP "fc-agent-stage"
+          if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "config") | Out-Null
+          Copy-Item -Force dist\FitnessClubAgent.exe $stage\
+          Copy-Item -Force installer\install.ps1 $stage\
+          Copy-Item -Force installer\uninstall.ps1 $stage\
+          Copy-Item -Force installer\VERSION.txt $stage\
+          # Classic install.bat — no build step (exe already in zip)
+          @"
+          @echo off
+          chcp 65001 >nul
+          title FitnessClub Agent - install
+          cd /d "%~dp0"
+          echo.
+          echo  FitnessClub Agent - install
+          echo  ==========================
+          echo.
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1" -AddFirewallRule -Launch
+          if errorlevel 1 (
+            echo.
+            echo Install failed.
+            pause
+            exit /b 1
+          )
+          "@ | Set-Content -Path (Join-Path $stage "install.bat") -Encoding ASCII
+          Copy-Item -Force agent_config.example.json (Join-Path $stage "config\agent_config.json")
+          $outDir = "installer\output"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $zipName = "FitnessClubAgent-Setup-$ver.zip"
+          $zipPath = Join-Path $outDir $zipName
+          if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zipPath -Force
+          @"
+          @echo off
+          title FitnessClub Agent - Setup $ver
+          cd /d "%~dp0"
+          set "ZIP=$zipName"
+          if not exist "%ZIP%" (
+            echo Missing %ZIP% in this folder.
+            pause
+            exit /b 1
+          )
+          set "DEST=%TEMP%\FitnessClubAgent-setup"
+          if exist "%DEST%" rmdir /s /q "%DEST%"
+          mkdir "%DEST%"
+          powershell -NoProfile -Command "Expand-Archive -LiteralPath '%CD%\%ZIP%' -DestinationPath '%DEST%' -Force"
+          cd /d "%DEST%"
+          call install.bat
+          "@ | Set-Content -Path (Join-Path $outDir "Setup.cmd") -Encoding ASCII
+          Write-Host "Packed $zipPath"
+          Get-Item $zipPath | Format-List FullName, Length
+
+      - name: Upload Setup package
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitnessClubAgent-Setup
+          path: |
+            crm-backend-symfony/scripts/club_agent/installer/output/FitnessClubAgent-Setup-*.zip
+            crm-backend-symfony/scripts/club_agent/installer/output/Setup.cmd
+          if-no-files-found: error
