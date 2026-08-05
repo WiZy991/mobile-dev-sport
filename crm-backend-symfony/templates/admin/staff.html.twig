@@ -3,6 +3,7 @@
 {% block body %}
 <div class="content-header">
     <h1 class="h4 mb-0">Тренеры</h1>
+    <p class="small text-secondary mb-0 mt-1">В клиентском приложении («Наша команда») видны только со статусом «Опубликован». Остальных можно скрыть без обновления APK.</p>
 </div>
 
 {% if admin_can_mutate() %}
@@ -12,13 +13,21 @@
             <label class="form-label small text-secondary">Имя</label>
             <input type="text" name="name" class="form-control form-control-sm" required>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label class="form-label small text-secondary">Специализация</label>
             <input type="text" name="specialization" class="form-control form-control-sm">
         </div>
         <div class="col-md-2">
             <label class="form-label small text-secondary">Рейтинг</label>
             <input type="number" step="0.1" name="rating" class="form-control form-control-sm" min="0" max="5">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-secondary">В приложении</label>
+            <select name="publication_status" class="form-select form-select-sm">
+                <option value="moderation" selected>На модерации</option>
+                <option value="published">Опубликован</option>
+                <option value="hidden">Скрыт</option>
+            </select>
         </div>
         <div class="col-md-3">
             <label class="form-label small text-secondary">Фото (URL)</label>
@@ -48,11 +57,13 @@
                 <th>Имя</th>
                 <th>Специализация</th>
                 <th>Рейтинг</th>
+                <th>В приложении</th>
                 <th></th>
             </tr>
             </thead>
             <tbody>
             {% for t in trainers %}
+                {% set pub = t.publicationStatus %}
                 <tr>
                     <td>{{ t.id }}</td>
                     <td>
@@ -61,6 +72,26 @@
                     </td>
                     <td>{{ t.specialization ?? '—' }}</td>
                     <td>{{ t.rating is not null ? t.rating : '—' }}</td>
+                    <td>
+                        {% if pub == 'published' %}
+                            <span class="badge text-bg-success">Опубликован</span>
+                        {% elseif pub == 'moderation' %}
+                            <span class="badge text-bg-warning text-dark">Модерация</span>
+                        {% else %}
+                            <span class="badge text-bg-secondary">Скрыт</span>
+                        {% endif %}
+                        {% if admin_can_coach() %}
+                        <form method="post" action="{{ path('admin_trainer_publication', {id: t.id}) }}" class="d-inline ms-1">
+                            {% if pub == 'published' %}
+                                <input type="hidden" name="publication_status" value="hidden">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary py-0">Скрыть</button>
+                            {% else %}
+                                <input type="hidden" name="publication_status" value="published">
+                                <button type="submit" class="btn btn-sm btn-outline-success py-0">Опубликовать</button>
+                            {% endif %}
+                        </form>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if admin_can_coach() %}
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#edit-trainer-{{ t.id }}">Изменить</button>
@@ -74,7 +105,7 @@
                 </tr>
                 {% if admin_can_coach() %}
                 <tr class="collapse" id="edit-trainer-{{ t.id }}">
-                        <td colspan="5" class="bg-dark py-2">
+                        <td colspan="6" class="bg-dark py-2">
                             <form method="post" action="{{ path('admin_trainer_update', {id: t.id}) }}" class="row g-2 align-items-end">
                                 <div class="col-md-2">
                                     <label class="form-label small mb-0">Имя</label>
@@ -84,15 +115,23 @@
                                     <label class="form-label small mb-0">Специализация</label>
                                     <input type="text" name="specialization" class="form-control form-control-sm" value="{{ t.specialization ?? '' }}">
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-1">
                                     <label class="form-label small mb-0">Рейтинг</label>
                                     <input type="number" step="0.1" name="rating" class="form-control form-control-sm" value="{{ t.rating ?? '' }}" min="0" max="5">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">В приложении</label>
+                                    <select name="publication_status" class="form-select form-select-sm">
+                                        <option value="published" {% if pub == 'published' %}selected{% endif %}>Опубликован</option>
+                                        <option value="moderation" {% if pub == 'moderation' %}selected{% endif %}>На модерации</option>
+                                        <option value="hidden" {% if pub == 'hidden' %}selected{% endif %}>Скрыт</option>
+                                    </select>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label small mb-0">Фото (URL)</label>
                                     <input type="url" name="photo_url" class="form-control form-control-sm" value="{{ t.photoUrl ?? '' }}">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label small mb-0">Телефон</label>
                                     <input type="tel" name="phone" class="form-control form-control-sm" value="{{ t.phone ?? '' }}" placeholder="+7 (___) ___-__-__" inputmode="tel" maxlength="18" data-phone-mask>
                                 </div>
@@ -109,7 +148,7 @@
                 {% endif %}
             {% else %}
                 <tr>
-                    <td colspan="5" class="text-center text-secondary">
+                    <td colspan="6" class="text-center text-secondary">
                         Персонал пока не добавлен.
                     </td>
                 </tr>
@@ -157,4 +196,3 @@
 })();
 </script>
 {% endblock %}
-

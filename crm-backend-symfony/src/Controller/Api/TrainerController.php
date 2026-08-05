@@ -19,7 +19,11 @@ class TrainerController extends AbstractController
     #[Route('', name: 'api_trainers_list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
-        $trainers = $this->em->getRepository(Trainer::class)->findAll();
+        // Только опубликованные — без обновления APK тестовые/на модерации не видны гостям.
+        $trainers = $this->em->getRepository(Trainer::class)->findBy(
+            ['publicationStatus' => Trainer::STATUS_PUBLISHED],
+            ['id' => 'ASC'],
+        );
 
         $data = array_map(function (Trainer $t) use ($request) {
             return $this->serialize($t, $request);
@@ -36,7 +40,7 @@ class TrainerController extends AbstractController
         /** @var Trainer|null $trainer */
         $trainer = $this->em->getRepository(Trainer::class)->find($numericId);
 
-        if (!$trainer) {
+        if (!$trainer || !$trainer->isPublishedInApp()) {
             return $this->json(['error' => 'Not found'], 404);
         }
 
@@ -46,6 +50,12 @@ class TrainerController extends AbstractController
     /** @return array<string, mixed> */
     private function serialize(Trainer $trainer, Request $request): array
     {
+        $description = $trainer->getDescription();
+        // В БД иногда лежит литерал "null" — в приложении не показываем.
+        if ($description !== null && strtolower(trim($description)) === 'null') {
+            $description = null;
+        }
+
         return [
             'id' => 'trainer-' . $trainer->getId(),
             'name' => $trainer->getName(),
@@ -53,7 +63,8 @@ class TrainerController extends AbstractController
             'specialization' => $trainer->getSpecialization(),
             'phone' => $trainer->getPhone(),
             'rating' => $trainer->getRating() ?? 0.0,
-            'description' => $trainer->getDescription(),
+            'description' => $description,
+            'publication_status' => $trainer->getPublicationStatus(),
         ];
     }
 

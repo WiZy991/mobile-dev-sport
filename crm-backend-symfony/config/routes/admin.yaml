@@ -252,6 +252,11 @@ admin_trainer_update:
   controller: App\Controller\Admin\AdminController::updateTrainer
   methods: [POST]
 
+admin_trainer_publication:
+  path: /admin/trainers/{id}/publication
+  controller: App\Controller\Admin\AdminController::setTrainerPublication
+  methods: [POST]
+
 admin_subscription_issue:
   path: /admin/subscriptions/issue
   controller: App\Controller\Admin\AdminController::issueSubscription

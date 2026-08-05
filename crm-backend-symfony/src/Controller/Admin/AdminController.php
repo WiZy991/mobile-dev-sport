@@ -2110,16 +2110,50 @@ class AdminController extends AbstractController
         $description = $description !== '' ? $description : null;
         $phone = $this->normalizeTrainerPhone($request->request->get('phone'));
 
+        $publicationStatus = Trainer::normalizePublicationStatus(
+            $request->request->get('publication_status'),
+            Trainer::STATUS_MODERATION,
+        );
+
         $trainer = (new Trainer())
             ->setName($name)
             ->setSpecialization($specialization)
             ->setPhotoUrl($photoUrl)
             ->setPhone($phone)
             ->setRating($rating)
-            ->setDescription($description);
+            ->setDescription($description)
+            ->setPublicationStatus($publicationStatus);
 
         $this->em->persist($trainer);
         $this->em->flush();
+        $this->addFlash('success', 'Тренер добавлен. В приложении виден только статус «Опубликован».');
+
+        return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+    }
+
+    #[Route('/trainers/{id}/publication', name: 'admin_trainer_publication', methods: ['POST'])]
+    public function setTrainerPublication(int $id, Request $request): Response
+    {
+        $trainer = $this->em->getRepository(Trainer::class)->find($id);
+        if (!$trainer) {
+            $this->addFlash('warning', 'Тренер не найден.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+        }
+
+        $status = Trainer::normalizePublicationStatus(
+            $request->request->get('publication_status'),
+            Trainer::STATUS_HIDDEN,
+        );
+        $trainer->setPublicationStatus($status);
+        $this->em->flush();
+
+        $label = match ($status) {
+            Trainer::STATUS_PUBLISHED => 'опубликован (виден в приложении)',
+            Trainer::STATUS_MODERATION => 'на модерации (скрыт в приложении)',
+            default => 'скрыт в приложении',
+        };
+        $this->addFlash('success', sprintf('Тренер «%s»: %s.', $trainer->getName(), $label));
 
         return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
     }
@@ -2217,6 +2251,12 @@ class AdminController extends AbstractController
             ->setDescription($description);
         $ratingRaw = $request->request->get('rating');
         $trainer->setRating($ratingRaw !== '' && $ratingRaw !== null ? (float) $ratingRaw : null);
+        if ($request->request->has('publication_status')) {
+            $trainer->setPublicationStatus(Trainer::normalizePublicationStatus(
+                $request->request->get('publication_status'),
+                $trainer->getPublicationStatus(),
+            ));
+        }
         $this->em->flush();
         $this->addFlash('success', 'Тренер обновлён.');
 

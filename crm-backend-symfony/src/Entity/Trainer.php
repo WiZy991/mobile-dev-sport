@@ -11,6 +11,18 @@ use Doctrine\ORM\Mapping as ORM;
 class Trainer implements TenantAware
 {
     use OrganizationOwnedTrait;
+
+    public const STATUS_PUBLISHED = 'published';
+    public const STATUS_MODERATION = 'moderation';
+    public const STATUS_HIDDEN = 'hidden';
+
+    /** @var list<string> */
+    public const PUBLICATION_STATUSES = [
+        self::STATUS_PUBLISHED,
+        self::STATUS_MODERATION,
+        self::STATUS_HIDDEN,
+    ];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -33,6 +45,16 @@ class Trainer implements TenantAware
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
+
+    /**
+     * Видимость в клиентском приложении:
+     * published — в списке «Наша команда»;
+     * moderation — скрыт (ожидает модерации);
+     * hidden — скрыт вручную.
+     */
+    /** Новые карточки по умолчанию на модерации; миграция оставляет существующих published. */
+    #[ORM\Column(name: 'publication_status', type: 'string', length: 20, options: ['default' => self::STATUS_MODERATION])]
+    private string $publicationStatus = self::STATUS_MODERATION;
 
     public function getId(): ?int
     {
@@ -104,5 +126,35 @@ class Trainer implements TenantAware
         $this->description = $description;
         return $this;
     }
-}
 
+    public function getPublicationStatus(): string
+    {
+        return $this->publicationStatus;
+    }
+
+    public function setPublicationStatus(string $publicationStatus): self
+    {
+        $status = strtolower(trim($publicationStatus));
+        if (!\in_array($status, self::PUBLICATION_STATUSES, true)) {
+            $status = self::STATUS_HIDDEN;
+        }
+        $this->publicationStatus = $status;
+
+        return $this;
+    }
+
+    public function isPublishedInApp(): bool
+    {
+        return $this->publicationStatus === self::STATUS_PUBLISHED;
+    }
+
+    public static function normalizePublicationStatus(mixed $raw, string $default = self::STATUS_MODERATION): string
+    {
+        if (!\is_string($raw)) {
+            return $default;
+        }
+        $status = strtolower(trim($raw));
+
+        return \in_array($status, self::PUBLICATION_STATUSES, true) ? $status : $default;
+    }
+}

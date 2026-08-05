@@ -87,7 +87,8 @@ class SeedDataCommand extends Command
                 ->setName($name)
                 ->setSpecialization($spec)
                 ->setRating($rating)
-                ->setDescription($bio);
+                ->setDescription($bio)
+                ->setPublicationStatus(Trainer::STATUS_PUBLISHED);
             $this->em->persist($t);
             $trainerEntities[] = $t;
         }
