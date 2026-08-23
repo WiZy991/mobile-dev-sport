@@ -26,7 +26,7 @@ final class TrainerRentalPaymentInitService
     /**
      * @return array{payment: Payment}|array{error: array<string, mixed>, status: int}
      */
-    public function init(StaffUser $staff, bool $offerAccepted): array
+    public function init(StaffUser $staff, bool $offerAccepted, int $months = 1): array
     {
         if ($staff->getRegistrationStatus() !== StaffUser::REGISTRATION_APPROVED) {
             return [
@@ -47,13 +47,15 @@ final class TrainerRentalPaymentInitService
             ];
         }
 
-        $amount = $this->onboarding->rentalAmountKopecks();
-        if ($amount <= 0) {
+        $months = $this->onboarding->normalizeRentalMonths($months);
+        $baseAmount = $this->onboarding->rentalAmountKopecks();
+        if ($baseAmount <= 0) {
             return [
                 'error' => ['error' => 'Сумма аренды не настроена в CRM', 'code' => 'rental_amount_missing'],
                 'status' => 400,
             ];
         }
+        $amount = $baseAmount * $months;
 
         $staff->setOfferAcceptedAt(new \DateTimeImmutable());
 
@@ -63,6 +65,7 @@ final class TrainerRentalPaymentInitService
             ->setType(Payment::TYPE_TRAINER_RENTAL)
             ->setSubscriptionPlan(null)
             ->setAmountKopecks($amount)
+            ->setDurationMonths($months)
             ->setDiscountAmount(0)
             ->setStatus(Payment::STATUS_PENDING)
             ->setExpiresAt((new \DateTimeImmutable())->modify('+' . $this->sessionTimeoutSecs . ' seconds'));
@@ -76,13 +79,19 @@ final class TrainerRentalPaymentInitService
 
         $returnUrl = $this->appendPaymentId($this->returnUrlBase, $payment->getId());
         $failUrl = $this->appendPaymentId($this->failUrlBase, $payment->getId(), 'fail');
+        $monthsLabel = match ($months) {
+            1 => '1 месяц',
+            3 => '3 месяца',
+            6 => '6 месяцев',
+            default => $months . ' мес.',
+        };
 
         $registerResponse = $this->alfaClient->registerOrder(new AlfaRegisterOrderRequest(
             orderNumber: $orderNumber,
             amountKopecks: $amount,
             returnUrl: $returnUrl,
             failUrl: $failUrl,
-            description: 'Аренда клуба (тренер) — 1 месяц',
+            description: 'Аренда клуба (тренер) — ' . $monthsLabel,
             dynamicCallbackUrl: $this->callbackUrl !== '' ? $this->callbackUrl : null,
             email: $staff->getEmail(),
             phone: null,

@@ -92,27 +92,32 @@ class TrainerProfileActivity : ComponentActivity() {
         loadProfile()
     }
 
+    private fun applyProfile(profile: TrainerPublicProfile) {
+        uiState = uiState.copy(
+            name = profile.name,
+            selectedSpecializations = profile.specializations.ifEmpty {
+                TrainerSpecializationCatalog.parseSelected(
+                    profile.specialization,
+                    profile.specializationsCatalog,
+                )
+            },
+            specializationsCatalog = profile.specializationsCatalog,
+            description = profile.description,
+            phoneNationalDigits = normalizeRussianNationalDigits(profile.phone),
+            photoUrl = profile.photoUrl ?: uiState.photoUrl,
+            publicationStatus = profile.publicationStatus,
+            publicationStatusLabel = profile.publicationStatusLabel,
+            loading = false,
+            saving = false,
+        )
+    }
+
     private fun loadProfile() {
         uiState = uiState.copy(loading = true, errorMessage = null)
         thread {
             try {
                 val profile = withRefresh { apiClient.loadTrainerProfile(it) }
-                runOnUiThread {
-                    uiState = uiState.copy(
-                        name = profile.name,
-                        selectedSpecializations = profile.specializations.ifEmpty {
-                            TrainerSpecializationCatalog.parseSelected(
-                                profile.specialization,
-                                profile.specializationsCatalog,
-                            )
-                        },
-                        specializationsCatalog = profile.specializationsCatalog,
-                        description = profile.description,
-                        phoneNationalDigits = normalizeRussianNationalDigits(profile.phone),
-                        photoUrl = profile.photoUrl,
-                        loading = false,
-                    )
-                }
+                runOnUiThread { applyProfile(profile) }
             } catch (e: Exception) {
                 runOnUiThread {
                     uiState = uiState.copy(
@@ -152,20 +157,13 @@ class TrainerProfileActivity : ComponentActivity() {
                     )
                 }
                 runOnUiThread {
+                    applyProfile(profile)
                     uiState = uiState.copy(
-                        name = profile.name,
-                        selectedSpecializations = profile.specializations.ifEmpty {
-                            TrainerSpecializationCatalog.parseSelected(
-                                profile.specialization,
-                                profile.specializationsCatalog,
-                            )
+                        statusMessage = when {
+                            profile.publicationStatus == "moderation" || profile.needsModeration ->
+                                "Сохранено. Профиль на модерации — клиенты увидят его после проверки сотрудником."
+                            else -> "Сохранено."
                         },
-                        specializationsCatalog = profile.specializationsCatalog,
-                        description = profile.description,
-                        phoneNationalDigits = normalizeRussianNationalDigits(profile.phone),
-                        photoUrl = profile.photoUrl ?: uiState.photoUrl,
-                        saving = false,
-                        statusMessage = "Сохранено. Профиль виден клиентам в разделе «Тренеры».",
                     )
                     if (requiredMode && profile.profileComplete) {
                         startActivity(Intent(this, WorkActivity::class.java))
@@ -187,19 +185,20 @@ class TrainerProfileActivity : ComponentActivity() {
         uiState = uiState.copy(saving = true, errorMessage = null, statusMessage = "Загружаем фото...")
         thread {
             try {
-                // Сжимаем и поворачиваем фото перед отправкой: оригиналы с камеры
-                // весят 5–15 МБ и упираются в лимит загрузки на сервере.
                 val bytes = preparePhotoForUpload(uri)
                 val profile = withRefresh {
                     apiClient.uploadTrainerPhoto(it, bytes, "image/jpeg", "photo.jpg")
                 }
                 runOnUiThread {
                     pendingPhotoUri = null
+                    applyProfile(profile)
                     uiState = uiState.copy(
-                        photoUrl = profile.photoUrl,
                         localPhotoUri = null,
-                        saving = false,
-                        statusMessage = "Фото обновлено",
+                        statusMessage = when {
+                            profile.publicationStatus == "moderation" || profile.needsModeration ->
+                                "Фото загружено. Профиль на модерации."
+                            else -> "Фото обновлено"
+                        },
                     )
                 }
             } catch (e: Exception) {
@@ -207,6 +206,7 @@ class TrainerProfileActivity : ComponentActivity() {
                     uiState = uiState.copy(
                         saving = false,
                         localPhotoUri = null,
+                        statusMessage = null,
                         errorMessage = UserFacingError.message(e),
                     )
                 }

@@ -9,6 +9,9 @@ data class SberLoginRequest(
     val codeChallengeMethod: String = "S256",
     @SerializedName("redirect_uri")
     val redirectUri: String,
+    /** Deep link именно этого APK (Доброзал vs Академия), иначе callback открывает чужое приложение. */
+    @SerializedName("app_bridge_uri")
+    val appBridgeUri: String,
 )
 
 data class SberLoginUrlResponse(

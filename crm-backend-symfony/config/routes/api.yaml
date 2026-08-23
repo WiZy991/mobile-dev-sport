@@ -406,6 +406,11 @@ api_staff_rental_init:
   controller: App\Controller\Api\StaffRentalController::init
   methods: [POST]
 
+api_staff_rental_payments:
+  path: /api/v1/staff/rental/payments
+  controller: App\Controller\Api\StaffRentalController::payments
+  methods: [GET]
+
 api_staff_rental_payment_status:
   path: /api/v1/staff/rental/payments/{id}/status
   controller: App\Controller\Api\StaffRentalController::status
@@ -487,6 +492,16 @@ api_staff_support_tickets:
   path: /api/v1/staff/support/tickets
   controller: App\Controller\Api\StaffSupportController::tickets
   methods: [GET]
+
+api_staff_feedback_tickets:
+  path: /api/v1/staff/feedback/tickets
+  controller: App\Controller\Api\StaffSupportController::myFeedbackTickets
+  methods: [GET]
+
+api_staff_feedback_tickets_create:
+  path: /api/v1/staff/feedback/tickets
+  controller: App\Controller\Api\StaffSupportController::createFeedbackTicket
+  methods: [POST]
 
 api_staff_support_ticket_status:
   path: /api/v1/staff/support/tickets/{id}/status

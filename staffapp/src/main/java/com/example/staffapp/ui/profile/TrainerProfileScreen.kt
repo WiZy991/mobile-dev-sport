@@ -57,6 +57,8 @@ data class TrainerProfileUiState(
     val phoneNationalDigits: String = "",
     val photoUrl: String? = null,
     val localPhotoUri: String? = null,
+    val publicationStatus: String = "moderation",
+    val publicationStatusLabel: String = "На модерации",
     /** Онбординг: нельзя уйти, пока не заполнены обязательные поля. */
     val requiredMode: Boolean = false,
     val loading: Boolean = true,
@@ -119,6 +121,16 @@ fun TrainerProfileScreen(
                         "так клиенты смогут найти вас в приложении.",
                 )
             } else {
+                StaffInfoBanner(
+                    when (state.publicationStatus) {
+                        "published" ->
+                            "Статус: Опубликован. После сохранения изменений профиль снова уйдёт на модерацию."
+                        "hidden" ->
+                            "Статус: Скрыт в клиентском приложении. Обратитесь к сотруднику клуба."
+                        else ->
+                            "Статус: На модерации. Пока клиенты не видят профиль — сотрудник клуба проверит данные."
+                    },
+                )
                 Text(
                     "Так вас увидят клиенты в разделе «Тренеры»",
                     color = StaffOnSurfaceVariant,
@@ -205,6 +217,7 @@ fun TrainerProfileScreen(
                     .height(160.dp),
                 enabled = !state.saving && !state.loading,
             )
+
             state.statusMessage?.let { Text(it, color = StaffOnSurfaceVariant) }
             state.errorMessage?.let { StaffErrorState(message = it) }
             Spacer(modifier = Modifier.height(8.dp))

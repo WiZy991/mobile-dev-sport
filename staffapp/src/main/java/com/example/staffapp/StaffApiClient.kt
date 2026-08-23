@@ -25,13 +25,18 @@ class StaffApiClient(private val baseUrl: String) {
         return parseOnboarding(requireJson(execute(conn)))
     }
 
-    fun initRentalPayment(token: String, offerAccepted: Boolean): RentalPaymentResult {
+    fun initRentalPayment(token: String, offerAccepted: Boolean, months: Int = 1): RentalPaymentResult {
         val conn = openConnection("/api/v1/staff/rental/init", "POST")
         conn.setRequestProperty("Authorization", "Bearer $token")
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
         conn.doOutput = true
         OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use {
-            it.write(JSONObject().put("offer_accepted", offerAccepted).toString())
+            it.write(
+                JSONObject()
+                    .put("offer_accepted", offerAccepted)
+                    .put("months", months)
+                    .toString(),
+            )
         }
         val json = requireJson(execute(conn))
         val paymentUrl = json.optString("payment_url").takeIf { it.isNotBlank() }
@@ -42,6 +47,73 @@ class StaffApiClient(private val baseUrl: String) {
             paymentUrl = paymentUrl,
             onboarding = parseOnboarding(json.optJSONObject("onboarding") ?: JSONObject()),
         )
+    }
+
+    fun loadRentalPayments(token: String): List<RentalPaymentItem> {
+        val conn = openConnection("/api/v1/staff/rental/payments", "GET")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        val json = requireJson(execute(conn))
+        val arr = json.optJSONArray("items") ?: JSONArray()
+        val out = mutableListOf<RentalPaymentItem>()
+        for (i in 0 until arr.length()) {
+            val row = arr.optJSONObject(i) ?: continue
+            out += RentalPaymentItem(
+                id = row.optInt("id"),
+                status = row.optString("status"),
+                amountRub = row.optDouble("amount_rub", row.optInt("amount_kopecks", 0) / 100.0),
+                durationMonths = row.optInt("duration_months", 1).coerceAtLeast(1),
+                paidAt = row.optString("paid_at").takeIf { it.isNotBlank() },
+                createdAt = row.optString("created_at").takeIf { it.isNotBlank() },
+            )
+        }
+        return out
+    }
+
+    fun createFeedbackTicket(
+        token: String,
+        subject: String,
+        message: String,
+        category: String = "other",
+    ): Int {
+        val conn = openConnection("/api/v1/staff/feedback/tickets", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.doOutput = true
+        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use {
+            it.write(
+                JSONObject()
+                    .put("subject", subject)
+                    .put("message", message)
+                    .put("category", category)
+                    .toString(),
+            )
+        }
+        val json = requireJson(execute(conn))
+        return json.optInt("id", 0)
+    }
+
+    fun loadMyFeedbackTickets(token: String): List<SupportTicketItem> {
+        val conn = openConnection("/api/v1/staff/feedback/tickets", "GET")
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        val json = requireJson(execute(conn))
+        val rows = json.optJSONArray("items") ?: JSONArray()
+        val items = mutableListOf<SupportTicketItem>()
+        for (i in 0 until rows.length()) {
+            val row = rows.optJSONObject(i) ?: continue
+            items += SupportTicketItem(
+                id = row.optInt("id"),
+                subject = row.optString("subject"),
+                message = row.optString("message"),
+                category = row.optString("category"),
+                status = row.optString("status"),
+                contactEmail = row.optString("contactEmail"),
+                clientName = row.optString("clientName"),
+                clientPhone = row.optString("clientPhone"),
+                clientId = row.optInt("clientId").takeIf { it > 0 },
+                createdAt = row.optString("createdAt"),
+            )
+        }
+        return items
     }
 
     fun rentalPaymentStatus(token: String, paymentId: Int): RentalPaymentResult {
@@ -139,6 +211,7 @@ class StaffApiClient(private val baseUrl: String) {
         specialization: String,
         description: String,
         phone: String,
+        services: List<TrainerServiceItem>? = null,
     ): TrainerPublicProfile {
         val conn = openConnection("/api/v1/staff/trainer-profile", "PUT")
         conn.setRequestProperty("Authorization", "Bearer $token")
@@ -149,6 +222,17 @@ class StaffApiClient(private val baseUrl: String) {
             .put("specialization", specialization)
             .put("description", description)
             .put("phone", phone)
+        if (services != null) {
+            val servicesArr = org.json.JSONArray()
+            services.forEach { s ->
+                servicesArr.put(
+                    JSONObject()
+                        .put("name", s.name)
+                        .put("price_from", s.priceFrom),
+                )
+            }
+            payload.put("services", servicesArr)
+        }
         OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
         return parseTrainerProfile(requireJson(execute(conn)))
     }
@@ -186,12 +270,34 @@ class StaffApiClient(private val baseUrl: String) {
             specialization = specs.joinToString(", ").ifBlank { json.optString("specialization") },
             specializations = specs,
             specializationsCatalog = catalog,
-            description = json.optString("description"),
+            description = json.cleanOptString("description"),
             phone = json.optString("phone"),
             rating = json.optDouble("rating", 0.0).toFloat(),
-            photoUrl = json.optString("photo_url").takeIf { it.isNotBlank() },
+            photoUrl = json.cleanOptString("photo_url").takeIf { it.isNotBlank() },
             profileComplete = json.optBoolean("profile_complete", true),
+            publicationStatus = json.optString("publication_status", "moderation"),
+            publicationStatusLabel = json.optString("publication_status_label", "На модерации"),
+            services = json.optJSONArray("services").toTrainerServices(),
+            needsModeration = json.optBoolean("needs_moderation", false) ||
+                json.optString("publication_status") == "moderation",
         )
+    }
+
+    private fun org.json.JSONArray?.toTrainerServices(): List<TrainerServiceItem> {
+        if (this == null) return emptyList()
+        val out = ArrayList<TrainerServiceItem>(length())
+        for (i in 0 until length()) {
+            val row = optJSONObject(i) ?: continue
+            val name = row.optString("name").trim()
+            if (name.isEmpty()) continue
+            out.add(
+                TrainerServiceItem(
+                    name = name,
+                    priceFrom = row.optInt("price_from", 0).coerceAtLeast(0),
+                ),
+            )
+        }
+        return out
     }
 
     fun login(email: String, password: String): AuthResult {
@@ -242,6 +348,7 @@ class StaffApiClient(private val baseUrl: String) {
         val employee = json.getJSONObject("employee")
         val metricsJson = json.getJSONObject("metrics")
         return StaffAppData(
+            employeeId = employee.optPositiveId("id") ?: employee.optInt("id", 0),
             employeeName = employee.optString("name"),
             employeeEmail = employee.optString("email"),
             roles = employee.optJSONArray("roles").toStringList(),
@@ -671,18 +778,64 @@ private fun parseOnboarding(json: JSONObject): StaffOnboarding {
     }
     val catalog = json.optJSONArray("specializations_catalog").toStringList()
         .ifEmpty { TrainerSpecializationCatalog.DEFAULT }
+    val plans = mutableListOf<RentalPlan>()
+    val plansArr = json.optJSONArray("rental_plans")
+    if (plansArr != null) {
+        for (i in 0 until plansArr.length()) {
+            val row = plansArr.optJSONObject(i) ?: continue
+            val months = row.optInt("months", 0)
+            if (months <= 0) continue
+            plans += RentalPlan(
+                months = months,
+                label = row.optString("label").ifBlank { "$months мес." },
+                amountKopecks = row.optInt("amount_kopecks", 0),
+                amountRub = row.optDouble("amount_rub", row.optInt("amount_kopecks", 0) / 100.0),
+            )
+        }
+    }
+    val requiresRental = json.optBoolean("requires_rental", false)
+    val paidUntil = json.optString("rental_paid_until").takeIf { it.isNotBlank() }
+    val staffUserId = json.optPositiveId("staff_user_id", "staffUserId")
+        ?: json.optJSONObject("employee")?.optPositiveId("id")
     return StaffOnboarding(
         status = json.optString("status", "active"),
         registrationStatus = json.optString("registration_status", "approved"),
-        requiresRental = json.optBoolean("requires_rental", false),
-        rentalPaidUntil = json.optString("rental_paid_until").takeIf { it.isNotBlank() },
+        requiresRental = requiresRental,
+        rentalPaidUntil = paidUntil,
+        rentalActive = if (json.has("rental_active")) {
+            json.optBoolean("rental_active", false)
+        } else {
+            !requiresRental || StaffRentalAccess.isPaidPeriodActive(paidUntil)
+        },
         offerUrl = json.optString("offer_url", "https://dobrozal.ru/doc/offer"),
         privacyUrl = json.optString("privacy_url", "https://dobrozal.ru/doc/privacy"),
         docsUrl = json.optString("docs_url", "https://dobrozal.ru/doc"),
         rentalAmountKopecks = json.optInt("rental_amount_kopecks", 0),
         rentalAmountRub = json.optDouble("rental_amount_rub", 0.0),
+        rentalPlans = plans,
+        staffUserId = staffUserId,
         profileComplete = json.optBoolean("profile_complete", true),
         profileMissing = missing,
         specializationsCatalog = catalog,
     )
+}
+
+/** Читает положительный id из Int/Long/String JSON-поля. */
+private fun JSONObject.optPositiveId(vararg keys: String): Int? {
+    for (key in keys) {
+        if (!has(key) || isNull(key)) continue
+        when (val raw = opt(key)) {
+            is Number -> raw.toInt().takeIf { it > 0 }?.let { return it }
+            is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }?.let { return it }
+        }
+        optInt(key, 0).takeIf { it > 0 }?.let { return it }
+    }
+    return null
+}
+
+/** optString при JSON null отдаёт литерал "null" — убираем. */
+private fun JSONObject.cleanOptString(key: String): String {
+    if (!has(key) || isNull(key)) return ""
+    val value = optString(key, "").trim()
+    return if (value.isEmpty() || value.equals("null", ignoreCase = true)) "" else value
 }

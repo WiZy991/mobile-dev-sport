@@ -7,8 +7,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.staffapp.legal.StaffLegalPdf
 import com.example.staffapp.ui.auth.LoginScreen
 import com.example.staffapp.ui.auth.LoginUiState
+import com.example.staffapp.ui.legal.LegalPdfScreen
 import com.example.staffapp.ui.theme.StaffTheme
 import kotlin.concurrent.thread
 
@@ -18,6 +20,7 @@ class MainActivity : ComponentActivity() {
     private var session: StaffSession? = null
 
     private var uiState by mutableStateOf(LoginUiState())
+    private var openLegalPdf by mutableStateOf<StaffLegalPdf?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,17 +30,21 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             StaffTheme {
-                LoginScreen(
-                    state = uiState,
-                    onEmailChange = { uiState = uiState.copy(email = it) },
-                    onNameChange = { uiState = uiState.copy(name = it) },
-                    onPasswordChange = { uiState = uiState.copy(password = it) },
-                    onOfferAcceptedChange = { uiState = uiState.copy(offerAccepted = it) },
-                    onPrivacyAcceptedChange = { uiState = uiState.copy(privacyAccepted = it) },
-                    onRoleSelected = {},
-                    onLogin = { runLogin() },
-                    onRegister = { runRegister() },
-                )
+                val pdf = openLegalPdf
+                if (pdf != null) {
+                    LegalPdfScreen(doc = pdf, onNavigateBack = { openLegalPdf = null })
+                } else {
+                    LoginScreen(
+                        state = uiState,
+                        onEmailChange = { uiState = uiState.copy(email = it) },
+                        onNameChange = { uiState = uiState.copy(name = it) },
+                        onPasswordChange = { uiState = uiState.copy(password = it) },
+                        onRoleSelected = {},
+                        onLogin = { runLogin() },
+                        onRegister = { runRegister() },
+                        onOpenLegalPdf = { openLegalPdf = it },
+                    )
+                }
             }
         }
 
@@ -52,12 +59,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun runRegister() {
-        if (!uiState.offerAccepted || !uiState.privacyAccepted) {
-            uiState = uiState.copy(
-                errorMessage = "Чтобы зарегистрироваться, примите оферту и согласие на обработку ПД",
-            )
-            return
-        }
         if (uiState.name.isBlank()) {
             uiState = uiState.copy(errorMessage = "Укажите имя")
             return

@@ -5,6 +5,7 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,51 +43,61 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.staffapp.legal.LegalPdfFiles
+import com.example.staffapp.legal.StaffLegalPdf
 import com.example.staffapp.ui.theme.StaffPrimary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+
+/** PdfRenderer не потокобезопасен — один рендер на файл за раз. */
+private val pdfFileLocks = ConcurrentHashMap<String, Mutex>()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LegalPdfScreen(
-    title: String = LegalPdfFiles.DOBROZAL_OFFER_TITLE,
+    doc: StaffLegalPdf,
     onNavigateBack: () -> Unit,
 ) {
     val context = LocalContext.current
     var pageCount by remember { mutableIntStateOf(0) }
     var pdfFile by remember { mutableStateOf<File?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    var loading by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
-        isLoading = true
+    LaunchedEffect(doc) {
+        loading = true
         error = null
+        pageCount = 0
+        pdfFile = null
         withContext(Dispatchers.IO) {
             try {
-                val file = LegalPdfFiles.resolveDobrozalOffer(context)
+                val file = LegalPdfFiles.resolve(context, doc)
                 ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
                     PdfRenderer(pfd).use { renderer ->
                         pageCount = renderer.pageCount
                         pdfFile = file
                     }
                 }
-            } catch (_: Exception) {
-                error = "Не удалось открыть документ"
-                pdfFile = null
-                pageCount = 0
+            } catch (e: Exception) {
+                error = e.message?.takeIf { it.isNotBlank() } ?: "Не удалось открыть документ"
             } finally {
-                isLoading = false
+                loading = false
             }
         }
     }
 
+    BackHandler(onBack = onNavigateBack)
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = { Text(doc.title, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
@@ -99,48 +110,41 @@ fun LegalPdfScreen(
                 ),
             )
         },
-    ) { paddingValues ->
+    ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
-                .padding(paddingValues),
+                .background(Color(0xFFF2F2F2))
+                .padding(padding),
         ) {
             when {
-                isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                loading -> CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = StaffPrimary,
+                )
+                error != null -> Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(error!!, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = onNavigateBack) { Text("Назад") }
                 }
-                error != null -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(error!!, style = MaterialTheme.typography.bodyLarge)
-                        TextButton(onClick = onNavigateBack) {
-                            Text("Назад")
-                        }
+                pdfFile != null && pageCount > 0 -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items((0 until pageCount).toList(), key = { it }) { pageIndex ->
+                        PdfPageImage(file = pdfFile!!, pageIndex = pageIndex)
                     }
                 }
-                pdfFile != null && pageCount > 0 -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items((0 until pageCount).toList(), key = { it }) { pageIndex ->
-                            PdfPageImage(file = pdfFile!!, pageIndex = pageIndex)
-                        }
-                    }
-                }
-                else -> {
-                    Text(
-                        "Документ пуст",
-                        modifier = Modifier.align(Alignment.Center),
-                        color = Color(0xFF666666),
-                    )
-                }
+                else -> Text(
+                    "Документ пуст",
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color(0xFF666666),
+                )
             }
         }
     }
@@ -157,66 +161,74 @@ private fun PdfPageImage(
     LaunchedEffect(file, pageIndex) {
         bitmap = null
         failed = false
-        withContext(Dispatchers.IO) {
-            try {
-                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
-                    PdfRenderer(pfd).use { renderer ->
-                        renderer.openPage(pageIndex).use { page ->
-                            val scale = 2
-                            val bmp = Bitmap.createBitmap(
-                                page.width * scale,
-                                page.height * scale,
-                                Bitmap.Config.ARGB_8888,
-                            )
-                            bmp.eraseColor(AndroidColor.WHITE)
-                            page.render(
-                                bmp,
-                                null,
-                                Matrix().apply { setScale(scale.toFloat(), scale.toFloat()) },
-                                PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY,
-                            )
-                            bitmap = bmp.asImageBitmap()
-                        }
-                    }
-                }
-            } catch (_: Exception) {
-                failed = true
-            }
+        val rendered = withContext(Dispatchers.IO) {
+            renderPdfPage(file, pageIndex)
+        }
+        if (rendered != null) {
+            bitmap = rendered.asImageBitmap()
+        } else {
+            failed = true
         }
     }
 
     when {
-        bitmap != null -> {
-            Image(
-                bitmap = bitmap!!,
-                contentDescription = "Страница ${pageIndex + 1}",
-                modifier = Modifier.fillMaxWidth(),
-                contentScale = ContentScale.FillWidth,
+        bitmap != null -> Image(
+            bitmap = bitmap!!,
+            contentDescription = "Страница ${pageIndex + 1}",
+            modifier = Modifier.fillMaxWidth(),
+            contentScale = ContentScale.FillWidth,
+        )
+        failed -> Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "Не удалось загрузить страницу ${pageIndex + 1}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF666666),
             )
         }
-        failed -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "Не удалось загрузить страницу ${pageIndex + 1}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF666666),
-                )
-            }
+        else -> Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(color = StaffPrimary)
         }
-        else -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
+    }
+}
+
+private suspend fun renderPdfPage(file: File, pageIndex: Int): Bitmap? {
+    val lock = pdfFileLocks.getOrPut(file.absolutePath) { Mutex() }
+    return lock.withLock {
+        try {
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                PdfRenderer(pfd).use { renderer ->
+                    if (pageIndex !in 0 until renderer.pageCount) return@withLock null
+                    renderer.openPage(pageIndex).use { page ->
+                        // 1.5x: читаемо и не раздувает память на длинных офертах
+                        val scale = 1.5f
+                        val bmp = Bitmap.createBitmap(
+                            (page.width * scale).toInt().coerceAtLeast(1),
+                            (page.height * scale).toInt().coerceAtLeast(1),
+                            Bitmap.Config.ARGB_8888,
+                        )
+                        bmp.eraseColor(AndroidColor.WHITE)
+                        page.render(
+                            bmp,
+                            null,
+                            Matrix().apply { setScale(scale, scale) },
+                            PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY,
+                        )
+                        bmp
+                    }
+                }
             }
+        } catch (_: Exception) {
+            null
         }
     }
 }

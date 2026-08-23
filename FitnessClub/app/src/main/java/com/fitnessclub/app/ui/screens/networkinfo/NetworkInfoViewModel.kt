@@ -3,6 +3,7 @@ package com.fitnessclub.app.ui.screens.networkinfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.model.resolvedSocialLinks
 import com.fitnessclub.app.data.repository.ClubRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,7 +16,7 @@ import javax.inject.Inject
 
 data class NetworkInfoUiState(
     val isLoading: Boolean = true,
-    val clubName: String = "Доброзал",
+    val clubName: String = Brand.name,
     val aboutText: String = "",
     val phone: String? = null,
     val email: String? = null,
@@ -48,7 +49,7 @@ class NetworkInfoViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            clubName = club.name.ifBlank { "Доброзал" },
+                            clubName = club.name.ifBlank { Brand.name },
                             aboutText = network?.about.orEmpty(),
                             phone = club.phone,
                             email = club.email,

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.ClubItem
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.model.RegisterRequest
 import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
@@ -136,7 +137,7 @@ object ReferralSourceOptions {
 
     val items: List<Pair<String, String>> = listOf(
         "friends_family" to "От друзей/родственников",
-        "friends_in_gymroom" to "Друзья/родственники уже ходят в Доброзал",
+        "friends_in_gymroom" to Brand.name.let { "Друзья/родственники уже ходят в $it" },
         "social" to "Из социальных сетей",
         "2gis" to "2ГИС",
         "yandex" to "Яндекс",

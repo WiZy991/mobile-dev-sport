@@ -10,6 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.fitnessclub.app.MainActivity
 import com.fitnessclub.app.R
+import com.fitnessclub.app.data.config.Brand
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
@@ -34,7 +35,7 @@ class FitnessMessagingService : FirebaseMessagingService() {
         val type = data["type"].orEmpty()
         val notification = message.notification
 
-        val title = notification?.title ?: data["title"] ?: "Доброзал"
+        val title = notification?.title ?: data["title"] ?: Brand.name
         val body = notification?.body ?: data["body"] ?: ""
         val channelId = if (type == "access_alarm") PushChannels.ACCESS_ALARM else PushChannels.GENERAL
 
@@ -56,7 +57,7 @@ class FitnessMessagingService : FirebaseMessagingService() {
 
         val largeIcon = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
         val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_stat_dobrozal)
+            .setSmallIcon(R.drawable.ic_stat_notification)
             .setLargeIcon(largeIcon)
             .setContentTitle(title)
             .setContentText(body)

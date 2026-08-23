@@ -49,8 +49,9 @@ final class StaffRentalController extends AbstractController
 
         $data = json_decode($request->getContent(), true) ?? [];
         $offerAccepted = (bool) ($data['offer_accepted'] ?? false);
+        $months = (int) ($data['months'] ?? $data['duration_months'] ?? 1);
 
-        $result = $this->rentalInit->init($user, $offerAccepted);
+        $result = $this->rentalInit->init($user, $offerAccepted, $months);
         if (isset($result['error'])) {
             return $this->json($result['error'], $result['status']);
         }
@@ -64,9 +65,51 @@ final class StaffRentalController extends AbstractController
             'payment_url' => $payment->getPaymentUrl(),
             'amount' => $payment->getAmountKopecks() / 100,
             'amount_kopecks' => $payment->getAmountKopecks(),
+            'duration_months' => $payment->getDurationMonths(),
             'expires_at' => $payment->getExpiresAt()?->format(\DateTimeInterface::ATOM),
             'onboarding' => $this->onboarding->serialize($user),
         ], 201);
+    }
+
+    #[Route('/payments', name: 'api_staff_rental_payments', methods: ['GET'])]
+    public function payments(Request $request): JsonResponse
+    {
+        $user = $this->staffResolver->resolve($request);
+        if (!$user instanceof StaffUser) {
+            return $this->json(['error' => 'Unauthorized', 'code' => 'unauthorized'], 401);
+        }
+
+        /** @var list<Payment> $rows */
+        $rows = $this->em->createQueryBuilder()
+            ->select('p')
+            ->from(Payment::class, 'p')
+            ->where('p.staffUser = :staff')
+            ->andWhere('p.type = :type')
+            ->setParameter('staff', $user)
+            ->setParameter('type', Payment::TYPE_TRAINER_RENTAL)
+            ->orderBy('p.createdAt', 'DESC')
+            ->setMaxResults(50)
+            ->getQuery()
+            ->getResult();
+
+        $items = [];
+        foreach ($rows as $payment) {
+            $items[] = [
+                'id' => $payment->getId(),
+                'status' => $payment->getStatus(),
+                'amount_kopecks' => $payment->getAmountKopecks(),
+                'amount_rub' => round($payment->getAmountKopecks() / 100, 2),
+                'duration_months' => $payment->getDurationMonths(),
+                'paid_at' => $payment->getPaidAt()?->format(\DateTimeInterface::ATOM),
+                'created_at' => $payment->getCreatedAt()->format(\DateTimeInterface::ATOM),
+                'failure_reason' => $payment->getFailureReason(),
+            ];
+        }
+
+        return $this->json([
+            'items' => $items,
+            'onboarding' => $this->onboarding->serialize($user),
+        ]);
     }
 
     #[Route('/payments/{id}/status', name: 'api_staff_rental_payment_status', methods: ['GET'], requirements: ['id' => '\d+'])]
@@ -99,6 +142,7 @@ final class StaffRentalController extends AbstractController
             'status' => $payment->getStatus(),
             'payment_url' => $payment->getPaymentUrl(),
             'amount_kopecks' => $payment->getAmountKopecks(),
+            'duration_months' => $payment->getDurationMonths(),
             'failure_reason' => $payment->getFailureReason(),
             'onboarding' => $this->onboarding->serialize($user),
         ]);

@@ -6,6 +6,8 @@ import android.net.Uri
 import androidx.fragment.app.FragmentActivity
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.auth.SberPkce
+import com.fitnessclub.app.data.config.Brand
+import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.local.AuthFlowStore
 import com.fitnessclub.app.data.local.BiometricLoginCoordinator
 import com.fitnessclub.app.data.local.BiometricLoginStore
@@ -32,7 +34,7 @@ class LoginViewModel @Inject constructor(
     private val authFlowStore: AuthFlowStore,
     private val biometricLoginStore: BiometricLoginStore,
 ) : ViewModel() {
-    private val sberRedirectUri = "https://worldcashfit.ru/api/v1/auth/sber/callback"
+    private val sberRedirectUri = BuildConfig.SBER_REDIRECT_URI
     private var sberCodeVerifier: String? = null
     private var welcomeAfterSberLogin = false
 
@@ -57,9 +59,7 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = clubRepository.getClubInfo()) {
                 is ApiResult.Success -> {
-                    val brand = result.data.brandName?.trim().orEmpty()
-                        .ifBlank { "Доброзал" }
-                        .let { if (it == "FitnessClub") "Доброзал" else it }
+                    val brand = Brand.orFallback(result.data.brandName)
                     _uiState.value = _uiState.value.copy(clubBrandName = brand)
                 }
                 else -> Unit
@@ -330,6 +330,7 @@ class LoginViewModel @Inject constructor(
             authRepository.getSberAuthorizeUrl(
                 codeChallenge = challenge,
                 redirectUri = sberRedirectUri,
+                appBridgeUri = BuildConfig.APP_AUTH_BRIDGE_URI,
             ).collect { result ->
                 when (result) {
                     is ApiResult.Loading -> {
@@ -436,7 +437,7 @@ data class LoginUiState(
     val showValidationAttempted: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val clubBrandName: String = "Доброзал",
+    val clubBrandName: String = Brand.name,
     val hasCompletedRegistration: Boolean = false,
     val biometricLoginConfigured: Boolean = false,
     val biometricHardwareReady: Boolean = false,

@@ -1,51 +1,28 @@
 package com.fitnessclub.app.data.config
 
-/**
- * Конфигурация приложения и внешние ссылки.
- * [SITE_URL] — платформа WorldCashFit (помощь, API).
- * Правовые документы клуба Доброзал — на [CLUB_SITE_URL].
- */
+import com.fitnessclub.app.BuildConfig
+
+/** Внешние ссылки зависят от product flavor (Доброзал / Академия Борьбы). */
 object AppConfig {
-    /** Публичный сайт платформы */
-    const val SITE_URL = "https://worldcashfit.ru"
+    val SITE_URL: String get() = BuildConfig.SITE_URL.trimEnd('/')
+    val CLUB_SITE_URL: String get() = BuildConfig.CLUB_SITE_URL.trimEnd('/')
 
-    /** Сайт клуба Доброзал (правовые PDF) */
-    const val CLUB_SITE_URL = "https://dobrozal.ru"
+    val DOBROZAL_DOC_URL get() = "$CLUB_SITE_URL/doc"
+    val DOBROZAL_OFFER_URL get() = "$CLUB_SITE_URL/doc/offer"
+    val DOBROZAL_PRIVACY_URL get() = "$CLUB_SITE_URL/doc/privacy"
+    val DOBROZAL_CONSENT_URL get() = "$CLUB_SITE_URL/consent_user"
 
-    const val DOBROZAL_DOC_URL = "$CLUB_SITE_URL/doc"
-    const val DOBROZAL_OFFER_URL = "$CLUB_SITE_URL/doc/offer"
-    const val DOBROZAL_PRIVACY_URL = "$CLUB_SITE_URL/doc/privacy"
-    const val DOBROZAL_CONSENT_URL = "$CLUB_SITE_URL/consent_user"
+    val HELP_URL get() = "$SITE_URL/help"
+    val FORGOT_PASSWORD_URL get() = "$SITE_URL/forgot-password"
+    val TERMS_URL get() = DOBROZAL_OFFER_URL
+    val USER_AGREEMENT_URL get() = DOBROZAL_OFFER_URL
+    val PRIVACY_URL get() = DOBROZAL_PRIVACY_URL
+    val CLIENT_AGREEMENT_URL get() = DOBROZAL_OFFER_URL
+    val TRAINER_AGREEMENT_URL get() = DOBROZAL_OFFER_URL
+    val PERSONAL_DATA_CONSENT_URL get() = DOBROZAL_CONSENT_URL
+    val LEGAL_INDEX_URL get() = DOBROZAL_DOC_URL
+    val REQUISITES_URL get() = "$SITE_URL/requisites"
 
-    /** Ссылка на страницу помощи (FAQ, инструкции) */
-    const val HELP_URL = "${SITE_URL}/help"
-
-    /** Ссылка на восстановление пароля */
-    const val FORGOT_PASSWORD_URL = "${SITE_URL}/forgot-password"
-
-    /** Договор-оферта / пользовательское соглашение (PDF на сайте клуба) */
-    const val TERMS_URL = DOBROZAL_OFFER_URL
-    const val USER_AGREEMENT_URL = DOBROZAL_OFFER_URL
-
-    /** Политика конфиденциальности */
-    const val PRIVACY_URL = DOBROZAL_PRIVACY_URL
-
-    /** Договор с клиентом и тренером — единая публичная оферта */
-    const val CLIENT_AGREEMENT_URL = DOBROZAL_OFFER_URL
-    const val TRAINER_AGREEMENT_URL = DOBROZAL_OFFER_URL
-
-    /** Согласие на обработку персональных данных */
-    const val PERSONAL_DATA_CONSENT_URL = DOBROZAL_CONSENT_URL
-
-    /** Все правовые документы */
-    const val LEGAL_INDEX_URL = DOBROZAL_DOC_URL
-
-    /** Реквизиты ИП (экран в приложении) */
-    const val REQUISITES_URL = "${SITE_URL}/requisites"
-    
-    /** Ссылка на страницу приложения в Google Play */
-    const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=ru.worldcashfit.app"
-
-    /** Страница приложения в RuStore (откроет приложение RuStore, если установлено) */
-    const val RUSTORE_CATALOG_URL = "https://www.rustore.ru/catalog/app/ru.worldcashfit.app"
+    val PLAY_STORE_URL: String get() = BuildConfig.PLAY_STORE_URL
+    val RUSTORE_CATALOG_URL: String get() = BuildConfig.RUSTORE_CATALOG_URL
 }

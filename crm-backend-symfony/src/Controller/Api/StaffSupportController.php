@@ -7,6 +7,7 @@ use App\Entity\StaffUser;
 use App\Entity\SupportTicket;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\CurrentStaffUserResolver;
+use App\Service\Support\SupportTicketStaffNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,6 +21,7 @@ final class StaffSupportController extends AbstractController
         private readonly CurrentStaffUserResolver $currentStaffUserResolver,
         private readonly AdminMenuBuilder $adminMenuBuilder,
         private readonly EntityManagerInterface $em,
+        private readonly SupportTicketStaffNotifier $staffNotifier,
     ) {
     }
 
@@ -52,6 +54,82 @@ final class StaffSupportController extends AbstractController
             'items' => $items,
             'newCount' => (int) $this->em->getRepository(SupportTicket::class)->count(['status' => SupportTicket::STATUS_NEW]),
         ]);
+    }
+
+    /** Обратная связь тренера/сотрудника в клуб (не инбокс поддержки). */
+    #[Route('/feedback/tickets', name: 'api_staff_feedback_tickets_list', methods: ['GET'])]
+    public function myFeedbackTickets(Request $request): JsonResponse
+    {
+        $user = $this->currentStaffUserResolver->resolve($request);
+        if (!$user instanceof StaffUser) {
+            return $this->json(['error' => 'Unauthorized', 'code' => 'unauthorized'], 401);
+        }
+
+        $tickets = $this->em->getRepository(SupportTicket::class)->findBy(
+            ['staffUser' => $user],
+            ['createdAt' => 'DESC'],
+            50,
+        );
+
+        return $this->json([
+            'items' => array_map($this->serializeTicket(...), $tickets),
+        ]);
+    }
+
+    #[Route('/feedback/tickets', name: 'api_staff_feedback_tickets_create', methods: ['POST'])]
+    public function createFeedbackTicket(Request $request): JsonResponse
+    {
+        $user = $this->currentStaffUserResolver->resolve($request);
+        if (!$user instanceof StaffUser) {
+            return $this->json(['error' => 'Unauthorized', 'code' => 'unauthorized'], 401);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $subject = mb_substr(trim((string) ($data['subject'] ?? '')), 0, 200);
+        $message = trim((string) ($data['message'] ?? ''));
+        $category = (string) ($data['category'] ?? SupportTicket::CATEGORY_OTHER);
+
+        if ($subject === '') {
+            return $this->json(['error' => 'Укажите тему', 'code' => 'subject_required'], 400);
+        }
+        if (mb_strlen($message) < 5) {
+            return $this->json(['error' => 'Сообщение слишком короткое', 'code' => 'message_too_short'], 400);
+        }
+        if (mb_strlen($message) > 8000) {
+            return $this->json(['error' => 'Сообщение слишком длинное', 'code' => 'message_too_long'], 400);
+        }
+        if (!in_array($category, SupportTicket::allowedCategories(), true)) {
+            $category = SupportTicket::CATEGORY_OTHER;
+        }
+
+        $staffLabel = $user->getName() !== '' ? $user->getName() : $user->getEmail();
+        $fullMessage = trim($message . "\n\n— " . $staffLabel . ' (' . $user->getEmail() . ')');
+
+        $ticket = (new SupportTicket())
+            ->setUser(null)
+            ->setStaffUser($user)
+            ->setSubject('[Тренер] ' . $subject)
+            ->setMessage($fullMessage)
+            ->setCategory($category)
+            ->setContactEmail($user->getEmail());
+
+        if ($user->getOrganization() !== null) {
+            $ticket->setOrganization($user->getOrganization());
+        }
+
+        $this->em->persist($ticket);
+        $this->em->flush();
+
+        try {
+            $this->staffNotifier->notifyNewTicket($ticket);
+        } catch (\Throwable) {
+        }
+
+        return $this->json([
+            'success' => true,
+            'id' => $ticket->getId(),
+            'ticket' => $this->serializeTicket($ticket),
+        ], 201);
     }
 
     #[Route('/support/tickets/{id}/status', name: 'api_staff_support_ticket_status', methods: ['POST'])]
@@ -182,9 +260,10 @@ final class StaffSupportController extends AbstractController
             'category' => $ticket->getCategory(),
             'status' => $ticket->getStatus(),
             'contactEmail' => $ticket->getContactEmail(),
-            'clientName' => $client?->getName(),
+            'clientName' => $client?->getName() ?? $ticket->getStaffUser()?->getName(),
             'clientPhone' => $client?->getPhone(),
             'clientId' => $client?->getId(),
+            'staffUserId' => $ticket->getStaffUser()?->getId(),
             'createdAt' => $ticket->getCreatedAt()->format('d.m.Y H:i'),
         ];
     }

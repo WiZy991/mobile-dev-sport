@@ -60,22 +60,19 @@ app/src/main/java/com/fitnessclub/app/
 - JDK 17
 - Android SDK 34
 
-### Сборка
-1. Клонируйте репозиторий
-2. Откройте проект в Android Studio
-3. Синхронизируйте Gradle
-4. Запустите приложение
+### Сборка (два приложения в одном проекте)
+- `dobrozal` → Доброзал (`ru.worldcashfit.app`)
+- `academyWrestling` → Академия Борьбы (`ru.academywrestling.app`) — отдельный Google Play
+
+В Android Studio: **Build Variants** → `academyWrestlingDebug` / `dobrozalDebug`.  
+Подробнее: [docs/franchise-academy-wrestling.md](docs/franchise-academy-wrestling.md)
 
 ### Конфигурация API
-Измените BASE_URL в `AppModule.kt`:
-```kotlin
-private const val BASE_URL = "https://your-api-url.com/v1/"
-```
+`BuildConfig.API_BASE_URL` (общий CRM: `https://worldcashfit.ru/api/v1/`).
 
 ### Firebase
-1. Создайте проект в Firebase Console
-2. Добавьте `google-services.json` в папку `app/`
-3. Включите Firebase Cloud Messaging
+- Доброзал: `app/google-services.json`
+- Академия: `app/src/academyWrestling/google-services.json` (заменить PLACEHOLDER)
 
 ## API Endpoints
 

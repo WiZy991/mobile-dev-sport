@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\GuestPass;
+use App\Entity\StaffUser;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\PercoWebClient;
@@ -73,6 +74,11 @@ class AccessController extends AbstractController
         // Гостевой пропуск: FITNESSCLUB:GUEST:passId:token
         if ($parts[1] === 'GUEST') {
             return $this->handleGuestPassEntry($qr, $parts, $log, $deviceId, $response);
+        }
+
+        // Тренер: FITNESSCLUB:STAFF:staffId:timestamp
+        if ($parts[1] === 'STAFF') {
+            return $this->handleStaffEntry($parts, $log, $response);
         }
 
         // Обычный вход: FITNESSCLUB:ENTRY:user-123:timestamp
@@ -303,6 +309,93 @@ class AccessController extends AbstractController
         $this->occupancyService->notifyPresenceChanged(null);
 
         return $this->json(['success' => true]);
+    }
+
+    /**
+     * @param string[] $parts
+     * @param array<string, mixed> $response
+     */
+    private function handleStaffEntry(array $parts, AccessLog $log, array $response): JsonResponse
+    {
+        if (count($parts) !== 4) {
+            $log->setReason('invalid_format');
+            $response['reason'] = 'invalid_format';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 400);
+        }
+
+        $staffId = (int) $parts[2];
+        $timestamp = FitnessClubEntryQrTimestamp::parseToUnixMs($parts[3]);
+        if ($staffId <= 0 || $timestamp === null) {
+            $log->setReason('invalid_format');
+            $response['reason'] = 'invalid_format';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 400);
+        }
+
+        /** @var StaffUser|null $staff */
+        $staff = $this->em->getRepository(StaffUser::class)->find($staffId);
+        if (!$staff instanceof StaffUser) {
+            $log->setReason('staff_not_found');
+            $response['reason'] = 'staff_not_found';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 404);
+        }
+
+        $nowMs = (int) (microtime(true) * 1000);
+        if (abs($nowMs - $timestamp) > 15_000) {
+            $log->setReason('qr_expired');
+            $response['reason'] = 'qr_expired';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 400);
+        }
+
+        if ($staff->getRegistrationStatus() !== StaffUser::REGISTRATION_APPROVED) {
+            $log->setReason('staff_not_approved');
+            $response['reason'] = 'staff_not_approved';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 403);
+        }
+        if ($staff->requiresTrainerRental() && !$staff->hasValidRental()) {
+            $log->setReason('staff_rental_expired');
+            $response['reason'] = 'staff_rental_expired';
+            $this->em->persist($log);
+            $this->em->flush();
+
+            return $this->json($response, 403);
+        }
+
+        $log->setResult('granted')->setReason('ok');
+        $this->em->persist($log);
+        $this->em->flush();
+        $this->occupancyService->notifyPresenceChanged(null);
+
+        $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
+
+        return $this->json($this->mergeEntrySuccess(
+            [
+                'access_granted' => true,
+                'reason' => 'ok',
+                'passage' => 'entry',
+                'success' => true,
+                'user' => [
+                    'id' => 'staff-' . $staff->getId(),
+                    'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                    'phone' => $staff->getTrainer()?->getPhone(),
+                ],
+            ],
+            $percoUnlock,
+        ));
     }
 
     private function handleGuestPassEntry(string $qr, array $parts, AccessLog $log, ?string $deviceId, array $response): JsonResponse

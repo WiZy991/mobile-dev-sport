@@ -56,6 +56,13 @@ class Trainer implements TenantAware
     #[ORM\Column(name: 'publication_status', type: 'string', length: 20, options: ['default' => self::STATUS_MODERATION])]
     private string $publicationStatus = self::STATUS_MODERATION;
 
+    /**
+     * Прайс для клиентского приложения: JSON-массив
+     * [{"name":"Персональная тренировка","price_from":2500}, ...]
+     */
+    #[ORM\Column(name: 'services_json', type: 'text', nullable: true)]
+    private ?string $servicesJson = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -156,5 +163,85 @@ class Trainer implements TenantAware
         $status = strtolower(trim($raw));
 
         return \in_array($status, self::PUBLICATION_STATUSES, true) ? $status : $default;
+    }
+
+    public function getPublicationStatusLabel(): string
+    {
+        return match ($this->publicationStatus) {
+            self::STATUS_PUBLISHED => 'Опубликован',
+            self::STATUS_HIDDEN => 'Скрыт',
+            default => 'На модерации',
+        };
+    }
+
+    /** @return list<array{name: string, price_from: int}> */
+    public function getServices(): array
+    {
+        if ($this->servicesJson === null || trim($this->servicesJson) === '') {
+            return [];
+        }
+        $decoded = json_decode($this->servicesJson, true);
+        if (!\is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $row) {
+            if (!\is_array($row)) {
+                continue;
+            }
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $price = (int) ($row['price_from'] ?? $row['priceFrom'] ?? 0);
+            $out[] = ['name' => $name, 'price_from' => max(0, $price)];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<mixed>|null $services
+     * @return list<string> ошибки валидации (пусто = ок)
+     */
+    public function setServicesFromInput(?array $services): array
+    {
+        if ($services === null) {
+            $this->servicesJson = null;
+
+            return [];
+        }
+        if (\count($services) > 20) {
+            return ['Не больше 20 услуг'];
+        }
+        $normalized = [];
+        foreach ($services as $row) {
+            if (!\is_array($row)) {
+                return ['Некорректный формат услуги'];
+            }
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                return ['Укажите название услуги'];
+            }
+            if (mb_strlen($name) > 120) {
+                return ['Название услуги слишком длинное'];
+            }
+            $priceRaw = $row['price_from'] ?? $row['priceFrom'] ?? 0;
+            if (!is_numeric($priceRaw) || (int) $priceRaw < 0) {
+                return ['Цена «от» должна быть числом ≥ 0'];
+            }
+            $normalized[] = [
+                'name' => $name,
+                'price_from' => (int) $priceRaw,
+            ];
+        }
+        $this->servicesJson = $normalized === [] ? null : json_encode($normalized, \JSON_UNESCAPED_UNICODE);
+
+        return [];
+    }
+
+    public function getServicesJson(): ?string
+    {
+        return $this->servicesJson;
     }
 }

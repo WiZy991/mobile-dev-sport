@@ -40,6 +40,16 @@ class PaymentController extends AbstractController
         return $auth;
     }
 
+    private function resolveDeepLinkScheme(Request $request): string
+    {
+        $scheme = strtolower(trim((string) $request->headers->get('X-App-Deep-Link-Scheme', '')));
+        if (in_array($scheme, ['dobrozal', 'worldfitness', 'academywrestling'], true)) {
+            return $scheme;
+        }
+
+        return 'dobrozal';
+    }
+
     #[Route('/promo/validate', name: 'api_payments_promo_validate', methods: ['POST'])]
     public function validatePromo(Request $request): JsonResponse
     {
@@ -128,7 +138,12 @@ class PaymentController extends AbstractController
             return $this->json(['error' => 'Plan not found'], 404);
         }
 
-        $result = $this->initService->init($user, $plan, $promoCodeRaw);
+        $result = $this->initService->init(
+            $user,
+            $plan,
+            $promoCodeRaw,
+            $this->resolveDeepLinkScheme($request),
+        );
         if (isset($result['error'])) {
             return $this->json($result['error'], $result['status']);
         }

@@ -91,6 +91,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation("androidx.browser:browser:1.8.0")
     implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("com.google.zxing:core:3.5.2")
 
     // Firebase Cloud Messaging (push-уведомления)
     implementation(platform(libs.firebase.bom))

@@ -33,6 +33,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.data.api.ClubItem
 import com.fitnessclub.app.data.catalog.LocalSubscriptionCatalog
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.ui.components.BrandHeader
 import com.fitnessclub.app.ui.theme.Primary
@@ -71,10 +73,14 @@ fun RegisterClubPickScreen(
     onPicked: (ClubItem) -> Unit,
     onContinueToRegister: () -> Unit = {},
     onRequestSberRegistration: (String) -> Unit = {},
+    apiClubs: List<ClubItem> = emptyList(),
+    clubsLoading: Boolean = false,
+    clubsLoadError: String? = null,
 ) {
     val scroll = rememberScrollState()
     var expandedIds by remember { mutableStateOf(setOf<String>()) }
     var showSberDialog by remember { mutableStateOf(false) }
+    val useApiClubs = Brand.isWhiteLabel
 
     fun toggleExpand(clubId: String) {
         expandedIds = if (expandedIds.contains(clubId)) {
@@ -107,7 +113,7 @@ fun RegisterClubPickScreen(
                 }
             }
             BrandHeader(
-                brandName = "Доброзал",
+                brandName = Brand.name,
                 subtitle = "Выберите зал",
                 modifier = Modifier
                     .fillMaxWidth()
@@ -123,6 +129,70 @@ fun RegisterClubPickScreen(
                 textAlign = TextAlign.Center,
             )
 
+            if (useApiClubs) {
+                when {
+                    clubsLoading -> CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(24.dp),
+                    )
+                    !clubsLoadError.isNullOrBlank() -> Text(
+                        text = clubsLoadError,
+                        color = Color.White,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                    apiClubs.isEmpty() -> Text(
+                        text = "Нет залов. Проверьте организацию в CRM и ORGANIZATION_SLUG в приложении.",
+                        color = Color.White.copy(0.9f),
+                        modifier = Modifier.padding(16.dp),
+                    )
+                    else -> apiClubs.forEach { club ->
+                        val selected = club.id == selectedClubId
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .then(
+                                    if (selected) Modifier.border(2.dp, Color.White, RoundedCornerShape(16.dp))
+                                    else Modifier,
+                                )
+                                .clickable { onPicked(club) },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(0.12f)),
+                        ) {
+                            Row(
+                                Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        text = club.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    if (club.address.isNotBlank()) {
+                                        Text(
+                                            text = club.address,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White.copy(0.88f),
+                                        )
+                                    }
+                                }
+                                if (selected) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(28.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
             RegistrationVenues.orderedCards.forEach { card ->
                 val selected = card.clubId == selectedClubId
                 val expanded = expandedIds.contains(card.clubId)
@@ -234,6 +304,7 @@ fun RegisterClubPickScreen(
                     }
                 }
             }
+            } // else: RegistrationVenues (Доброзал)
 
             Spacer(Modifier.height(6.dp))
             Button(

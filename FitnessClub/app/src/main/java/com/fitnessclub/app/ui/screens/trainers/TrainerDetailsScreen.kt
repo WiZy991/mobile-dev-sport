@@ -193,6 +193,46 @@ fun TrainerDetailsScreen(
                             }
                         }
                     }
+                    t.services.filter { it.name.isNotBlank() }.takeIf { it.isNotEmpty() }?.let { offers ->
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "Услуги и цены",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Primary,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                offers.forEachIndexed { index, offer ->
+                                    if (index > 0) Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(
+                                            text = offer.name,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(
+                                            text = "от ${"%,d".format(offer.priceFrom).replace(',', ' ')} ₽",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Primary,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth(),

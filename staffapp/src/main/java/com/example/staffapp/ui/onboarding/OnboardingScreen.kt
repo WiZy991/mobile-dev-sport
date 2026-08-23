@@ -12,17 +12,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.staffapp.RentalPlan
 import com.example.staffapp.ui.components.StaffErrorState
 import com.example.staffapp.ui.components.StaffPrimaryButton
 import com.example.staffapp.ui.components.StaffSecondaryButton
@@ -31,10 +30,10 @@ import com.example.staffapp.ui.theme.StaffPrimary
 
 data class OnboardingUiState(
     val status: String = "pending_approval",
-    val offerUrl: String = "https://dobrozal.ru/doc/offer",
     val amountRub: Double = 0.0,
+    val rentalPlans: List<RentalPlan> = emptyList(),
+    val selectedMonths: Int = 1,
     val rentalPaidUntil: String? = null,
-    val offerAccepted: Boolean = false,
     val isLoading: Boolean = false,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
@@ -43,12 +42,15 @@ data class OnboardingUiState(
 @Composable
 fun OnboardingScreen(
     state: OnboardingUiState,
-    onOfferAcceptedChange: (Boolean) -> Unit,
-    onOpenOffer: () -> Unit,
+    onPlanSelected: (Int) -> Unit,
     onPayClick: () -> Unit,
     onRefresh: () -> Unit,
     onLogout: () -> Unit,
 ) {
+    val selectedPlan = state.rentalPlans.firstOrNull { it.months == state.selectedMonths }
+        ?: state.rentalPlans.firstOrNull()
+    val payAmount = selectedPlan?.amountRub ?: state.amountRub
+
     Surface(modifier = Modifier.fillMaxSize(), color = StaffPrimary) {
         Column(
             modifier = Modifier
@@ -66,7 +68,7 @@ fun OnboardingScreen(
             Text(
                 text = when (state.status) {
                     "pending_approval" -> "Ожидание одобрения"
-                    "needs_offer_payment" -> "Оплата аренды клуба"
+                    "needs_offer_payment" -> "Оплата доступа специалиста"
                     "needs_profile" -> "Заполнение профиля"
                     "rejected" -> "Регистрация отклонена"
                     else -> "Доступ"
@@ -87,7 +89,7 @@ fun OnboardingScreen(
                     when (state.status) {
                         "pending_approval" -> {
                             Text(
-                                "Заявка отправлена администратору CRM. После одобрения вы сможете оплатить аренду и начать работу.",
+                                "Заявка отправлена администратору CRM. После одобрения вы сможете оплатить доступ и начать работу.",
                                 color = StaffOnSurfaceVariant,
                             )
                             StaffPrimaryButton(
@@ -104,25 +106,45 @@ fun OnboardingScreen(
                         }
                         "needs_offer_payment" -> {
                             Text(
-                                "Ежемесячная аренда клуба: ${"%.0f".format(state.amountRub)} ₽",
+                                "Выберите срок доступа",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                             )
+                            if (state.rentalPlans.isNotEmpty()) {
+                                androidx.compose.foundation.layout.Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    state.rentalPlans.forEach { plan ->
+                                        FilterChip(
+                                            selected = plan.months == state.selectedMonths,
+                                            onClick = { onPlanSelected(plan.months) },
+                                            label = {
+                                                Text("${plan.label}\n${"%.0f".format(plan.amountRub)} ₽")
+                                            },
+                                        )
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    "Доступ в клуб: ${"%.0f".format(state.amountRub)} ₽ / мес.",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
                             Text(
-                                "Без оплаты доступ к рабочим разделам закрыт.",
+                                "К оплате: ${"%.0f".format(payAmount)} ₽",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                "Без оплаты доступ к рабочим разделам закрыт. Перед оплатой нужно подтвердить оферту и инструктаж.",
                                 color = StaffOnSurfaceVariant,
                             )
-                            TextButton(onClick = onOpenOffer) {
-                                Text("Открыть публичную оферту Доброзал", color = StaffPrimary)
-                            }
-                            RowAccept(
-                                accepted = state.offerAccepted,
-                                onChange = onOfferAcceptedChange,
-                            )
                             StaffPrimaryButton(
-                                text = if (state.isLoading) "Создаём платёж..." else "Оплатить аренду",
+                                text = if (state.isLoading) "Создаём платёж..." else "Приобрести абонемент",
                                 onClick = onPayClick,
-                                enabled = !state.isLoading && state.offerAccepted,
+                                enabled = !state.isLoading,
                             )
                             StaffSecondaryButton(
                                 text = "Проверить оплату",
@@ -132,7 +154,7 @@ fun OnboardingScreen(
                         }
                         "needs_profile" -> {
                             Text(
-                                "Осталось заполнить карточку тренера: телефон и специализацию. " +
+                                "Осталось заполнить карточку специалиста: телефон и специализацию. " +
                                     "Без этого клиенты не увидят вас в приложении.",
                                 color = StaffOnSurfaceVariant,
                             )
@@ -155,20 +177,5 @@ fun OnboardingScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun RowAccept(accepted: Boolean, onChange: (Boolean) -> Unit) {
-    androidx.compose.foundation.layout.Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Checkbox(checked = accepted, onCheckedChange = onChange)
-        Text(
-            "Принимаю публичную оферту Доброзал",
-            modifier = Modifier.padding(start = 4.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
     }
 }

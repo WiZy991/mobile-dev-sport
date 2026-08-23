@@ -74,6 +74,7 @@ final class StaffApiAccessSubscriber implements EventSubscriberInterface
             '/api/v1/staff/auth/',
             '/api/v1/staff/onboarding',
             '/api/v1/staff/rental/',
+            '/api/v1/staff/feedback/',
             '/api/v1/staff/config',
             '/api/v1/staff/push-token',
             '/api/v1/staff/notifications',

@@ -27,7 +27,7 @@ class SubscriptionPaymentInitService
     /**
      * @return array{payment: Payment}|array{error: array<string, mixed>, status: int}
      */
-    public function init(User $user, SubscriptionPlan $plan, string $promoCodeRaw): array
+    public function init(User $user, SubscriptionPlan $plan, string $promoCodeRaw, string $deepLinkScheme = 'dobrozal'): array
     {
         $sberGate = $this->checkSberGate($user);
         if ($sberGate !== null) {
@@ -65,8 +65,8 @@ class SubscriptionPaymentInitService
         $payment->setOrderNumber($orderNumber);
         $this->em->flush();
 
-        $returnUrl = $this->appendPaymentId($this->returnUrlBase, $payment->getId());
-        $failUrl = $this->appendPaymentId($this->failUrlBase, $payment->getId(), 'fail');
+        $returnUrl = $this->appendPaymentId($this->returnUrlBase, $payment->getId(), 'success', $deepLinkScheme);
+        $failUrl = $this->appendPaymentId($this->failUrlBase, $payment->getId(), 'fail', $deepLinkScheme);
 
         $orderBundle = null;
         if ($this->fiscalizationEnabled) {
@@ -183,13 +183,14 @@ class SubscriptionPaymentInitService
         return null;
     }
 
-    private function appendPaymentId(string $baseUrl, int $paymentId, string $result = 'success'): string
+    private function appendPaymentId(string $baseUrl, int $paymentId, string $result = 'success', string $deepLinkScheme = 'dobrozal'): string
     {
         $separator = str_contains($baseUrl, '?') ? '&' : '?';
 
         return $baseUrl . $separator . http_build_query([
             'payment_id' => $paymentId,
             'result' => $result,
+            'scheme' => $deepLinkScheme,
         ]);
     }
 

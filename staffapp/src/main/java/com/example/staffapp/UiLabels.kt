@@ -2,7 +2,7 @@ package com.example.staffapp
 
 object UiLabels {
     private val roleMap = mapOf(
-        "ROLE_TRAINER" to "Тренер",
+        "ROLE_TRAINER" to "Специалист",
         "ROLE_MANAGER" to "Менеджер",
         "ROLE_FINANCE" to "Финансы",
         "ROLE_VIEWER" to "Наблюдатель",

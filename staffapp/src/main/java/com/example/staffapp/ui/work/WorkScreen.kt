@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Home
@@ -39,6 +40,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -46,7 +48,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +78,7 @@ import com.example.staffapp.ui.components.StaffPrimaryButton
 import com.example.staffapp.ui.components.StaffSecondaryButton
 import com.example.staffapp.ui.components.StaffSearchBar
 import com.example.staffapp.ui.components.StaffSectionTitle
+import com.example.staffapp.ui.qr.StaffEntryQrCard
 import com.example.staffapp.ui.theme.StaffOnSurfaceVariant
 import com.example.staffapp.ui.theme.StaffPrimary
 
@@ -124,6 +132,9 @@ fun WorkScreen(
         onTabSelected(WorkUiState.TAB_HOME)
     }
 
+    var showEntryQrSheet by remember { mutableStateOf(false) }
+    val entryQrSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     state.assignDialog?.let { dialog ->
         AssignClientDialog(
             state = dialog,
@@ -148,6 +159,20 @@ fun WorkScreen(
             onDismiss = onCreateDismiss,
         )
     }
+    if (showEntryQrSheet && state.home.showEntryQr) {
+        ModalBottomSheet(
+            onDismissRequest = { showEntryQrSheet = false },
+            sheetState = entryQrSheetState,
+        ) {
+            StaffEntryQrCard(
+                staffUserId = state.home.entryQrStaffUserId,
+                rentalActive = state.home.entryQrActive,
+                blockedMessage = state.home.entryQrBlockedMessage,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
     val navItems = buildList {
         add(NavItem(WorkUiState.TAB_HOME, "Главная", Icons.Filled.Home, Icons.Outlined.Home))
         if (state.showScheduleNav) {
@@ -168,7 +193,7 @@ fun WorkScreen(
                 title = {
                     Column {
                         Text(
-                            "Сотрудник",
+                            "Специалист",
                             style = MaterialTheme.typography.labelMedium,
                             color = Color.White.copy(alpha = 0.85f),
                         )
@@ -192,13 +217,24 @@ fun WorkScreen(
             )
         },
         floatingActionButton = {
-            if (state.selectedTab == WorkUiState.TAB_SCHEDULE && state.showScheduleNav && !state.schedule.denied) {
-                FloatingActionButton(
-                    onClick = onCreateSessionClick,
-                    containerColor = StaffPrimary,
-                    contentColor = Color.White,
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Создать запись")
+            when {
+                state.selectedTab == WorkUiState.TAB_HOME && state.home.showEntryQr -> {
+                    FloatingActionButton(
+                        onClick = { showEntryQrSheet = true },
+                        containerColor = StaffPrimary,
+                        contentColor = Color.White,
+                    ) {
+                        Icon(Icons.Filled.QrCode2, contentDescription = "Проход в зал")
+                    }
+                }
+                state.selectedTab == WorkUiState.TAB_SCHEDULE && state.showScheduleNav && !state.schedule.denied -> {
+                    FloatingActionButton(
+                        onClick = onCreateSessionClick,
+                        containerColor = StaffPrimary,
+                        contentColor = Color.White,
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Создать запись")
+                    }
                 }
             }
         },
@@ -481,19 +517,43 @@ private fun ProfileTabContent(
         profile.rentalPaidUntilLabel?.let { rental ->
             item { StaffInfoBanner(rental, color = StaffPrimary) }
         }
+        if (profile.showClubEntryQr) {
+            item {
+                StaffSecondaryButton(
+                    text = "QR прохода в зал",
+                    onClick = { onAction("open_entry_qr") },
+                )
+            }
+        }
+        if (profile.showRentalManage) {
+            item {
+                StaffSecondaryButton(
+                    text = "Аренда и платежи",
+                    onClick = { onAction("open_rental") },
+                )
+            }
+        }
+        if (profile.showFeedback) {
+            item {
+                StaffSecondaryButton(
+                    text = "Написать в клуб",
+                    onClick = { onAction("open_feedback") },
+                )
+            }
+        }
         if (profile.showTrainerProfileEdit) {
             item {
                 StaffPrimaryButton(
-                    text = "Редактировать профиль тренера",
+                    text = "Редактировать профиль специалиста",
                     onClick = { onAction("edit_trainer_profile") },
                 )
             }
         }
         item { StaffSectionTitle("Документы") }
         item {
-            StaffPrimaryButton(
-                text = "Публичная оферта",
-                onClick = { onAction("open_offer") },
+            StaffSecondaryButton(
+                text = "Пользовательское соглашение",
+                onClick = { onAction("open_user_agreement") },
             )
         }
         item {
@@ -504,7 +564,13 @@ private fun ProfileTabContent(
         }
         item {
             StaffSecondaryButton(
-                text = "Все документы клуба",
+                text = "Договор с Клубом",
+                onClick = { onAction("open_pro_offer") },
+            )
+        }
+        item {
+            StaffSecondaryButton(
+                text = "Иные документы Клуба",
                 onClick = { onAction("open_docs") },
             )
         }
@@ -582,7 +648,7 @@ private fun ProfileHeaderCard(profile: ProfileTabUi) {
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        text = profile.name.ifBlank { "Сотрудник" },
+                        text = profile.name.ifBlank { "Специалист" },
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -598,7 +664,9 @@ private fun ProfileHeaderCard(profile: ProfileTabUi) {
             ProfileInfoRow(label = "Email", value = profile.email)
             ProfileInfoRow(label = "Телефон", value = profile.phone)
             ProfileInfoRow(label = "Специализация", value = profile.specialization)
-            if (profile.description.isNotBlank()) {
+            if (profile.description.isNotBlank() &&
+                !profile.description.equals("null", ignoreCase = true)
+            ) {
                 Text(
                     text = profile.description,
                     style = MaterialTheme.typography.bodyMedium,

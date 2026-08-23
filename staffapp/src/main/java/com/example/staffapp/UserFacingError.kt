@@ -18,7 +18,7 @@ object UserFacingError {
             lower.contains("http 403") || lower.contains("403") || lower.contains("forbidden") ->
                 "У вас нет прав для этого действия."
             lower.contains("no route found") || Regex("""\b404\b""").containsMatchIn(lower) ->
-                "На сервере нет нужного API (404). Обновите CRM и перезапустите контейнер."
+                "На CRM ещё нет этого API. Задеплойте свежий crm-backend-symfony (migrate + перезапуск контейнера)."
             lower.contains("http 500") || lower.contains("500") || lower.contains("internal server error") ->
                 "Ошибка сервера CRM. Уже разбираемся, попробуйте позже."
             lower.contains("could not find driver") ->

@@ -65,6 +65,7 @@ class TrainerController extends AbstractController
             'rating' => $trainer->getRating() ?? 0.0,
             'description' => $description,
             'publication_status' => $trainer->getPublicationStatus(),
+            'services' => $trainer->getServices(),
         ];
     }
 

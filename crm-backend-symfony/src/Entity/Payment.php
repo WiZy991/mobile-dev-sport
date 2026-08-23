@@ -47,6 +47,10 @@ class Payment
     #[ORM\Column(type: 'integer')]
     private int $amountKopecks;
 
+    /** Срок аренды тренера в месяцах (TYPE_TRAINER_RENTAL). */
+    #[ORM\Column(type: 'integer', options: ['default' => 1])]
+    private int $durationMonths = 1;
+
     #[ORM\Column(type: 'integer')]
     private int $currency = 643;
 
@@ -165,6 +169,18 @@ class Payment
     public function getAmountKopecks(): int
     {
         return $this->amountKopecks;
+    }
+
+    public function getDurationMonths(): int
+    {
+        return max(1, $this->durationMonths);
+    }
+
+    public function setDurationMonths(int $durationMonths): self
+    {
+        $this->durationMonths = max(1, $durationMonths);
+
+        return $this;
     }
 
     public function setAmountKopecks(int $amountKopecks): self

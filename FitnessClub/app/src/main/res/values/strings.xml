@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Доброзал</string>
+    <string name="brand_first_time">Впервые в Доброзал?</string>
+    <string name="about_settings_subtitle">О Доброзал, обратная связь, оценка приложения</string>
+    <string name="referral_share_template">Присоединяйся к Доброзал! Используй мой промокод %1$s при регистрации и получи скидку! %2$s</string>
 
     <!-- Auth -->
     <string name="login">Войти</string>

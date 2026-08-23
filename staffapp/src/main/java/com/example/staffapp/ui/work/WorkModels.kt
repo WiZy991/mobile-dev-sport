@@ -43,6 +43,11 @@ data class HomeTabUi(
     val roleTitle: String = "",
     val metrics: List<MetricUi> = emptyList(),
     val showAdminButton: Boolean = false,
+    /** QR прохода на главной (тренер с активной арендой). */
+    val showEntryQr: Boolean = false,
+    val entryQrStaffUserId: Int = 0,
+    val entryQrActive: Boolean = false,
+    val entryQrBlockedMessage: String? = null,
     val sections: List<HomeSectionUi> = emptyList(),
     val actions: List<ActionUi> = emptyList(),
     val loading: Boolean = false,
@@ -125,6 +130,9 @@ data class ProfileTabUi(
     val photoUrl: String? = null,
     /** Действующая аренда клуба (п.25). */
     val rentalPaidUntilLabel: String? = null,
+    val showClubEntryQr: Boolean = false,
+    val showRentalManage: Boolean = false,
+    val showFeedback: Boolean = false,
     /** Ссылки на документы (п.26). */
     val offerUrl: String = "https://dobrozal.ru/doc/offer",
     val privacyUrl: String = "https://dobrozal.ru/doc/privacy",

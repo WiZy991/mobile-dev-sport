@@ -24,6 +24,9 @@
                 <data android:scheme="staffapp" android:host="payment" android:pathPrefix="/callback" />
             </intent-filter>
         </activity>
+        <activity android:name=".RentalActivity" />
+        <activity android:name=".StaffEntryQrActivity" />
+        <activity android:name=".StaffFeedbackActivity" />
         <activity android:name=".AdminActivity" />
         <activity android:name=".AdminSectionActivity" />
         <activity android:name=".ClientDetailActivity" />

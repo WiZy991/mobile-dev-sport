@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.ClubPromotion
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.repository.NotificationRepository
 import com.fitnessclub.app.data.model.BookingStatus
 import com.fitnessclub.app.data.repository.AccessRepository
@@ -24,7 +25,7 @@ data class HomeUiState(
     /** Пока false — баннер не рисуем (нет вспышки демо «СКИДКА 20%»). */
     val promotionsReady: Boolean = false,
     /** Бренд сети в шапке (не название площадки). */
-    val brandName: String = "Доброзал",
+    val brandName: String = Brand.name,
     /** Название зала для плашки заполненности. */
     val clubHallName: String = "",
     val promotions: List<ClubPromotion> = emptyList(),
@@ -210,9 +211,7 @@ class HomeViewModel @Inject constructor(
             when (val result = clubRepository.getClubInfo()) {
                 is ApiResult.Success -> {
                     val info = result.data
-                    val brand = info.brandName?.trim().orEmpty()
-                        .ifBlank { "Доброзал" }
-                        .let { if (it == "FitnessClub") "Доброзал" else it }
+                    val brand = Brand.orFallback(info.brandName)
                     val hall = info.name.trim().ifBlank { brand }
                     _uiState.update {
                         it.copy(

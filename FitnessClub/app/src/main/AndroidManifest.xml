@@ -47,7 +47,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data
-                    android:scheme="worldfitness"
+                    android:scheme="${deepLinkScheme}"
                     android:host="auth"
                     android:path="/callback" />
             </intent-filter>
@@ -58,7 +58,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data
-                    android:scheme="worldfitness"
+                    android:scheme="${deepLinkScheme}"
                     android:host="payment"
                     android:path="/callback" />
             </intent-filter>
@@ -77,7 +77,7 @@
             android:value="general" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_stat_dobrozal" />
+            android:resource="@drawable/ic_stat_notification" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/primary" />

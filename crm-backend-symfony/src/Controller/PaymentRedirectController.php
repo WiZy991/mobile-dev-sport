@@ -33,6 +33,7 @@ class PaymentRedirectController extends AbstractController
     {
         $paymentId = (int) $request->query->get('payment_id', 0);
         $orderId = (string) $request->query->get('orderId', $request->query->get('mdOrder', ''));
+        $scheme = strtolower(trim((string) $request->query->get('scheme', '')));
 
         $query = http_build_query(array_filter([
             'payment_id' => $paymentId > 0 ? $paymentId : null,
@@ -40,7 +41,7 @@ class PaymentRedirectController extends AbstractController
             'result' => $result,
         ]));
 
-        $bridgeBase = $this->resolveBridgeUri($paymentId, $orderId);
+        $bridgeBase = $this->resolveBridgeUri($paymentId, $orderId, $scheme);
         $deepLink = $bridgeBase . ($query !== '' ? '?' . $query : '');
 
         $html = <<<HTML
@@ -68,7 +69,7 @@ HTML;
         return new Response($html, Response::HTTP_OK, ['Content-Type' => 'text/html; charset=UTF-8']);
     }
 
-    private function resolveBridgeUri(int $paymentId, string $orderId): string
+    private function resolveBridgeUri(int $paymentId, string $orderId, string $scheme = ''): string
     {
         $payment = null;
         if ($paymentId > 0) {
@@ -81,6 +82,16 @@ HTML;
 
         if ($payment instanceof Payment && $payment->getType() === Payment::TYPE_TRAINER_RENTAL) {
             return $this->staffAppBridgeUri !== '' ? $this->staffAppBridgeUri : 'staffapp://payment/callback';
+        }
+
+        if ($scheme === 'academywrestling') {
+            return 'academywrestling://payment/callback';
+        }
+        if ($scheme === 'dobrozal') {
+            return 'dobrozal://payment/callback';
+        }
+        if ($scheme === 'worldfitness') {
+            return 'worldfitness://payment/callback';
         }
 
         return $this->appBridgeUri;

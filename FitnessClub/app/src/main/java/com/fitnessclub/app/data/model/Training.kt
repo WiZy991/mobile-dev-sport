@@ -103,6 +103,16 @@ data class Trainer(
     /** Текст «о себе» из CRM (карточка тренера в приложении). */
     @SerializedName("description")
     val description: String? = null,
+
+    @SerializedName("services")
+    val services: List<TrainerServiceOffer> = emptyList(),
+)
+
+data class TrainerServiceOffer(
+    @SerializedName("name")
+    val name: String = "",
+    @SerializedName("price_from")
+    val priceFrom: Int = 0,
 )
 
 data class Booking(

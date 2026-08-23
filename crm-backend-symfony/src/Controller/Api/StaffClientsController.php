@@ -40,6 +40,23 @@ final class StaffClientsController extends AbstractController
             ->orderBy('u.name', 'ASC')
             ->setMaxResults(80);
 
+        // Тренер видит только клиентов с записью к себе (активной или архивной).
+        if (!$this->isPrivileged($user)) {
+            $linkedTrainer = $user->getTrainer();
+            if ($linkedTrainer === null) {
+                return $this->json(['items' => []]);
+            }
+            $qb->andWhere(
+                'EXISTS (
+                    SELECT 1 FROM App\Entity\Booking b2
+                    JOIN b2.training t2
+                    WHERE b2.user = u AND t2.trainer = :ownTrainer AND b2.status != :ownCancelled
+                )'
+            )
+                ->setParameter('ownTrainer', $linkedTrainer)
+                ->setParameter('ownCancelled', 'cancelled');
+        }
+
         if ($q !== '') {
             $qb->andWhere('LOWER(u.name) LIKE :q OR LOWER(u.email) LIKE :q OR u.phone LIKE :qPhone')
                 ->setParameter('q', '%' . $q . '%')
@@ -154,12 +171,31 @@ final class StaffClientsController extends AbstractController
             $bookings = $bookingsQb->getQuery()->getResult();
         } else {
             $linkedTrainer = $user->getTrainer();
-            if ($linkedTrainer !== null) {
-                $bookings = $bookingsQb
+            if ($linkedTrainer === null) {
+                return $this->json(['error' => 'Not found', 'code' => 'not_found'], 404);
+            }
+            $bookings = $bookingsQb
+                ->andWhere('t.trainer = :trainer')
+                ->setParameter('trainer', $linkedTrainer)
+                ->getQuery()
+                ->getResult();
+            // Нет ни одной записи к этому тренеру — клиент вне зоны видимости.
+            if ($bookings === []) {
+                $any = (int) $this->em->createQueryBuilder()
+                    ->select('COUNT(b.id)')
+                    ->from(Booking::class, 'b')
+                    ->join('b.training', 't')
+                    ->where('b.user = :user')
                     ->andWhere('t.trainer = :trainer')
+                    ->andWhere('b.status != :cancelled')
+                    ->setParameter('user', $client)
                     ->setParameter('trainer', $linkedTrainer)
+                    ->setParameter('cancelled', 'cancelled')
                     ->getQuery()
-                    ->getResult();
+                    ->getSingleScalarResult();
+                if ($any === 0) {
+                    return $this->json(['error' => 'Not found', 'code' => 'not_found'], 404);
+                }
             }
         }
 

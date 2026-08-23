@@ -50,6 +50,14 @@ class LegalController extends AbstractController
         return $this->servePublicLegalPdf('user_agreement.pdf', 'user_agreement.pdf');
     }
 
+    /** Оферта для специалистов (проф. доступ / staffapp). */
+    #[Route('/pro_offer/', name: 'legal_pro_offer', methods: ['GET'])]
+    #[Route('/pro_offer', name: 'legal_pro_offer_noslash', methods: ['GET'])]
+    public function proOffer(): Response
+    {
+        return $this->servePublicLegalPdf('pro_offer.pdf', 'pro_offer.pdf');
+    }
+
     #[Route('/privacy', name: 'legal_privacy', methods: ['GET'])]
     #[Route('/privacy/', name: 'legal_privacy_slash', methods: ['GET'])]
     public function privacy(): Response

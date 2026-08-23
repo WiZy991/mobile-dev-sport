@@ -10,19 +10,35 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.example.staffapp.legal.StaffLegalPdf
 import com.example.staffapp.ui.components.StaffErrorState
 import com.example.staffapp.ui.components.StaffPrimaryButton
 import com.example.staffapp.ui.components.StaffSecondaryButton
@@ -38,8 +54,6 @@ data class LoginUiState(
     val selectedRole: RoleOptionUi? = null,
     val roles: List<RoleOptionUi> = emptyList(),
     val configSummary: String = "",
-    val offerAccepted: Boolean = false,
-    val privacyAccepted: Boolean = false,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
     val isLoading: Boolean = false,
@@ -51,12 +65,13 @@ fun LoginScreen(
     onEmailChange: (String) -> Unit,
     onNameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
-    onOfferAcceptedChange: (Boolean) -> Unit = {},
-    onPrivacyAcceptedChange: (Boolean) -> Unit = {},
     onRoleSelected: (RoleOptionUi) -> Unit,
     onLogin: () -> Unit,
     onRegister: () -> Unit,
+    onOpenLegalPdf: (StaffLegalPdf) -> Unit,
 ) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = StaffPrimary,
@@ -76,7 +91,7 @@ fun LoginScreen(
                 color = Color.White,
             )
             Text(
-                text = "Вход для сотрудников",
+                text = "Приложение для специалистов и сотрудников Клуба",
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White.copy(alpha = 0.9f),
             )
@@ -110,38 +125,66 @@ fun LoginScreen(
                         label = { Text("Пароль") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
+                        visualTransformation = if (passwordVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = null,
+                                )
+                            }
+                        },
                         shape = RoundedCornerShape(14.dp),
                     )
                     Text(
-                        text = "Регистрация доступна только для тренеров. После заявки администратор одобрит доступ, затем нужно будет оплатить аренду и заполнить карточку профиля.",
+                        text = "Войдите в приложение или создайте новый аккаунт, чтобы получить доступ к функциям для специалистов или сотрудников Клуба.",
                         style = MaterialTheme.typography.bodySmall,
                         color = StaffOnSurfaceVariant,
                     )
-                    androidx.compose.foundation.layout.Row(
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    ) {
-                        androidx.compose.material3.Checkbox(
-                            checked = state.offerAccepted,
-                            onCheckedChange = onOfferAcceptedChange,
-                        )
-                        Text(
-                            "Принимаю публичную оферту Доброзал",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                    val legalText = remember {
+                        buildAnnotatedString {
+                            append("Продолжая использовать приложение, Вы принимаете условия ")
+                            pushStringAnnotation("PDF", StaffLegalPdf.USER_AGREEMENT.name)
+                            withStyle(
+                                SpanStyle(
+                                    color = StaffPrimary,
+                                    textDecoration = TextDecoration.Underline,
+                                ),
+                            ) {
+                                append("Пользовательского соглашения")
+                            }
+                            pop()
+                            append(" и подтверждаете ознакомление с ")
+                            pushStringAnnotation("PDF", StaffLegalPdf.PRIVACY.name)
+                            withStyle(
+                                SpanStyle(
+                                    color = StaffPrimary,
+                                    textDecoration = TextDecoration.Underline,
+                                ),
+                            ) {
+                                append("Политикой конфиденциальности")
+                            }
+                            pop()
+                            append(".")
+                        }
                     }
-                    androidx.compose.foundation.layout.Row(
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    ) {
-                        androidx.compose.material3.Checkbox(
-                            checked = state.privacyAccepted,
-                            onCheckedChange = onPrivacyAcceptedChange,
-                        )
-                        Text(
-                            "Согласен на обработку персональных данных",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+                    ClickableText(
+                        text = legalText,
+                        style = MaterialTheme.typography.bodySmall.copy(color = StaffOnSurfaceVariant),
+                        onClick = { offset ->
+                            legalText.getStringAnnotations("PDF", offset, offset)
+                                .firstOrNull()
+                                ?.let { ann ->
+                                    StaffLegalPdf.entries
+                                        .find { it.name == ann.item }
+                                        ?.let(onOpenLegalPdf)
+                                }
+                        },
+                    )
                     if (state.configSummary.isNotBlank()) {
                         Text(
                             text = state.configSummary,
@@ -157,7 +200,7 @@ fun LoginScreen(
                     StaffSecondaryButton(
                         text = "Зарегистрироваться",
                         onClick = onRegister,
-                        enabled = !state.isLoading && state.offerAccepted && state.privacyAccepted,
+                        enabled = !state.isLoading,
                     )
                     if (state.isLoading && state.statusMessage != null) {
                         Text(

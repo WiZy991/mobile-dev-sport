@@ -8,9 +8,11 @@ import java.io.FileOutputStream
 object LegalPdfFiles {
     fun resolve(context: Context, asset: LegalPdfAsset): File {
         val out = File(context.cacheDir, "legal_${asset.cacheFileName}")
-        if (!out.exists() || out.length() == 0L) {
-            context.assets.open(asset.assetPath).use { input ->
-                FileOutputStream(out).use { output -> input.copyTo(output) }
+        context.assets.open(asset.assetPath).use { input ->
+            val bytes = input.readBytes()
+            // Обновляем кэш, если APK принёс новую версию документа (другой размер).
+            if (!out.exists() || out.length() != bytes.size.toLong()) {
+                FileOutputStream(out).use { it.write(bytes) }
             }
         }
         return out

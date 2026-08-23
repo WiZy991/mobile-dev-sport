@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fitnessclub.app.R
+import com.fitnessclub.app.data.config.Brand
 
 /**
  * Шапка под бренд сети. Не показывает адрес/название площадки —
@@ -29,7 +30,7 @@ import com.fitnessclub.app.R
  */
 @Composable
 fun BrandHeader(
-    brandName: String = "Доброзал",
+    brandName: String = Brand.name,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     textColor: Color = Color.White,
@@ -37,7 +38,7 @@ fun BrandHeader(
     /** @deprecated Используйте [brandName]. */
     clubName: String? = null,
 ) {
-    val title = brandName.ifBlank { clubName?.takeIf { it.isNotBlank() } ?: "Доброзал" }
+    val title = brandName.ifBlank { clubName?.takeIf { it.isNotBlank() } ?: Brand.name }
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -34,6 +34,66 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        buildConfigField("String", "API_BASE_URL", "\"https://worldcashfit.ru/api/v1/\"")
+        buildConfigField("String", "SITE_URL", "\"https://worldcashfit.ru\"")
+        buildConfigField(
+            "String",
+            "SBER_REDIRECT_URI",
+            "\"https://worldcashfit.ru/api/v1/auth/sber/callback\"",
+        )
+        // Fallback для merge; реальные значения задаются в productFlavors.
+        manifestPlaceholders["deepLinkScheme"] = "dobrozal"
+    }
+
+    flavorDimensions += "brand"
+    productFlavors {
+        create("dobrozal") {
+            dimension = "brand"
+            isDefault = true
+            applicationId = "ru.worldcashfit.app"
+            // Уникальная схема: старые APK Академии всё ещё ловят worldfitness:// и крадут callback.
+            manifestPlaceholders["deepLinkScheme"] = "dobrozal"
+            buildConfigField("String", "DEEP_LINK_SCHEME", "\"dobrozal\"")
+            buildConfigField("String", "APP_AUTH_BRIDGE_URI", "\"dobrozal://auth/callback\"")
+            buildConfigField("String", "APP_PAYMENT_BRIDGE_URI", "\"dobrozal://payment/callback\"")
+            buildConfigField("String", "BRAND_NAME", "\"Доброзал\"")
+            // Пусто = DEFAULT_ORGANIZATION_SLUG на сервере (организация Доброзал).
+            buildConfigField("String", "ORGANIZATION_SLUG", "\"\"")
+            buildConfigField("String", "CLUB_SITE_URL", "\"https://dobrozal.ru\"")
+            buildConfigField(
+                "String",
+                "PLAY_STORE_URL",
+                "\"https://play.google.com/store/apps/details?id=ru.worldcashfit.app\"",
+            )
+            buildConfigField(
+                "String",
+                "RUSTORE_CATALOG_URL",
+                "\"https://www.rustore.ru/catalog/app/ru.worldcashfit.app\"",
+            )
+        }
+        create("academyWrestling") {
+            dimension = "brand"
+            applicationId = "ru.academywrestling.app"
+            manifestPlaceholders["deepLinkScheme"] = "academywrestling"
+            buildConfigField("String", "DEEP_LINK_SCHEME", "\"academywrestling\"")
+            buildConfigField("String", "APP_AUTH_BRIDGE_URI", "\"academywrestling://auth/callback\"")
+            buildConfigField("String", "APP_PAYMENT_BRIDGE_URI", "\"academywrestling://payment/callback\"")
+            buildConfigField("String", "BRAND_NAME", "\"Академия Борьбы\"")
+            // Slug организации из CRM (платформа → организации).
+            buildConfigField("String", "ORGANIZATION_SLUG", "\"akademiy-borbi\"")
+            buildConfigField("String", "CLUB_SITE_URL", "\"https://worldcashfit.ru\"")
+            buildConfigField(
+                "String",
+                "PLAY_STORE_URL",
+                "\"https://play.google.com/store/apps/details?id=ru.academywrestling.app\"",
+            )
+            buildConfigField(
+                "String",
+                "RUSTORE_CATALOG_URL",
+                "\"https://www.rustore.ru/catalog/app/ru.academywrestling.app\"",
+            )
+        }
     }
 
     signingConfigs {

@@ -88,6 +88,7 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.runtime.collectAsState
 import com.fitnessclub.app.R
 import com.fitnessclub.app.data.api.ClubItem
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.ui.components.BrandHeader
 import com.fitnessclub.app.ui.theme.Primary
@@ -185,7 +186,7 @@ fun RegisterScreen(
             }
             RegisterStepIndicator(current = uiState.formStep)
             BrandHeader(
-                brandName = "Доброзал",
+                brandName = Brand.name,
                 subtitle = uiState.formStep.title,
                 modifier = Modifier
                     .fillMaxWidth()

@@ -71,6 +71,7 @@ class WorkActivity : ComponentActivity() {
     private val sessionLock = Any()
 
     private var uiState by mutableStateOf(WorkUiState())
+    private var openLegalPdf by mutableStateOf<com.example.staffapp.legal.StaffLegalPdf?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +89,13 @@ class WorkActivity : ComponentActivity() {
 
         setContent {
             StaffTheme {
+                val pdf = openLegalPdf
+                if (pdf != null) {
+                    com.example.staffapp.ui.legal.LegalPdfScreen(
+                        doc = pdf,
+                        onNavigateBack = { openLegalPdf = null },
+                    )
+                } else {
                 WorkScreen(
                     state = uiState,
                     onTabSelected = { selectTab(it) },
@@ -165,6 +173,7 @@ class WorkActivity : ComponentActivity() {
                         refreshNotificationBanner()
                     },
                 )
+                }
             }
         }
 
@@ -252,9 +261,27 @@ class WorkActivity : ComponentActivity() {
         when {
             actionId == "open_admin" -> startActivity(Intent(this, AdminActivity::class.java))
             actionId == "edit_trainer_profile" -> startActivity(Intent(this, TrainerProfileActivity::class.java))
-            actionId == "open_offer" -> openExternalUrl(uiState.profile.offerUrl)
-            actionId == "open_privacy" -> openExternalUrl(uiState.profile.privacyUrl)
-            actionId == "open_docs" -> openExternalUrl(uiState.profile.docsUrl)
+            actionId == "open_entry_qr" -> {
+                val id = resolveStaffUserIdForQr()
+                startActivity(
+                    Intent(this, StaffEntryQrActivity::class.java).putExtra(
+                        StaffEntryQrActivity.EXTRA_STAFF_USER_ID,
+                        id,
+                    ),
+                )
+            }
+            actionId == "open_rental" -> startActivity(Intent(this, RentalActivity::class.java))
+            actionId == "open_feedback" -> startActivity(Intent(this, StaffFeedbackActivity::class.java))
+            actionId == "open_user_agreement" ->
+                openLegalPdf = com.example.staffapp.legal.StaffLegalPdf.USER_AGREEMENT
+            actionId == "open_privacy" ->
+                openLegalPdf = com.example.staffapp.legal.StaffLegalPdf.PRIVACY
+            actionId == "open_pro_offer" ->
+                openLegalPdf = com.example.staffapp.legal.StaffLegalPdf.PRO_OFFER
+            actionId == "open_docs" ->
+                openExternalUrl(com.example.staffapp.legal.LegalPdfFiles.CLUB_DOCS_URL)
+            actionId == "open_offer" ->
+                openLegalPdf = com.example.staffapp.legal.StaffLegalPdf.PRO_OFFER
             actionId == "enable_notifications" -> requestOrOpenNotificationSettings()
             actionId == "retry" -> selectTab(uiState.selectedTab)
             actionId == "mark_notifications_read" -> {
@@ -300,6 +327,11 @@ class WorkActivity : ComponentActivity() {
         refreshNotificationBanner()
         if (session != null && allowedSections.contains("app_support")) {
             pollUnreadNotifications()
+        }
+        val isTrainer = primaryRole() == "ROLE_TRAINER"
+            || (config?.roles.orEmpty() + appData?.roles.orEmpty()).contains("ROLE_TRAINER")
+        if (session != null && isTrainer && uiState.selectedTab == WorkUiState.TAB_HOME) {
+            refreshHomeEntryQr()
         }
     }
 
@@ -375,12 +407,25 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun showHomeTab() {
+        val isTrainer = primaryRole() == "ROLE_TRAINER"
+            || (config?.roles.orEmpty() + appData?.roles.orEmpty()).contains("ROLE_TRAINER")
+        val staffId = appData?.employeeId?.takeIf { it > 0 }
+            ?: uiState.home.entryQrStaffUserId
+        // QR не включаем «наугад»: только после проверки аренды в refreshHomeEntryQr().
         uiState = uiState.copy(
             screenTitle = "Главная",
             errorMessage = null,
             home = HomeTabUi(
                 loading = appData == null,
                 needNotificationsPermission = !NotificationPermissionHelper.notificationsEnabled(this),
+                showEntryQr = isTrainer,
+                entryQrStaffUserId = staffId,
+                entryQrActive = false,
+                entryQrBlockedMessage = if (isTrainer) {
+                    "Проверяем оплату аренды…"
+                } else {
+                    null
+                },
             ),
         )
         val data = appData ?: return
@@ -400,8 +445,19 @@ class WorkActivity : ComponentActivity() {
                 showAdminButton = showAdmin,
                 loading = true,
                 needNotificationsPermission = !NotificationPermissionHelper.notificationsEnabled(this),
+                showEntryQr = isTrainer,
+                entryQrStaffUserId = data.employeeId.takeIf { it > 0 } ?: staffId,
+                entryQrActive = false,
+                entryQrBlockedMessage = if (isTrainer) {
+                    "Проверяем оплату аренды…"
+                } else {
+                    null
+                },
             ),
         )
+        if (isTrainer) {
+            refreshHomeEntryQr()
+        }
 
         val homeSection = when (role) {
             "ROLE_TRAINER" -> "bookings"
@@ -488,6 +544,90 @@ class WorkActivity : ComponentActivity() {
         } else {
             uiState = uiState.copy(home = uiState.home.copy(loading = false))
         }
+    }
+
+    /** Id StaffUser для QR: onboarding → home state → app/data. */
+    private fun resolveStaffUserIdForQr(): Int {
+        return listOfNotNull(
+            lastOnboarding?.staffUserId?.takeIf { it > 0 },
+            uiState.home.entryQrStaffUserId.takeIf { it > 0 },
+            appData?.employeeId?.takeIf { it > 0 },
+        ).firstOrNull() ?: 0
+    }
+
+    /** Уточняет staffUserId / статус аренды (оплата + срок) для QR на главной. */
+    private fun refreshHomeEntryQr() {
+        // Сразу из кэша — не ждём сеть и не гасим QR при сбое запроса.
+        lastOnboarding?.let { cached ->
+            applyHomeEntryQr(
+                staffUserId = resolveStaffUserIdForQr().takeIf { it > 0 }
+                    ?: cached.staffUserId ?: 0,
+                onboarding = cached,
+            )
+        }
+        thread {
+            try {
+                val onboarding = withRefresh { token -> apiClient.loadOnboarding(token) }
+                lastOnboarding = onboarding
+                var id = listOfNotNull(
+                    onboarding.staffUserId?.takeIf { it > 0 },
+                    appData?.employeeId?.takeIf { it > 0 },
+                    uiState.home.entryQrStaffUserId.takeIf { it > 0 },
+                ).firstOrNull() ?: 0
+                if (id <= 0) {
+                    runCatching {
+                        withRefresh { token -> apiClient.loadAppData(token).employeeId }
+                    }.getOrNull()?.takeIf { it > 0 }?.let { loaded ->
+                        id = loaded
+                        appData = appData?.copy(employeeId = loaded) ?: appData
+                    }
+                }
+                runOnUiThread {
+                    if (uiState.selectedTab != WorkUiState.TAB_HOME) return@runOnUiThread
+                    applyHomeEntryQr(staffUserId = id, onboarding = onboarding)
+                }
+            } catch (_: Exception) {
+                runOnUiThread {
+                    if (uiState.selectedTab != WorkUiState.TAB_HOME) return@runOnUiThread
+                    val cached = lastOnboarding
+                    val id = resolveStaffUserIdForQr()
+                    if (cached != null && id > 0) {
+                        applyHomeEntryQr(staffUserId = id, onboarding = cached)
+                    } else if (uiState.home.entryQrStaffUserId <= 0) {
+                        uiState = uiState.copy(
+                            home = uiState.home.copy(
+                                entryQrActive = false,
+                                entryQrBlockedMessage = "Не удалось определить учётную запись.",
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun applyHomeEntryQr(staffUserId: Int, onboarding: StaffOnboarding) {
+        val active = StaffRentalAccess.canShowEntryQr(
+            staffUserId = staffUserId,
+            status = onboarding.status,
+            requiresRental = onboarding.requiresRental,
+            rentalPaidUntilIso = onboarding.rentalPaidUntil,
+            rentalActiveFromServer = onboarding.rentalActive,
+        )
+        val blocked = StaffRentalAccess.entryQrBlockedMessage(
+            staffUserId = staffUserId,
+            status = onboarding.status,
+            requiresRental = onboarding.requiresRental,
+            rentalPaidUntilIso = onboarding.rentalPaidUntil,
+        )
+        uiState = uiState.copy(
+            home = uiState.home.copy(
+                showEntryQr = true,
+                entryQrStaffUserId = staffUserId.takeIf { it > 0 } ?: uiState.home.entryQrStaffUserId,
+                entryQrActive = active,
+                entryQrBlockedMessage = blocked,
+            ),
+        )
     }
 
     /**
@@ -791,6 +931,9 @@ class WorkActivity : ComponentActivity() {
                 adminAvailable = adminAvailable,
                 showAdminButton = adminAvailable,
                 showTrainerProfileEdit = showTrainerEdit,
+                showClubEntryQr = showTrainerEdit,
+                showRentalManage = showTrainerEdit,
+                showFeedback = true,
                 loading = data == null,
             ),
             errorMessage = null,

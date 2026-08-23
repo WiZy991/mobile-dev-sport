@@ -32,6 +32,11 @@ class SupportTicket implements TenantAware
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $user = null;
 
+    /** Обращение от сотрудника/тренера (не клиента). */
+    #[ORM\ManyToOne(targetEntity: StaffUser::class)]
+    #[ORM\JoinColumn(name: 'staff_user_id', nullable: true, onDelete: 'SET NULL')]
+    private ?StaffUser $staffUser = null;
+
     #[ORM\Column(type: 'string', length: 200)]
     private string $subject = '';
 
@@ -68,6 +73,18 @@ class SupportTicket implements TenantAware
     public function setUser(?User $user): self
     {
         $this->user = $user;
+
+        return $this;
+    }
+
+    public function getStaffUser(): ?StaffUser
+    {
+        return $this->staffUser;
+    }
+
+    public function setStaffUser(?StaffUser $staffUser): self
+    {
+        $this->staffUser = $staffUser;
 
         return $this;
     }

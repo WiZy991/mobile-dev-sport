@@ -40,6 +40,7 @@ class AuthRepository @Inject constructor(
     fun getSberAuthorizeUrl(
         codeChallenge: String,
         redirectUri: String,
+        appBridgeUri: String,
     ): Flow<ApiResult<String>> = flow {
         emit(ApiResult.Loading)
         try {
@@ -47,6 +48,7 @@ class AuthRepository @Inject constructor(
                 SberLoginRequest(
                     codeChallenge = codeChallenge,
                     redirectUri = redirectUri,
+                    appBridgeUri = appBridgeUri,
                 )
             )
             if (response.isSuccessful && response.body() != null) {

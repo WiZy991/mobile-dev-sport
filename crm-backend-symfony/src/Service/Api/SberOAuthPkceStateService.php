@@ -4,6 +4,7 @@ namespace App\Service\Api;
 
 /**
  * Подписанный OAuth state для PKCE-потока мобильного приложения (nonce для проверки id_token).
+ * Опционально хранит app_bridge — deep link конкретного APK (Доброзал / Академия Борьбы).
  */
 final class SberOAuthPkceStateService
 {
@@ -14,19 +15,27 @@ final class SberOAuthPkceStateService
         $this->secret = $secret !== '' ? $secret : 'dev-change-me';
     }
 
-    /** @return array{state: string, nonce: string} */
-    public function issue(int $ttlSeconds = 900): array
+    /**
+     * @return array{state: string, nonce: string}
+     */
+    public function issue(int $ttlSeconds = 900, ?string $appBridge = null): array
     {
         $nonce = bin2hex(random_bytes(16));
         $exp = time() + $ttlSeconds;
-        $payload = json_encode(['nonce' => $nonce, 'exp' => $exp], JSON_THROW_ON_ERROR);
-        $b64 = $this->base64UrlEncode($payload);
+        $payload = ['nonce' => $nonce, 'exp' => $exp];
+        if ($appBridge !== null && $appBridge !== '') {
+            $payload['app_bridge'] = $appBridge;
+        }
+        $json = json_encode($payload, JSON_THROW_ON_ERROR);
+        $b64 = $this->base64UrlEncode($json);
         $sig = $this->sign($b64);
 
         return ['state' => $b64 . '.' . $sig, 'nonce' => $nonce];
     }
 
-    /** @return array{nonce: string}|null */
+    /**
+     * @return array{nonce: string, app_bridge?: string}|null
+     */
     public function verify(string $state): ?array
     {
         $parts = explode('.', $state, 2);
@@ -53,7 +62,12 @@ final class SberOAuthPkceStateService
             return null;
         }
 
-        return ['nonce' => $data['nonce']];
+        $result = ['nonce' => $data['nonce']];
+        if (isset($data['app_bridge']) && is_string($data['app_bridge']) && $data['app_bridge'] !== '') {
+            $result['app_bridge'] = $data['app_bridge'];
+        }
+
+        return $result;
     }
 
     private function sign(string $data): string

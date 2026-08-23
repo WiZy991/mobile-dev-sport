@@ -8,6 +8,7 @@ use App\Entity\Club;
 use App\Entity\GatewayCommand;
 use App\Entity\GuestPass;
 use App\Entity\StaffNotification;
+use App\Entity\StaffUser;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
 use App\Service\Integration\SubscriptionGateResolver;
@@ -97,6 +98,10 @@ class GatewayController extends AbstractController
 
         if ($parts[1] === 'GUEST') {
             return $this->handleGuestPassEntry($club, $parts, $log);
+        }
+
+        if ($parts[1] === 'STAFF') {
+            return $this->handleStaffEntry($club, $parts, $log);
         }
 
         if ($parts[1] !== 'ENTRY' || count($parts) !== 4) {
@@ -255,7 +260,15 @@ class GatewayController extends AbstractController
             ->setClub($club);
 
         $parts = explode(':', $qr);
-        if (count($parts) < 3 || $parts[0] !== 'FITNESSCLUB' || $parts[1] !== 'ENTRY') {
+        if (count($parts) < 3 || $parts[0] !== 'FITNESSCLUB') {
+            return $this->denied($log, 'invalid_format', 400);
+        }
+
+        if ($parts[1] === 'STAFF') {
+            return $this->handleStaffExit($club, $parts, $log);
+        }
+
+        if ($parts[1] !== 'ENTRY') {
             return $this->denied($log, 'invalid_format', 400);
         }
 
@@ -492,6 +505,118 @@ class GatewayController extends AbstractController
     }
 
     /**
+     * Проход тренера: FITNESSCLUB:STAFF:{staffId}:{base62Ts} — при активной аренде.
+     *
+     * @param string[] $parts
+     */
+    private function handleStaffEntry(Club $club, array $parts, AccessLog $log): JsonResponse
+    {
+        if (count($parts) !== 4) {
+            return $this->denied($log, 'invalid_format', 400);
+        }
+
+        $staffId = (int) $parts[2];
+        $timestamp = FitnessClubEntryQrTimestamp::parseToUnixMs($parts[3]);
+        if ($staffId <= 0 || $timestamp === null) {
+            return $this->denied($log, 'invalid_format', 400);
+        }
+
+        /** @var StaffUser|null $staff */
+        $staff = $this->em->getRepository(StaffUser::class)->find($staffId);
+        if (!$staff instanceof StaffUser) {
+            return $this->denied($log, 'staff_not_found', 404);
+        }
+
+        $dup = $this->occupancyService->findRecentGrantedByRawQr($log->getRawData(), self::QR_DEDUPE_SECONDS);
+        if ($dup !== null) {
+            $passage = ($dup['event_type'] === 'exit') ? 'exit' : 'entry';
+
+            return $this->json($this->grantedPayload($club, [
+                'access_granted' => true,
+                'reason' => 'ok',
+                'passage' => $passage,
+                'duplicate' => true,
+                'success' => true,
+                'user' => [
+                    'id' => 'staff-' . $staff->getId(),
+                    'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                    'phone' => $staff->getTrainer()?->getPhone(),
+                ],
+            ]));
+        }
+
+        $nowMs = (int) (microtime(true) * 1000);
+        $deltaMs = abs($nowMs - $timestamp);
+        if ($deltaMs > 15_000) {
+            return $this->denied($log, 'qr_expired', 400, [
+                'delta_ms' => $deltaMs,
+                'server_now_ms' => $nowMs,
+                'qr_timestamp_ms' => $timestamp,
+                'qr_time_segment' => $parts[3],
+            ]);
+        }
+
+        if ($staff->getRegistrationStatus() !== StaffUser::REGISTRATION_APPROVED) {
+            return $this->denied($log, 'staff_not_approved', 403);
+        }
+        if ($staff->requiresTrainerRental() && !$staff->hasValidRental()) {
+            return $this->denied($log, 'staff_rental_expired', 403);
+        }
+
+        $log->setResult('granted')->setReason('ok');
+        $this->em->persist($log);
+        $this->em->flush();
+        $this->occupancyService->notifyPresenceChanged($club);
+
+        return $this->json($this->grantedPayload($club, [
+            'access_granted' => true,
+            'reason' => 'ok',
+            'passage' => 'entry',
+            'success' => true,
+            'user' => [
+                'id' => 'staff-' . $staff->getId(),
+                'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                'phone' => $staff->getTrainer()?->getPhone(),
+            ],
+        ]));
+    }
+
+    /**
+     * @param string[] $parts
+     */
+    private function handleStaffExit(Club $club, array $parts, AccessLog $log): JsonResponse
+    {
+        if (count($parts) < 3) {
+            return $this->denied($log, 'invalid_format', 400);
+        }
+
+        $staffId = (int) $parts[2];
+        /** @var StaffUser|null $staff */
+        $staff = $staffId > 0 ? $this->em->getRepository(StaffUser::class)->find($staffId) : null;
+
+        $log->setResult('granted')->setReason('ok');
+        $this->em->persist($log);
+        $this->em->flush();
+        $this->occupancyService->notifyPresenceChanged($club);
+
+        $payload = [
+            'access_granted' => true,
+            'reason' => 'ok',
+            'passage' => 'exit',
+            'success' => true,
+        ];
+        if ($staff instanceof StaffUser) {
+            $payload['user'] = [
+                'id' => 'staff-' . $staff->getId(),
+                'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                'phone' => $staff->getTrainer()?->getPhone(),
+            ];
+        }
+
+        return $this->json($this->grantedPayload($club, $payload));
+    }
+
+    /**
      * @param string[] $parts
      */
     private function handleGuestPassEntry(Club $club, array $parts, AccessLog $log): JsonResponse
@@ -554,6 +679,9 @@ class GatewayController extends AbstractController
                 'user_blocked' => 'Клиент заблокирован',
                 'qr_expired' => 'QR-код устарел, обновите в приложении',
                 'already_inside' => 'Клиент уже в зале — используйте считыватель выхода',
+                'staff_rental_expired' => 'Аренда тренера не оплачена или истекла',
+                'staff_not_approved' => 'Учётная запись тренера не одобрена',
+                'staff_not_found' => 'Тренер не найден',
                 default => null,
             },
         ], $extra), $status);

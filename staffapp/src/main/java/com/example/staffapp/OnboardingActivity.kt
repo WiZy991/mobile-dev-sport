@@ -9,9 +9,11 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.staffapp.legal.StaffLegalPdf
 import com.example.staffapp.ui.legal.LegalPdfScreen
 import com.example.staffapp.ui.onboarding.OnboardingScreen
 import com.example.staffapp.ui.onboarding.OnboardingUiState
+import com.example.staffapp.ui.rental.SpecialistPurchaseConsentDialog
 import com.example.staffapp.ui.theme.StaffTheme
 import kotlin.concurrent.thread
 
@@ -22,7 +24,8 @@ class OnboardingActivity : ComponentActivity() {
     private var lastPaymentId: Int? = null
 
     private var uiState by mutableStateOf(OnboardingUiState())
-    private var showOfferPdf by mutableStateOf(false)
+    private var showConsentDialog by mutableStateOf(false)
+    private var openLegalPdf by mutableStateOf<StaffLegalPdf?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,17 +40,29 @@ class OnboardingActivity : ComponentActivity() {
 
         setContent {
             StaffTheme {
-                if (showOfferPdf) {
-                    LegalPdfScreen(onNavigateBack = { showOfferPdf = false })
-                } else {
-                    OnboardingScreen(
-                        state = uiState,
-                        onOfferAcceptedChange = { uiState = uiState.copy(offerAccepted = it) },
-                        onOpenOffer = { showOfferPdf = true },
-                        onPayClick = { startPayment() },
-                        onRefresh = { refreshOnboarding() },
-                        onLogout = { logout() },
-                    )
+                val pdf = openLegalPdf
+                when {
+                    pdf != null -> LegalPdfScreen(doc = pdf, onNavigateBack = { openLegalPdf = null })
+                    else -> {
+                        if (showConsentDialog) {
+                            SpecialistPurchaseConsentDialog(
+                                onDismiss = { showConsentDialog = false },
+                                onConfirm = {
+                                    showConsentDialog = false
+                                    startPayment()
+                                },
+                                onOpenPdf = { openLegalPdf = it },
+                                isLoading = uiState.isLoading,
+                            )
+                        }
+                        OnboardingScreen(
+                            state = uiState,
+                            onPlanSelected = { uiState = uiState.copy(selectedMonths = it) },
+                            onPayClick = { showConsentDialog = true },
+                            onRefresh = { refreshOnboarding() },
+                            onLogout = { logout() },
+                        )
+                    }
                 }
             }
         }
@@ -96,7 +111,11 @@ class OnboardingActivity : ComponentActivity() {
     private fun startPayment() {
         runAsync("Создаём платёж...") {
             val result = executeWithRefresh {
-                apiClient.initRentalPayment(it, offerAccepted = uiState.offerAccepted)
+                apiClient.initRentalPayment(
+                    it,
+                    offerAccepted = true,
+                    months = uiState.selectedMonths,
+                )
             }
             val url = result.paymentUrl
             if (url.isNullOrBlank()) {
@@ -156,8 +175,13 @@ class OnboardingActivity : ComponentActivity() {
         runOnUiThread {
             uiState = uiState.copy(
                 status = onboarding.status,
-                offerUrl = onboarding.offerUrl,
                 amountRub = onboarding.rentalAmountRub,
+                rentalPlans = onboarding.rentalPlans,
+                selectedMonths = when {
+                    onboarding.rentalPlans.any { it.months == uiState.selectedMonths } -> uiState.selectedMonths
+                    onboarding.rentalPlans.isNotEmpty() -> onboarding.rentalPlans.first().months
+                    else -> 1
+                },
                 rentalPaidUntil = onboarding.rentalPaidUntil,
                 errorMessage = null,
             )

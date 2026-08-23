@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.config.AppDistribution
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.ui.theme.Primary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,7 +54,7 @@ fun AboutScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Доброзал",
+                text = Brand.name,
                 style = MaterialTheme.typography.headlineMedium
             )
             Spacer(modifier = Modifier.height(8.dp))

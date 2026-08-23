@@ -22,11 +22,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-    
-    // Прод: только HTTPS. http:// даёт 301→https, OkHttp при редиректе превращает POST в GET → 405 на /auth/login.
-    // Локально с compose «ports: 8000:8000» — http://10.0.2.2:8000/api/v1/ (эмулятор).
-    private const val BASE_URL = "https://worldcashfit.ru/api/v1/"
-    
+
     @Provides
     @Singleton
     fun provideGson(): Gson = GsonBuilder()
@@ -67,6 +63,14 @@ object AppModule {
                     }
                 }
 
+                // Франшиза: тот же API host, другая организация в CRM.
+                val orgSlug = BuildConfig.ORGANIZATION_SLUG.trim()
+                if (orgSlug.isNotEmpty()) {
+                    requestBuilder.header("X-Organization-Slug", orgSlug)
+                }
+                // Чтобы HTTPS return/Sber callback вернул в это APK, а не в соседний flavor.
+                requestBuilder.header("X-App-Deep-Link-Scheme", BuildConfig.DEEP_LINK_SCHEME)
+
                 chain.proceed(requestBuilder.build())
             }
             .addInterceptor(MockInterceptor())
@@ -77,7 +81,7 @@ object AppModule {
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient, gson: Gson): Retrofit {
         return Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(BuildConfig.API_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()

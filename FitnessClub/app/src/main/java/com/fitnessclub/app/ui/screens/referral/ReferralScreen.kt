@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.BorderStroke
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.R
 import com.fitnessclub.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -174,8 +175,14 @@ fun ReferralScreen(
                             onClick = {
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, 
-                                        "Присоединяйся к Доброзал! Используй мой промокод ${uiState.referralCode} при регистрации и получи скидку! ${uiState.referralLink}")
+                                    putExtra(
+                                        Intent.EXTRA_TEXT,
+                                        context.getString(
+                                            R.string.referral_share_template,
+                                            uiState.referralCode,
+                                            uiState.referralLink,
+                                        ),
+                                    )
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, "Поделиться"))
                             },

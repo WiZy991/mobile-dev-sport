@@ -250,9 +250,19 @@ class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface, Te
 
     public function hasValidRental(?\DateTimeImmutable $now = null): bool
     {
-        $now ??= new \DateTimeImmutable();
+        if ($this->rentalPaidUntil === null) {
+            return false;
+        }
 
-        return $this->rentalPaidUntil !== null && $this->rentalPaidUntil >= $now;
+        $tz = \App\Service\ClubTimezone::zone();
+        $nowLocal = ($now ?? \App\Service\ClubTimezone::now())->setTimezone($tz);
+        // Дата в БД без TZ — это календарный день клуба; «до ДД.ММ» действует весь день во Владивостоке.
+        $untilEndOfDay = new \DateTimeImmutable(
+            $this->rentalPaidUntil->format('Y-m-d') . ' 23:59:59',
+            $tz,
+        );
+
+        return $untilEndOfDay >= $nowLocal;
     }
 
     public function isTrainerRole(): bool

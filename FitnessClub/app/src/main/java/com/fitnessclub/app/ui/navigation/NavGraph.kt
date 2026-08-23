@@ -148,6 +148,9 @@ fun NavGraph(
                 val registerState by viewModel.uiState.collectAsState()
                 RegisterClubPickScreen(
                     selectedClubId = registerState.selectedClub?.id,
+                    apiClubs = registerState.clubs,
+                    clubsLoading = registerState.clubsLoading,
+                    clubsLoadError = registerState.clubsLoadError,
                     onBack = {
                         navController.popBackStack(Screen.Login.route, inclusive = false)
                     },

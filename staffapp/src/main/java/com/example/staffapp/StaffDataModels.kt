@@ -1,6 +1,7 @@
 package com.example.staffapp
 
 data class StaffAppData(
+    val employeeId: Int = 0,
     val employeeName: String,
     val employeeEmail: String,
     val roles: List<String> = emptyList(),
@@ -19,6 +20,15 @@ data class TrainerPublicProfile(
     val rating: Float,
     val photoUrl: String?,
     val profileComplete: Boolean = true,
+    val publicationStatus: String = "moderation",
+    val publicationStatusLabel: String = "На модерации",
+    val services: List<TrainerServiceItem> = emptyList(),
+    val needsModeration: Boolean = false,
+)
+
+data class TrainerServiceItem(
+    val name: String,
+    val priceFrom: Int,
 )
 
 data class StaffAdminData(
@@ -71,14 +81,34 @@ data class StaffOnboarding(
     val registrationStatus: String,
     val requiresRental: Boolean,
     val rentalPaidUntil: String?,
+    /** Сервер: аренда не нужна или срок ещё действует. */
+    val rentalActive: Boolean = false,
     val offerUrl: String,
     val privacyUrl: String = "https://dobrozal.ru/doc/privacy",
     val docsUrl: String = "https://dobrozal.ru/doc",
     val rentalAmountKopecks: Int,
     val rentalAmountRub: Double,
+    val rentalPlans: List<RentalPlan> = emptyList(),
+    val staffUserId: Int? = null,
     val profileComplete: Boolean = true,
     val profileMissing: List<String> = emptyList(),
     val specializationsCatalog: List<String> = TrainerSpecializationCatalog.DEFAULT,
+)
+
+data class RentalPlan(
+    val months: Int,
+    val label: String,
+    val amountKopecks: Int,
+    val amountRub: Double,
+)
+
+data class RentalPaymentItem(
+    val id: Int,
+    val status: String,
+    val amountRub: Double,
+    val durationMonths: Int,
+    val paidAt: String?,
+    val createdAt: String?,
 )
 
 data class RentalPaymentResult(

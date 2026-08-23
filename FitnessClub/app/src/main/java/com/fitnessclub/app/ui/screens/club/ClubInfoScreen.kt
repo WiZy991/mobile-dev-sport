@@ -21,8 +21,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.fitnessclub.app.ui.theme.*
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.model.resolvedSocialLinks
+import com.fitnessclub.app.ui.theme.*
 
 private fun parseSocialColor(hex: String): Color =
     runCatching { Color(android.graphics.Color.parseColor(hex)) }
@@ -41,7 +42,7 @@ fun ClubInfoScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(club?.name ?: "Доброзал") },
+                title = { Text(club?.name ?: Brand.name) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Назад")

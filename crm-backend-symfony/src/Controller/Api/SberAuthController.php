@@ -108,6 +108,7 @@ class SberAuthController extends AbstractController
             'codeChallenge' => 'code_challenge',
             'codeChallengeMethod' => 'code_challenge_method',
             'redirectUri' => 'redirect_uri',
+            'appBridgeUri' => 'app_bridge_uri',
         ];
         foreach ($aliases as $from => $to) {
             if (!isset($params[$to]) && array_key_exists($from, $params) && is_scalar($params[$from])) {
@@ -152,7 +153,13 @@ class SberAuthController extends AbstractController
             return $this->json(['error' => 'invalid_redirect_uri', 'message' => 'redirect_uri должен совпадать с SBER_ID_NATIVE_REDIRECT_URI'], 400);
         }
 
-        $issued = $this->pkceState->issue();
+        $appBridge = $this->resolveAllowedAppBridge(
+            isset($params['app_bridge_uri']) && is_string($params['app_bridge_uri'])
+                ? $params['app_bridge_uri']
+                : null
+        );
+
+        $issued = $this->pkceState->issue(900, $appBridge);
         $authorizeUrl = $this->sberId->buildAuthorizeUrlWithPkce(
             $redirectUri,
             $issued['state'],
@@ -272,10 +279,16 @@ class SberAuthController extends AbstractController
         $state = (string) $request->query->get('state', '');
         // PKCE: в кабинете Сбер ID может быть только HTTPS redirect — приходим сюда с code/state,
         // затем перенаправляем на кастомную схему для завершения ASWebAuthenticationSession.
-        if ($state !== '' && $this->pkceState->verify($state) !== null) {
-            $bridge = trim($this->nativeAppBridgeUri);
-            if ($bridge !== '') {
-                return new RedirectResponse($this->buildNativeAppBridgeUrl($bridge, $request));
+        if ($state !== '') {
+            $verified = $this->pkceState->verify($state);
+            if ($verified !== null) {
+                $bridge = trim((string) ($verified['app_bridge'] ?? ''));
+                if ($bridge === '') {
+                    $bridge = trim($this->nativeAppBridgeUri);
+                }
+                if ($bridge !== '') {
+                    return new RedirectResponse($this->buildNativeAppBridgeUrl($bridge, $request));
+                }
             }
         }
 
@@ -356,6 +369,28 @@ class SberAuthController extends AbstractController
         $sep = str_contains($bridgeBase, '?') ? '&' : '?';
 
         return $bridgeBase . $sep . $qs;
+    }
+
+    /**
+     * Разрешённые deep link’и клиентских APK. Без whitelist любой URI в state = open redirect.
+     */
+    private function resolveAllowedAppBridge(?string $requested): string
+    {
+        $default = trim($this->nativeAppBridgeUri);
+        if ($default === '') {
+            $default = 'worldfitness://auth/callback';
+        }
+        $requested = trim((string) $requested);
+        $allowed = [
+            'dobrozal://auth/callback',
+            'worldfitness://auth/callback',
+            'academywrestling://auth/callback',
+        ];
+        if ($requested !== '' && in_array($requested, $allowed, true)) {
+            return $requested;
+        }
+
+        return $default;
     }
 
     private function htmlResult(bool $ok, string $message): string

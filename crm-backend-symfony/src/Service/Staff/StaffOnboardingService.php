@@ -166,14 +166,17 @@ final class StaffOnboardingService
         return [
             'status' => $gate,
             'registration_status' => $user->getRegistrationStatus(),
+            'staff_user_id' => $user->getId(),
             'requires_rental' => $user->requiresTrainerRental(),
             'rental_paid_until' => $user->getRentalPaidUntil()?->format('Y-m-d\TH:i:s'),
+            'rental_active' => !$user->requiresTrainerRental() || $user->hasValidRental(),
             'offer_accepted_at' => $user->getOfferAcceptedAt()?->format('Y-m-d\TH:i:s'),
             'offer_url' => $offerUrl,
             'privacy_url' => $privacyUrl,
             'docs_url' => $docsUrl,
             'rental_amount_kopecks' => $amount,
             'rental_amount_rub' => round($amount / 100, 2),
+            'rental_plans' => $this->rentalPlans($amount),
             'trainer_id' => $trainer?->getId() !== null
                 ? 'trainer-' . $trainer->getId()
                 : null,
@@ -182,6 +185,38 @@ final class StaffOnboardingService
             'specializations_catalog' => self::specializationCatalog(),
             'specializations_max' => self::MAX_SPECIALIZATIONS,
         ];
+    }
+
+    /**
+     * Тарифы аренды: база × N месяцев (1 / 3 / 6).
+     *
+     * @return list<array{months: int, label: string, amount_kopecks: int, amount_rub: float}>
+     */
+    public function rentalPlans(int $baseKopecks): array
+    {
+        $base = max(0, $baseKopecks);
+        $plans = [];
+        foreach ([1, 3, 6] as $months) {
+            $amount = $base * $months;
+            $plans[] = [
+                'months' => $months,
+                'label' => match ($months) {
+                    1 => '1 месяц',
+                    3 => '3 месяца',
+                    6 => '6 месяцев',
+                    default => $months . ' мес.',
+                },
+                'amount_kopecks' => $amount,
+                'amount_rub' => round($amount / 100, 2),
+            ];
+        }
+
+        return $plans;
+    }
+
+    public function normalizeRentalMonths(int $months): int
+    {
+        return \in_array($months, [1, 3, 6], true) ? $months : 1;
     }
 
     public function rentalAmountKopecks(): int

@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.BuildConfig
+import com.fitnessclub.app.R
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.LegalLinks
 import com.fitnessclub.app.data.config.LegalPdfAsset
@@ -35,6 +36,7 @@ import com.fitnessclub.app.data.local.AppLanguage
 import com.fitnessclub.app.data.local.ThemeMode
 import com.fitnessclub.app.ui.components.GeneralFeedbackDialog
 import com.fitnessclub.app.ui.theme.Primary
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -198,7 +200,7 @@ fun SettingsScreen(
                 ClickableSettingItem(
                     icon = Icons.Default.Info,
                     title = "О сети и контакты",
-                    subtitle = "О Доброзал, обратная связь, оценка приложения",
+                    subtitle = stringResource(R.string.about_settings_subtitle),
                     onClick = onNavigateToNetworkInfo
                 )
             }

@@ -180,18 +180,30 @@ class PaymentFulfillmentService
             throw new \RuntimeException('Trainer rental payment missing staff user');
         }
 
-        $now = new \DateTimeImmutable();
+        $now = \App\Service\ClubTimezone::now();
         $base = $staff->getRentalPaidUntil();
         if ($base === null || $base < $now) {
             $base = $now;
         }
-        $staff->setRentalPaidUntil($base->modify('+1 month'));
+        $months = $payment->getDurationMonths();
+        // Конец срока — конец календарного дня во Владивостоке.
+        $paidUntil = (new \DateTimeImmutable(
+            $base->modify(sprintf('+%d month', $months))->format('Y-m-d') . ' 23:59:59',
+            \App\Service\ClubTimezone::zone(),
+        ));
+        $staff->setRentalPaidUntil($paidUntil);
 
+        $monthsLabel = match ($months) {
+            1 => '1 месяц',
+            3 => '3 месяца',
+            6 => '6 месяцев',
+            default => $months . ' мес.',
+        };
         $price = $payment->getAmountKopecks() / 100;
         $sale = (new Sale())
             ->setUser(null)
             ->setClientName($staff->getName() !== '' ? $staff->getName() : $staff->getEmail())
-            ->setProductName('Аренда клуба (тренер) — 1 месяц')
+            ->setProductName('Аренда клуба (тренер) — ' . $monthsLabel)
             ->setQuantity(1)
             ->setPrice($price)
             ->setTotal($price)

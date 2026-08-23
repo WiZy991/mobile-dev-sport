@@ -3,6 +3,7 @@ package com.fitnessclub.app
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatDelegate
+import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
 import com.fitnessclub.app.data.auth.SberAuthDeepLinkBus
 import androidx.activity.compose.setContent
@@ -113,10 +114,12 @@ class MainActivity : FragmentActivity() {
 
     private fun dispatchDeepLinks(intent: Intent?) {
         val data = intent?.data ?: return
-        if (data.scheme == "worldfitness" && data.host == "auth" && data.path == "/callback") {
+        // Только схема своего flavor — иначе при двух APK на телефоне callback уходит в чужое приложение.
+        if (data.scheme != BuildConfig.DEEP_LINK_SCHEME) return
+        if (data.host == "auth" && data.path == "/callback") {
             SberAuthDeepLinkBus.publish(data)
         }
-        if (data.scheme == "worldfitness" && data.host == "payment" && data.path == "/callback") {
+        if (data.host == "payment" && data.path == "/callback") {
             PaymentDeepLinkBus.publish(data)
         }
     }

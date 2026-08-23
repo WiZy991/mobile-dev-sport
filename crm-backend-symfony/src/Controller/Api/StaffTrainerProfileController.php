@@ -57,11 +57,15 @@ final class StaffTrainerProfileController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true) ?? [];
+        $publicChanged = false;
 
         if (array_key_exists('name', $data)) {
             $name = trim((string) $data['name']);
             if ($name === '') {
                 return $this->json(['error' => 'Имя не может быть пустым', 'code' => 'invalid_name'], 400);
+            }
+            if ($trainer->getName() !== $name) {
+                $publicChanged = true;
             }
             $trainer->setName($name);
             $staff->setName($name);
@@ -76,11 +80,18 @@ final class StaffTrainerProfileController extends AbstractController
                     'specializations_catalog' => StaffOnboardingService::specializationCatalog(),
                 ], 400);
             }
+            if ((string) ($trainer->getSpecialization() ?? '') !== $normalized) {
+                $publicChanged = true;
+            }
             $trainer->setSpecialization($normalized);
         }
         if (array_key_exists('description', $data)) {
             $desc = trim((string) $data['description']);
-            $trainer->setDescription($desc !== '' ? $desc : null);
+            $newDesc = $desc !== '' ? $desc : null;
+            if ($trainer->getDescription() !== $newDesc) {
+                $publicChanged = true;
+            }
+            $trainer->setDescription($newDesc);
         }
         if (array_key_exists('phone', $data)) {
             $phone = trim((string) $data['phone']);
@@ -91,11 +102,33 @@ final class StaffTrainerProfileController extends AbstractController
             if (!(\strlen($digits) === 10 || (\strlen($digits) === 11 && ($digits[0] === '7' || $digits[0] === '8')))) {
                 return $this->json(['error' => 'Введите корректный номер телефона', 'code' => 'invalid_phone'], 400);
             }
+            if ($trainer->getPhone() !== $phone) {
+                $publicChanged = true;
+            }
             $trainer->setPhone($phone);
         }
         if (array_key_exists('photo_url', $data)) {
             $url = trim((string) $data['photo_url']);
-            $trainer->setPhotoUrl($url !== '' ? $url : null);
+            $newUrl = $url !== '' ? $url : null;
+            if ($trainer->getPhotoUrl() !== $newUrl) {
+                $publicChanged = true;
+            }
+            $trainer->setPhotoUrl($newUrl);
+        }
+        if (array_key_exists('services', $data)) {
+            $services = $data['services'];
+            if ($services !== null && !\is_array($services)) {
+                return $this->json(['error' => 'services должен быть массивом', 'code' => 'invalid_services'], 400);
+            }
+            $errors = $trainer->setServicesFromInput(\is_array($services) ? $services : null);
+            if ($errors !== []) {
+                return $this->json(['error' => $errors[0], 'code' => 'invalid_services'], 400);
+            }
+            $publicChanged = true;
+        }
+
+        if ($publicChanged && $trainer->getPublicationStatus() === Trainer::STATUS_PUBLISHED) {
+            $trainer->setPublicationStatus(Trainer::STATUS_MODERATION);
         }
 
         $this->em->flush();
@@ -103,6 +136,7 @@ final class StaffTrainerProfileController extends AbstractController
         return $this->json($this->serialize($trainer, $request) + [
             'profile_complete' => $this->onboarding->isTrainerProfileComplete($staff),
             'onboarding' => $this->onboarding->serialize($staff),
+            'needs_moderation' => $trainer->getPublicationStatus() === Trainer::STATUS_MODERATION,
         ]);
     }
 
@@ -135,9 +169,14 @@ final class StaffTrainerProfileController extends AbstractController
         }
 
         $trainer->setPhotoUrl($path);
+        if ($trainer->getPublicationStatus() === Trainer::STATUS_PUBLISHED) {
+            $trainer->setPublicationStatus(Trainer::STATUS_MODERATION);
+        }
         $this->em->flush();
 
-        return $this->json($this->serialize($trainer, $request));
+        return $this->json($this->serialize($trainer, $request) + [
+            'needs_moderation' => $trainer->getPublicationStatus() === Trainer::STATUS_MODERATION,
+        ]);
     }
 
     /** @return StaffUser|JsonResponse */
@@ -175,6 +214,9 @@ final class StaffTrainerProfileController extends AbstractController
             'rating' => $trainer->getRating() ?? 0.0,
             'photo_url' => self::absolutePublicUrl($request, $trainer->getPhotoUrl()),
             'photo_path' => $trainer->getPhotoUrl(),
+            'publication_status' => $trainer->getPublicationStatus(),
+            'publication_status_label' => $trainer->getPublicationStatusLabel(),
+            'services' => $trainer->getServices(),
         ];
     }
 

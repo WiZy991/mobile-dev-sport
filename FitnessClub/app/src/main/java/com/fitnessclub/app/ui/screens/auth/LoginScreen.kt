@@ -49,7 +49,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -71,11 +70,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
+import com.fitnessclub.app.R
 import com.fitnessclub.app.data.auth.SberAuthDeepLinkBus
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.ui.components.BrandHeader
 
@@ -93,13 +94,13 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     val focusManager = LocalFocusManager.current
     var passwordVisible by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     var sberLaunchConsumed by remember { mutableStateOf(false) }
+    var sberAuthorizeUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -111,12 +112,8 @@ fun LoginScreen(
                     onLoginSuccess()
                 }
                 is LoginEvent.OpenExternalUrl -> {
-                    runCatching {
-                        val customTabsIntent = CustomTabsIntent.Builder().build()
-                        customTabsIntent.launchUrl(context, android.net.Uri.parse(event.url))
-                    }.onFailure {
-                        runCatching { uriHandler.openUri(event.url) }
-                    }
+                    // Только внутри этого APK — не Custom Tabs (иначе callback уезжает в Академию).
+                    sberAuthorizeUrl = event.url
                 }
             }
         }
@@ -138,6 +135,17 @@ fun LoginScreen(
             viewModel.setWelcomeAfterSberLogin(true)
             viewModel.loginWithSberId()
         }
+    }
+
+    sberAuthorizeUrl?.let { url ->
+        SberAuthWebDialog(
+            authorizeUrl = url,
+            onCallback = { uri ->
+                sberAuthorizeUrl = null
+                viewModel.handleSberDeepLink(uri)
+            },
+            onDismiss = { sberAuthorizeUrl = null },
+        )
     }
 
     Box(
@@ -163,7 +171,7 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(8.dp))
             BrandHeader(
-                brandName = uiState.clubBrandName,
+                brandName = Brand.name,
                 subtitle = if (uiState.hasCompletedRegistration) {
                     "Вход в аккаунт"
                 } else {
@@ -376,7 +384,7 @@ fun LoginScreen(
                 text = if (uiState.hasCompletedRegistration) {
                     "Нужен другой аккаунт?"
                 } else {
-                    "Впервые в Доброзал?"
+                    stringResource(R.string.brand_first_time)
                 },
                 color = LoginSurfaceWhite.copy(0.88f),
                 style = MaterialTheme.typography.bodyMedium,
