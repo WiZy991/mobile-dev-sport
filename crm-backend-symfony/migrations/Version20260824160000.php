@@ -9,7 +9,12 @@ use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
-/** Мультизал аренда тренера: staff_club_rentals, active_club, цены по клубам. */
+/**
+ * Мультизал аренда тренера: staff_club_rentals, active_club, цены по клубам.
+ *
+ * DDL выполняется сразу через connection (не через отложенный addSql),
+ * иначе seed/backfill падает: колонок ещё нет.
+ */
 final class Version20260824160000 extends AbstractMigration
 {
     use MigrationHelpers;
@@ -19,41 +24,71 @@ final class Version20260824160000 extends AbstractMigration
         return 'staff_club_rentals + staff_users.active_club_id + payments.club_id + clubs.trainer_rental_amount_rub';
     }
 
+    public function isTransactional(): bool
+    {
+        // MySQL DDL делает implicit commit — без транзакции безопаснее для partial retry.
+        return false;
+    }
+
     public function up(Schema $schema): void
     {
         $sqlite = $this->connection->getDatabasePlatform() instanceof SQLitePlatform;
 
         if ($this->tableExists('clubs') && !$this->columnExists('clubs', 'trainer_rental_amount_rub')) {
-            if ($sqlite) {
-                $this->addSql('ALTER TABLE clubs ADD COLUMN trainer_rental_amount_rub INTEGER DEFAULT NULL');
-            } else {
-                $this->addSql('ALTER TABLE clubs ADD trainer_rental_amount_rub INT DEFAULT NULL');
-            }
+            $this->connection->executeStatement(
+                $sqlite
+                    ? 'ALTER TABLE clubs ADD COLUMN trainer_rental_amount_rub INTEGER DEFAULT NULL'
+                    : 'ALTER TABLE clubs ADD trainer_rental_amount_rub INT DEFAULT NULL'
+            );
         }
 
         if ($this->tableExists('staff_users') && !$this->columnExists('staff_users', 'active_club_id')) {
             if ($sqlite) {
-                $this->addSql('ALTER TABLE staff_users ADD COLUMN active_club_id INTEGER DEFAULT NULL');
+                $this->connection->executeStatement(
+                    'ALTER TABLE staff_users ADD COLUMN active_club_id INTEGER DEFAULT NULL'
+                );
             } else {
-                $this->addSql('ALTER TABLE staff_users ADD active_club_id INT DEFAULT NULL');
-                $this->addSql('ALTER TABLE staff_users ADD CONSTRAINT FK_staff_users_active_club FOREIGN KEY (active_club_id) REFERENCES clubs (id) ON DELETE SET NULL');
-                $this->addSql('CREATE INDEX IDX_staff_users_active_club ON staff_users (active_club_id)');
+                $this->connection->executeStatement(
+                    'ALTER TABLE staff_users ADD active_club_id INT DEFAULT NULL'
+                );
+                if (!$this->foreignKeyExists('staff_users', 'FK_staff_users_active_club')) {
+                    $this->connection->executeStatement(
+                        'ALTER TABLE staff_users ADD CONSTRAINT FK_staff_users_active_club FOREIGN KEY (active_club_id) REFERENCES clubs (id) ON DELETE SET NULL'
+                    );
+                }
+                if (!$this->indexExists('staff_users', 'IDX_staff_users_active_club')) {
+                    $this->connection->executeStatement(
+                        'CREATE INDEX IDX_staff_users_active_club ON staff_users (active_club_id)'
+                    );
+                }
             }
         }
 
         if ($this->tableExists('payments') && !$this->columnExists('payments', 'club_id')) {
             if ($sqlite) {
-                $this->addSql('ALTER TABLE payments ADD COLUMN club_id INTEGER DEFAULT NULL');
+                $this->connection->executeStatement(
+                    'ALTER TABLE payments ADD COLUMN club_id INTEGER DEFAULT NULL'
+                );
             } else {
-                $this->addSql('ALTER TABLE payments ADD club_id INT DEFAULT NULL');
-                $this->addSql('ALTER TABLE payments ADD CONSTRAINT FK_payments_club FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE SET NULL');
-                $this->addSql('CREATE INDEX IDX_payments_club ON payments (club_id)');
+                $this->connection->executeStatement(
+                    'ALTER TABLE payments ADD club_id INT DEFAULT NULL'
+                );
+                if (!$this->foreignKeyExists('payments', 'FK_payments_club')) {
+                    $this->connection->executeStatement(
+                        'ALTER TABLE payments ADD CONSTRAINT FK_payments_club FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE SET NULL'
+                    );
+                }
+                if (!$this->indexExists('payments', 'IDX_payments_club')) {
+                    $this->connection->executeStatement(
+                        'CREATE INDEX IDX_payments_club ON payments (club_id)'
+                    );
+                }
             }
         }
 
         if (!$this->tableExists('staff_club_rentals')) {
             if ($sqlite) {
-                $this->addSql(<<<'SQL'
+                $this->connection->executeStatement(<<<'SQL'
 CREATE TABLE staff_club_rentals (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     staff_user_id INTEGER NOT NULL,
@@ -64,11 +99,17 @@ CREATE TABLE staff_club_rentals (
     FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE CASCADE
 )
 SQL);
-                $this->addSql('CREATE UNIQUE INDEX uniq_staff_club_rental ON staff_club_rentals (staff_user_id, club_id)');
-                $this->addSql('CREATE INDEX idx_staff_club_rental_staff ON staff_club_rentals (staff_user_id)');
-                $this->addSql('CREATE INDEX idx_staff_club_rental_club ON staff_club_rentals (club_id)');
+                $this->connection->executeStatement(
+                    'CREATE UNIQUE INDEX uniq_staff_club_rental ON staff_club_rentals (staff_user_id, club_id)'
+                );
+                $this->connection->executeStatement(
+                    'CREATE INDEX idx_staff_club_rental_staff ON staff_club_rentals (staff_user_id)'
+                );
+                $this->connection->executeStatement(
+                    'CREATE INDEX idx_staff_club_rental_club ON staff_club_rentals (club_id)'
+                );
             } else {
-                $this->addSql(<<<'SQL'
+                $this->connection->executeStatement(<<<'SQL'
 CREATE TABLE staff_club_rentals (
     id INT AUTO_INCREMENT NOT NULL,
     staff_user_id INT NOT NULL,
@@ -86,6 +127,7 @@ SQL);
             }
         }
 
+        // Только после реального появления колонок.
         $this->seedRentalClubsAndPrices();
         $this->backfillLegacyRentals();
     }
@@ -123,7 +165,7 @@ SQL);
 
     private function seedRentalClubsAndPrices(): void
     {
-        if (!$this->tableExists('clubs')) {
+        if (!$this->tableExists('clubs') || !$this->columnExists('clubs', 'trainer_rental_amount_rub')) {
             return;
         }
 
@@ -131,7 +173,6 @@ SQL);
         $orgId = $orgId !== false && $orgId !== null ? (int) $orgId : null;
         $hasOrgCol = $this->columnExists('clubs', 'organization_id');
 
-        // [name, address, amount_rub, match needles for existing rows]
         $venues = [
             ['ТЦ Седанка Сити', 'ул. Полетаева, 6д', 30000, ['полетаева', 'седанка']],
             ['ТЦ Формат', 'ул. Центральная, 18, 2 этаж', 25000, ['центральная', 'формат']],
@@ -157,11 +198,10 @@ SQL);
                     $row['organization_id'] = $orgId;
                 }
                 $this->connection->insert('clubs', $row);
-                $clubId = (int) $this->connection->lastInsertId();
             } else {
                 $this->connection->executeStatement(
-                    'UPDATE clubs SET trainer_rental_amount_rub = ?, name = COALESCE(NULLIF(name, \'\'), ?), address = CASE WHEN address IS NULL OR address = \'\' THEN ? ELSE address END WHERE id = ?',
-                    [$amount, $name, $address, $clubId],
+                    'UPDATE clubs SET trainer_rental_amount_rub = ? WHERE id = ?',
+                    [$amount, $clubId],
                 );
             }
         }
@@ -191,18 +231,27 @@ SQL);
         if (!$this->columnExists('staff_users', 'rental_paid_until')) {
             return;
         }
+        if (!$this->columnExists('clubs', 'trainer_rental_amount_rub')) {
+            return;
+        }
 
         $defaultClubId = $this->connection->fetchOne(
             'SELECT id FROM clubs WHERE trainer_rental_amount_rub IS NOT NULL ORDER BY id ASC LIMIT 1'
         );
         if ($defaultClubId === false || $defaultClubId === null) {
+            $defaultClubId = $this->connection->fetchOne('SELECT id FROM clubs ORDER BY id ASC LIMIT 1');
+        }
+        if ($defaultClubId === false || $defaultClubId === null) {
             return;
         }
         $defaultClubId = (int) $defaultClubId;
 
-        $staffRows = $this->connection->fetchAllAssociative(
-            'SELECT id, rental_paid_until, active_club_id FROM staff_users WHERE rental_paid_until IS NOT NULL'
-        );
+        $hasActiveClub = $this->columnExists('staff_users', 'active_club_id');
+        $select = $hasActiveClub
+            ? 'SELECT id, rental_paid_until, active_club_id FROM staff_users WHERE rental_paid_until IS NOT NULL'
+            : 'SELECT id, rental_paid_until FROM staff_users WHERE rental_paid_until IS NOT NULL';
+
+        $staffRows = $this->connection->fetchAllAssociative($select);
         foreach ($staffRows as $row) {
             $staffId = (int) $row['id'];
             $until = (string) $row['rental_paid_until'];
@@ -220,7 +269,7 @@ SQL);
                 'paid_until' => $until,
                 'updated_at' => $now,
             ]);
-            if (empty($row['active_club_id'])) {
+            if ($hasActiveClub && empty($row['active_club_id'])) {
                 $this->connection->executeStatement(
                     'UPDATE staff_users SET active_club_id = ? WHERE id = ?',
                     [$defaultClubId, $staffId],
