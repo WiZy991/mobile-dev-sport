@@ -33,6 +33,11 @@ class Payment
     #[ORM\JoinColumn(name: 'staff_user_id', nullable: true, onDelete: 'SET NULL')]
     private ?StaffUser $staffUser = null;
 
+    /** Клуб аренды (TYPE_TRAINER_RENTAL). */
+    #[ORM\ManyToOne(targetEntity: Club::class)]
+    #[ORM\JoinColumn(name: 'club_id', nullable: true, onDelete: 'SET NULL')]
+    private ?Club $club = null;
+
     #[ORM\Column(type: 'string', length: 30)]
     private string $type = self::TYPE_SUBSCRIPTION;
 
@@ -126,6 +131,18 @@ class Payment
     public function setStaffUser(?StaffUser $staffUser): self
     {
         $this->staffUser = $staffUser;
+
+        return $this;
+    }
+
+    public function getClub(): ?Club
+    {
+        return $this->club;
+    }
+
+    public function setClub(?Club $club): self
+    {
+        $this->club = $club;
 
         return $this;
     }

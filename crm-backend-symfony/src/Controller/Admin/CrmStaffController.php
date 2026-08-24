@@ -46,11 +46,39 @@ final class CrmStaffController extends AbstractController
             ));
         }
 
+        $clubRentalsByStaff = [];
+        if ($users !== []) {
+            $ids = array_values(array_filter(array_map(
+                static fn (StaffUser $u) => $u->getId(),
+                $users,
+            )));
+            if ($ids !== []) {
+                /** @var list<\App\Entity\StaffClubRental> $rentals */
+                $rentals = $this->em->createQueryBuilder()
+                    ->select('r', 'c')
+                    ->from(\App\Entity\StaffClubRental::class, 'r')
+                    ->join('r.club', 'c')
+                    ->where('IDENTITY(r.staffUser) IN (:ids)')
+                    ->setParameter('ids', $ids)
+                    ->orderBy('r.id', 'ASC')
+                    ->getQuery()
+                    ->getResult();
+                foreach ($rentals as $rental) {
+                    $sid = $rental->getStaffUser()->getId();
+                    if ($sid === null) {
+                        continue;
+                    }
+                    $clubRentalsByStaff[$sid][] = $rental;
+                }
+            }
+        }
+
         return $this->render('admin/crm_staff_index.html.twig', [
             'menu' => $this->menu(),
             'current' => 'crm_staff',
             'staffUsers' => $users,
             'filter' => $filter,
+            'club_rentals_by_staff' => $clubRentalsByStaff,
         ]);
     }
 
@@ -68,6 +96,7 @@ final class CrmStaffController extends AbstractController
             'selectableRoles' => self::SELECTABLE_ROLES,
             'checkedRoles' => ['ROLE_TRAINER'],
             'generatePassword' => true,
+            'clubRentals' => [],
         ]);
     }
 
@@ -95,6 +124,10 @@ final class CrmStaffController extends AbstractController
             'selectableRoles' => self::SELECTABLE_ROLES,
             'checkedRoles' => $stored !== [] ? $stored : ['ROLE_VIEWER'],
             'generatePassword' => false,
+            'clubRentals' => $this->em->getRepository(\App\Entity\StaffClubRental::class)->findBy(
+                ['staffUser' => $staff],
+                ['id' => 'ASC'],
+            ),
         ]);
     }
 

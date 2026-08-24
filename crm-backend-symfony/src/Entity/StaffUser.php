@@ -64,6 +64,11 @@ class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface, Te
     #[ORM\Column(name: 'rental_paid_until', type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $rentalPaidUntil = null;
 
+    /** Текущий зал для QR / UX (среди оплаченных аренд). */
+    #[ORM\ManyToOne(targetEntity: Club::class)]
+    #[ORM\JoinColumn(name: 'active_club_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?Club $activeClub = null;
+
     #[ORM\OneToOne(targetEntity: Trainer::class)]
     #[ORM\JoinColumn(name: 'trainer_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
     private ?Trainer $trainer = null;
@@ -232,6 +237,18 @@ class StaffUser implements UserInterface, PasswordAuthenticatedUserInterface, Te
     public function setRentalPaidUntil(?\DateTimeImmutable $rentalPaidUntil): self
     {
         $this->rentalPaidUntil = $rentalPaidUntil;
+
+        return $this;
+    }
+
+    public function getActiveClub(): ?Club
+    {
+        return $this->activeClub;
+    }
+
+    public function setActiveClub(?Club $activeClub): self
+    {
+        $this->activeClub = $activeClub;
 
         return $this;
     }

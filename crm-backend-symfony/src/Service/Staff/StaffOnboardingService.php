@@ -51,6 +51,7 @@ final class StaffOnboardingService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly ClubSettingsStore $clubSettings,
+        private readonly StaffClubRentalService $clubRentals,
     ) {
     }
 
@@ -65,7 +66,7 @@ final class StaffOnboardingService
 
     private function resolveApprovedGate(StaffUser $user): string
     {
-        if ($user->requiresTrainerRental() && !$user->hasValidRental()) {
+        if ($user->requiresTrainerRental() && !$this->clubRentals->hasAnyValidRental($user)) {
             return self::GATE_NEEDS_PAYMENT;
         }
         if ($user->isTrainerRole() && !$this->isTrainerProfileComplete($user)) {
@@ -138,7 +139,27 @@ final class StaffOnboardingService
     public function serialize(StaffUser $user): array
     {
         $gate = $this->resolveGate($user);
-        $amount = $this->rentalAmountKopecks();
+        $clubs = $this->clubRentals->serializeClubs($user);
+        $activeClub = $user->getActiveClub();
+        $activePaidUntil = null;
+        if ($activeClub !== null) {
+            $activeRental = $this->clubRentals->findRental($user, $activeClub);
+            $activePaidUntil = $activeRental?->getPaidUntil();
+        }
+        if ($activePaidUntil === null) {
+            $activePaidUntil = $user->getRentalPaidUntil();
+        }
+
+        $defaultAmount = 0;
+        foreach ($clubs as $row) {
+            if (($row['amount_kopecks'] ?? 0) > $defaultAmount) {
+                $defaultAmount = (int) $row['amount_kopecks'];
+            }
+        }
+        if ($defaultAmount <= 0) {
+            $defaultAmount = $this->rentalAmountKopecks();
+        }
+
         $offerUrl = trim((string) ($this->clubSettings->get('offer_url') ?? ''));
         if ($offerUrl === '') {
             $offerUrl = 'https://dobrozal.ru/doc/offer';
@@ -163,20 +184,40 @@ final class StaffOnboardingService
             }
         }
 
+        $rentalActive = !$user->requiresTrainerRental() || $this->clubRentals->hasAnyValidRental($user);
+        $activeClubRow = null;
+        foreach ($clubs as $row) {
+            if (!empty($row['is_active_club'])) {
+                $activeClubRow = $row;
+                break;
+            }
+        }
+
         return [
             'status' => $gate,
             'registration_status' => $user->getRegistrationStatus(),
             'staff_user_id' => $user->getId(),
             'requires_rental' => $user->requiresTrainerRental(),
-            'rental_paid_until' => $user->getRentalPaidUntil()?->format('Y-m-d\TH:i:s'),
-            'rental_active' => !$user->requiresTrainerRental() || $user->hasValidRental(),
+            'rental_paid_until' => $activePaidUntil?->format('Y-m-d\TH:i:s'),
+            'rental_active' => $rentalActive,
+            'active_club_id' => $activeClub?->getId(),
+            'active_club' => $activeClubRow,
+            'rental_clubs' => $clubs,
+            'rental_days' => StaffClubRentalService::RENTAL_DAYS,
             'offer_accepted_at' => $user->getOfferAcceptedAt()?->format('Y-m-d\TH:i:s'),
             'offer_url' => $offerUrl,
             'privacy_url' => $privacyUrl,
             'docs_url' => $docsUrl,
-            'rental_amount_kopecks' => $amount,
-            'rental_amount_rub' => round($amount / 100, 2),
-            'rental_plans' => $this->rentalPlans($amount),
+            'rental_amount_kopecks' => $defaultAmount,
+            'rental_amount_rub' => round($defaultAmount / 100, 2),
+            // Совместимость: один план 30 дней; сумма зависит от выбранного клуба на клиенте.
+            'rental_plans' => [[
+                'months' => 1,
+                'days' => StaffClubRentalService::RENTAL_DAYS,
+                'label' => StaffClubRentalService::RENTAL_DAYS . ' дней',
+                'amount_kopecks' => $defaultAmount,
+                'amount_rub' => round($defaultAmount / 100, 2),
+            ]],
             'trainer_id' => $trainer?->getId() !== null
                 ? 'trainer-' . $trainer->getId()
                 : null,
@@ -188,35 +229,26 @@ final class StaffOnboardingService
     }
 
     /**
-     * Тарифы аренды: база × N месяцев (1 / 3 / 6).
+     * @deprecated Тарифы теперь по клубам; оставлен для совместимости.
      *
      * @return list<array{months: int, label: string, amount_kopecks: int, amount_rub: float}>
      */
     public function rentalPlans(int $baseKopecks): array
     {
         $base = max(0, $baseKopecks);
-        $plans = [];
-        foreach ([1, 3, 6] as $months) {
-            $amount = $base * $months;
-            $plans[] = [
-                'months' => $months,
-                'label' => match ($months) {
-                    1 => '1 месяц',
-                    3 => '3 месяца',
-                    6 => '6 месяцев',
-                    default => $months . ' мес.',
-                },
-                'amount_kopecks' => $amount,
-                'amount_rub' => round($amount / 100, 2),
-            ];
-        }
 
-        return $plans;
+        return [[
+            'months' => 1,
+            'days' => StaffClubRentalService::RENTAL_DAYS,
+            'label' => StaffClubRentalService::RENTAL_DAYS . ' дней',
+            'amount_kopecks' => $base,
+            'amount_rub' => round($base / 100, 2),
+        ]];
     }
 
     public function normalizeRentalMonths(int $months): int
     {
-        return \in_array($months, [1, 3, 6], true) ? $months : 1;
+        return 1;
     }
 
     public function rentalAmountKopecks(): int

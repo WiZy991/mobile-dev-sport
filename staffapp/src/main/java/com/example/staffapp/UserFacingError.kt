@@ -8,13 +8,35 @@ object UserFacingError {
     fun message(error: Throwable): String {
         val raw = error.message.orEmpty()
         val lower = raw.lowercase()
+        val detail = httpDetail(raw)
 
         return when {
             error is SocketTimeoutException -> "Сервер долго отвечает. Повторите попытку."
             error is UnknownHostException || error is ConnectException ->
                 "Нет связи с CRM. Запустите backend и проверьте адрес API в strings.xml."
-            lower.contains("401") || lower.contains("unauthorized") ->
+
+            // Ошибки входа/регистрации (тоже HTTP 401) — не путать с истекшей сессией.
+            // Всегда одна понятная фраза (в т.ч. вместо старого «Неверные данные» с сервера).
+            isAuthCredentialsFailure(lower, detail) ->
+                "Неверный email или пароль"
+
+            lower.contains("registration_rejected") ||
+                detail.contains("отклон", ignoreCase = true) ->
+                "Регистрация отклонена администратором"
+
+            lower.contains("invalid_refresh") || lower.contains("missing_refresh") ->
                 "Сессия истекла. Выйдите и войдите заново."
+
+            // 401 без текста про логин — реальная просроченная сессия на рабочих API.
+            lower.contains("401") || lower.contains("unauthorized") -> {
+                val clean = stripApiCode(detail)
+                when {
+                    isVagueCredentialsText(clean) -> "Неверный email или пароль"
+                    hasCyrillic(clean) && !looksLikeSessionExpiry(clean) -> clean
+                    else -> "Сессия истекла. Выйдите и войдите заново."
+                }
+            }
+
             lower.contains("http 403") || lower.contains("403") || lower.contains("forbidden") ->
                 "У вас нет прав для этого действия."
             lower.contains("no route found") || Regex("""\b404\b""").containsMatchIn(lower) ->
@@ -28,13 +50,42 @@ object UserFacingError {
             lower.contains("json parse") || lower.contains("empty response") ->
                 "Не удалось прочитать ответ CRM. Запустите backend:\ncd crm-backend-symfony\nphp -S 0.0.0.0:8000 -t public public/index.php"
             raw.startsWith("HTTP ") -> {
-                // Если сервер прислал человекочитаемое сообщение — показываем его как есть.
-                val detail = raw.substringAfter(": ", "")
-                if (Regex("\\p{IsCyrillic}").containsMatchIn(detail)) detail else "Ошибка CRM: $raw"
+                val clean = stripApiCode(detail)
+                if (hasCyrillic(clean)) clean else "Ошибка CRM: $raw"
             }
             raw.isBlank() -> "Не удалось выполнить запрос. Повторите попытку."
-            Regex("\\p{IsCyrillic}").containsMatchIn(raw) -> raw
+            hasCyrillic(raw) -> raw
             else -> "Не удалось загрузить данные. Повторите попытку."
         }
+    }
+
+    private fun httpDetail(raw: String): String =
+        if (raw.startsWith("HTTP ")) raw.substringAfter(": ", "").trim() else raw.trim()
+
+    private fun stripApiCode(detail: String): String =
+        detail.replace(Regex("""\s*\[[a-z0-9_]+]\s*$""", RegexOption.IGNORE_CASE), "").trim()
+
+    private fun hasCyrillic(text: String): Boolean =
+        Regex("\\p{IsCyrillic}").containsMatchIn(text)
+
+    private fun looksLikeSessionExpiry(detail: String): Boolean {
+        val d = detail.lowercase()
+        return d.contains("сессия") || d.contains("refresh") || d.contains("unauthorized")
+    }
+
+    private fun isAuthCredentialsFailure(lower: String, detail: String): Boolean {
+        if (lower.contains("invalid_credentials") || lower.contains("missing_credentials")) {
+            return true
+        }
+        return isVagueCredentialsText(stripApiCode(detail))
+    }
+
+    /** Старые ответы CRM вроде «Неверные данные». */
+    private fun isVagueCredentialsText(detail: String): Boolean {
+        val d = detail.lowercase().trim()
+        if (d == "неверные данные" || d.startsWith("неверные данные")) return true
+        return d.contains("неверн") &&
+            (d.contains("парол") || d.contains("email") || d.contains("e-mail") ||
+                d.contains("данн") || d.contains("логин"))
     }
 }

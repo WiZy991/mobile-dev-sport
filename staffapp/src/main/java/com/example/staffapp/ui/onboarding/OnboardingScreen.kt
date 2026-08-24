@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.staffapp.RentalPlan
+import com.example.staffapp.RentalClubOption
 import com.example.staffapp.ui.components.StaffErrorState
 import com.example.staffapp.ui.components.StaffPrimaryButton
 import com.example.staffapp.ui.components.StaffSecondaryButton
@@ -31,8 +31,9 @@ import com.example.staffapp.ui.theme.StaffPrimary
 data class OnboardingUiState(
     val status: String = "pending_approval",
     val amountRub: Double = 0.0,
-    val rentalPlans: List<RentalPlan> = emptyList(),
-    val selectedMonths: Int = 1,
+    val rentalClubs: List<RentalClubOption> = emptyList(),
+    val selectedClubId: Int? = null,
+    val rentalDays: Int = 30,
     val rentalPaidUntil: String? = null,
     val isLoading: Boolean = false,
     val statusMessage: String? = null,
@@ -42,14 +43,14 @@ data class OnboardingUiState(
 @Composable
 fun OnboardingScreen(
     state: OnboardingUiState,
-    onPlanSelected: (Int) -> Unit,
+    onClubSelected: (Int) -> Unit,
     onPayClick: () -> Unit,
     onRefresh: () -> Unit,
     onLogout: () -> Unit,
 ) {
-    val selectedPlan = state.rentalPlans.firstOrNull { it.months == state.selectedMonths }
-        ?: state.rentalPlans.firstOrNull()
-    val payAmount = selectedPlan?.amountRub ?: state.amountRub
+    val selectedClub = state.rentalClubs.firstOrNull { it.clubId == state.selectedClubId }
+        ?: state.rentalClubs.firstOrNull()
+    val payAmount = selectedClub?.amountRub ?: state.amountRub
 
     Surface(modifier = Modifier.fillMaxSize(), color = StaffPrimary) {
         Column(
@@ -106,28 +107,24 @@ fun OnboardingScreen(
                         }
                         "needs_offer_payment" -> {
                             Text(
-                                "Выберите срок доступа",
+                                "Выберите зал · ${state.rentalDays} дней",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            if (state.rentalPlans.isNotEmpty()) {
-                                androidx.compose.foundation.layout.Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    state.rentalPlans.forEach { plan ->
-                                        FilterChip(
-                                            selected = plan.months == state.selectedMonths,
-                                            onClick = { onPlanSelected(plan.months) },
-                                            label = {
-                                                Text("${plan.label}\n${"%.0f".format(plan.amountRub)} ₽")
-                                            },
-                                        )
-                                    }
+                            if (state.rentalClubs.isNotEmpty()) {
+                                state.rentalClubs.forEach { club ->
+                                    FilterChip(
+                                        selected = club.clubId == selectedClub?.clubId,
+                                        onClick = { onClubSelected(club.clubId) },
+                                        label = {
+                                            Text("${club.title}\n${"%.0f".format(club.amountRub)} ₽")
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
                                 }
                             } else {
                                 Text(
-                                    "Доступ в клуб: ${"%.0f".format(state.amountRub)} ₽ / мес.",
+                                    "Доступ в клуб: ${"%.0f".format(state.amountRub)} ₽ / ${state.rentalDays} дн.",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -144,7 +141,7 @@ fun OnboardingScreen(
                             StaffPrimaryButton(
                                 text = if (state.isLoading) "Создаём платёж..." else "Приобрести абонемент",
                                 onClick = onPayClick,
-                                enabled = !state.isLoading,
+                                enabled = !state.isLoading && (selectedClub != null || state.rentalClubs.isEmpty()),
                             )
                             StaffSecondaryButton(
                                 text = "Проверить оплату",

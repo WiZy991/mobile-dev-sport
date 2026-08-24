@@ -517,6 +517,19 @@ private fun ProfileTabContent(
         profile.rentalPaidUntilLabel?.let { rental ->
             item { StaffInfoBanner(rental, color = StaffPrimary) }
         }
+        if (profile.paidRentalClubs.size > 1) {
+            item { StaffSectionTitle("Рабочий адрес") }
+            items(profile.paidRentalClubs, key = { it.clubId }) { club ->
+                StaffSecondaryButton(
+                    text = if (club.clubId == profile.activeClubId) {
+                        "✓ ${club.title}"
+                    } else {
+                        club.title
+                    },
+                    onClick = { onAction("set_active_club:${club.clubId}") },
+                )
+            }
+        }
         if (profile.showClubEntryQr) {
             item {
                 StaffSecondaryButton(

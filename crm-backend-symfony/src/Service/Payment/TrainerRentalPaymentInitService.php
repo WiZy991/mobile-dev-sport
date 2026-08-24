@@ -6,6 +6,7 @@ namespace App\Service\Payment;
 
 use App\Entity\Payment;
 use App\Entity\StaffUser;
+use App\Service\Staff\StaffClubRentalService;
 use App\Service\Staff\StaffOnboardingService;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -14,6 +15,7 @@ final class TrainerRentalPaymentInitService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly StaffOnboardingService $onboarding,
+        private readonly StaffClubRentalService $clubRentals,
         private readonly AlfaAcquiringClient $alfaClient,
         private readonly string $returnUrlBase,
         private readonly string $failUrlBase,
@@ -26,7 +28,7 @@ final class TrainerRentalPaymentInitService
     /**
      * @return array{payment: Payment}|array{error: array<string, mixed>, status: int}
      */
-    public function init(StaffUser $staff, bool $offerAccepted, int $months = 1): array
+    public function init(StaffUser $staff, bool $offerAccepted, int $clubId, int $months = 1): array
     {
         if ($staff->getRegistrationStatus() !== StaffUser::REGISTRATION_APPROVED) {
             return [
@@ -46,26 +48,41 @@ final class TrainerRentalPaymentInitService
                 'status' => 400,
             ];
         }
-
-        $months = $this->onboarding->normalizeRentalMonths($months);
-        $baseAmount = $this->onboarding->rentalAmountKopecks();
-        if ($baseAmount <= 0) {
+        if ($clubId <= 0) {
             return [
-                'error' => ['error' => 'Сумма аренды не настроена в CRM', 'code' => 'rental_amount_missing'],
+                'error' => ['error' => 'Выберите зал для оплаты аренды', 'code' => 'club_required'],
                 'status' => 400,
             ];
         }
-        $amount = $baseAmount * $months;
 
+        $club = $this->clubRentals->resolveCatalogClub($staff, $clubId);
+        if ($club === null) {
+            return [
+                'error' => ['error' => 'Зал недоступен для аренды', 'code' => 'club_not_in_catalog'],
+                'status' => 400,
+            ];
+        }
+
+        $amountRub = $this->clubRentals->amountRubForClub($club, $staff);
+        $amount = $amountRub * 100;
+        if ($amount <= 0) {
+            return [
+                'error' => ['error' => 'Сумма аренды не настроена для этого зала', 'code' => 'rental_amount_missing'],
+                'status' => 400,
+            ];
+        }
+
+        $this->onboarding->normalizeRentalMonths($months);
         $staff->setOfferAcceptedAt(new \DateTimeImmutable());
 
         $payment = (new Payment())
             ->setStaffUser($staff)
             ->setUser(null)
+            ->setClub($club)
             ->setType(Payment::TYPE_TRAINER_RENTAL)
             ->setSubscriptionPlan(null)
             ->setAmountKopecks($amount)
-            ->setDurationMonths($months)
+            ->setDurationMonths(1)
             ->setDiscountAmount(0)
             ->setStatus(Payment::STATUS_PENDING)
             ->setExpiresAt((new \DateTimeImmutable())->modify('+' . $this->sessionTimeoutSecs . ' seconds'));
@@ -79,19 +96,14 @@ final class TrainerRentalPaymentInitService
 
         $returnUrl = $this->appendPaymentId($this->returnUrlBase, $payment->getId());
         $failUrl = $this->appendPaymentId($this->failUrlBase, $payment->getId(), 'fail');
-        $monthsLabel = match ($months) {
-            1 => '1 месяц',
-            3 => '3 месяца',
-            6 => '6 месяцев',
-            default => $months . ' мес.',
-        };
+        $clubLabel = trim($club->getName() . ' — ' . $club->getAddress());
 
         $registerResponse = $this->alfaClient->registerOrder(new AlfaRegisterOrderRequest(
             orderNumber: $orderNumber,
             amountKopecks: $amount,
             returnUrl: $returnUrl,
             failUrl: $failUrl,
-            description: 'Аренда клуба (тренер) — ' . $monthsLabel,
+            description: 'Аренда клуба (тренер) — ' . StaffClubRentalService::RENTAL_DAYS . ' дн. — ' . $clubLabel,
             dynamicCallbackUrl: $this->callbackUrl !== '' ? $this->callbackUrl : null,
             email: $staff->getEmail(),
             phone: null,

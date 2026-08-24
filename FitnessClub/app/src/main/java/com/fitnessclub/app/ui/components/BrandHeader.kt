@@ -49,15 +49,16 @@ fun BrandHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
+                // Только bitmap/drawable PNG — mipmap adaptive-icon XML роняет Compose painterResource.
                 Image(
                     painter = painterResource(R.drawable.ic_launcher_foreground),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                 )
-                Spacer(Modifier.width(10.dp))
+                Spacer(modifier.width(10.dp))
                 Text(
                     text = title,
                     color = textColor,

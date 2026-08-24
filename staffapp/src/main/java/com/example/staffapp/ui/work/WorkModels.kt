@@ -1,5 +1,7 @@
 package com.example.staffapp.ui.work
 
+import com.example.staffapp.RentalClubOption
+
 data class MetricUi(val label: String, val value: String)
 
 data class ListCardUi(
@@ -130,6 +132,9 @@ data class ProfileTabUi(
     val photoUrl: String? = null,
     /** Действующая аренда клуба (п.25). */
     val rentalPaidUntilLabel: String? = null,
+    /** Оплаченные залы для смены адреса. */
+    val paidRentalClubs: List<RentalClubOption> = emptyList(),
+    val activeClubId: Int? = null,
     val showClubEntryQr: Boolean = false,
     val showRentalManage: Boolean = false,
     val showFeedback: Boolean = false,

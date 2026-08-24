@@ -12,6 +12,7 @@ use App\Service\Integration\PercoWebClient;
 use App\Service\Integration\SubscriptionGateResolver;
 use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Reports\OccupancyService;
+use App\Service\Staff\StaffClubRentalService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -32,6 +33,7 @@ class AccessController extends AbstractController
         private readonly SubscriptionGateResolver $subscriptionGateResolver,
         private readonly OccupancyService $occupancyService,
         private readonly SubscriptionLifecycleService $subscriptionLifecycle,
+        private readonly StaffClubRentalService $clubRentals,
         private readonly string $accessGateToken = '',
         private readonly string $percoOpenFromCrm = '1',
     ) {}
@@ -78,7 +80,7 @@ class AccessController extends AbstractController
 
         // Тренер: FITNESSCLUB:STAFF:staffId:timestamp
         if ($parts[1] === 'STAFF') {
-            return $this->handleStaffEntry($parts, $log, $response);
+            return $this->handleStaffEntry($parts, $log, $response, $gateClub);
         }
 
         // Обычный вход: FITNESSCLUB:ENTRY:user-123:timestamp
@@ -315,7 +317,7 @@ class AccessController extends AbstractController
      * @param string[] $parts
      * @param array<string, mixed> $response
      */
-    private function handleStaffEntry(array $parts, AccessLog $log, array $response): JsonResponse
+    private function handleStaffEntry(array $parts, AccessLog $log, array $response, ?Club $gateClub): JsonResponse
     {
         if (count($parts) !== 4) {
             $log->setReason('invalid_format');
@@ -366,13 +368,24 @@ class AccessController extends AbstractController
 
             return $this->json($response, 403);
         }
-        if ($staff->requiresTrainerRental() && !$staff->hasValidRental()) {
-            $log->setReason('staff_rental_expired');
-            $response['reason'] = 'staff_rental_expired';
-            $this->em->persist($log);
-            $this->em->flush();
+        if ($staff->requiresTrainerRental()) {
+            if (!$this->clubRentals->hasAnyValidRental($staff)) {
+                $log->setReason('staff_rental_expired');
+                $response['reason'] = 'staff_rental_expired';
+                $this->em->persist($log);
+                $this->em->flush();
 
-            return $this->json($response, 403);
+                return $this->json($response, 403);
+            }
+            if ($gateClub instanceof Club && !$this->clubRentals->hasValidRentalForClub($staff, $gateClub)) {
+                $log->setReason('staff_rental_wrong_club');
+                $response['reason'] = 'staff_rental_wrong_club';
+                $response['club_id'] = $gateClub->getId();
+                $this->em->persist($log);
+                $this->em->flush();
+
+                return $this->json($response, 403);
+            }
         }
 
         $log->setResult('granted')->setReason('ok');

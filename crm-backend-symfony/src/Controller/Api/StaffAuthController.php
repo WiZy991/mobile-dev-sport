@@ -76,20 +76,20 @@ final class StaffAuthController extends AbstractController
 
         $user = $this->em->getRepository(StaffUser::class)->findOneBy(['email' => $email]);
         if ($user === null) {
-            return $this->json(['error' => 'Неверные данные', 'code' => 'invalid_credentials'], 401);
+            return $this->json(['error' => 'Неверный email или пароль', 'code' => 'invalid_credentials'], 401);
         }
         if ($user->getRegistrationStatus() === StaffUser::REGISTRATION_REJECTED || !$user->isActive()) {
             return $this->json([
                 'error' => $user->getRegistrationStatus() === StaffUser::REGISTRATION_REJECTED
                     ? 'Регистрация отклонена администратором'
-                    : 'Неверные данные',
+                    : 'Неверный email или пароль',
                 'code' => $user->getRegistrationStatus() === StaffUser::REGISTRATION_REJECTED
                     ? 'registration_rejected'
                     : 'invalid_credentials',
             ], 401);
         }
         if (!$this->passwordHasher->isPasswordValid($user, $password)) {
-            return $this->json(['error' => 'Неверные данные', 'code' => 'invalid_credentials'], 401);
+            return $this->json(['error' => 'Неверный email или пароль', 'code' => 'invalid_credentials'], 401);
         }
 
         $issued = $this->tokens->issue($user, false);

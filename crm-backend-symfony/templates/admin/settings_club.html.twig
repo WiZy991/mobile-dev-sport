@@ -69,11 +69,30 @@
             <hr class="border-secondary my-3">
 
             <div class="mb-2 text-primary small fw-semibold text-uppercase">Аренда клуба для тренеров</div>
-            <p class="small text-secondary mb-3">Ежемесячная сумма, которую тренер оплачивает в staff-приложении после одобрения регистрации (Альфа-Банк).</p>
+            <p class="small text-secondary mb-3">
+                Срок — 30 дней. Цена по залу ниже; если пусто — берётся общая сумма.
+                В staff-приложении показываются <strong>все клубы</strong> из раздела «Клубы и шлюзы».
+            </p>
+            <div class="row g-2 mb-3">
+                {% for c in rental_clubs|default([]) %}
+                    <div class="col-md-4">
+                        <label class="form-label small">{{ c.name }}{% if c.address %} · {{ c.address }}{% endif %}</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" min="0" step="1" name="trainer_rental_club_price[{{ c.id }}]" class="form-control form-control-sm" value="{{ c.trainerRentalAmountRub|default('') }}" placeholder="₽ / 30 дней">
+                            <span class="input-group-text">₽</span>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="col-12">
+                        <p class="small text-warning mb-0">Клубы ещё не созданы — добавьте зал в «Клубы и шлюзы».</p>
+                    </div>
+                {% endfor %}
+            </div>
             <div class="row g-2 mb-3">
                 <div class="col-md-4">
-                    <label class="form-label small">Сумма аренды, ₽ / месяц</label>
+                    <label class="form-label small">Общая сумма аренды, ₽ / 30 дней</label>
                     <input type="number" min="0" step="1" name="trainer_rental_amount_rub" class="form-control form-control-sm" value="{{ club.trainer_rental_amount_rub }}">
+                    <div class="form-text small">Подставляется залам без своей цены. Сейчас у вас в настройках: {{ club.trainer_rental_amount_rub }} ₽.</div>
                 </div>
             </div>
 

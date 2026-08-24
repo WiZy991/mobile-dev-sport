@@ -148,7 +148,18 @@ final class PaymentFulfillmentServiceTest extends TestCase
         $scheduler = $this->createMock(ClientNotificationScheduler::class);
         $scheduler->expects(self::never())->method('scheduleSubscriptionExpiryReminders');
 
-        $service = new PaymentFulfillmentService($em, new SubscriptionFreezePolicy(), $scheduler);
+        $clientNotifications = $this->createMock(\App\Service\Notification\ClientNotificationService::class);
+        $emailNotifier = $this->createMock(\App\Service\Notification\ClientEmailNotifier::class);
+        $clubRentals = $this->createMock(\App\Service\Staff\StaffClubRentalService::class);
+
+        $service = new PaymentFulfillmentService(
+            $em,
+            new SubscriptionFreezePolicy(),
+            $scheduler,
+            $clientNotifications,
+            $emailNotifier,
+            $clubRentals,
+        );
         $sub = $service->fulfill($payment, 'CARD');
 
         self::assertSame($existingSub, $sub);

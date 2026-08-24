@@ -63,12 +63,17 @@ class StaffEntryQrActivity : ComponentActivity() {
                     }.getOrNull()?.takeIf { it > 0 }?.let { id = it }
                 }
 
+                val paidClubs = onboarding.rentalClubs.filter { it.rentalActive }
+                val hasPaidButInactive = onboarding.requiresRental &&
+                    paidClubs.isNotEmpty() &&
+                    !onboarding.activeClubRentalOk
                 val active = StaffRentalAccess.canShowEntryQr(
                     staffUserId = id,
                     status = onboarding.status,
                     requiresRental = onboarding.requiresRental,
-                    rentalPaidUntilIso = onboarding.rentalPaidUntil,
+                    rentalPaidUntilIso = onboarding.activeClubPaidUntil,
                     rentalActiveFromServer = onboarding.rentalActive,
+                    activeClubRentalOk = onboarding.activeClubRentalOk,
                 )
 
                 runOnUiThread {
@@ -78,7 +83,8 @@ class StaffEntryQrActivity : ComponentActivity() {
                         staffUserId = id,
                         status = onboarding.status,
                         requiresRental = onboarding.requiresRental,
-                        rentalPaidUntilIso = onboarding.rentalPaidUntil,
+                        rentalPaidUntilIso = onboarding.activeClubPaidUntil,
+                        hasPaidClubsButWrongActive = hasPaidButInactive,
                     )
                 }
             } catch (e: Exception) {

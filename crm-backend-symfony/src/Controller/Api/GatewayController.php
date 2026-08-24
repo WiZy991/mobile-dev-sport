@@ -15,6 +15,7 @@ use App\Service\Integration\SubscriptionGateResolver;
 use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Reports\OccupancyService;
 use App\Service\Security\AccessAlarmNotifier;
+use App\Service\Staff\StaffClubRentalService;
 use App\Service\Staff\StaffEventNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -66,6 +67,7 @@ class GatewayController extends AbstractController
         private readonly AccessAlarmNotifier $accessAlarmNotifier,
         private readonly StaffEventNotifier $staffEventNotifier,
         private readonly OccupancyService $occupancyService,
+        private readonly StaffClubRentalService $clubRentals,
     ) {
     }
 
@@ -559,8 +561,13 @@ class GatewayController extends AbstractController
         if ($staff->getRegistrationStatus() !== StaffUser::REGISTRATION_APPROVED) {
             return $this->denied($log, 'staff_not_approved', 403);
         }
-        if ($staff->requiresTrainerRental() && !$staff->hasValidRental()) {
-            return $this->denied($log, 'staff_rental_expired', 403);
+        if ($staff->requiresTrainerRental()) {
+            if (!$this->clubRentals->hasAnyValidRental($staff)) {
+                return $this->denied($log, 'staff_rental_expired', 403);
+            }
+            if (!$this->clubRentals->hasValidRentalForClub($staff, $club)) {
+                return $this->denied($log, 'staff_rental_wrong_club', 403, ['club_id' => $club->getId()]);
+            }
         }
 
         $log->setResult('granted')->setReason('ok');
@@ -680,6 +687,7 @@ class GatewayController extends AbstractController
                 'qr_expired' => 'QR-код устарел, обновите в приложении',
                 'already_inside' => 'Клиент уже в зале — используйте считыватель выхода',
                 'staff_rental_expired' => 'Аренда тренера не оплачена или истекла',
+                'staff_rental_wrong_club' => 'Аренда оформлена на другой зал',
                 'staff_not_approved' => 'Учётная запись тренера не одобрена',
                 'staff_not_found' => 'Тренер не найден',
                 default => null,

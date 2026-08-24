@@ -44,7 +44,13 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if u.rentalPaidUntil %}
+                        {% if club_rentals_by_staff is defined and club_rentals_by_staff[u.id] is defined %}
+                            {% for r in club_rentals_by_staff[u.id] %}
+                                <div class="small">{{ r.club.name }}: {{ r.paidUntil|date('d.m.Y') }}{% if not r.valid %} <span class="text-secondary">(истёк)</span>{% endif %}</div>
+                            {% else %}
+                                <span class="text-secondary">—</span>
+                            {% endfor %}
+                        {% elseif u.rentalPaidUntil %}
                             {{ u.rentalPaidUntil|date('d.m.Y') }}
                         {% else %}
                             <span class="text-secondary">—</span>

@@ -57,7 +57,7 @@ class RentalActivity : ComponentActivity() {
                         RentalScreen(
                             state = uiState,
                             onBack = { finish() },
-                            onPlanSelected = { uiState = uiState.copy(selectedMonths = it) },
+                            onClubSelected = { uiState = uiState.copy(selectedClubId = it) },
                             onPayClick = { showConsentDialog = true },
                             onRefresh = { load() },
                         )
@@ -104,25 +104,21 @@ class RentalActivity : ComponentActivity() {
                     if (!isMissingApi(e)) throw e
                     emptyList()
                 }
+                val selected = when {
+                    uiState.selectedClubId != null &&
+                        onboarding.rentalClubs.any { it.clubId == uiState.selectedClubId } ->
+                        uiState.selectedClubId
+                    onboarding.activeClubId != null -> onboarding.activeClubId
+                    onboarding.rentalClubs.isNotEmpty() -> onboarding.rentalClubs.first().clubId
+                    else -> null
+                }
+                val active = onboarding.activeClub
                 runOnUiThread {
                     uiState = uiState.copy(
-                        rentalPaidUntilLabel = formatRentalUntil(onboarding.rentalPaidUntil),
-                        plans = onboarding.rentalPlans.ifEmpty {
-                            listOf(
-                                RentalPlan(
-                                    months = 1,
-                                    label = "1 месяц",
-                                    amountKopecks = onboarding.rentalAmountKopecks,
-                                    amountRub = onboarding.rentalAmountRub,
-                                ),
-                            )
-                        },
-                        selectedMonths = when {
-                            onboarding.rentalPlans.any { it.months == uiState.selectedMonths } ->
-                                uiState.selectedMonths
-                            onboarding.rentalPlans.isNotEmpty() -> onboarding.rentalPlans.first().months
-                            else -> 1
-                        },
+                        rentalPaidUntilLabel = formatRentalBanner(active?.title, active?.paidUntil ?: onboarding.rentalPaidUntil),
+                        clubs = onboarding.rentalClubs,
+                        selectedClubId = selected,
+                        rentalDays = onboarding.rentalDays,
                         payments = payments,
                         loading = false,
                         statusMessage = uiState.statusMessage,
@@ -145,6 +141,12 @@ class RentalActivity : ComponentActivity() {
     }
 
     private fun startPayment() {
+        val clubId = uiState.selectedClubId
+            ?: uiState.clubs.firstOrNull()?.clubId
+        if (clubId == null || clubId <= 0) {
+            uiState = uiState.copy(errorMessage = "Выберите зал для оплаты")
+            return
+        }
         uiState = uiState.copy(paying = true, errorMessage = null, statusMessage = "Создаём платёж...")
         thread {
             try {
@@ -152,7 +154,7 @@ class RentalActivity : ComponentActivity() {
                     apiClient.initRentalPayment(
                         it,
                         offerAccepted = true,
-                        months = uiState.selectedMonths,
+                        clubId = clubId,
                     )
                 }
                 val url = result.paymentUrl
@@ -209,10 +211,14 @@ class RentalActivity : ComponentActivity() {
         }
     }
 
-    private fun formatRentalUntil(iso: String?): String? {
+    private fun formatRentalBanner(clubTitle: String?, iso: String?): String? {
         if (iso.isNullOrBlank()) return null
         val date = iso.take(10)
-        return "Аренда оплачена до $date"
+        return if (!clubTitle.isNullOrBlank()) {
+            "Активный зал: $clubTitle · оплачен до $date"
+        } else {
+            "Аренда оплачена до $date"
+        }
     }
 
     private fun <T> withRefresh(action: (token: String) -> T): T {

@@ -10,6 +10,7 @@ use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Notification\ClientEmailNotifier;
 use App\Service\Notification\ClientNotificationScheduler;
 use App\Service\Notification\ClientNotificationService;
+use App\Service\Staff\StaffClubRentalService;
 use Doctrine\ORM\EntityManagerInterface;
 
 class PaymentFulfillmentService
@@ -20,6 +21,7 @@ class PaymentFulfillmentService
         private readonly ClientNotificationScheduler $notificationScheduler,
         private readonly ClientNotificationService $clientNotifications,
         private readonly ClientEmailNotifier $emailNotifier,
+        private readonly StaffClubRentalService $clubRentals,
     ) {}
 
     public function fulfill(Payment $payment, ?string $paymentWay = null): ?Subscription
@@ -180,30 +182,29 @@ class PaymentFulfillmentService
             throw new \RuntimeException('Trainer rental payment missing staff user');
         }
 
-        $now = \App\Service\ClubTimezone::now();
-        $base = $staff->getRentalPaidUntil();
-        if ($base === null || $base < $now) {
-            $base = $now;
+        $club = $payment->getClub();
+        if ($club === null) {
+            // Legacy-платежи без club_id: первый клуб из каталога.
+            $catalog = $this->clubRentals->catalogClubs($staff);
+            $club = $catalog[0] ?? null;
         }
-        $months = $payment->getDurationMonths();
-        // Конец срока — конец календарного дня во Владивостоке.
-        $paidUntil = (new \DateTimeImmutable(
-            $base->modify(sprintf('+%d month', $months))->format('Y-m-d') . ' 23:59:59',
-            \App\Service\ClubTimezone::zone(),
-        ));
-        $staff->setRentalPaidUntil($paidUntil);
+        if ($club === null) {
+            throw new \RuntimeException('Trainer rental payment missing club');
+        }
 
-        $monthsLabel = match ($months) {
-            1 => '1 месяц',
-            3 => '3 месяца',
-            6 => '6 месяцев',
-            default => $months . ' мес.',
-        };
+        $rental = $this->clubRentals->extendRental($staff, $club, StaffClubRentalService::RENTAL_DAYS);
+        $paidUntil = $rental->getPaidUntil();
+
+        $clubLabel = trim($club->getName());
         $price = $payment->getAmountKopecks() / 100;
         $sale = (new Sale())
             ->setUser(null)
             ->setClientName($staff->getName() !== '' ? $staff->getName() : $staff->getEmail())
-            ->setProductName('Аренда клуба (тренер) — ' . $monthsLabel)
+            ->setProductName(sprintf(
+                'Аренда клуба (тренер) — %d дн.%s',
+                StaffClubRentalService::RENTAL_DAYS,
+                $clubLabel !== '' ? ' — ' . $clubLabel : '',
+            ))
             ->setQuantity(1)
             ->setPrice($price)
             ->setTotal($price)
@@ -217,24 +218,22 @@ class PaymentFulfillmentService
         $this->em->persist($sale);
         $this->em->flush();
 
-        // Письмо тренеру об успешной оплате аренды (пункт 8 репорта).
         $staffEmail = $staff->getEmail();
         if ($staffEmail !== '') {
-            $paidUntil = $staff->getRentalPaidUntil();
             try {
                 $this->emailNotifier->send(
                     $staffEmail,
                     'Оплата аренды прошла успешно',
                     implode("\n", array_filter([
                         'Оплата аренды клуба прошла успешно.',
+                        $clubLabel !== '' ? 'Зал: ' . $clubLabel . '.' : null,
                         'Сумма: ' . number_format($payment->getAmountKopecks() / 100, 2, ',', ' ') . ' ₽.',
-                        $paidUntil !== null ? 'Доступ активен до ' . $paidUntil->format('d.m.Y') . '.' : null,
+                        'Доступ активен до ' . $paidUntil->format('d.m.Y') . '.',
                         '',
                         'Приложение для тренеров уже доступно. Если возникнут вопросы — ответьте на это письмо.',
                     ])),
                 );
             } catch (\Throwable) {
-                // Письмо — вторичное действие; не должно ломать зачисление оплаты.
             }
         }
     }

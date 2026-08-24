@@ -9,6 +9,7 @@ use App\Entity\StaffUser;
 use App\Service\CurrentStaffUserResolver;
 use App\Service\Payment\PaymentStatusSyncService;
 use App\Service\Payment\TrainerRentalPaymentInitService;
+use App\Service\Staff\StaffClubRentalService;
 use App\Service\Staff\StaffOnboardingService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,6 +23,7 @@ final class StaffRentalController extends AbstractController
     public function __construct(
         private readonly CurrentStaffUserResolver $staffResolver,
         private readonly StaffOnboardingService $onboarding,
+        private readonly StaffClubRentalService $clubRentals,
         private readonly TrainerRentalPaymentInitService $rentalInit,
         private readonly PaymentStatusSyncService $statusSync,
         private readonly EntityManagerInterface $em,
@@ -49,9 +51,10 @@ final class StaffRentalController extends AbstractController
 
         $data = json_decode($request->getContent(), true) ?? [];
         $offerAccepted = (bool) ($data['offer_accepted'] ?? false);
+        $clubId = (int) ($data['club_id'] ?? 0);
         $months = (int) ($data['months'] ?? $data['duration_months'] ?? 1);
 
-        $result = $this->rentalInit->init($user, $offerAccepted, $months);
+        $result = $this->rentalInit->init($user, $offerAccepted, $clubId, $months);
         if (isset($result['error'])) {
             return $this->json($result['error'], $result['status']);
         }
@@ -65,10 +68,38 @@ final class StaffRentalController extends AbstractController
             'payment_url' => $payment->getPaymentUrl(),
             'amount' => $payment->getAmountKopecks() / 100,
             'amount_kopecks' => $payment->getAmountKopecks(),
+            'club_id' => $payment->getClub()?->getId(),
             'duration_months' => $payment->getDurationMonths(),
+            'duration_days' => StaffClubRentalService::RENTAL_DAYS,
             'expires_at' => $payment->getExpiresAt()?->format(\DateTimeInterface::ATOM),
             'onboarding' => $this->onboarding->serialize($user),
         ], 201);
+    }
+
+    #[Route('/active-club', name: 'api_staff_rental_active_club', methods: ['PATCH', 'POST'])]
+    public function activeClub(Request $request): JsonResponse
+    {
+        $user = $this->staffResolver->resolve($request);
+        if (!$user instanceof StaffUser) {
+            return $this->json(['error' => 'Unauthorized', 'code' => 'unauthorized'], 401);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $clubId = (int) ($data['club_id'] ?? 0);
+        if ($clubId <= 0) {
+            return $this->json(['error' => 'Укажите club_id', 'code' => 'club_required'], 400);
+        }
+
+        $result = $this->clubRentals->setActiveClub($user, $clubId);
+        if (isset($result['error'])) {
+            return $this->json($result['error'], $result['status']);
+        }
+
+        return $this->json([
+            'ok' => true,
+            'active_club_id' => $user->getActiveClub()?->getId(),
+            'onboarding' => $this->onboarding->serialize($user),
+        ]);
     }
 
     #[Route('/payments', name: 'api_staff_rental_payments', methods: ['GET'])]
@@ -99,7 +130,10 @@ final class StaffRentalController extends AbstractController
                 'status' => $payment->getStatus(),
                 'amount_kopecks' => $payment->getAmountKopecks(),
                 'amount_rub' => round($payment->getAmountKopecks() / 100, 2),
+                'club_id' => $payment->getClub()?->getId(),
+                'club_name' => $payment->getClub()?->getName(),
                 'duration_months' => $payment->getDurationMonths(),
+                'duration_days' => StaffClubRentalService::RENTAL_DAYS,
                 'paid_at' => $payment->getPaidAt()?->format(\DateTimeInterface::ATOM),
                 'created_at' => $payment->getCreatedAt()->format(\DateTimeInterface::ATOM),
                 'failure_reason' => $payment->getFailureReason(),
@@ -142,7 +176,9 @@ final class StaffRentalController extends AbstractController
             'status' => $payment->getStatus(),
             'payment_url' => $payment->getPaymentUrl(),
             'amount_kopecks' => $payment->getAmountKopecks(),
+            'club_id' => $payment->getClub()?->getId(),
             'duration_months' => $payment->getDurationMonths(),
+            'duration_days' => StaffClubRentalService::RENTAL_DAYS,
             'failure_reason' => $payment->getFailureReason(),
             'onboarding' => $this->onboarding->serialize($user),
         ]);

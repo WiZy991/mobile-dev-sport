@@ -2540,10 +2540,48 @@ class AdminController extends AbstractController
             $this->clubSettings->set('social_telegram', ClubSocialLinks::firstUrlByType($socialLinks, 'telegram'));
             $rentalRub = trim((string) ($request->request->get('trainer_rental_amount_rub') ?? ''));
             if ($rentalRub !== '' && is_numeric($rentalRub)) {
+                $amount = (int) round((float) $rentalRub);
                 $this->clubSettings->set(
                     'trainer_rental_amount_kopecks',
-                    (string) (int) round(((float) $rentalRub) * 100)
+                    (string) ($amount * 100)
                 );
+                // Та же сумма — на все клубы без своей цены (чтобы сразу видны в staffapp).
+                foreach ($this->em->getRepository(Club::class)->findAll() as $clubEntity) {
+                    if (!$clubEntity instanceof Club) {
+                        continue;
+                    }
+                    if ($clubEntity->getTrainerRentalAmountRub() === null || $clubEntity->getTrainerRentalAmountRub() <= 0) {
+                        $clubEntity->setTrainerRentalAmountRub(max(1, $amount));
+                    }
+                }
+            }
+
+            $clubPrices = $request->request->all('trainer_rental_club_price');
+            if (\is_array($clubPrices) && $clubPrices !== []) {
+                foreach ($clubPrices as $clubIdRaw => $priceRaw) {
+                    $clubId = (int) $clubIdRaw;
+                    if ($clubId <= 0) {
+                        continue;
+                    }
+                    $clubEntity = $this->em->getRepository(Club::class)->find($clubId);
+                    if (!$clubEntity instanceof Club) {
+                        continue;
+                    }
+                    $priceTrim = trim((string) $priceRaw);
+                    if ($priceTrim === '' || !is_numeric($priceTrim)) {
+                        $clubEntity->setTrainerRentalAmountRub(null);
+                    } else {
+                        $clubEntity->setTrainerRentalAmountRub((int) round((float) $priceTrim));
+                    }
+                }
+            } elseif ($rentalRub !== '' && is_numeric($rentalRub)) {
+                // Старая форма без полей по клубам: одна сумма на все залы.
+                $amount = max(1, (int) round((float) $rentalRub));
+                foreach ($this->em->getRepository(Club::class)->findAll() as $clubEntity) {
+                    if ($clubEntity instanceof Club) {
+                        $clubEntity->setTrainerRentalAmountRub($amount);
+                    }
+                }
             }
 
             $enabledModules = $request->request->all('enabled_modules');
@@ -2624,6 +2662,7 @@ class AdminController extends AbstractController
                 'perco_cmd_value' => $getSetting('perco_cmd_value', ''),
                 'perco_cmd_param' => $getSetting('perco_cmd_param', ''),
             ],
+            'rental_clubs' => $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']),
         ]);
     }
 

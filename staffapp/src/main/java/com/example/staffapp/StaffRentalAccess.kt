@@ -24,10 +24,12 @@ object StaffRentalAccess {
         requiresRental: Boolean,
         rentalPaidUntilIso: String?,
         rentalActiveFromServer: Boolean? = null,
+        activeClubRentalOk: Boolean? = null,
     ): Boolean {
         if (staffUserId <= 0) return false
         if (status == "pending_approval" || status == "rejected") return false
         if (!requiresRental) return true
+        if (activeClubRentalOk != null) return activeClubRentalOk
         return isPaidPeriodActive(rentalPaidUntilIso) || rentalActiveFromServer == true
     }
 
@@ -36,16 +38,21 @@ object StaffRentalAccess {
         status: String,
         requiresRental: Boolean,
         rentalPaidUntilIso: String?,
+        hasPaidClubsButWrongActive: Boolean = false,
     ): String? {
         if (staffUserId <= 0) return "Не удалось определить учётную запись."
         if (status == "pending_approval" || status == "rejected") {
             return "QR откроется после одобрения регистрации."
         }
-        if (requiresRental && !isPaidPeriodActive(rentalPaidUntilIso)) {
+        if (!requiresRental) return null
+        if (hasPaidClubsButWrongActive) {
+            return "Выберите оплаченный зал в профиле, чтобы открыть QR прохода."
+        }
+        if (!isPaidPeriodActive(rentalPaidUntilIso)) {
             return if (rentalPaidUntilIso.isNullOrBlank()) {
-                "Оплатите аренду клуба, чтобы пройти в зал по QR."
+                "Оплатите аренду зала, чтобы пройти по QR."
             } else {
-                "Срок аренды истёк. Продлите оплату, чтобы снова открыть QR прохода."
+                "Срок аренды выбранного зала истёк. Продлите оплату или смените адрес."
             }
         }
         return null

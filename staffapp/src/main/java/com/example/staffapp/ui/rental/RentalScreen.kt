@@ -20,9 +20,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.staffapp.RentalClubOption
 import com.example.staffapp.RentalPaymentItem
-import com.example.staffapp.RentalPlan
 import com.example.staffapp.ui.components.StaffErrorState
 import com.example.staffapp.ui.components.StaffInfoBanner
 import com.example.staffapp.ui.components.StaffListCard
@@ -34,8 +35,9 @@ import com.example.staffapp.ui.work.ListCardUi
 
 data class RentalScreenState(
     val rentalPaidUntilLabel: String? = null,
-    val plans: List<RentalPlan> = emptyList(),
-    val selectedMonths: Int = 1,
+    val clubs: List<RentalClubOption> = emptyList(),
+    val selectedClubId: Int? = null,
+    val rentalDays: Int = 30,
     val offerAccepted: Boolean = true,
     val payments: List<RentalPaymentItem> = emptyList(),
     val loading: Boolean = true,
@@ -49,12 +51,12 @@ data class RentalScreenState(
 fun RentalScreen(
     state: RentalScreenState,
     onBack: () -> Unit,
-    onPlanSelected: (Int) -> Unit,
+    onClubSelected: (Int) -> Unit,
     onPayClick: () -> Unit,
     onRefresh: () -> Unit,
 ) {
-    val selected = state.plans.firstOrNull { it.months == state.selectedMonths }
-        ?: state.plans.firstOrNull()
+    val selected = state.clubs.firstOrNull { it.clubId == state.selectedClubId }
+        ?: state.clubs.firstOrNull()
 
     Scaffold(
         topBar = {
@@ -78,20 +80,41 @@ fun RentalScreen(
             state.rentalPaidUntilLabel?.let {
                 item { StaffInfoBanner(it) }
             }
-            item { StaffSectionTitle("Продлить") }
-            if (state.plans.isNotEmpty()) {
+            item { StaffSectionTitle("Выберите зал · ${state.rentalDays} дней") }
+            if (state.clubs.isEmpty() && !state.loading) {
                 item {
-                    androidx.compose.foundation.layout.Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        state.plans.forEach { plan ->
-                            FilterChip(
-                                selected = plan.months == state.selectedMonths,
-                                onClick = { onPlanSelected(plan.months) },
-                                label = { Text("${plan.label}: ${"%.0f".format(plan.amountRub)} ₽") },
-                            )
+                    Text(
+                        "Каталог залов пока пуст. Добавьте клуб в CRM (раздел клубов) и обновите экран.",
+                        color = StaffOnSurfaceVariant,
+                    )
+                }
+            } else {
+                items(state.clubs, key = { it.clubId }) { club ->
+                    val selectedChip = club.clubId == selected?.clubId
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        FilterChip(
+                            selected = selectedChip,
+                            onClick = { onClubSelected(club.clubId) },
+                            label = {
+                                Text(
+                                    "${club.title}: ${"%.0f".format(club.amountRub)} ₽",
+                                    fontWeight = if (selectedChip) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        val status = when {
+                            club.rentalActive && club.paidUntil != null ->
+                                "Оплачен до ${club.paidUntil.take(10)}"
+                            club.rentalActive -> "Активен"
+                            else -> "Не оплачен"
                         }
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = StaffOnSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
                     }
                 }
             }
@@ -116,15 +139,16 @@ fun RentalScreen(
             } else if (state.payments.isEmpty()) {
                 item {
                     Text(
-                        "История платежей пока пуста (или API ещё не задеплоен на сервере).",
+                        "История платежей пока пуста.",
                         color = StaffOnSurfaceVariant,
                     )
                 }
             } else {
                 items(state.payments, key = { it.id }) { payment ->
+                    val clubPart = payment.clubName?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
                     StaffListCard(
                         item = ListCardUi(
-                            title = "${"%.0f".format(payment.amountRub)} ₽ · ${payment.durationMonths} мес.",
+                            title = "${"%.0f".format(payment.amountRub)} ₽ · ${state.rentalDays} дн.$clubPart",
                             subtitle = statusLabel(payment.status),
                             meta = payment.paidAt ?: payment.createdAt ?: "",
                         ),

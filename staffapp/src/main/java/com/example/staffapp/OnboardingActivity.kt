@@ -57,7 +57,7 @@ class OnboardingActivity : ComponentActivity() {
                         }
                         OnboardingScreen(
                             state = uiState,
-                            onPlanSelected = { uiState = uiState.copy(selectedMonths = it) },
+                            onClubSelected = { uiState = uiState.copy(selectedClubId = it) },
                             onPayClick = { showConsentDialog = true },
                             onRefresh = { refreshOnboarding() },
                             onLogout = { logout() },
@@ -109,12 +109,18 @@ class OnboardingActivity : ComponentActivity() {
     }
 
     private fun startPayment() {
+        val clubId = uiState.selectedClubId
+            ?: uiState.rentalClubs.firstOrNull()?.clubId
+        if (clubId == null || clubId <= 0) {
+            uiState = uiState.copy(errorMessage = "Выберите зал для оплаты")
+            return
+        }
         runAsync("Создаём платёж...") {
             val result = executeWithRefresh {
                 apiClient.initRentalPayment(
                     it,
                     offerAccepted = true,
-                    months = uiState.selectedMonths,
+                    clubId = clubId,
                 )
             }
             val url = result.paymentUrl
@@ -173,15 +179,20 @@ class OnboardingActivity : ComponentActivity() {
 
     private fun applyOnboarding(onboarding: StaffOnboarding) {
         runOnUiThread {
+            val selected = when {
+                uiState.selectedClubId != null &&
+                    onboarding.rentalClubs.any { it.clubId == uiState.selectedClubId } ->
+                    uiState.selectedClubId
+                onboarding.activeClubId != null -> onboarding.activeClubId
+                onboarding.rentalClubs.isNotEmpty() -> onboarding.rentalClubs.first().clubId
+                else -> null
+            }
             uiState = uiState.copy(
                 status = onboarding.status,
                 amountRub = onboarding.rentalAmountRub,
-                rentalPlans = onboarding.rentalPlans,
-                selectedMonths = when {
-                    onboarding.rentalPlans.any { it.months == uiState.selectedMonths } -> uiState.selectedMonths
-                    onboarding.rentalPlans.isNotEmpty() -> onboarding.rentalPlans.first().months
-                    else -> 1
-                },
+                rentalClubs = onboarding.rentalClubs,
+                selectedClubId = selected,
+                rentalDays = onboarding.rentalDays,
                 rentalPaidUntil = onboarding.rentalPaidUntil,
                 errorMessage = null,
             )

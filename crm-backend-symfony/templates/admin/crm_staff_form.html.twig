@@ -51,6 +51,46 @@
                 <p class="small text-secondary mb-0">Созданный тренер считается одобренным и при входе сразу попадает на оплату аренды клуба.</p>
             </div>
         {% endif %}
+        {% if staffUser and clubRentals is defined and clubRentals|length > 0 %}
+            <div class="col-12">
+                <div class="mb-2 text-primary small fw-semibold text-uppercase">Аренда по залам</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-dark align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>Зал</th>
+                            <th>Адрес</th>
+                            <th>Оплачено до</th>
+                            <th>Статус</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for r in clubRentals %}
+                            <tr>
+                                <td>{{ r.club.name }}</td>
+                                <td class="small text-secondary">{{ r.club.address }}</td>
+                                <td>{{ r.paidUntil|date('d.m.Y') }}</td>
+                                <td>
+                                    {% if r.valid %}
+                                        <span class="badge text-bg-success">активна</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">истекла</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if staffUser.activeClub %}
+                    <p class="small text-secondary mt-2 mb-0">Активный адрес в приложении: <strong>{{ staffUser.activeClub.name }}</strong></p>
+                {% endif %}
+            </div>
+        {% elseif staffUser and staffUser.rentalPaidUntil %}
+            <div class="col-12">
+                <p class="small text-secondary mb-0">Legacy аренда до {{ staffUser.rentalPaidUntil|date('d.m.Y') }} (до разнесения по залам).</p>
+            </div>
+        {% endif %}
         <div class="col-12">
             <button type="submit" class="btn btn-sm btn-success">Сохранить</button>
         </div>

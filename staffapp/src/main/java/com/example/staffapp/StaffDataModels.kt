@@ -81,7 +81,7 @@ data class StaffOnboarding(
     val registrationStatus: String,
     val requiresRental: Boolean,
     val rentalPaidUntil: String?,
-    /** Сервер: аренда не нужна или срок ещё действует. */
+    /** Сервер: аренда не нужна или срок ещё действует (хотя бы один зал). */
     val rentalActive: Boolean = false,
     val offerUrl: String,
     val privacyUrl: String = "https://dobrozal.ru/doc/privacy",
@@ -89,11 +89,49 @@ data class StaffOnboarding(
     val rentalAmountKopecks: Int,
     val rentalAmountRub: Double,
     val rentalPlans: List<RentalPlan> = emptyList(),
+    val rentalClubs: List<RentalClubOption> = emptyList(),
+    val activeClubId: Int? = null,
+    val rentalDays: Int = 30,
     val staffUserId: Int? = null,
     val profileComplete: Boolean = true,
     val profileMissing: List<String> = emptyList(),
     val specializationsCatalog: List<String> = TrainerSpecializationCatalog.DEFAULT,
-)
+) {
+    val activeClub: RentalClubOption?
+        get() = rentalClubs.firstOrNull { it.isActiveClub }
+            ?: activeClubId?.let { id -> rentalClubs.firstOrNull { it.clubId == id } }
+
+    /** Срок для QR: активный зал, иначе общий legacy. */
+    val activeClubPaidUntil: String?
+        get() = activeClub?.paidUntil ?: rentalPaidUntil
+
+    val activeClubRentalOk: Boolean
+        get() = when {
+            !requiresRental -> true
+            activeClub != null -> activeClub!!.rentalActive ||
+                StaffRentalAccess.isPaidPeriodActive(activeClub!!.paidUntil)
+            else -> rentalActive || StaffRentalAccess.isPaidPeriodActive(rentalPaidUntil)
+        }
+}
+
+data class RentalClubOption(
+    val clubId: Int,
+    val name: String,
+    val address: String,
+    val amountKopecks: Int,
+    val amountRub: Double,
+    val paidUntil: String? = null,
+    val rentalActive: Boolean = false,
+    val isActiveClub: Boolean = false,
+    val days: Int = 30,
+) {
+    val title: String
+        get() = if (address.isNotBlank() && !name.contains(address, ignoreCase = true)) {
+            "$name · $address"
+        } else {
+            name.ifBlank { address }
+        }
+}
 
 data class RentalPlan(
     val months: Int,
@@ -109,6 +147,8 @@ data class RentalPaymentItem(
     val durationMonths: Int,
     val paidAt: String?,
     val createdAt: String?,
+    val clubId: Int? = null,
+    val clubName: String? = null,
 )
 
 data class RentalPaymentResult(

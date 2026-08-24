@@ -271,6 +271,12 @@ class WorkActivity : ComponentActivity() {
                 )
             }
             actionId == "open_rental" -> startActivity(Intent(this, RentalActivity::class.java))
+            actionId.startsWith("set_active_club:") -> {
+                val clubId = actionId.removePrefix("set_active_club:").toIntOrNull()
+                if (clubId != null && clubId > 0) {
+                    setActiveRentalClub(clubId)
+                }
+            }
             actionId == "open_feedback" -> startActivity(Intent(this, StaffFeedbackActivity::class.java))
             actionId == "open_user_agreement" ->
                 openLegalPdf = com.example.staffapp.legal.StaffLegalPdf.USER_AGREEMENT
@@ -607,18 +613,24 @@ class WorkActivity : ComponentActivity() {
     }
 
     private fun applyHomeEntryQr(staffUserId: Int, onboarding: StaffOnboarding) {
+        val paidClubs = onboarding.rentalClubs.filter { it.rentalActive }
+        val hasPaidButInactive = onboarding.requiresRental &&
+            paidClubs.isNotEmpty() &&
+            !onboarding.activeClubRentalOk
         val active = StaffRentalAccess.canShowEntryQr(
             staffUserId = staffUserId,
             status = onboarding.status,
             requiresRental = onboarding.requiresRental,
-            rentalPaidUntilIso = onboarding.rentalPaidUntil,
+            rentalPaidUntilIso = onboarding.activeClubPaidUntil,
             rentalActiveFromServer = onboarding.rentalActive,
+            activeClubRentalOk = onboarding.activeClubRentalOk,
         )
         val blocked = StaffRentalAccess.entryQrBlockedMessage(
             staffUserId = staffUserId,
             status = onboarding.status,
             requiresRental = onboarding.requiresRental,
-            rentalPaidUntilIso = onboarding.rentalPaidUntil,
+            rentalPaidUntilIso = onboarding.activeClubPaidUntil,
+            hasPaidClubsButWrongActive = hasPaidButInactive,
         )
         uiState = uiState.copy(
             home = uiState.home.copy(
@@ -626,6 +638,38 @@ class WorkActivity : ComponentActivity() {
                 entryQrStaffUserId = staffUserId.takeIf { it > 0 } ?: uiState.home.entryQrStaffUserId,
                 entryQrActive = active,
                 entryQrBlockedMessage = blocked,
+            ),
+        )
+    }
+
+    private fun setActiveRentalClub(clubId: Int) {
+        runAsyncForTab(WorkUiState.TAB_PROFILE, "Меняем зал...") {
+            val onboarding = withRefresh { token -> apiClient.setActiveRentalClub(token, clubId) }
+            lastOnboarding = onboarding
+            runOnUiThread {
+                applyProfileRentalState(onboarding)
+                applyHomeEntryQr(
+                    onboarding.staffUserId ?: uiState.home.entryQrStaffUserId,
+                    onboarding,
+                )
+            }
+            "Адрес обновлён"
+        }
+    }
+
+    private fun applyProfileRentalState(onboarding: StaffOnboarding) {
+        val active = onboarding.activeClub
+        uiState = uiState.copy(
+            profile = uiState.profile.copy(
+                rentalPaidUntilLabel = formatRentalUntil(
+                    active?.paidUntil ?: onboarding.rentalPaidUntil,
+                    active?.title,
+                ),
+                paidRentalClubs = onboarding.rentalClubs.filter { it.rentalActive },
+                activeClubId = onboarding.activeClubId,
+                offerUrl = onboarding.offerUrl,
+                privacyUrl = onboarding.privacyUrl,
+                docsUrl = onboarding.docsUrl,
             ),
         )
     }
@@ -911,8 +955,13 @@ class WorkActivity : ComponentActivity() {
                 specialization = uiState.profile.specialization,
                 description = uiState.profile.description,
                 photoUrl = uiState.profile.photoUrl,
-                rentalPaidUntilLabel = formatRentalUntil(lastOnboarding?.rentalPaidUntil)
-                    ?: uiState.profile.rentalPaidUntilLabel,
+                rentalPaidUntilLabel = formatRentalUntil(
+                    lastOnboarding?.activeClubPaidUntil ?: lastOnboarding?.rentalPaidUntil,
+                    lastOnboarding?.activeClub?.title,
+                ) ?: uiState.profile.rentalPaidUntilLabel,
+                paidRentalClubs = lastOnboarding?.rentalClubs?.filter { it.rentalActive }
+                    ?: uiState.profile.paidRentalClubs,
+                activeClubId = lastOnboarding?.activeClubId ?: uiState.profile.activeClubId,
                 offerUrl = lastOnboarding?.offerUrl ?: uiState.profile.offerUrl,
                 privacyUrl = lastOnboarding?.privacyUrl ?: uiState.profile.privacyUrl,
                 docsUrl = lastOnboarding?.docsUrl ?: uiState.profile.docsUrl,
@@ -961,7 +1010,12 @@ class WorkActivity : ComponentActivity() {
                                 specialization = trainerProfile.specialization,
                                 description = trainerProfile.description,
                                 photoUrl = trainerProfile.photoUrl,
-                                rentalPaidUntilLabel = formatRentalUntil(onboarding.rentalPaidUntil),
+                                rentalPaidUntilLabel = formatRentalUntil(
+                                    onboarding.activeClubPaidUntil,
+                                    onboarding.activeClub?.title,
+                                ),
+                                paidRentalClubs = onboarding.rentalClubs.filter { it.rentalActive },
+                                activeClubId = onboarding.activeClubId,
                                 offerUrl = onboarding.offerUrl,
                                 privacyUrl = onboarding.privacyUrl,
                                 docsUrl = onboarding.docsUrl,
@@ -1004,15 +1058,20 @@ class WorkActivity : ComponentActivity() {
         return if (national.length == 10) formatRussianPhoneMask(national) else phone
     }
 
-    private fun formatRentalUntil(iso: String?): String? {
+    private fun formatRentalUntil(iso: String?, clubTitle: String? = null): String? {
         if (iso.isNullOrBlank()) return null
         val date = runCatching {
             java.time.LocalDateTime.parse(iso.replace(' ', 'T').take(19))
         }.getOrNull()?.toLocalDate()
             ?: runCatching { LocalDate.parse(iso.take(10)) }.getOrNull()
             ?: return null
-        return "Аренда оплачена до ${date.dayOfMonth.toString().padStart(2, '0')}." +
+        val until = "до ${date.dayOfMonth.toString().padStart(2, '0')}." +
             "${date.monthValue.toString().padStart(2, '0')}.${date.year}"
+        return if (!clubTitle.isNullOrBlank()) {
+            "Зал: $clubTitle · оплачен $until"
+        } else {
+            "Аренда оплачена $until"
+        }
     }
 
     private fun openExternalUrl(url: String) {

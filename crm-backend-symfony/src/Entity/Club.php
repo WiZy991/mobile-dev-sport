@@ -70,6 +70,10 @@ class Club implements TenantAware
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $percoVerifySsl = true;
 
+    /** Цена аренды для тренера (руб / 30 дней). null = зал не в каталоге аренды. */
+    #[ORM\Column(name: 'trainer_rental_amount_rub', type: 'integer', nullable: true)]
+    private ?int $trainerRentalAmountRub = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -126,4 +130,16 @@ class Club implements TenantAware
 
     public function isPercoVerifySsl(): bool { return $this->percoVerifySsl; }
     public function setPercoVerifySsl(bool $v): self { $this->percoVerifySsl = $v; return $this; }
+
+    public function getTrainerRentalAmountRub(): ?int
+    {
+        return $this->trainerRentalAmountRub;
+    }
+
+    public function setTrainerRentalAmountRub(?int $v): self
+    {
+        $this->trainerRentalAmountRub = $v !== null && $v > 0 ? $v : null;
+
+        return $this;
+    }
 }
