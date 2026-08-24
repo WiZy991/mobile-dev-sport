@@ -1,29 +1,25 @@
 package com.example.staffapp.ui.rental
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.staffapp.RentalClubOption
 import com.example.staffapp.RentalPaymentItem
+import com.example.staffapp.ui.components.RentalClubSelectCard
 import com.example.staffapp.ui.components.StaffErrorState
 import com.example.staffapp.ui.components.StaffInfoBanner
 import com.example.staffapp.ui.components.StaffListCard
@@ -90,32 +86,12 @@ fun RentalScreen(
                 }
             } else {
                 items(state.clubs, key = { it.clubId }) { club ->
-                    val selectedChip = club.clubId == selected?.clubId
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        FilterChip(
-                            selected = selectedChip,
-                            onClick = { onClubSelected(club.clubId) },
-                            label = {
-                                Text(
-                                    "${club.title}: ${"%.0f".format(club.amountRub)} ₽",
-                                    fontWeight = if (selectedChip) FontWeight.SemiBold else FontWeight.Normal,
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        val status = when {
-                            club.rentalActive && club.paidUntil != null ->
-                                "Оплачен до ${club.paidUntil.take(10)}"
-                            club.rentalActive -> "Активен"
-                            else -> "Не оплачен"
-                        }
-                        Text(
-                            status,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = StaffOnSurfaceVariant,
-                            modifier = Modifier.padding(start = 4.dp),
-                        )
-                    }
+                    RentalClubSelectCard(
+                        club = club,
+                        selected = club.clubId == selected?.clubId,
+                        onClick = { onClubSelected(club.clubId) },
+                        showPaidStatus = true,
+                    )
                 }
             }
             item {

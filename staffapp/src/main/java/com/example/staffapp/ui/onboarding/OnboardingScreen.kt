@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,9 +21,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.staffapp.RentalClubOption
+import com.example.staffapp.ui.components.RentalClubSelectCard
 import com.example.staffapp.ui.components.StaffErrorState
 import com.example.staffapp.ui.components.StaffPrimaryButton
 import com.example.staffapp.ui.components.StaffSecondaryButton
+import com.example.staffapp.ui.theme.StaffOnSurface
 import com.example.staffapp.ui.theme.StaffOnSurfaceVariant
 import com.example.staffapp.ui.theme.StaffPrimary
 
@@ -107,20 +108,25 @@ fun OnboardingScreen(
                         }
                         "needs_offer_payment" -> {
                             Text(
-                                "Выберите зал · ${state.rentalDays} дней",
+                                "Выберите зал",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
+                                color = StaffOnSurface,
+                            )
+                            Text(
+                                "Аренда на ${state.rentalDays} дней · можно докупить другие залы позже",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = StaffOnSurfaceVariant,
                             )
                             if (state.rentalClubs.isNotEmpty()) {
-                                state.rentalClubs.forEach { club ->
-                                    FilterChip(
-                                        selected = club.clubId == selectedClub?.clubId,
-                                        onClick = { onClubSelected(club.clubId) },
-                                        label = {
-                                            Text("${club.title}\n${"%.0f".format(club.amountRub)} ₽")
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    state.rentalClubs.forEach { club ->
+                                        RentalClubSelectCard(
+                                            club = club,
+                                            selected = club.clubId == selectedClub?.clubId,
+                                            onClick = { onClubSelected(club.clubId) },
+                                        )
+                                    }
                                 }
                             } else {
                                 Text(
@@ -130,16 +136,27 @@ fun OnboardingScreen(
                                 )
                             }
                             Text(
-                                "К оплате: ${"%.0f".format(payAmount)} ₽",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
+                                "К оплате",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = StaffOnSurfaceVariant,
+                            )
+                            Text(
+                                "${"%.0f".format(payAmount)} ₽",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = StaffPrimary,
                             )
                             Text(
                                 "Без оплаты доступ к рабочим разделам закрыт. Перед оплатой нужно подтвердить оферту и инструктаж.",
                                 color = StaffOnSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
                             )
                             StaffPrimaryButton(
-                                text = if (state.isLoading) "Создаём платёж..." else "Приобрести абонемент",
+                                text = if (state.isLoading) {
+                                    "Создаём платёж..."
+                                } else {
+                                    "Оплатить ${"%.0f".format(payAmount)} ₽"
+                                },
                                 onClick = onPayClick,
                                 enabled = !state.isLoading && (selectedClub != null || state.rentalClubs.isEmpty()),
                             )
