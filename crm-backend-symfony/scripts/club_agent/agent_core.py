@@ -28,6 +28,12 @@ def _looks_like_numeric_reader_payload(qr: str) -> bool:
     return q.isdigit() and len(q) <= 24
 
 
+def _is_wiegand_entry_qr(qr: str) -> bool:
+    """9 цифр UUUUUTTTC — компактный QR для PERCo Wiegand (см. WiegandEntryQrCodec в CRM)."""
+    q = (qr or "").strip()
+    return len(q) == 9 and q.isdigit()
+
+
 def _hint_full_fitnessclub_qr() -> str:
     return (
         "Приложение отдаёт строку вида FITNESSCLUB:ENTRY:<id_пользователя>:<время_мс> — её должен "
@@ -216,13 +222,18 @@ class ClubAgent:
                 "Укажите в Оборудование пары для входа и выхода → Сохранить всё.",
             )
 
-        if self.cfg.only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
+        if (
+            self.cfg.only_fitnessclub_qr
+            and not qr.startswith("FITNESSCLUB:")
+            and not _is_wiegand_entry_qr(qr)
+        ):
             self._emit(
                 "warning",
-                "Строка не FITNESSCLUB: — в CRM не отправляем (галочка «Только QR FITNESSCLUB» на вкладке CRM). "
-                "API клуба принимает только формат из мобильного приложения.",
+                "Строка не FITNESSCLUB: и не 9-значный Wiegand-QR — в CRM не отправляем "
+                "(галочка «Только QR FITNESSCLUB» на вкладке CRM). "
+                "Для PERCo Wiegand приложение отдаёт 9 цифр; обновите iOS/Android.",
             )
-            if _looks_like_numeric_reader_payload(qr):
+            if _looks_like_numeric_reader_payload(qr) and not _is_wiegand_entry_qr(qr):
                 self._emit("info", _hint_full_fitnessclub_qr())
             return False
         if not self.cfg.crm_ready():
