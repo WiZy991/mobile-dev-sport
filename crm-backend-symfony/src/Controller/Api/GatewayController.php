@@ -807,11 +807,12 @@ class GatewayController extends AbstractController
     private function parseGatewayExitUserId(string $qr): ?int
     {
         if (WiegandEntryQrCodec::isPayload($qr)) {
-            if (!WiegandEntryQrCodec::verifyChecksum($qr)) {
+            $normalized = WiegandEntryQrCodec::normalize($qr);
+            if ($normalized === null) {
                 return null;
             }
 
-            return (int) substr(trim($qr), 0, 5);
+            return (int) substr($normalized, 0, 5);
         }
 
         $parts = explode(':', $qr);

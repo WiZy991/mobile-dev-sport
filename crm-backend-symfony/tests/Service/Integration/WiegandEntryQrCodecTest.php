@@ -29,10 +29,15 @@ final class WiegandEntryQrCodecTest extends TestCase
         self::assertNull(WiegandEntryQrCodec::parse($broken));
     }
 
-    public function testUserIdWrapsAt100k(): void
+    public function testParseEightDigitsWithLeadingZeroStripped(): void
     {
-        $ms = 1_700_000_000_000;
-        $payload = WiegandEntryQrCodec::encode(100_042, $ms);
-        self::assertStringStartsWith('00042', $payload);
+        $full = WiegandEntryQrCodec::encode(5133, 1_700_000_000_000);
+        self::assertSame(9, \strlen($full));
+        $stripped = ltrim($full, '0');
+        self::assertGreaterThanOrEqual(8, \strlen($stripped));
+
+        $parsed = WiegandEntryQrCodec::parse($stripped, 1_700_000_000_000);
+        self::assertNotNull($parsed);
+        self::assertSame(5133, $parsed['user_id']);
     }
 }

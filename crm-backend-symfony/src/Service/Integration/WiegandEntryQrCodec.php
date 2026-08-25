@@ -20,12 +20,30 @@ final class WiegandEntryQrCodec
     public const SLOT_MOD = 1000;
     public const USER_MOD = 100_000;
     public const LENGTH = 9;
+    public const MIN_WIEGAND_LEN = 5;
+
+    public static function normalize(string $qr): ?string
+    {
+        $q = trim($qr);
+        if (!ctype_digit($q)) {
+            return null;
+        }
+        $len = \strlen($q);
+        if ($len < self::MIN_WIEGAND_LEN || $len > self::LENGTH) {
+            return null;
+        }
+
+        return str_pad($q, self::LENGTH, '0', \STR_PAD_LEFT);
+    }
 
     public static function isPayload(string $qr): bool
     {
-        $q = trim($qr);
+        $normalized = self::normalize($qr);
+        if ($normalized === null) {
+            return false;
+        }
 
-        return \strlen($q) === self::LENGTH && ctype_digit($q);
+        return self::verifyChecksum($normalized);
     }
 
     public static function encode(int $userId, int $timestampMs): string
@@ -43,8 +61,8 @@ final class WiegandEntryQrCodec
      */
     public static function parse(string $qr, ?int $nowMs = null): ?array
     {
-        $q = trim($qr);
-        if (!self::isPayload($q) || !self::verifyChecksum($q)) {
+        $q = self::normalize($qr);
+        if ($q === null || !self::verifyChecksum($q)) {
             return null;
         }
 
@@ -65,8 +83,8 @@ final class WiegandEntryQrCodec
 
     public static function verifyChecksum(string $nineDigits): bool
     {
-        $q = trim($nineDigits);
-        if (!self::isPayload($q)) {
+        $q = self::normalize($nineDigits);
+        if ($q === null) {
             return false;
         }
 

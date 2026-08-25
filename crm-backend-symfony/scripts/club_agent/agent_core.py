@@ -28,10 +28,45 @@ def _looks_like_numeric_reader_payload(qr: str) -> bool:
     return q.isdigit() and len(q) <= 24
 
 
-def _is_wiegand_entry_qr(qr: str) -> bool:
-    """9 цифр UUUUUTTTC — компактный QR для PERCo Wiegand (см. WiegandEntryQrCodec в CRM)."""
+def _luhn_check_digit(eight_digits: str) -> int:
+    if len(eight_digits) != 8 or not eight_digits.isdigit():
+        return 0
+    total = 0
+    for i, ch in enumerate(reversed(eight_digits)):
+        n = int(ch)
+        if i % 2 == 0:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return (10 - total % 10) % 10
+
+
+def _normalize_wiegand_qr(qr: str) -> str | None:
+    """
+    PERCo Wiegand часто отрезает ведущие нули (9 цифр в QR → 8 в C01).
+    Дополняем слева до 9 и проверяем контрольную цифру (как WiegandEntryQrCodec в CRM).
+    """
     q = (qr or "").strip()
-    return len(q) == 9 and q.isdigit()
+    if not q.isdigit() or len(q) < 5 or len(q) > 9:
+        return None
+    padded = q.zfill(9)
+    if _luhn_check_digit(padded[:8]) != int(padded[8]):
+        return None
+    return padded
+
+
+def _is_wiegand_entry_qr(qr: str) -> bool:
+    return _normalize_wiegand_qr(qr) is not None
+
+
+def _normalize_access_qr(qr: str) -> str:
+    """FITNESSCLUB без изменений; Wiegand — дополнение нулей до 9 цифр для CRM."""
+    q = (qr or "").strip()
+    if q.startswith("FITNESSCLUB:"):
+        return q
+    normalized = _normalize_wiegand_qr(q)
+    return normalized if normalized is not None else q
 
 
 def _hint_full_fitnessclub_qr() -> str:
@@ -194,6 +229,14 @@ class ClubAgent:
 
     async def _handle_card(self, qr: str, number: int, direction: int, equipment: EquipmentItem) -> bool:
         equipment = self._live_equipment(equipment)
+        raw_qr = (qr or "").strip()
+        qr = _normalize_access_qr(raw_qr)
+        if qr != raw_qr and _is_wiegand_entry_qr(raw_qr):
+            self._emit(
+                "info",
+                f"Wiegand: PERCo передал {len(raw_qr)} цифр, в CRM отправляем {qr} "
+                f"(восстановлены ведущие нули).",
+            )
         passage, passage_err = equipment.resolve_passage(number, direction)
         if passage is None:
             self._emit("warning", f"══════ ОТКАЗ: {passage_err} ══════")
@@ -229,9 +272,9 @@ class ClubAgent:
         ):
             self._emit(
                 "warning",
-                "Строка не FITNESSCLUB: и не 9-значный Wiegand-QR — в CRM не отправляем "
+                "Строка не FITNESSCLUB: и не Wiegand-QR (5–9 цифр с контрольной суммой) — в CRM не отправляем "
                 "(галочка «Только QR FITNESSCLUB» на вкладке CRM). "
-                "Для PERCo Wiegand приложение отдаёт 9 цифр; обновите iOS/Android.",
+                "Для PERCo Wiegand обновите приложение iOS/Android (9 цифр в QR; PERCo может отдать 8).",
             )
             if _looks_like_numeric_reader_payload(qr) and not _is_wiegand_entry_qr(qr):
                 self._emit("info", _hint_full_fitnessclub_qr())
@@ -662,9 +705,13 @@ class ClubAgent:
         if passage not in ("entry", "exit"):
             passage = "entry"
         title = "ВЫХОД" if passage == "exit" else "ВХОД"
+        normalized = _normalize_access_qr(qr)
         self._emit("info", f"══════ {title}: тест QR (вручную) ══════")
-        self._emit("info", f"QR: {qr.strip()}")
-        code, body = self._crm_client().submit_qr(qr.strip(), passage=passage)
+        if normalized != qr.strip():
+            self._emit("info", f"QR (исходный): {qr.strip()} → в CRM: {normalized}")
+        else:
+            self._emit("info", f"QR: {normalized}")
+        code, body = self._crm_client().submit_qr(normalized, passage=passage)
         granted = code == 200 and bool(body.get("access_granted"))
         if granted:
             ep = None

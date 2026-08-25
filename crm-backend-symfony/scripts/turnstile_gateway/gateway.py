@@ -48,6 +48,30 @@ from typing import Any, Optional
 
 from perco_client import PercoApiError, PercoClient
 
+
+def _luhn_check_digit(eight_digits: str) -> int:
+    if len(eight_digits) != 8 or not eight_digits.isdigit():
+        return 0
+    total = 0
+    for i, ch in enumerate(reversed(eight_digits)):
+        n = int(ch)
+        if i % 2 == 0:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return (10 - total % 10) % 10
+
+
+def _normalize_wiegand_qr(qr: str) -> Optional[str]:
+    q = (qr or "").strip()
+    if not q.isdigit() or len(q) < 5 or len(q) > 9:
+        return None
+    padded = q.zfill(9)
+    if _luhn_check_digit(padded[:8]) != int(padded[8]):
+        return None
+    return padded
+
 LOG = logging.getLogger("gateway")
 
 
@@ -397,7 +421,7 @@ class GatewayDaemon:
             if (
                 self.cfg.perco_only_fitnessclub_qr
                 and not qr.startswith("FITNESSCLUB:")
-                and not (len(qr.strip()) == 9 and qr.strip().isdigit())
+                and _normalize_wiegand_qr(qr) is None
             ):
                 LOG.debug("PERCo event пропущен: идентификатор не FITNESSCLUB/Wiegand (%s)", qr[:48])
                 continue
