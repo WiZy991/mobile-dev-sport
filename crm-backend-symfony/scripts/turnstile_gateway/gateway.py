@@ -394,8 +394,12 @@ class GatewayDaemon:
             qr = self._extract_qr_from_perco_event(event)
             if not qr:
                 continue
-            if self.cfg.perco_only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
-                LOG.debug("PERCo event пропущен: идентификатор не FITNESSCLUB (%s)", qr[:48])
+            if (
+                self.cfg.perco_only_fitnessclub_qr
+                and not qr.startswith("FITNESSCLUB:")
+                and not (len(qr.strip()) == 9 and qr.strip().isdigit())
+            ):
+                LOG.debug("PERCo event пропущен: идентификатор не FITNESSCLUB/Wiegand (%s)", qr[:48])
                 continue
 
             LOG.info("PERCo event → QR найден: %s", qr[:96])

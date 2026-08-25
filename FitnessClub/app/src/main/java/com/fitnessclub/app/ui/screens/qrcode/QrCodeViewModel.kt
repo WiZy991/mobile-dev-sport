@@ -183,13 +183,14 @@ class QrCodeViewModel @Inject constructor(
                 }
 
                 val ts = System.currentTimeMillis()
+                val clubId = user.clubId
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         isInsideGym = insideNow,
                         userName = user.name,
                         memberId = user.id.takeLast(8).uppercase(),
-                        qrCodeData = generateQrData(user.id, ts),
+                        qrCodeData = generateQrData(user.id, clubId, ts),
                         secondsRemaining = 15,
                         entryBlockedMessage = null,
                     )
@@ -208,7 +209,10 @@ class QrCodeViewModel @Inject constructor(
         super.onCleared()
     }
 
-    private fun generateQrData(userId: String, timestamp: Long): String {
+    private fun generateQrData(userId: String, clubId: String?, timestamp: Long): String {
+        if (com.fitnessclub.app.data.qr.WiegandEntryQrCodec.usesWiegandNumeric(clubId)) {
+            return com.fitnessclub.app.data.qr.WiegandEntryQrCodec.encode(userId, timestamp)
+        }
         val uid = if (userId.lowercase().startsWith("user-")) {
             userId.substring(5)
         } else {
