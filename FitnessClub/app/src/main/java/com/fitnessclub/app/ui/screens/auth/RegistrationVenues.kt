@@ -33,6 +33,12 @@ object RegistrationVenues {
             addressLines = "ул. Купера 2, 2 этаж",
             imageRes = R.drawable.registration_club_kupera,
         ),
+        RegistrationVenueCard(
+            clubId = "11",
+            title = "ТЦ Седанка Сити",
+            addressLines = "ул. Полетаева 6Д",
+            imageRes = R.drawable.registration_club_mall,
+        ),
     )
 
     val orderedCards: List<RegistrationVenueCard> = allCards.filter { it.openForRegistration }

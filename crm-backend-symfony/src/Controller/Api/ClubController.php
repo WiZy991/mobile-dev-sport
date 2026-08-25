@@ -6,8 +6,10 @@ use App\Entity\Club;
 use App\Entity\Product;
 use App\Entity\Promotion;
 use App\Entity\SubscriptionPlan;
+use App\Entity\User;
 use App\Service\Admin\ClubSettingsStore;
 use App\Service\Admin\ClubSocialLinks;
+use App\Service\CurrentUserResolver;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,27 +24,60 @@ class ClubController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly ClubSettingsStore $clubSettings,
         private readonly OccupancyService $occupancy,
+        private readonly CurrentUserResolver $userResolver,
     ) {}
 
     #[Route('/occupancy', name: 'api_club_occupancy', methods: ['GET'])]
-    public function occupancy(): JsonResponse
+    public function occupancy(Request $request): JsonResponse
     {
+        $club = $this->resolveOccupancyClub($request);
+
         $maxCapacity = 100;
-        $capRaw = $this->clubSettings->get('gym_max_capacity');
-        if ($capRaw !== null && $capRaw !== '') {
-            $maxCapacity = max(10, (int) $capRaw);
+        if ($club instanceof Club && $club->getMaxCapacity() !== null) {
+            $maxCapacity = max(10, $club->getMaxCapacity());
+        } else {
+            $capRaw = $this->clubSettings->get('gym_max_capacity');
+            if ($capRaw !== null && $capRaw !== '') {
+                $maxCapacity = max(10, (int) $capRaw);
+            }
         }
 
-        // Та же логика, что в CRM: кто сейчас в зале (последнее granted = entry).
-        $current = $this->occupancy->countCurrentlyInside();
+        // Та же логика, что в CRM: кто сейчас в зале (последнее granted = entry), по клубу клиента.
+        $current = $this->occupancy->countCurrentlyInside($club);
         $percentage = $maxCapacity > 0 ? min(100, (int) round($current * 100 / $maxCapacity)) : 0;
 
-        return $this->json([
+        $payload = [
             'current' => $current,
             'max_capacity' => $maxCapacity,
             'percentage' => $percentage,
             'status' => $percentage < 50 ? 'low' : ($percentage < 80 ? 'medium' : 'high'),
-        ]);
+        ];
+        if ($club instanceof Club) {
+            $payload['club_id'] = $club->getId();
+        }
+
+        return $this->json($payload);
+    }
+
+    /** Клуб для заполненности: ?club_id=… или клуб авторизованного клиента. */
+    private function resolveOccupancyClub(Request $request): ?Club
+    {
+        $clubIdRaw = $request->query->get('club_id');
+        if ($clubIdRaw !== null && $clubIdRaw !== '') {
+            $club = $this->em->getRepository(Club::class)->find((int) $clubIdRaw);
+
+            return $club instanceof Club ? $club : null;
+        }
+
+        $user = $this->userResolver->resolve($request);
+        if ($user instanceof User) {
+            $club = $user->getClub();
+            if ($club instanceof Club) {
+                return $club;
+            }
+        }
+
+        return null;
     }
 
     private function legalUrlsFromSettings(): array
@@ -176,6 +211,12 @@ class ClubController extends AbstractController
         }
         $legal = $this->legalUrlsFromSettings();
 
+        [$lat, $lon] = $this->resolveClubCoordinates(
+            (float) ($club->getLatitude() ?? 0.0),
+            (float) ($club->getLongitude() ?? 0.0),
+            $club->getAddress(),
+        );
+
         return $this->json([
             'id' => (string) $club->getId(),
             'name' => $club->getName(),
@@ -184,8 +225,8 @@ class ClubController extends AbstractController
             'email' => $club->getEmail(),
             'working_hours' => $club->getWorkingHours(),
             'amenities' => $club->getAmenities(),
-            'latitude' => $club->getLatitude(),
-            'longitude' => $club->getLongitude(),
+            'latitude' => $lat,
+            'longitude' => $lon,
             'network' => [
                 'about' => $this->clubSettings->get('network_about') ?: null,
                 'social_links' => $this->socialLinksForApi(),
@@ -423,18 +464,32 @@ class ClubController extends AbstractController
     private function resolveClubCoordinates(float $lat, float $lon, string $address): array
     {
         $a = mb_strtolower($address);
-        $looksVladivostok =
-            str_contains($a, 'владивосток')
-            || str_contains($a, 'де фриз')
+        $looksSedanka =
+            str_contains($a, 'седанка')
+            || str_contains($a, 'полетаева');
+
+        $looksDeFriz =
+            str_contains($a, 'де фриз')
             || str_contains($a, 'де-фриз')
             || str_contains($a, 'купера')
             || str_contains($a, 'надеждин');
 
+        $looksVladivostok = str_contains($a, 'владивосток') || $looksSedanka || $looksDeFriz;
+
         $isMoscowPlaceholder = abs($lat - 55.7558) < 0.05 && abs($lon - 37.6173) < 0.05;
         $missing = abs($lat) < 0.01 && abs($lon) < 0.01;
 
-        if ($looksVladivostok && ($isMoscowPlaceholder || $missing || $lon < 100.0)) {
+        if ($looksSedanka && ($isMoscowPlaceholder || $missing || $lon < 100.0)) {
+            // ТРК «Седанка Сити», ул. Полетаева 6Д
+            return [43.348611, 131.893611];
+        }
+
+        if ($looksDeFriz && ($isMoscowPlaceholder || $missing || $lon < 100.0)) {
             // АТЦ «Новый Де-Фриз», ул. Купера 2
+            return [43.313906, 131.999418];
+        }
+
+        if ($looksVladivostok && ($isMoscowPlaceholder || $missing || $lon < 100.0)) {
             return [43.313906, 131.999418];
         }
 
