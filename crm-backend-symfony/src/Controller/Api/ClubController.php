@@ -479,13 +479,12 @@ class ClubController extends AbstractController
         $isMoscowPlaceholder = abs($lat - 55.7558) < 0.05 && abs($lon - 37.6173) < 0.05;
         $missing = abs($lat) < 0.01 && abs($lon) < 0.01;
 
-        if ($looksSedanka && ($isMoscowPlaceholder || $missing || $lon < 100.0)) {
-            // ТРК «Седанка Сити», ул. Полетаева 6Д
-            return [43.348611, 131.893611];
+        if ($looksSedanka) {
+            // ТРК «Седанка Сити», ул. Полетаева 6Д (2ГИС) — не доверяем ошибочным coords из CRM.
+            return [43.212592, 131.95021];
         }
 
-        if ($looksDeFriz && ($isMoscowPlaceholder || $missing || $lon < 100.0)) {
-            // АТЦ «Новый Де-Фриз», ул. Купера 2
+        if ($looksDeFriz) {
             return [43.313906, 131.999418];
         }
 

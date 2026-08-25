@@ -36,7 +36,7 @@ object RegistrationVenues {
         RegistrationVenueCard(
             clubId = "11",
             title = "ТЦ Седанка Сити",
-            addressLines = "ул. Полетаева 6Д",
+            addressLines = "г. Владивосток, ул. Полетаева 6Д",
             imageRes = R.drawable.registration_club_mall,
         ),
     )
