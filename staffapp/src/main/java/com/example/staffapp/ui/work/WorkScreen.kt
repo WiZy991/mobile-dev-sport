@@ -418,7 +418,15 @@ private fun ClientsTabContent(
             if (clients.loading) {
                 item { StaffLoadingState("Поиск клиентов...") }
             } else if (clients.items.isEmpty()) {
-                item { StaffEmptyState("Клиенты не найдены") }
+                item {
+                    StaffEmptyState(
+                        if (clients.query.isBlank()) {
+                            "Клиенты не найдены"
+                        } else {
+                            "По запросу ничего не найдено"
+                        },
+                    )
+                }
             } else {
                 if (clients.summary.isNotBlank()) {
                     item { StaffInfoBanner(clients.summary) }

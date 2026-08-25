@@ -1534,6 +1534,11 @@ class WorkActivity : ComponentActivity() {
                     if (generation != loadGeneration || uiState.selectedTab != tab) return@runOnUiThread
                     uiState = uiState.copy(errorMessage = UserFacingError.message(e))
                     if (tab == WorkUiState.TAB_SCHEDULE) scheduleData = null
+                    if (tab == WorkUiState.TAB_CLIENTS) {
+                        uiState = uiState.copy(
+                            clients = uiState.clients.copy(loading = false, items = emptyList()),
+                        )
+                    }
                 }
             }
         }

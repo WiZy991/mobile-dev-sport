@@ -40,23 +40,9 @@ final class StaffClientsController extends AbstractController
             ->orderBy('u.name', 'ASC')
             ->setMaxResults(80);
 
-        // Тренер видит только клиентов с записью к себе (активной или архивной).
-        if (!$this->isPrivileged($user)) {
-            $linkedTrainer = $user->getTrainer();
-            if ($linkedTrainer === null) {
-                return $this->json(['items' => []]);
-            }
-            $qb->andWhere(
-                'EXISTS (
-                    SELECT 1 FROM App\Entity\Booking b2
-                    JOIN b2.training t2
-                    WHERE b2.user = u AND t2.trainer = :ownTrainer AND b2.status != :ownCancelled
-                )'
-            )
-                ->setParameter('ownTrainer', $linkedTrainer)
-                ->setParameter('ownCancelled', 'cancelled');
-        }
-
+        // Список общий для всех ролей с доступом к разделу (иначе нельзя найти
+        // клиента для первой записи на занятие). Ограничение «только свои»
+        // остаётся в detail() и в бейдже hasActiveBooking (пункты 29/47).
         if ($q !== '') {
             $qb->andWhere('LOWER(u.name) LIKE :q OR LOWER(u.email) LIKE :q OR u.phone LIKE :qPhone')
                 ->setParameter('q', '%' . $q . '%')
@@ -106,7 +92,7 @@ final class StaffClientsController extends AbstractController
             ->setParameter('cancelled', 'cancelled')
             ->setParameter('now', new \DateTimeImmutable());
 
-        if (!$this->isPrivileged($user)) {
+        if ($this->scopesToOwnTrainerClients($user)) {
             $linkedTrainer = $user->getTrainer();
             if ($linkedTrainer === null) {
                 return [];
@@ -128,6 +114,12 @@ final class StaffClientsController extends AbstractController
         return \in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true)
             || \in_array('ROLE_ADMIN', $user->getRoles(), true)
             || \in_array('ROLE_MANAGER', $user->getRoles(), true);
+    }
+
+    /** Список/бейджи «своих» — только чистый ROLE_TRAINER без admin/manager. */
+    private function scopesToOwnTrainerClients(StaffUser $user): bool
+    {
+        return $user->isTrainerRole() && !$this->isPrivileged($user);
     }
 
     #[Route('/clients/{id}', name: 'api_staff_client_detail', methods: ['GET'], requirements: ['id' => '\\d+'])]
@@ -166,37 +158,19 @@ final class StaffClientsController extends AbstractController
 
         // Тренер видит только записи клиента к себе (включая завершённые),
         // но не записи к другим тренерам (пункт 47 репорта).
-        $bookings = [];
-        if ($this->isPrivileged($user)) {
+        // Карточку клиента при этом можно открыть из общего списка / поиска.
+        // Finance/support/viewer — все записи, как в CRM.
+        if (!$this->scopesToOwnTrainerClients($user)) {
             $bookings = $bookingsQb->getQuery()->getResult();
         } else {
             $linkedTrainer = $user->getTrainer();
-            if ($linkedTrainer === null) {
-                return $this->json(['error' => 'Not found', 'code' => 'not_found'], 404);
-            }
-            $bookings = $bookingsQb
-                ->andWhere('t.trainer = :trainer')
-                ->setParameter('trainer', $linkedTrainer)
-                ->getQuery()
-                ->getResult();
-            // Нет ни одной записи к этому тренеру — клиент вне зоны видимости.
-            if ($bookings === []) {
-                $any = (int) $this->em->createQueryBuilder()
-                    ->select('COUNT(b.id)')
-                    ->from(Booking::class, 'b')
-                    ->join('b.training', 't')
-                    ->where('b.user = :user')
+            $bookings = $linkedTrainer === null
+                ? []
+                : $bookingsQb
                     ->andWhere('t.trainer = :trainer')
-                    ->andWhere('b.status != :cancelled')
-                    ->setParameter('user', $client)
                     ->setParameter('trainer', $linkedTrainer)
-                    ->setParameter('cancelled', 'cancelled')
                     ->getQuery()
-                    ->getSingleScalarResult();
-                if ($any === 0) {
-                    return $this->json(['error' => 'Not found', 'code' => 'not_found'], 404);
-                }
-            }
+                    ->getResult();
         }
 
         $bookingRows = [];
