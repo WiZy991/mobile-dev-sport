@@ -1,5 +1,19 @@
 {% extends 'admin/base.html.twig' %}
 
+{% macro trainer_photo_src(photoUrl) %}
+{%- if photoUrl -%}
+{%- if photoUrl starts with 'http://' or photoUrl starts with 'https://' -%}
+{{- photoUrl -}}
+{%- elseif photoUrl starts with '/' -%}
+{{- app.request.schemeAndHttpHost ~ photoUrl -}}
+{%- else -%}
+{{- app.request.schemeAndHttpHost ~ '/' ~ photoUrl -}}
+{%- endif -%}
+{%- endif -%}
+{% endmacro %}
+
+{% import _self as trainers %}
+
 {% block body %}
 <div class="content-header">
     <h1 class="h4 mb-0">Тренеры</h1>
@@ -30,8 +44,8 @@
             </select>
         </div>
         <div class="col-md-3">
-            <label class="form-label small text-secondary">Фото (URL)</label>
-            <input type="url" name="photo_url" class="form-control form-control-sm">
+            <label class="form-label small text-secondary">Фото (URL или путь)</label>
+            <input type="text" name="photo_url" class="form-control form-control-sm" placeholder="https://… или /uploads/trainers/…">
         </div>
         <div class="col-md-3">
             <label class="form-label small text-secondary">Телефон</label>
@@ -53,7 +67,8 @@
         <table class="table table-sm table-dark align-middle mb-0">
             <thead>
             <tr>
-                <th>ID</th>
+                <th style="width:3rem">ID</th>
+                <th style="width:4.5rem">Фото</th>
                 <th>Имя</th>
                 <th>Специализация</th>
                 <th>Рейтинг</th>
@@ -64,8 +79,24 @@
             <tbody>
             {% for t in trainers %}
                 {% set pub = t.publicationStatus %}
+                {% set photoSrc = trainers.trainer_photo_src(t.photoUrl) %}
                 <tr>
                     <td>{{ t.id }}</td>
+                    <td>
+                        {% if photoSrc %}
+                            <a href="{{ photoSrc|trim }}" target="_blank" rel="noopener" title="Открыть фото">
+                                <img
+                                    src="{{ photoSrc|trim }}"
+                                    alt="{{ t.name }}"
+                                    class="trainer-photo-thumb"
+                                    loading="lazy"
+                                    onerror="this.outerHTML='<span class=&quot;trainer-photo-placeholder&quot; title=&quot;Файл не найден&quot;>—</span>'"
+                                >
+                            </a>
+                        {% else %}
+                            <span class="trainer-photo-placeholder" title="Фото не загружено">—</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {{ t.name }}
                         <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="btn btn-sm btn-outline-secondary ms-1 py-0" title="Расписание">📅</a>
@@ -105,8 +136,16 @@
                 </tr>
                 {% if admin_can_coach() %}
                 <tr class="collapse" id="edit-trainer-{{ t.id }}">
-                        <td colspan="6" class="bg-dark py-2">
+                        <td colspan="7" class="bg-dark py-2">
                             <form method="post" action="{{ path('admin_trainer_update', {id: t.id}) }}" class="row g-2 align-items-end">
+                                {% if photoSrc %}
+                                <div class="col-12 col-md-auto">
+                                    <label class="form-label small mb-0 d-block">Текущее фото</label>
+                                    <a href="{{ photoSrc|trim }}" target="_blank" rel="noopener">
+                                        <img src="{{ photoSrc|trim }}" alt="{{ t.name }}" class="trainer-photo-preview" loading="lazy">
+                                    </a>
+                                </div>
+                                {% endif %}
                                 <div class="col-md-2">
                                     <label class="form-label small mb-0">Имя</label>
                                     <input type="text" name="name" class="form-control form-control-sm" value="{{ t.name }}" required>
@@ -128,8 +167,9 @@
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label small mb-0">Фото (URL)</label>
-                                    <input type="url" name="photo_url" class="form-control form-control-sm" value="{{ t.photoUrl ?? '' }}">
+                                    <label class="form-label small mb-0">Фото (URL или путь из приложения)</label>
+                                    <input type="text" name="photo_url" class="form-control form-control-sm" value="{{ t.photoUrl ?? '' }}" placeholder="/uploads/trainers/…">
+                                    <div class="form-text">То же фото, что в staffapp и в «Наша команда». Очистите поле, чтобы убрать.</div>
                                 </div>
                                 <div class="col-md-2">
                                     <label class="form-label small mb-0">Телефон</label>
@@ -148,7 +188,7 @@
                 {% endif %}
             {% else %}
                 <tr>
-                    <td colspan="6" class="text-center text-secondary">
+                    <td colspan="7" class="text-center text-secondary">
                         Персонал пока не добавлен.
                     </td>
                 </tr>
@@ -157,6 +197,38 @@
         </table>
     </div>
 </div>
+<style>
+.trainer-photo-thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    display: block;
+}
+.trainer-photo-preview {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    display: block;
+}
+.trainer-photo-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.7rem;
+    background: rgba(255, 255, 255, 0.04);
+}
+</style>
 <script>
 (() => {
     const formatPhone = (raw) => {
