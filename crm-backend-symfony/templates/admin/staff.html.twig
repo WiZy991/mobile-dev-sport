@@ -22,7 +22,16 @@
 
 {% if admin_can_mutate() %}
 <div class="content-card mb-3">
-    <form method="post" action="{{ path('admin_trainer_new') }}" class="row g-2 align-items-end">
+    <form method="post" action="{{ path('admin_trainer_new') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+        <div class="col-auto">
+            <label class="form-label small text-secondary d-block">Фото</label>
+            <label class="trainer-photo-tile trainer-photo-tile--new" title="Выбрать фото">
+                <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/*" class="trainer-photo-input" data-photo-preview>
+                <span class="trainer-photo-empty">+</span>
+                <img class="trainer-photo-img d-none" alt="">
+                <span class="trainer-photo-hint">Добавить</span>
+            </label>
+        </div>
         <div class="col-md-3">
             <label class="form-label small text-secondary">Имя</label>
             <input type="text" name="name" class="form-control form-control-sm" required>
@@ -42,10 +51,6 @@
                 <option value="published">Опубликован</option>
                 <option value="hidden">Скрыт</option>
             </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small text-secondary">Фото (URL или путь)</label>
-            <input type="text" name="photo_url" class="form-control form-control-sm" placeholder="https://… или /uploads/trainers/…">
         </div>
         <div class="col-md-3">
             <label class="form-label small text-secondary">Телефон</label>
@@ -68,7 +73,7 @@
             <thead>
             <tr>
                 <th style="width:3rem">ID</th>
-                <th style="width:4.5rem">Фото</th>
+                <th style="width:5.5rem">Фото</th>
                 <th>Имя</th>
                 <th>Специализация</th>
                 <th>Рейтинг</th>
@@ -79,22 +84,38 @@
             <tbody>
             {% for t in trainers %}
                 {% set pub = t.publicationStatus %}
-                {% set photoSrc = trainers.trainer_photo_src(t.photoUrl) %}
+                {% set photoSrc = trainers.trainer_photo_src(t.photoUrl)|trim %}
                 <tr>
                     <td>{{ t.id }}</td>
                     <td>
-                        {% if photoSrc %}
-                            <a href="{{ photoSrc|trim }}" target="_blank" rel="noopener" title="Открыть фото">
-                                <img
-                                    src="{{ photoSrc|trim }}"
-                                    alt="{{ t.name }}"
-                                    class="trainer-photo-thumb"
-                                    loading="lazy"
-                                    onerror="this.outerHTML='<span class=&quot;trainer-photo-placeholder&quot; title=&quot;Файл не найден&quot;>—</span>'"
-                                >
-                            </a>
+                        {% if admin_can_coach() %}
+                            <div class="trainer-photo-tile {% if not photoSrc %}trainer-photo-tile--empty{% endif %}">
+                                {% if photoSrc %}
+                                    <img src="{{ photoSrc }}" alt="{{ t.name }}" class="trainer-photo-img" loading="lazy"
+                                         onerror="this.classList.add('d-none'); this.parentElement.classList.add('trainer-photo-tile--empty');">
+                                {% else %}
+                                    <span class="trainer-photo-empty">Нет</span>
+                                {% endif %}
+                                <div class="trainer-photo-actions">
+                                    <form method="post" action="{{ path('admin_trainer_photo', {id: t.id}) }}" enctype="multipart/form-data" class="trainer-photo-replace-form">
+                                        <label class="trainer-photo-btn" title="{{ photoSrc ? 'Заменить фото' : 'Загрузить фото' }}">
+                                            <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/*" class="trainer-photo-input" data-auto-submit>
+                                            <span>{{ photoSrc ? '↻' : '+' }}</span>
+                                        </label>
+                                    </form>
+                                    {% if photoSrc %}
+                                    <form method="post" action="{{ path('admin_trainer_photo_delete', {id: t.id}) }}" onsubmit="return confirm('Удалить фото тренера?')">
+                                        <button type="submit" class="trainer-photo-btn trainer-photo-btn--danger" title="Удалить фото">×</button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
                         {% else %}
-                            <span class="trainer-photo-placeholder" title="Фото не загружено">—</span>
+                            {% if photoSrc %}
+                                <img src="{{ photoSrc }}" alt="{{ t.name }}" class="trainer-photo-img trainer-photo-img--static" loading="lazy">
+                            {% else %}
+                                <span class="trainer-photo-placeholder">—</span>
+                            {% endif %}
                         {% endif %}
                     </td>
                     <td>
@@ -138,14 +159,6 @@
                 <tr class="collapse" id="edit-trainer-{{ t.id }}">
                         <td colspan="7" class="bg-dark py-2">
                             <form method="post" action="{{ path('admin_trainer_update', {id: t.id}) }}" class="row g-2 align-items-end">
-                                {% if photoSrc %}
-                                <div class="col-12 col-md-auto">
-                                    <label class="form-label small mb-0 d-block">Текущее фото</label>
-                                    <a href="{{ photoSrc|trim }}" target="_blank" rel="noopener">
-                                        <img src="{{ photoSrc|trim }}" alt="{{ t.name }}" class="trainer-photo-preview" loading="lazy">
-                                    </a>
-                                </div>
-                                {% endif %}
                                 <div class="col-md-2">
                                     <label class="form-label small mb-0">Имя</label>
                                     <input type="text" name="name" class="form-control form-control-sm" value="{{ t.name }}" required>
@@ -166,11 +179,6 @@
                                         <option value="hidden" {% if pub == 'hidden' %}selected{% endif %}>Скрыт</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label small mb-0">Фото (URL или путь из приложения)</label>
-                                    <input type="text" name="photo_url" class="form-control form-control-sm" value="{{ t.photoUrl ?? '' }}" placeholder="/uploads/trainers/…">
-                                    <div class="form-text">То же фото, что в staffapp и в «Наша команда». Очистите поле, чтобы убрать.</div>
-                                </div>
                                 <div class="col-md-2">
                                     <label class="form-label small mb-0">Телефон</label>
                                     <input type="tel" name="phone" class="form-control form-control-sm" value="{{ t.phone ?? '' }}" placeholder="+7 (___) ___-__-__" inputmode="tel" maxlength="18" data-phone-mask>
@@ -183,6 +191,7 @@
                                     <button type="submit" class="btn btn-sm btn-success">Сохранить</button>
                                 </div>
                             </form>
+                            <p class="small text-secondary mb-0 mt-2">Фото меняйте в колонке «Фото»: наведите на снимок → заменить или удалить.</p>
                         </td>
                 </tr>
                 {% endif %}
@@ -198,35 +207,118 @@
     </div>
 </div>
 <style>
-.trainer-photo-thumb {
-    width: 48px;
-    height: 48px;
-    object-fit: cover;
-    border-radius: 10px;
+.trainer-photo-tile {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.15);
     background: rgba(255, 255, 255, 0.06);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.trainer-photo-tile--new {
+    width: 72px;
+    height: 72px;
+    cursor: pointer;
+}
+.trainer-photo-tile--empty {
+    border-style: dashed;
+}
+.trainer-photo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
 }
-.trainer-photo-preview {
-    width: 96px;
-    height: 96px;
-    object-fit: cover;
+.trainer-photo-img--static {
+    width: 64px;
+    height: 64px;
     border-radius: 12px;
+    object-fit: cover;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.06);
-    display: block;
+}
+.trainer-photo-empty {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.trainer-photo-hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 2px 0;
+    text-align: center;
+    font-size: 0.65rem;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+}
+.trainer-photo-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+}
+.trainer-photo-actions {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 3;
+}
+.trainer-photo-tile:hover .trainer-photo-actions,
+.trainer-photo-tile:focus-within .trainer-photo-actions {
+    opacity: 1;
+}
+.trainer-photo-btn {
+    position: relative;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    border: 0;
+    background: #fff;
+    color: #111;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+}
+.trainer-photo-btn .trainer-photo-input {
+    z-index: 4;
+}
+.trainer-photo-btn--danger {
+    background: #dc3545;
+    color: #fff;
+    font-size: 1.1rem;
 }
 .trainer-photo-placeholder {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
     border: 1px dashed rgba(255, 255, 255, 0.2);
     color: rgba(255, 255, 255, 0.45);
-    font-size: 0.7rem;
-    background: rgba(255, 255, 255, 0.04);
+}
+.trainer-photo-replace-form {
+    margin: 0;
 }
 </style>
 <script>
@@ -264,6 +356,30 @@
         input.addEventListener('input', applyMask);
         input.addEventListener('blur', applyMask);
         applyMask();
+    });
+
+    document.querySelectorAll('input[data-auto-submit]').forEach((input) => {
+        input.addEventListener('change', () => {
+            if (!input.files || !input.files.length) return;
+            const form = input.closest('form');
+            if (form) form.submit();
+        });
+    });
+
+    document.querySelectorAll('input[data-photo-preview]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const tile = input.closest('.trainer-photo-tile');
+            if (!tile || !input.files || !input.files[0]) return;
+            const img = tile.querySelector('.trainer-photo-img');
+            const empty = tile.querySelector('.trainer-photo-empty');
+            const url = URL.createObjectURL(input.files[0]);
+            if (img) {
+                img.src = url;
+                img.classList.remove('d-none');
+            }
+            if (empty) empty.classList.add('d-none');
+            tile.classList.remove('trainer-photo-tile--empty');
+        });
     });
 })();
 </script>

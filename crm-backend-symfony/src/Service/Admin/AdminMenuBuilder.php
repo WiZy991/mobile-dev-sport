@@ -100,6 +100,8 @@ final class AdminMenuBuilder
         'admin_training_delete',
         'admin_booking_cancel',
         'admin_trainer_update',
+        'admin_trainer_photo',
+        'admin_trainer_photo_delete',
     ];
 
     /** @return list<string> */

@@ -2101,7 +2101,6 @@ class AdminController extends AbstractController
     {
         $name = (string) $request->request->get('name');
         $specialization = $request->request->get('specialization') ?: null;
-        $photoUrl = $request->request->get('photo_url') ?: null;
         $ratingRaw = $request->request->get('rating');
         $rating = $ratingRaw !== null && $ratingRaw !== '' ? (float) $ratingRaw : null;
 
@@ -2118,15 +2117,54 @@ class AdminController extends AbstractController
         $trainer = (new Trainer())
             ->setName($name)
             ->setSpecialization($specialization)
-            ->setPhotoUrl($photoUrl)
             ->setPhone($phone)
             ->setRating($rating)
             ->setDescription($description)
             ->setPublicationStatus($publicationStatus);
 
+        $this->applyTrainerPhotoUpload($request, $trainer);
+
         $this->em->persist($trainer);
         $this->em->flush();
         $this->addFlash('success', 'Тренер добавлен. В приложении виден только статус «Опубликован».');
+
+        return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+    }
+
+    #[Route('/trainers/{id}/photo', name: 'admin_trainer_photo', methods: ['POST'], requirements: ['id' => '\\d+'])]
+    public function uploadTrainerPhoto(int $id, Request $request): Response
+    {
+        $trainer = $this->em->getRepository(Trainer::class)->find($id);
+        if (!$trainer) {
+            $this->addFlash('warning', 'Тренер не найден.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+        }
+
+        $hadPhoto = $trainer->getPhotoUrl() !== null && trim((string) $trainer->getPhotoUrl()) !== '';
+        $this->applyTrainerPhotoUpload($request, $trainer, replaceExisting: true);
+        if ($trainer->getPhotoUrl() !== null && trim((string) $trainer->getPhotoUrl()) !== '') {
+            $this->em->flush();
+            $this->addFlash('success', $hadPhoto ? 'Фото заменено.' : 'Фото загружено.');
+        }
+
+        return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+    }
+
+    #[Route('/trainers/{id}/photo/delete', name: 'admin_trainer_photo_delete', methods: ['POST'], requirements: ['id' => '\\d+'])]
+    public function deleteTrainerPhoto(int $id): Response
+    {
+        $trainer = $this->em->getRepository(Trainer::class)->find($id);
+        if (!$trainer) {
+            $this->addFlash('warning', 'Тренер не найден.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+        }
+
+        $this->removeTrainerPhotoFile($trainer->getPhotoUrl());
+        $trainer->setPhotoUrl(null);
+        $this->em->flush();
+        $this->addFlash('success', 'Фото удалено.');
 
         return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
     }
@@ -2194,6 +2232,7 @@ class AdminController extends AbstractController
         }
 
         $name = $trainer->getName();
+        $this->removeTrainerPhotoFile($trainer->getPhotoUrl());
 
         // Отвязать staff-аккаунт (FK SET NULL, но снимем явно).
         $staffLinked = $this->em->getRepository(StaffUser::class)->findBy(['trainer' => $trainer]);
@@ -2246,7 +2285,6 @@ class AdminController extends AbstractController
 
         $trainer->setName((string) $request->request->get('name'))
             ->setSpecialization($request->request->get('specialization') ?: null)
-            ->setPhotoUrl($request->request->get('photo_url') ?: null)
             ->setPhone($phone)
             ->setDescription($description);
         $ratingRaw = $request->request->get('rating');
@@ -4166,6 +4204,79 @@ class AdminController extends AbstractController
             $promotion->setImagePath($this->storePromotionImage($file));
         } catch (\Throwable $e) {
             $this->addFlash('warning', $e->getMessage());
+        }
+    }
+
+    private function applyTrainerPhotoUpload(Request $request, Trainer $trainer, bool $replaceExisting = false): void
+    {
+        $file = $request->files->get('photo') ?? $request->files->get('photo_file');
+        if (!$file instanceof UploadedFile) {
+            if ($replaceExisting) {
+                $this->addFlash('warning', 'Выберите файл фото (jpg, png, webp).');
+            }
+
+            return;
+        }
+        if (!$file->isValid()) {
+            if ($file->getError() !== \UPLOAD_ERR_NO_FILE) {
+                $this->addFlash('warning', 'Фото не принято: ' . $file->getErrorMessage());
+            }
+
+            return;
+        }
+        try {
+            $old = $trainer->getPhotoUrl();
+            $path = $this->storeTrainerPhoto($file);
+            $trainer->setPhotoUrl($path);
+            if ($old !== null && $old !== $path) {
+                $this->removeTrainerPhotoFile($old);
+            }
+        } catch (\Throwable $e) {
+            $this->addFlash('warning', $e->getMessage());
+        }
+    }
+
+    private function storeTrainerPhoto(UploadedFile $file): string
+    {
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        $ext = strtolower(pathinfo($file->getClientOriginalName(), \PATHINFO_EXTENSION));
+        if (!\in_array($ext, $allowed, true)) {
+            try {
+                $g = strtolower((string) ($file->guessExtension() ?: ''));
+                if (\in_array($g, $allowed, true)) {
+                    $ext = $g;
+                }
+            } catch (\Throwable) {
+            }
+        }
+        if (!\in_array($ext, $allowed, true)) {
+            throw new \RuntimeException('Формат фото: jpg, png, webp.');
+        }
+
+        $uploadsDir = $this->getParameter('kernel.project_dir') . '/public/uploads/trainers';
+        if (!is_dir($uploadsDir) && !mkdir($uploadsDir, 0775, true) && !is_dir($uploadsDir)) {
+            throw new \RuntimeException('Не удалось создать директорию для фото.');
+        }
+
+        $filename = 'trainer_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $file->move($uploadsDir, $filename);
+
+        return '/uploads/trainers/' . $filename;
+    }
+
+    private function removeTrainerPhotoFile(?string $photoUrl): void
+    {
+        if ($photoUrl === null || trim($photoUrl) === '') {
+            return;
+        }
+        $path = trim($photoUrl);
+        // Удаляем только локальные загрузки, внешние URL не трогаем.
+        if (!str_starts_with($path, '/uploads/trainers/')) {
+            return;
+        }
+        $absolute = $this->getParameter('kernel.project_dir') . '/public' . $path;
+        if (is_file($absolute)) {
+            @unlink($absolute);
         }
     }
 
