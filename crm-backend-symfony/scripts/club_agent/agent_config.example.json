@@ -41,7 +41,7 @@
     "event_codes": "CrossLineDetection",
     "inbound_direction": "",
     "require_human": true,
-    "tailgating_window_ms": 6000,
+    "tailgating_window_ms": 8000,
     "pre_roll_ms": 1000,
     "min_people": 2,
     "standalone_enabled": false,

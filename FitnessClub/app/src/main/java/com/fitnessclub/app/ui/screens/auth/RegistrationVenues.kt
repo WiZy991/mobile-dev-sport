@@ -34,6 +34,12 @@ object RegistrationVenues {
             imageRes = R.drawable.registration_club_kupera,
             openForRegistration = true,
         ),
+        RegistrationVenueCard(
+            clubId = "11",
+            title = "ТЦ Седанка Сити",
+            addressLines = "г. Владивосток, ул. Полетаева 6Д",
+            imageRes = R.drawable.registration_club_mall,
+        ),
     )
 
     val orderedCards: List<RegistrationVenueCard> = allCards.filter { it.openForRegistration }

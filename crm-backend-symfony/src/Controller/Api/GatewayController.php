@@ -11,6 +11,7 @@ use App\Entity\StaffNotification;
 use App\Entity\StaffUser;
 use App\Entity\User;
 use App\Service\Integration\FitnessClubEntryQrTimestamp;
+use App\Service\Integration\WiegandEntryQrCodec;
 use App\Service\Integration\SubscriptionGateResolver;
 use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Reports\OccupancyService;
@@ -93,32 +94,22 @@ class GatewayController extends AbstractController
             ->setResult('denied')
             ->setClub($club);
 
-        $parts = explode(':', $qr);
-        if (count($parts) < 4 || $parts[0] !== 'FITNESSCLUB') {
+        $entryParsed = $this->parseGatewayEntryQr($qr);
+        if ($entryParsed === null) {
             return $this->denied($log, 'invalid_format', 400);
         }
 
-        if ($parts[1] === 'GUEST') {
-            return $this->handleGuestPassEntry($club, $parts, $log);
+        if ($entryParsed['kind'] === 'guest') {
+            return $this->handleGuestPassEntry($club, $entryParsed['parts'], $log);
         }
 
-        if ($parts[1] === 'STAFF') {
-            return $this->handleStaffEntry($club, $parts, $log);
+        if ($entryParsed['kind'] === 'staff') {
+            return $this->handleStaffEntry($club, $entryParsed['parts'], $log);
         }
 
-        if ($parts[1] !== 'ENTRY' || count($parts) !== 4) {
-            return $this->denied($log, 'invalid_format', 400);
-        }
-
-        $userExternalId = $parts[2];
-        $timestamp = FitnessClubEntryQrTimestamp::parseToUnixMs($parts[3]);
-        if ($timestamp === null) {
-            return $this->denied($log, 'invalid_format', 400);
-        }
-
-        $userId = str_starts_with($userExternalId, 'user-')
-            ? (int) substr($userExternalId, 5)
-            : (int) $userExternalId;
+        $userId = $entryParsed['user_id'];
+        $timestamp = $entryParsed['timestamp_ms'];
+        $timeSegment = $entryParsed['time_segment'];
 
         /** @var User|null $user */
         $user = $this->em->getRepository(User::class)->find($userId);
@@ -202,7 +193,7 @@ class GatewayController extends AbstractController
                 'delta_ms' => $deltaMs,
                 'server_now_ms' => $nowMs,
                 'qr_timestamp_ms' => $timestamp,
-                'qr_time_segment' => $parts[3],
+                'qr_time_segment' => $timeSegment,
             ]);
         }
 
@@ -262,22 +253,14 @@ class GatewayController extends AbstractController
             ->setClub($club);
 
         $parts = explode(':', $qr);
-        if (count($parts) < 3 || $parts[0] !== 'FITNESSCLUB') {
-            return $this->denied($log, 'invalid_format', 400);
-        }
-
-        if ($parts[1] === 'STAFF') {
+        if (count($parts) >= 3 && $parts[0] === 'FITNESSCLUB' && $parts[1] === 'STAFF') {
             return $this->handleStaffExit($club, $parts, $log);
         }
 
-        if ($parts[1] !== 'ENTRY') {
+        $userId = $this->parseGatewayExitUserId($qr);
+        if ($userId === null) {
             return $this->denied($log, 'invalid_format', 400);
         }
-
-        $userExternalId = $parts[2];
-        $userId = str_starts_with($userExternalId, 'user-')
-            ? (int) substr($userExternalId, 5)
-            : (int) $userExternalId;
 
         /** @var User|null $user */
         $user = $this->em->getRepository(User::class)->find($userId);
@@ -762,5 +745,91 @@ class GatewayController extends AbstractController
         }
 
         return AccessAlarm::TYPE_TAILGATING;
+    }
+
+    /**
+     * @return array{
+     *     kind: string,
+     *     user_id?: int,
+     *     timestamp_ms?: int,
+     *     time_segment?: string,
+     *     parts?: list<string>
+     * }|null
+     */
+    private function parseGatewayEntryQr(string $qr): ?array
+    {
+        if (WiegandEntryQrCodec::isPayload($qr)) {
+            $parsed = WiegandEntryQrCodec::parse($qr);
+            if ($parsed === null) {
+                return null;
+            }
+
+            return [
+                'kind' => 'entry',
+                'user_id' => $parsed['user_id'],
+                'timestamp_ms' => $parsed['timestamp_ms'],
+                'time_segment' => $parsed['time_segment'],
+            ];
+        }
+
+        $parts = explode(':', $qr);
+        if (count($parts) < 4 || $parts[0] !== 'FITNESSCLUB') {
+            return null;
+        }
+        if ($parts[1] === 'GUEST') {
+            return ['kind' => 'guest', 'parts' => $parts];
+        }
+        if ($parts[1] === 'STAFF') {
+            return ['kind' => 'staff', 'parts' => $parts];
+        }
+        if ($parts[1] !== 'ENTRY' || count($parts) !== 4) {
+            return null;
+        }
+
+        $timestamp = FitnessClubEntryQrTimestamp::parseToUnixMs($parts[3]);
+        if ($timestamp === null) {
+            return null;
+        }
+
+        $userExternalId = $parts[2];
+        $userId = str_starts_with($userExternalId, 'user-')
+            ? (int) substr($userExternalId, 5)
+            : (int) $userExternalId;
+
+        return [
+            'kind' => 'entry',
+            'user_id' => $userId,
+            'timestamp_ms' => $timestamp,
+            'time_segment' => $parts[3],
+        ];
+    }
+
+    private function parseGatewayExitUserId(string $qr): ?int
+    {
+        if (WiegandEntryQrCodec::isPayload($qr)) {
+            $parsed = WiegandEntryQrCodec::parse($qr);
+            if ($parsed !== null) {
+                return $parsed['user_id'];
+            }
+            // Выход без окна времени: берём user id из нормализованной строки.
+            $normalized = WiegandEntryQrCodec::normalize($qr);
+            if ($normalized === null) {
+                return null;
+            }
+            $userLen = \strlen($normalized) === WiegandEntryQrCodec::LEGACY_LENGTH ? 5 : 4;
+
+            return (int) substr($normalized, 0, $userLen);
+        }
+
+        $parts = explode(':', $qr);
+        if (count($parts) < 3 || $parts[0] !== 'FITNESSCLUB' || $parts[1] !== 'ENTRY') {
+            return null;
+        }
+
+        $userExternalId = $parts[2];
+
+        return str_starts_with($userExternalId, 'user-')
+            ? (int) substr($userExternalId, 5)
+            : (int) $userExternalId;
     }
 }

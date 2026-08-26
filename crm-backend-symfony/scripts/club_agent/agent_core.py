@@ -28,6 +28,54 @@ def _looks_like_numeric_reader_payload(qr: str) -> bool:
     return q.isdigit() and len(q) <= 24
 
 
+def _luhn_check_digit(body_digits: str) -> int:
+    if not body_digits or not body_digits.isdigit():
+        return 0
+    total = 0
+    for i, ch in enumerate(reversed(body_digits)):
+        n = int(ch)
+        if i % 2 == 0:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return (10 - total % 10) % 10
+
+
+def _normalize_wiegand_qr(qr: str) -> str | None:
+    """
+    Wiegand-26: приложение отдаёт 7 цифр (UUUUTTC), C01 может срезать ведущие нули.
+    Старый 9-значный формат ещё принимаем, если checksum сходится (полная строка).
+    """
+    q = (qr or "").strip()
+    if not q.isdigit():
+        return None
+    if 4 <= len(q) <= 7:
+        padded = q.zfill(7)
+        if _luhn_check_digit(padded[:6]) == int(padded[6]):
+            return padded
+        return None
+    if 8 <= len(q) <= 9:
+        padded = q.zfill(9)
+        if _luhn_check_digit(padded[:8]) == int(padded[8]):
+            return padded
+        return None
+    return None
+
+
+def _is_wiegand_entry_qr(qr: str) -> bool:
+    return _normalize_wiegand_qr(qr) is not None
+
+
+def _normalize_access_qr(qr: str) -> str:
+    """FITNESSCLUB без изменений; Wiegand — дополнение нулей до 7 (или legacy 9) цифр для CRM."""
+    q = (qr or "").strip()
+    if q.startswith("FITNESSCLUB:"):
+        return q
+    normalized = _normalize_wiegand_qr(q)
+    return normalized if normalized is not None else q
+
+
 def _hint_full_fitnessclub_qr() -> str:
     return (
         "Приложение отдаёт строку вида FITNESSCLUB:ENTRY:<id_пользователя>:<время_мс> — её должен "
@@ -188,6 +236,14 @@ class ClubAgent:
 
     async def _handle_card(self, qr: str, number: int, direction: int, equipment: EquipmentItem) -> bool:
         equipment = self._live_equipment(equipment)
+        raw_qr = (qr or "").strip()
+        qr = _normalize_access_qr(raw_qr)
+        if qr != raw_qr and _is_wiegand_entry_qr(raw_qr):
+            self._emit(
+                "info",
+                f"Wiegand: PERCo передал {len(raw_qr)} цифр, в CRM отправляем {qr} "
+                f"(восстановлены ведущие нули).",
+            )
         passage, passage_err = equipment.resolve_passage(number, direction)
         if passage is None:
             self._emit("warning", f"══════ ОТКАЗ: {passage_err} ══════")
@@ -216,13 +272,18 @@ class ClubAgent:
                 "Укажите в Оборудование пары для входа и выхода → Сохранить всё.",
             )
 
-        if self.cfg.only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
+        if (
+            self.cfg.only_fitnessclub_qr
+            and not qr.startswith("FITNESSCLUB:")
+            and not _is_wiegand_entry_qr(qr)
+        ):
             self._emit(
                 "warning",
-                "Строка не FITNESSCLUB: — в CRM не отправляем (галочка «Только QR FITNESSCLUB» на вкладке CRM). "
-                "API клуба принимает только формат из мобильного приложения.",
+                "Строка не FITNESSCLUB: и не Wiegand-QR (7 цифр UUUUTTC, ≤24 bit) — в CRM не отправляем "
+                "(галочка «Только QR FITNESSCLUB» на вкладке CRM). "
+                "Для PERCo Wiegand обновите приложение iOS/Android (7 цифр в QR).",
             )
-            if _looks_like_numeric_reader_payload(qr):
+            if _looks_like_numeric_reader_payload(qr) and not _is_wiegand_entry_qr(qr):
                 self._emit("info", _hint_full_fitnessclub_qr())
             return False
         if not self.cfg.crm_ready():
@@ -378,7 +439,9 @@ class ClubAgent:
                 if now >= end:
                     break
                 self._stop.wait(min(0.2, end - now))
-            crossings = cam.crossings_between(t0 - pre_roll_ms / 1000.0, time.monotonic())
+            # Граница окна фиксированная (не «сейчас»), иначе поздние Stop после закрытия окна
+            # и гонки потоков искажают счёт. Небольшой хвост 50 мс — на погрешность таймера.
+            crossings = cam.crossings_between(t0 - pre_roll_ms / 1000.0, end + 0.05)
             count = len(crossings)
             if count >= min_people:
                 self._emit(
@@ -651,9 +714,13 @@ class ClubAgent:
         if passage not in ("entry", "exit"):
             passage = "entry"
         title = "ВЫХОД" if passage == "exit" else "ВХОД"
+        normalized = _normalize_access_qr(qr)
         self._emit("info", f"══════ {title}: тест QR (вручную) ══════")
-        self._emit("info", f"QR: {qr.strip()}")
-        code, body = self._crm_client().submit_qr(qr.strip(), passage=passage)
+        if normalized != qr.strip():
+            self._emit("info", f"QR (исходный): {qr.strip()} → в CRM: {normalized}")
+        else:
+            self._emit("info", f"QR: {normalized}")
+        code, body = self._crm_client().submit_qr(normalized, passage=passage)
         granted = code == 200 and bool(body.get("access_granted"))
         if granted:
             ep = None

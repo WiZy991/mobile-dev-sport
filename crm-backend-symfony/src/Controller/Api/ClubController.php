@@ -30,11 +30,11 @@ class ClubController extends AbstractController
     #[Route('/occupancy', name: 'api_club_occupancy', methods: ['GET'])]
     public function occupancy(Request $request): JsonResponse
     {
-        $preferred = $this->resolvePreferredClub($request);
+        $club = $this->resolveOccupancyClub($request);
 
         $maxCapacity = 100;
-        if ($preferred instanceof Club && $preferred->getMaxCapacity() !== null && $preferred->getMaxCapacity() > 0) {
-            $maxCapacity = max(10, $preferred->getMaxCapacity());
+        if ($club instanceof Club && $club->getMaxCapacity() !== null && $club->getMaxCapacity() > 0) {
+            $maxCapacity = max(10, $club->getMaxCapacity());
         } else {
             $capRaw = $this->clubSettings->get('gym_max_capacity');
             if ($capRaw !== null && $capRaw !== '') {
@@ -42,18 +42,43 @@ class ClubController extends AbstractController
             }
         }
 
-        // Для клиента с выбранным залом — заполненность этого зала; иначе сеть целиком.
-        $current = $this->occupancy->countCurrentlyInside($preferred);
+        // Заполненность по залу клиента (?club_id=… или клуб из регистрации).
+        $current = $this->occupancy->countCurrentlyInside($club);
         $percentage = $maxCapacity > 0 ? min(100, (int) round($current * 100 / $maxCapacity)) : 0;
 
-        return $this->json([
+        $payload = [
             'current' => $current,
             'max_capacity' => $maxCapacity,
             'percentage' => $percentage,
             'status' => $percentage < 50 ? 'low' : ($percentage < 80 ? 'medium' : 'high'),
-            'club_id' => $preferred?->getId(),
-            'club_name' => $preferred !== null ? $this->hallDisplayLabel($preferred) : null,
-        ]);
+        ];
+        if ($club instanceof Club) {
+            $payload['club_id'] = $club->getId();
+            $payload['club_name'] = $this->hallDisplayLabel($club);
+        }
+
+        return $this->json($payload);
+    }
+
+    /** Клуб для заполненности: ?club_id=… или клуб авторизованного клиента. */
+    private function resolveOccupancyClub(Request $request): ?Club
+    {
+        $clubIdRaw = $request->query->get('club_id');
+        if ($clubIdRaw !== null && $clubIdRaw !== '') {
+            $club = $this->em->getRepository(Club::class)->find((int) $clubIdRaw);
+
+            return $club instanceof Club ? $club : null;
+        }
+
+        $user = $this->userResolver->resolve($request);
+        if ($user instanceof User) {
+            $club = $user->getClub();
+            if ($club instanceof Club) {
+                return $club;
+            }
+        }
+
+        return null;
     }
 
     private function legalUrlsFromSettings(): array
@@ -187,6 +212,12 @@ class ClubController extends AbstractController
         }
         $legal = $this->legalUrlsFromSettings();
 
+        [$lat, $lon] = $this->resolveClubCoordinates(
+            (float) ($club->getLatitude() ?? 0.0),
+            (float) ($club->getLongitude() ?? 0.0),
+            $club->getAddress(),
+        );
+
         return $this->json([
             'id' => (string) $club->getId(),
             'name' => $club->getName(),
@@ -195,8 +226,8 @@ class ClubController extends AbstractController
             'email' => $club->getEmail(),
             'working_hours' => $club->getWorkingHours(),
             'amenities' => $club->getAmenities(),
-            'latitude' => $club->getLatitude(),
-            'longitude' => $club->getLongitude(),
+            'latitude' => $lat,
+            'longitude' => $lon,
             'network' => [
                 'about' => $this->clubSettings->get('network_about') ?: null,
                 'social_links' => $this->socialLinksForApi(),
@@ -341,13 +372,7 @@ class ClubController extends AbstractController
     /** Клуб, привязанный к аккаунту клиента (выбор при регистрации). */
     private function resolvePreferredClub(Request $request): ?Club
     {
-        $user = $this->userResolver->resolve($request);
-        if (!$user instanceof User) {
-            return null;
-        }
-        $club = $user->getClub();
-
-        return $club instanceof Club ? $club : null;
+        return $this->resolveOccupancyClub($request);
     }
 
     /** Подпись зала как на главной/в профиле: «ТЦ Формат, ул. Центральная, 18». */
@@ -403,6 +428,10 @@ class ClubController extends AbstractController
         if (str_contains($hay, 'формат') || str_contains($hay, 'центральная')) {
             // ТЦ «Формат», ул. Центральная 18, п. Зима Южная
             return [43.305608, 131.956621];
+        }
+        if (str_contains($hay, 'седанка') || str_contains($hay, 'полетаева')) {
+            // ТРК «Седанка Сити», ул. Полетаева 6Д
+            return [43.212592, 131.95021];
         }
         if (
             str_contains($hay, 'купера')
@@ -559,6 +588,11 @@ class ClubController extends AbstractController
             return [43.305608, 131.956621];
         }
 
+        if (str_contains($a, 'седанка') || str_contains($a, 'полетаева')) {
+            // ТРК «Седанка Сити», ул. Полетаева 6Д (2ГИС)
+            return [43.212592, 131.95021];
+        }
+
         $looksDeFries =
             str_contains($a, 'де фриз')
             || str_contains($a, 'де-фриз')
@@ -568,7 +602,7 @@ class ClubController extends AbstractController
             || str_contains($a, 'владивосток');
 
         if ($looksDeFries) {
-            // АТЦ «Новый Де-Фриз», ул. Купера 2 (исторический дефолт сети)
+            // АТЦ «Новый Де-Фриз», ул. Купера 2
             return [43.313906, 131.999418];
         }
 

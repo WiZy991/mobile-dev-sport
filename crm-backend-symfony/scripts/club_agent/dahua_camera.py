@@ -572,8 +572,10 @@ class DahuaCameraListener:
         action = fields.get("action", "")
         if code not in _IVS_CODES:
             return
-        # Tripwire: Start/Pulse — начало; Stop — на части прошивок Dahua приходит с полным JSON.
-        if action and action.lower() not in ("start", "pulse", "stop"):
+        # Tripwire: один человек = Start (+ иногда Stop). Считаем только Start/Pulse,
+        # иначе Start+Stop одного человека даёт «2 чел.» и ломает порог tailgating.
+        action_l = (action or "").lower()
+        if action_l and action_l not in ("start", "pulse", "stop"):
             return
 
         data: dict = {}
@@ -593,6 +595,14 @@ class DahuaCameraListener:
             "info",
             f"IVS событие: {code} action={action or '—'} dir={direction or '—'} type={obj_type or '—'}",
         )
+
+        if action_l == "stop":
+            self._emit(
+                "info",
+                f"пересечение (Stop) не в счётчик: завершение прохода {obj_type or 'object'} "
+                f"dir={direction or '—'} (в порог идут только Start/Pulse)",
+            )
+            return
 
         if self.require_human:
             if not obj_type:
@@ -618,6 +628,7 @@ class DahuaCameraListener:
             "direction": direction,
             "object": obj_type or ("human" if self.require_human else ""),
             "code": code,
+            "action": action or "Start",
         }
         with self._lock:
             self._crossings.append(record)

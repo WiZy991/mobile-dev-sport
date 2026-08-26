@@ -48,6 +48,37 @@ from typing import Any, Optional
 
 from perco_client import PercoApiError, PercoClient
 
+
+def _luhn_check_digit(body_digits: str) -> int:
+    if not body_digits or not body_digits.isdigit():
+        return 0
+    total = 0
+    for i, ch in enumerate(reversed(body_digits)):
+        n = int(ch)
+        if i % 2 == 0:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return (10 - total % 10) % 10
+
+
+def _normalize_wiegand_qr(qr: str) -> Optional[str]:
+    q = (qr or "").strip()
+    if not q.isdigit():
+        return None
+    if 4 <= len(q) <= 7:
+        padded = q.zfill(7)
+        if _luhn_check_digit(padded[:6]) == int(padded[6]):
+            return padded
+        return None
+    if 8 <= len(q) <= 9:
+        padded = q.zfill(9)
+        if _luhn_check_digit(padded[:8]) == int(padded[8]):
+            return padded
+        return None
+    return None
+
 LOG = logging.getLogger("gateway")
 
 
@@ -394,8 +425,12 @@ class GatewayDaemon:
             qr = self._extract_qr_from_perco_event(event)
             if not qr:
                 continue
-            if self.cfg.perco_only_fitnessclub_qr and not qr.startswith("FITNESSCLUB:"):
-                LOG.debug("PERCo event пропущен: идентификатор не FITNESSCLUB (%s)", qr[:48])
+            if (
+                self.cfg.perco_only_fitnessclub_qr
+                and not qr.startswith("FITNESSCLUB:")
+                and _normalize_wiegand_qr(qr) is None
+            ):
+                LOG.debug("PERCo event пропущен: идентификатор не FITNESSCLUB/Wiegand (%s)", qr[:48])
                 continue
 
             LOG.info("PERCo event → QR найден: %s", qr[:96])

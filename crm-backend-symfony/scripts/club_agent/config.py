@@ -72,7 +72,7 @@ class CameraConfig:
     event_codes: str = "CrossLineDetection"
     inbound_direction: str = ""  # "", "LeftToRight" или "RightToLeft"
     require_human: bool = True
-    tailgating_window_ms: int = 6000
+    tailgating_window_ms: int = 8000
     pre_roll_ms: int = 1000
     min_people: int = 2
 
