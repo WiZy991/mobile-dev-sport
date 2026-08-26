@@ -1232,15 +1232,17 @@ struct ClubInfoView: View {
                             }
                         }
                     }
-                    Section("Мы в соцсетях") {
-                        if let vk = socialURL(info?.network?.socialVk) ?? optionalConfigURL(AppConfiguration.vkURL) {
-                            clubSocialRow(title: "ВКонтакте", color: Color(red: 0.30, green: 0.46, blue: 0.64), url: vk)
-                        }
-                        if let tg = socialURL(info?.network?.socialTelegram) ?? optionalConfigURL(AppConfiguration.telegramURL) {
-                            clubSocialRow(title: "Telegram", color: Color(red: 0, green: 0.53, blue: 0.80), url: tg)
-                        }
-                        if let wa = whatsAppURL(for: info) {
-                            clubSocialRow(title: "WhatsApp", color: Color(red: 0.15, green: 0.83, blue: 0.40), url: wa)
+                    if let links = info.network?.resolvedSocialLinks, !links.isEmpty {
+                        Section("Мы в соцсетях") {
+                            ForEach(Array(links.enumerated()), id: \.offset) { _, link in
+                                if let url = socialURL(link.url) {
+                                    clubSocialRow(
+                                        title: link.displayTitle,
+                                        color: socialColor(link),
+                                        url: url
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1314,19 +1316,21 @@ struct ClubInfoView: View {
         return URL(string: s)
     }
 
-    /// Не показывать placeholder fitnessclub из AppConfiguration, если нет данных CRM.
-    private func optionalConfigURL(_ url: URL) -> URL? {
-        let host = url.host?.lowercased() ?? ""
-        if host.contains("fitnessclub") { return nil }
-        return url
-    }
-
-    private func whatsAppURL(for info: ClubInfo?) -> URL? {
-        let digits = (info?.phone ?? "").filter(\.isNumber)
-        if digits.count >= 10 {
-            return URL(string: "https://wa.me/\(digits)")
+    private func socialColor(_ link: ClubSocialLink) -> Color {
+        let hex = link.color?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if hex.hasPrefix("#"), hex.count == 7, let rgb = UInt32(hex.dropFirst(), radix: 16) {
+            return Color(
+                red: Double((rgb >> 16) & 0xFF) / 255,
+                green: Double((rgb >> 8) & 0xFF) / 255,
+                blue: Double(rgb & 0xFF) / 255
+            )
         }
-        return optionalConfigURL(AppConfiguration.whatsAppURL)
+        switch (link.type ?? "").lowercased() {
+        case "vk": return Color(red: 0.30, green: 0.46, blue: 0.64)
+        case "telegram": return Color(red: 0, green: 0.53, blue: 0.80)
+        case "whatsapp": return Color(red: 0.15, green: 0.83, blue: 0.40)
+        default: return Theme.primary
+        }
     }
 }
 

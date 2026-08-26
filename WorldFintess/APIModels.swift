@@ -217,11 +217,67 @@ struct ClubShopCounts: Codable, Hashable, Sendable {
     var subscriptions: Int?
 }
 
+struct ClubSocialLink: Codable, Hashable, Sendable {
+    var type: String?
+    var label: String?
+    var url: String
+    var color: String?
+
+    init(type: String? = nil, label: String? = nil, url: String, color: String? = nil) {
+        self.type = type
+        self.label = label
+        self.url = url
+        self.color = color
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        label = try c.decodeIfPresent(String.self, forKey: .label)
+        url = (try? c.decode(String.self, forKey: .url)) ?? ""
+        color = try c.decodeIfPresent(String.self, forKey: .color)
+    }
+
+    enum CodingKeys: String, CodingKey { case type, label, url, color }
+
+    var displayTitle: String {
+        let fromLabel = label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !fromLabel.isEmpty { return fromLabel }
+        switch (type ?? "").lowercased() {
+        case "vk": return "ВКонтакте"
+        case "telegram": return "Telegram"
+        case "whatsapp": return "WhatsApp"
+        case "website": return "Сайт"
+        case "youtube": return "YouTube"
+        case "instagram": return "Instagram"
+        default: return "Ссылка"
+        }
+    }
+}
+
 struct ClubNetworkInfo: Codable, Hashable, Sendable {
     var about: String?
     var socialVk: String?
     var socialTelegram: String?
     var website: String?
+    var socialLinks: [ClubSocialLink]?
+
+    /// Ссылки для UI: сначала `social_links` из CRM, иначе legacy vk/telegram/website.
+    var resolvedSocialLinks: [ClubSocialLink] {
+        let fromList = (socialLinks ?? []).filter { !$0.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if !fromList.isEmpty { return fromList }
+        var legacy: [ClubSocialLink] = []
+        if let website, !website.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            legacy.append(ClubSocialLink(type: "website", label: "Сайт", url: website))
+        }
+        if let socialVk, !socialVk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            legacy.append(ClubSocialLink(type: "vk", label: "ВКонтакте", url: socialVk))
+        }
+        if let socialTelegram, !socialTelegram.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            legacy.append(ClubSocialLink(type: "telegram", label: "Telegram", url: socialTelegram))
+        }
+        return legacy
+    }
 }
 
 struct RegisterRequest: Codable, Sendable {
