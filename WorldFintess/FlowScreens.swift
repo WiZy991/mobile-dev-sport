@@ -1,3 +1,5 @@
+import LocalAuthentication
+import MapKit
 import SwiftUI
 import SafariServices
 import Security
@@ -37,7 +39,7 @@ fileprivate func fcLockerEndsAtFormatted(_ iso: String) -> String {
 }
 
 /// Как `SupportCategories` в `HelpViewModel.kt`.
-fileprivate let fcHelpTicketCategories: [(api: String, label: String)] = [
+let fcHelpTicketCategories: [(api: String, label: String)] = [
     ("question", "Вопрос"),
     ("complaint", "Жалоба"),
     ("suggestion", "Пожелание"),
@@ -46,11 +48,11 @@ fileprivate let fcHelpTicketCategories: [(api: String, label: String)] = [
     ("other", "Другое"),
 ]
 
-fileprivate func fcHelpCategoryLabel(for api: String) -> String {
+func fcHelpCategoryLabel(for api: String) -> String {
     fcHelpTicketCategories.first { $0.api == api }?.label ?? "Другое"
 }
 
-fileprivate func fcLooksLikeEmail(_ s: String) -> Bool {
+func fcLooksLikeEmail(_ s: String) -> Bool {
     let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
     let parts = t.split(separator: "@")
     guard parts.count == 2 else { return false }
@@ -62,19 +64,24 @@ fileprivate func fcLooksLikeEmail(_ s: String) -> Bool {
 struct SubscriptionPlansView: View {
     @EnvironmentObject private var app: WorldFitnessAppState
     @Environment(\.dismiss) private var dismiss
+    var onNavigate: (AppRoute) -> Void = { _ in }
     @State private var plans: [SubscriptionPlan] = []
     @State private var isLoading = true
     @State private var loadError: String?
     @State private var showPromoSheet = false
     @State private var promoField = ""
     @State private var appliedPromo: String?
-    @State private var discountPct = 0
+    @State private var promoDiscountPercent: Double?
+    @State private var promoDiscountAmount: Double?
     @State private var isApplyingPromo = false
     @State private var snackMessage: String?
     @State private var safariSheet: SafariIdent?
     @State private var purchaseSheetPlan: PurchaseSheetPlan?
+    @State private var consentPlan: PurchaseSheetPlan?
     @State private var purchaseError: String?
     @State private var isPurchasing = false
+    @State private var legalSheet: LegalDocumentKind?
+    @State private var clubDisplayName = AppConfiguration.appDisplayName
 
     /// Обёртка для `.sheet(item:)`: у `SubscriptionPlan` уже есть поле `id` из API — второй `id` для `Identifiable` недопустим.
     private struct PurchaseSheetPlan: Identifiable {
@@ -118,12 +125,12 @@ struct SubscriptionPlansView: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         if let code = appliedPromo {
-                            promoAppliedCard(code: code, discount: discountPct)
+                            promoAppliedCard(code: code)
                         }
                         ForEach(plans, id: \.safeId) { plan in
                             subscriptionPlanCard(plan) {
                                 purchaseError = nil
-                                purchaseSheetPlan = PurchaseSheetPlan(plan)
+                                consentPlan = PurchaseSheetPlan(plan)
                             }
                         }
                         subscriptionInfoCard
@@ -150,6 +157,19 @@ struct SubscriptionPlansView: View {
             }
         }
         .task { await load() }
+        .sheet(item: $consentPlan) { wrapped in
+            ClubPurchaseConsentSheet(
+                clubName: clubDisplayName,
+                isLoading: isPurchasing,
+                onConfirm: {
+                    let plan = wrapped.plan
+                    consentPlan = nil
+                    purchaseSheetPlan = PurchaseSheetPlan(plan)
+                },
+                onDismiss: { if !isPurchasing { consentPlan = nil } },
+                onOpenURL: { url in UIApplication.shared.open(url) }
+            )
+        }
         .sheet(isPresented: $showPromoSheet) {
             NavigationStack {
                 Form {
@@ -176,6 +196,16 @@ struct SubscriptionPlansView: View {
         .sheet(item: $purchaseSheetPlan) { wrapped in
             purchaseConfirmSheet(plan: wrapped.plan)
         }
+        .sheet(item: $legalSheet) { kind in
+            NavigationStack {
+                LegalDocumentView(document: kind)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Закрыть") { legalSheet = nil }
+                        }
+                    }
+            }
+        }
         .alert("Сообщение", isPresented: Binding(get: { snackMessage != nil }, set: { if !$0 { snackMessage = nil } })) {
             Button("OK", role: .cancel) { snackMessage = nil }
         } message: { Text(snackMessage ?? "") }
@@ -184,7 +214,7 @@ struct SubscriptionPlansView: View {
         }
     }
 
-    private func promoAppliedCard(code: String, discount: Int) -> some View {
+    private func promoAppliedCard(code: String) -> some View {
         HStack {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
@@ -194,7 +224,7 @@ struct SubscriptionPlansView: View {
                         .font(FCTypography.titleSmall())
                         .fontWeight(.semibold)
                         .foregroundStyle(Theme.onBackground)
-                    Text("\(code) — скидка \(discount)%")
+                    Text(promoDiscountLabel(code: code))
                         .font(FCTypography.bodyMedium())
                         .foregroundStyle(Theme.success)
                 }
@@ -202,7 +232,8 @@ struct SubscriptionPlansView: View {
             Spacer()
             Button {
                 appliedPromo = nil
-                discountPct = 0
+                promoDiscountPercent = nil
+                promoDiscountAmount = nil
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(Theme.onSurfaceVariant)
@@ -212,6 +243,35 @@ struct SubscriptionPlansView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.success.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
+    }
+
+    private func promoDiscountLabel(code: String) -> String {
+        if let pct = promoDiscountPercent, pct > 0 {
+            return "\(code) — скидка \(Int(pct))%"
+        }
+        if let amt = promoDiscountAmount, amt > 0 {
+            return "\(code) — скидка \(Int(amt)) ₽"
+        }
+        return code
+    }
+
+    private func discountedPrice(_ plan: SubscriptionPlan) -> Double {
+        let base = plan.price
+        guard appliedPromo != nil else { return base }
+        if let pct = promoDiscountPercent {
+            return max(0, base - base * pct / 100)
+        }
+        if let amt = promoDiscountAmount {
+            return max(0, base - min(amt, base))
+        }
+        return base
+    }
+
+    /// Каталожная цена для зачёркивания, если есть скидка группы и/или промокода.
+    private func strikeThroughPrice(_ plan: SubscriptionPlan) -> Double? {
+        let final = discountedPrice(plan)
+        let catalog = plan.catalogPrice
+        return final < catalog ? catalog : nil
     }
 
     private func subscriptionPlanCard(_ plan: SubscriptionPlan, onBuy: @escaping () -> Void) -> some View {
@@ -259,12 +319,13 @@ struct SubscriptionPlansView: View {
                 }
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 4) {
-                        if discountPct > 0 {
-                            Text("\(Int(plan.price)) ₽")
+                        let final = discountedPrice(plan)
+                        if let list = strikeThroughPrice(plan) {
+                            Text("\(Int(list)) ₽")
                                 .font(FCTypography.bodyLarge())
                                 .strikethrough()
                                 .foregroundStyle(Theme.onSurfaceVariant)
-                            Text("\(Int(plan.price * Double(100 - discountPct) / 100)) ₽")
+                            Text("\(Int(final)) ₽")
                                 .font(FCTypography.headlineSmall())
                                 .fontWeight(.bold)
                                 .foregroundStyle(Theme.success)
@@ -327,12 +388,19 @@ struct SubscriptionPlansView: View {
             }
             Text(
                 "• Оплата онлайн или в клубе\n" +
+                "• ИП Мацкова Александра Сергеевна — реквизиты в приложении\n" +
                 "• Если клуб включил проверку — подтверждение через Сбер ID перед оплатой\n" +
-                "• Заморозка до 14 дней (по правилам тарифа)\n" +
+                "• Заморозка: 1 мес — нет; 3 мес — 14 дн.; 6 мес — 20 дн.; 12 мес — 30 дн.\n" +
                 "• Возврат в течение 14 дней"
             )
             .font(FCTypography.bodyMedium())
             .foregroundStyle(Theme.onSurfaceVariant)
+            NavigationLink(value: AppRoute.legalDocument(.requisites)) {
+                Text("Реквизиты")
+                    .font(FCTypography.labelLarge())
+                    .foregroundStyle(Theme.primary)
+            }
+            .buttonStyle(.plain)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -344,11 +412,21 @@ struct SubscriptionPlansView: View {
         isLoading = true
         loadError = nil
         defer { isLoading = false }
+        if let info = try? await app.api.getClubInfo() {
+            let brand = info.resolvedBrandName
+            clubDisplayName = brand
+        }
         do {
             let list = try await app.api.getSubscriptionPlans()
-            plans = list.filter { !$0.safeId.isEmpty && !$0.safeName.isEmpty }
+            let valid = list.filter { !$0.safeId.isEmpty && !$0.safeName.isEmpty }
+            if valid.isEmpty {
+                loadError = "Тарифы не настроены на сервере"
+                plans = []
+            } else {
+                plans = valid
+            }
         } catch {
-            loadError = (error as? FitnessAPIError)?.localizedDescription ?? error.localizedDescription
+            loadError = error.localizedDescription
             plans = []
         }
     }
@@ -356,23 +434,30 @@ struct SubscriptionPlansView: View {
     private func applyPromoFromSheet() {
         isApplyingPromo = true
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            let map = ["WELCOME10": 10, "FITNESS20": 20, "NEWYEAR25": 25, "VIP30": 30]
+            defer { isApplyingPromo = false }
             let key = promoField.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            if let d = map[key] {
-                appliedPromo = key
-                discountPct = d
-                showPromoSheet = false
-            } else {
-                snackMessage = "Промокод недействителен"
+            guard !key.isEmpty else { return }
+            do {
+                let result = try await app.api.validatePromoCode(key)
+                if result.promoValid {
+                    appliedPromo = result.promoCode ?? key
+                    promoDiscountPercent = result.discountPercent
+                    promoDiscountAmount = result.discountAmount
+                    showPromoSheet = false
+                } else {
+                    snackMessage = result.promoError ?? "Промокод недействителен"
+                }
+            } catch {
+                snackMessage = error.localizedDescription
             }
-            isApplyingPromo = false
         }
     }
 
     @ViewBuilder
     private func purchaseConfirmSheet(plan: SubscriptionPlan) -> some View {
-        let final = discountPct > 0 ? Int(plan.price * Double(100 - discountPct) / 100) : Int(plan.price)
+        let final = Int(discountedPrice(plan))
+        let listPrice = strikeThroughPrice(plan)
+        let hasDiscount = listPrice != nil
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Подтверждение покупки")
@@ -394,10 +479,30 @@ struct SubscriptionPlansView: View {
                         .font(FCTypography.bodySmall())
                         .foregroundStyle(Theme.error)
                 }
+                if hasDiscount, let listPrice {
+                    Text("Было: \(Int(listPrice)) ₽")
+                        .font(FCTypography.bodySmall())
+                        .strikethrough()
+                        .foregroundStyle(Theme.onSurfaceVariant)
+                        .padding(.top, 8)
+                }
                 Text("К оплате: \(final) ₽")
                     .font(FCTypography.titleLarge())
                     .fontWeight(.bold)
-                    .padding(.top, 8)
+                    .padding(.top, hasDiscount ? 0 : 8)
+                Text("ИП Мацкова Александра Сергеевна, ИНН 254009880989")
+                    .font(FCTypography.bodySmall())
+                    .foregroundStyle(Theme.onSurfaceVariant)
+                    .padding(.top, 4)
+                Button {
+                    legalSheet = .requisites
+                } label: {
+                    Text("Реквизиты")
+                        .font(FCTypography.bodySmall())
+                        .underline()
+                        .foregroundStyle(Theme.primary)
+                }
+                .buttonStyle(.plain)
                 Spacer()
                 Button {
                     Task { await confirmPurchase(plan) }
@@ -437,6 +542,7 @@ struct SubscriptionPlansView: View {
     }
 
     private func confirmPurchase(_ plan: SubscriptionPlan) async {
+        guard !isPurchasing else { return }
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
@@ -446,6 +552,11 @@ struct SubscriptionPlansView: View {
             purchaseSheetPlan = nil
             snackMessage = "Абонемент оформлен"
             dismiss()
+        case .paymentRequired(let paymentId, let url, _):
+            purchaseSheetPlan = nil
+            app.currentPaymentId = paymentId
+            onNavigate(.paymentPending(paymentId))
+            safariSheet = SafariIdent(url: url)
         case .verificationRequired(let url, let msg):
             purchaseSheetPlan = nil
             snackMessage = msg
@@ -454,6 +565,7 @@ struct SubscriptionPlansView: View {
             purchaseError = msg
         }
     }
+
 }
 
 struct SafariView: UIViewControllerRepresentable {
@@ -467,14 +579,26 @@ struct SafariView: UIViewControllerRepresentable {
 // MARK: - Shop
 
 enum ShopCategory: String, CaseIterable {
-    case services, subscriptions, goods, deposits
+    case subscriptions, services, goods
 
     var titleRu: String {
         switch self {
         case .services: return "Услуги"
         case .subscriptions: return "Абонементы"
         case .goods: return "Товары"
-        case .deposits: return "Депозиты"
+        }
+    }
+
+    var apiKey: String {
+        rawValue
+    }
+
+    static func fromApiKey(_ key: String) -> ShopCategory? {
+        switch key.lowercased() {
+        case "subscriptions", "subscription", "абонементы": return .subscriptions
+        case "services", "service", "услуги": return .services
+        case "goods", "products", "товары": return .goods
+        default: return nil
         }
     }
 }
@@ -493,9 +617,32 @@ struct ShopItem: Identifiable, Hashable {
 struct ShopView: View {
     @EnvironmentObject private var app: WorldFitnessAppState
     @State private var items: [ShopItem] = []
+    @State private var subscriptionPlansByItemId: [String: SubscriptionPlan] = [:]
     @State private var isLoading = true
     @State private var toast: String?
-    @State private var selectedCategory: ShopCategory = .services
+    @State private var selectedCategory: ShopCategory = .subscriptions
+    @State private var visibleCategories: [ShopCategory] = ShopCategory.allCases
+    @State private var purchaseSheetPlan: ShopPurchasePlan?
+    @State private var consentPlan: ShopPurchasePlan?
+    @State private var purchaseError: String?
+    @State private var isPurchasing = false
+    @State private var safariSheet: ShopSafariSheet?
+    @State private var clubDisplayName = AppConfiguration.appDisplayName
+    @State private var shopConfig: ClubShopConfig?
+
+    private struct ShopPurchasePlan: Identifiable {
+        let id: String
+        let plan: SubscriptionPlan
+        init(_ plan: SubscriptionPlan) {
+            self.plan = plan
+            id = plan.safeId
+        }
+    }
+
+    private struct ShopSafariSheet: Identifiable {
+        let id = UUID()
+        let url: URL
+    }
 
     private var filtered: [ShopItem] {
         items.filter { $0.category == selectedCategory }
@@ -505,7 +652,7 @@ struct ShopView: View {
         VStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(ShopCategory.allCases, id: \.self) { cat in
+                    ForEach(visibleCategories, id: \.self) { cat in
                         Button {
                             selectedCategory = cat
                         } label: {
@@ -558,6 +705,25 @@ struct ShopView: View {
             }
         }
         .task { await load() }
+        .sheet(item: $consentPlan) { wrapped in
+            ClubPurchaseConsentSheet(
+                clubName: clubDisplayName,
+                isLoading: isPurchasing,
+                onConfirm: {
+                    let plan = wrapped.plan
+                    consentPlan = nil
+                    purchaseSheetPlan = ShopPurchasePlan(plan)
+                },
+                onDismiss: { if !isPurchasing { consentPlan = nil } },
+                onOpenURL: { url in UIApplication.shared.open(url) }
+            )
+        }
+        .sheet(item: $purchaseSheetPlan) { wrapped in
+            shopPurchaseConfirmSheet(plan: wrapped.plan)
+        }
+        .sheet(item: $safariSheet) { item in
+            SafariView(url: item.url)
+        }
         .alert("Готово", isPresented: Binding(get: { toast != nil }, set: { if !$0 { toast = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(toast ?? "") }
@@ -640,7 +806,23 @@ struct ShopView: View {
 
     @ViewBuilder
     private func shopBuyControl(for item: ShopItem) -> some View {
-        if item.category == .subscriptions || item.id.hasPrefix("sub-") {
+        if let plan = subscriptionPlansByItemId[item.id] {
+            Button {
+                purchaseError = nil
+                consentPlan = ShopPurchasePlan(plan)
+            } label: {
+                Text("КУПИТЬ")
+                    .font(FCTypography.labelLarge())
+                    .foregroundStyle(Theme.primary)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous)
+                            .stroke(Theme.outlineVariant, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+        } else if item.category == .subscriptions || item.id.hasPrefix("sub-") {
             NavigationLink(value: AppRoute.subscriptionPlans) {
                 Text("КУПИТЬ")
                     .font(FCTypography.labelLarge())
@@ -674,8 +856,20 @@ struct ShopView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
+
+        async let productsResult = try? await app.api.getProducts()
+        async let plansResult = try? await app.api.getSubscriptionPlans()
+        async let clubResult = try? await app.api.getClubInfo()
+
+        let products = await productsResult ?? []
+        let plans = (await plansResult ?? []).filter { !$0.safeId.isEmpty && !$0.safeName.isEmpty }
+        if let club = await clubResult {
+            clubDisplayName = club.resolvedBrandName
+            shopConfig = club.shopConfig
+        }
+
         var all: [ShopItem] = []
-        if let products = try? await app.api.getProducts() {
+        if !products.isEmpty {
             all += products.map {
                 ShopItem(
                     id: $0.id,
@@ -689,33 +883,181 @@ struct ShopView: View {
                 )
             }
         }
-        all += extraSubscriptionRows()
-        all += mockIfEmpty(base: all)
+
+        if !plans.isEmpty {
+            let mapped = subscriptionShopItems(from: plans)
+            all += mapped.items
+            subscriptionPlansByItemId = mapped.plansByItemId
+        } else {
+            subscriptionPlansByItemId = [:]
+        }
+
         items = all
+        applyShopConfigTabs(allItems: all)
     }
 
-    private func extraSubscriptionRows() -> [ShopItem] {
-        [
-            ShopItem(id: "sub-1", name: "Безлимит на месяц", description: "Оформление на экране тарифов.", price: 4500, oldPrice: nil, isPromo: false, promoText: nil, category: .subscriptions),
-            ShopItem(id: "sub-2", name: "Безлимит на 3 месяца", description: "Оформление на экране тарифов.", price: 12000, oldPrice: 13500, isPromo: true, promoText: "Скидка при оплате онлайн", category: .subscriptions),
-            ShopItem(id: "dep-1", name: "Пополнение депозита", description: "На ресепшене клуба.", price: 1000, oldPrice: nil, isPromo: false, promoText: nil, category: .deposits),
-        ]
+    private func applyShopConfigTabs(allItems: [ShopItem]) {
+        let config = shopConfig
+        let orderKeys = config?.resolvedTabOrder ?? ["subscriptions", "services", "goods"]
+        var ordered: [ShopCategory] = []
+        for key in orderKeys {
+            if let cat = ShopCategory.fromApiKey(key), !ordered.contains(cat) {
+                ordered.append(cat)
+            }
+        }
+        for cat in ShopCategory.allCases where !ordered.contains(cat) {
+            ordered.append(cat)
+        }
+
+        let hideEmpty = config?.shouldHideEmptyTabs ?? true
+        let visible: [ShopCategory]
+        if hideEmpty {
+            visible = ordered.filter { cat in
+                allItems.contains { $0.category == cat }
+            }
+        } else {
+            visible = ordered
+        }
+        visibleCategories = visible.isEmpty ? ordered : visible
+
+        let defaultKey = config?.resolvedDefaultTab ?? "subscriptions"
+        if let preferred = ShopCategory.fromApiKey(defaultKey), visibleCategories.contains(preferred) {
+            selectedCategory = preferred
+        } else if let first = visibleCategories.first {
+            selectedCategory = first
+        }
     }
 
-    private func mockIfEmpty(base: [ShopItem]) -> [ShopItem] {
-        guard base.isEmpty else { return [] }
-        return [
-            ShopItem(id: "srv-1", name: "Пробная тренировка", description: "Запись в расписании.", price: 0, oldPrice: nil, isPromo: false, promoText: nil, category: .services),
-            ShopItem(id: "srv-2", name: "Йога", description: "Групповое занятие.", price: 350, oldPrice: 450, isPromo: true, promoText: "Акция для новых клиентов", category: .services),
-            ShopItem(id: "good-1", name: "Полотенце", description: "В клубе.", price: 800, oldPrice: nil, isPromo: false, promoText: nil, category: .goods),
-        ] + extraSubscriptionRows()
+    private func subscriptionShopItems(from plans: [SubscriptionPlan]) -> (items: [ShopItem], plansByItemId: [String: SubscriptionPlan]) {
+        var items: [ShopItem] = []
+        var plansByItemId: [String: SubscriptionPlan] = [:]
+        for plan in plans {
+            let itemId = "sub-\(plan.safeId)"
+            var details = plan.safeDescription
+            if plan.safeDurationDays > 0 {
+                if !details.isEmpty { details += " " }
+                details += "Срок: \(plan.safeDurationDays) дней."
+            }
+            if let visits = plan.visitsCount {
+                if !details.isEmpty { details += " " }
+                details += "Посещений: \(visits)."
+            }
+            if details.isEmpty {
+                details = "Оформление абонемента на следующем экране."
+            }
+            let listPrice = plan.originalPrice.flatMap { $0 > plan.price ? $0 : nil }
+            items.append(
+                ShopItem(
+                    id: itemId,
+                    name: plan.safeName.isEmpty ? "Абонемент" : plan.safeName,
+                    description: details,
+                    price: plan.price,
+                    oldPrice: listPrice,
+                    isPromo: plan.isPopular,
+                    promoText: plan.isPopular ? "Популярный выбор" : nil,
+                    category: .subscriptions
+                )
+            )
+            plansByItemId[itemId] = plan
+        }
+        return (items, plansByItemId)
+    }
+
+    @ViewBuilder
+    private func shopPurchaseConfirmSheet(plan: SubscriptionPlan) -> some View {
+        let listPrice = plan.originalPrice.flatMap { $0 > plan.price ? $0 : nil }
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Подтверждение покупки")
+                    .font(FCTypography.titleLarge())
+                    .fontWeight(.bold)
+                Text(plan.safeName)
+                    .font(FCTypography.titleMedium())
+                    .fontWeight(.semibold)
+                if plan.safeDurationDays > 0 {
+                    Text("Срок: \(plan.safeDurationDays) дней")
+                        .font(FCTypography.bodyMedium())
+                }
+                if let v = plan.visitsCount {
+                    Text("Посещений: \(v)")
+                        .font(FCTypography.bodyMedium())
+                }
+                if let purchaseError {
+                    Text(purchaseError)
+                        .font(FCTypography.bodySmall())
+                        .foregroundStyle(Theme.error)
+                }
+                if let listPrice {
+                    Text("Было: \(Int(listPrice)) ₽")
+                        .font(FCTypography.bodySmall())
+                        .strikethrough()
+                        .foregroundStyle(Theme.onSurfaceVariant)
+                        .padding(.top, 8)
+                }
+                Text("К оплате: \(Int(plan.price)) ₽")
+                    .font(FCTypography.titleLarge())
+                    .fontWeight(.bold)
+                    .padding(.top, listPrice == nil ? 8 : 0)
+                Spacer()
+                Button {
+                    Task { await confirmShopPurchase(plan) }
+                } label: {
+                    HStack(spacing: 10) {
+                        if isPurchasing {
+                            ProgressView().tint(Theme.onPrimary)
+                        }
+                        Text(isPurchasing ? "Оформление…" : "Оплатить")
+                            .font(FCTypography.titleMedium())
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.primary)
+                    .foregroundStyle(Theme.onPrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(isPurchasing)
+            }
+            .padding(20)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") {
+                        purchaseSheetPlan = nil
+                        purchaseError = nil
+                    }
+                    .disabled(isPurchasing)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func confirmShopPurchase(_ plan: SubscriptionPlan) async {
+        isPurchasing = true
+        purchaseError = nil
+        defer { isPurchasing = false }
+        let outcome = await app.api.purchaseSubscriptionParsed(planId: plan.safeId, promoCode: nil)
+        switch outcome {
+        case .success:
+            purchaseSheetPlan = nil
+            toast = "Абонемент оформлен"
+            app.subscriptionsRevision = UUID()
+        case .paymentRequired(let paymentId, let url, _):
+            purchaseSheetPlan = nil
+            app.currentPaymentId = paymentId
+            app.paymentNavigationRequest = paymentId
+            safariSheet = ShopSafariSheet(url: url)
+        case .verificationRequired(let url, let msg):
+            purchaseSheetPlan = nil
+            toast = msg
+            safariSheet = ShopSafariSheet(url: url)
+        case .error(let msg):
+            purchaseError = msg
+        }
     }
 
     private func buy(_ item: ShopItem) async {
-        if item.category == .deposits || item.id.hasPrefix("dep-") {
-            toast = "Депозит пополняется на ресепшене клуба или через администратора."
-            return
-        }
         if item.price == 0 {
             toast = "Бесплатная услуга: запись в разделе «Расписание»."
             return
@@ -831,22 +1173,38 @@ struct ClubsListView: View {
 
 struct ClubInfoView: View {
     @EnvironmentObject private var app: WorldFitnessAppState
+    @Environment(\.openURL) private var openURL
     let clubId: String?
     @State private var info: ClubInfo?
-    private var chromeTitle: String { info?.name ?? "FitnessClub" }
+    private var chromeTitle: String { info?.name ?? AppConfiguration.appDisplayName }
 
     var body: some View {
         Group {
             if let info {
                 List {
                     Section {
+                        ClubMapPreview(
+                            latitude: info.latitude,
+                            longitude: info.longitude,
+                            address: info.address
+                        )
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                    }
+                    Section {
                         Text(info.name)
                             .font(FCTypography.titleLarge())
                             .fontWeight(.bold)
                             .foregroundStyle(Theme.onBackground)
-                        Text(info.address)
-                            .font(FCTypography.bodyMedium())
-                            .foregroundStyle(Theme.onSurfaceVariant)
+                        Button {
+                            openAddressInMaps(info)
+                        } label: {
+                            Text(info.address)
+                                .font(FCTypography.bodyMedium())
+                                .foregroundStyle(Theme.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
                         if let promo = info.promoTitle, !promo.isEmpty {
                             Text(promo)
                                 .font(FCTypography.bodyMedium())
@@ -872,6 +1230,17 @@ struct ClubInfoView: View {
                                 Text(a)
                                     .font(FCTypography.bodyMedium())
                             }
+                        }
+                    }
+                    Section("Мы в соцсетях") {
+                        if let vk = socialURL(info?.network?.socialVk) ?? optionalConfigURL(AppConfiguration.vkURL) {
+                            clubSocialRow(title: "ВКонтакте", color: Color(red: 0.30, green: 0.46, blue: 0.64), url: vk)
+                        }
+                        if let tg = socialURL(info?.network?.socialTelegram) ?? optionalConfigURL(AppConfiguration.telegramURL) {
+                            clubSocialRow(title: "Telegram", color: Color(red: 0, green: 0.53, blue: 0.80), url: tg)
+                        }
+                        if let wa = whatsAppURL(for: info) {
+                            clubSocialRow(title: "WhatsApp", color: Color(red: 0.15, green: 0.83, blue: 0.40), url: wa)
                         }
                     }
                 }
@@ -901,6 +1270,63 @@ struct ClubInfoView: View {
                 info = try? await app.api.getClubInfo()
             }
         }
+    }
+
+    private func openAddressInMaps(_ info: ClubInfo) {
+        let coords = ClubMapCoords.resolve(
+            latitude: info.latitude,
+            longitude: info.longitude,
+            address: info.address
+        )
+        let hasCoords = abs(coords.lat) > 0.01 || abs(coords.lon) > 0.01
+        if hasCoords {
+            let item = MKMapItem(placemark: MKPlacemark(coordinate: .init(latitude: coords.lat, longitude: coords.lon)))
+            item.name = info.address.isEmpty ? info.name : info.address
+            item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+        } else if let q = info.address.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let url = URL(string: "http://maps.apple.com/?q=\(q)") {
+            openURL(url)
+        }
+    }
+
+    private func clubSocialRow(title: String, color: Color, url: URL) -> some View {
+        Button {
+            openURL(url)
+        } label: {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 10, height: 10)
+                Text(title)
+                    .font(FCTypography.bodyMedium())
+                    .foregroundStyle(Theme.onBackground)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption)
+                    .foregroundStyle(Theme.onSurfaceVariant)
+            }
+        }
+    }
+
+    private func socialURL(_ raw: String?) -> URL? {
+        let s = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !s.isEmpty else { return nil }
+        return URL(string: s)
+    }
+
+    /// Не показывать placeholder fitnessclub из AppConfiguration, если нет данных CRM.
+    private func optionalConfigURL(_ url: URL) -> URL? {
+        let host = url.host?.lowercased() ?? ""
+        if host.contains("fitnessclub") { return nil }
+        return url
+    }
+
+    private func whatsAppURL(for info: ClubInfo?) -> URL? {
+        let digits = (info?.phone ?? "").filter(\.isNumber)
+        if digits.count >= 10 {
+            return URL(string: "https://wa.me/\(digits)")
+        }
+        return optionalConfigURL(AppConfiguration.whatsAppURL)
     }
 }
 
@@ -1622,12 +2048,9 @@ struct LockersView: View {
                             .fontWeight(.semibold)
 
                         if let img = QRCodeGenerator.image(from: booking.qrCodeData, dimension: 256) {
-                            Image(uiImage: img)
-                                .interpolation(.none)
-                                .resizable()
-                                .scaledToFit()
-                                .padding(14)
+                            SecureQRImageView(image: img)
                                 .frame(width: 220, height: 220)
+                                .padding(14)
                                 .background(Theme.surface)
                                 .clipShape(RoundedRectangle(cornerRadius: Theme.radius12, style: .continuous))
                         }
@@ -1876,10 +2299,7 @@ struct GuestPassView: View {
                         .font(FCTypography.titleMedium())
 
                     if let img = QRCodeGenerator.image(from: pass.qrCodeData, dimension: 280) {
-                        Image(uiImage: img)
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
+                        SecureQRImageView(image: img)
                             .frame(width: 240, height: 240)
                             .padding(12)
                             .background(Theme.surface)
@@ -2316,20 +2736,63 @@ struct EditProfileView: View {
     @State private var name = ""
     @State private var phone = ""
     @State private var email = ""
+    @State private var dateOfBirthDisplay = ""
     @State private var message: String?
+    @State private var avatarHint: String?
 
     var body: some View {
-        Form {
-            Section {
-                TextField("Имя", text: $name)
-                TextField("Телефон", text: $phone)
-                    .keyboardType(.phonePad)
-                TextField("Email", text: $email)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
+        ScrollView {
+            VStack(spacing: 24) {
+                Button {
+                    avatarHint = "Смена фото в приложении появится позже. Пока обратитесь в клуб или добавьте документ в разделе «Документы»."
+                } label: {
+                    ZStack(alignment: .bottomTrailing) {
+                        Circle()
+                            .fill(Theme.primary.opacity(0.15))
+                            .frame(width: 120, height: 120)
+                            .overlay {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 56))
+                                    .foregroundStyle(Theme.primary)
+                            }
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.onPrimary)
+                            .padding(8)
+                            .background(Theme.primary)
+                            .clipShape(Circle())
+                            .offset(x: 4, y: 4)
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 8)
+
+                VStack(spacing: 16) {
+                    editProfileField("Имя", text: $name)
+                    editProfileField("Email", text: $email, keyboard: .emailAddress)
+                    editProfileField("Телефон", text: $phone, keyboard: .phonePad)
+                    editProfileField("Дата рождения", text: $dateOfBirthDisplay, placeholder: "ДД.ММ.ГГГГ")
+
+                    NavigationLink(value: AppRoute.changePassword) {
+                        HStack {
+                            Image(systemName: "lock.fill")
+                                .foregroundStyle(Theme.primary)
+                            Text("Изменить пароль")
+                                .font(FCTypography.bodyLarge())
+                                .foregroundStyle(Theme.onSurface)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(Theme.onSurfaceVariant)
+                        }
+                        .padding(16)
+                        .background(Theme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radius14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
+            .padding(16)
         }
-        .scrollContentBackground(.hidden)
         .background(Theme.background)
         .fcPrimaryNavigation(title: "Редактировать профиль")
         .toolbar {
@@ -2346,11 +2809,60 @@ struct EditProfileView: View {
                 name = u.name
                 phone = u.phone
                 email = u.email
+                dateOfBirthDisplay = formatBirthdayForDisplay(u.dateOfBirth)
             }
         }
         .alert("", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(message ?? "") }
+        .alert("", isPresented: Binding(get: { avatarHint != nil }, set: { if !$0 { avatarHint = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(avatarHint ?? "") }
+    }
+
+    private func editProfileField(
+        _ title: String,
+        text: Binding<String>,
+        placeholder: String? = nil,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(FCTypography.labelMedium())
+                .foregroundStyle(Theme.onSurfaceVariant)
+            TextField(placeholder ?? title, text: text)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(keyboard == .emailAddress ? .never : .sentences)
+                .padding(14)
+                .background(Theme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radius12, style: .continuous))
+        }
+    }
+
+    private func formatBirthdayForDisplay(_ iso: String?) -> String {
+        guard let iso, !iso.isEmpty else { return "" }
+        let inF = DateFormatter()
+        inF.locale = Locale(identifier: "en_US_POSIX")
+        inF.dateFormat = "yyyy-MM-dd"
+        guard let date = inF.date(from: String(iso.prefix(10))) else { return iso }
+        let outF = DateFormatter()
+        outF.locale = Locale(identifier: "ru_RU")
+        outF.dateFormat = "dd.MM.yyyy"
+        return outF.string(from: date)
+    }
+
+    private func parseBirthdayForAPI(_ display: String) -> String? {
+        let trimmed = display.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let outF = DateFormatter()
+        outF.locale = Locale(identifier: "en_US_POSIX")
+        outF.dateFormat = "yyyy-MM-dd"
+        if let d = outF.date(from: String(trimmed.prefix(10))) { return outF.string(from: d) }
+        let inF = DateFormatter()
+        inF.locale = Locale(identifier: "ru_RU")
+        inF.dateFormat = "dd.MM.yyyy"
+        guard let date = inF.date(from: trimmed) else { return trimmed }
+        return outF.string(from: date)
     }
 
     private func save() async {
@@ -2363,10 +2875,11 @@ struct EditProfileView: View {
             avatarUrl: u.avatarUrl,
             bonusPoints: u.bonusPoints,
             passportVerificationStatus: u.passportVerificationStatus,
-            dateOfBirth: u.dateOfBirth,
+            dateOfBirth: parseBirthdayForAPI(dateOfBirthDisplay),
             createdAt: u.createdAt,
             isVerified: u.isVerified,
-            sberId: u.sberId
+            sberId: u.sberId,
+            clubId: u.clubId
         )
         do {
             let updated = try await app.api.updateProfile(u)
@@ -2390,11 +2903,11 @@ struct ReferralView: View {
     }
 
     private var referralLink: String {
-        "https://fitnessclub.app/invite/\(referralCode)"
+        "https://worldcashfit.ru/invite/\(referralCode)"
     }
 
     private var shareMessage: String {
-        "Присоединяйся к FitnessClub! Используй мой промокод \(referralCode) при регистрации и получи скидку! \(referralLink)"
+        "Присоединяйся к \(AppConfiguration.appDisplayName)! Используй мой промокод \(referralCode) при регистрации и получи скидку! \(referralLink)"
     }
 
     var body: some View {
@@ -2684,7 +3197,7 @@ struct NotificationsView: View {
             Text("Нет уведомлений")
                 .font(FCTypography.titleLarge())
                 .foregroundStyle(Theme.onSurfaceVariant)
-            Text("Здесь будут появляться уведомления о тренировках, акциях и новостях клуба")
+            Text("Здесь будут напоминания о тренировках, окончании абонемента, изменениях в расписании и акциях клуба")
                 .font(FCTypography.bodyMedium())
                 .foregroundStyle(Theme.onSurfaceVariant.opacity(0.75))
                 .multilineTextAlignment(.center)
@@ -2750,10 +3263,116 @@ struct NotificationsView: View {
         .buttonStyle(.plain)
     }
 
-    private func load() async {
+    private func load(forceRefresh: Bool = false) async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await app.api.getNotifications()) ?? []
+        do {
+            let list = try await app.api.getNotifications(forceRefresh: forceRefresh)
+            items = list
+        } catch {
+            if error is CancellationError { return }
+            if let url = error as? URLError, url.code == .cancelled { return }
+            items = []
+        }
+    }
+}
+
+// MARK: - Legal documents (`LegalDocumentScreen.kt`)
+
+struct LegalDocumentView: View {
+    @EnvironmentObject private var app: WorldFitnessAppState
+    let document: LegalDocumentKind
+
+    @State private var title = ""
+    @State private var bodyText: String?
+    @State private var fields: [LegalDocumentField] = []
+    @State private var isLoading = true
+    @State private var error: String?
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error {
+                VStack(spacing: 16) {
+                    Text(error)
+                        .font(FCTypography.bodyLarge())
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Theme.onBackground)
+                        .padding(.horizontal, 24)
+                    Button("Повторить") { Task { await load() } }
+                        .font(FCTypography.labelLarge())
+                        .foregroundStyle(Theme.onPrimary)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(Theme.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !fields.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Индивидуальный предприниматель Мацкова Александра Сергеевна")
+                            .font(FCTypography.bodyMedium())
+                            .foregroundStyle(Theme.onSurfaceVariant)
+                            .padding(.bottom, 8)
+                        ForEach(fields) { field in
+                            legalFieldCard(field)
+                        }
+                    }
+                    .padding(16)
+                    .padding(.bottom, 24)
+                }
+            } else if let bodyText, !bodyText.isEmpty {
+                ScrollView {
+                    Text(bodyText)
+                        .font(FCTypography.bodyMedium())
+                        .foregroundStyle(Theme.onBackground)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .padding(.bottom, 24)
+                }
+            } else {
+                Text("Документ пуст")
+                    .font(FCTypography.bodyLarge())
+                    .foregroundStyle(Theme.onSurfaceVariant)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(Theme.background)
+        .fcPrimaryNavigation(title: title.isEmpty ? document.title : title)
+        .task { await load() }
+    }
+
+    private func legalFieldCard(_ field: LegalDocumentField) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(field.label)
+                .font(FCTypography.labelMedium())
+                .foregroundStyle(Theme.onSurfaceVariant)
+            Text(field.value)
+                .font(FCTypography.bodyLarge())
+                .fontWeight(.medium)
+                .foregroundStyle(Theme.onBackground)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surfaceVariant.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radius12, style: .continuous))
+    }
+
+    private func load() async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        do {
+            let response = try await app.api.getLegalDocument(slug: document.apiSlug)
+            title = response.title.isEmpty ? document.title : response.title
+            bodyText = response.body
+            fields = response.fields ?? []
+        } catch {
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
     }
 }
 
@@ -2771,48 +3390,90 @@ struct SettingsView: View {
     @State private var trainingReminders = true
     @State private var scheduleChanges = true
     @State private var promoNotifications = false
-    @State private var biometricEnrollPresented = false
-    @State private var biometricEnrollPassword = ""
+    @State private var notificationSettingsLoaded = false
+    @State private var notificationSaveBusy = false
     @State private var biometricEnrollBusy = false
+    @State private var showPinSettings = false
+    @State private var biometricLoginEnabled = BiometricCredentialStore.hasSavedLogin
+    @State private var showDeleteAccountConfirm = false
+    @State private var showDeleteAccountFinalConfirm = false
+    @State private var showThemeDialog = false
+    @AppStorage("appThemeMode") private var themeModeRaw = AppThemeMode.system.rawValue
+    @State private var deleteAccountBusy = false
 
     var body: some View {
-        ScrollView {
+        ZStack {
+            ScrollView {
             VStack(spacing: 8) {
                 settingsSectionTitle("Уведомления")
                 settingsCard {
-                    settingsToggle(icon: "bell.fill", title: "Push-уведомления", subtitle: "Получать push-уведомления", on: $pushEnabled)
+                    settingsToggle(icon: "bell.fill", title: "Push-уведомления", subtitle: "Напоминания о тренировках, абонементе и акциях", on: Binding(
+                        get: { pushEnabled },
+                        set: { on in
+                            pushEnabled = on
+                            Task { await saveNotificationSettings(syncPush: true) }
+                        }
+                    ))
                     Divider().padding(.leading, 52)
-                    settingsToggle(icon: "envelope.fill", title: "Email-уведомления", subtitle: "Получать уведомления на почту", on: $emailEnabled)
+                    settingsToggle(icon: "envelope.fill", title: "Email-уведомления", subtitle: "Получать уведомления на почту", on: Binding(
+                        get: { emailEnabled },
+                        set: { emailEnabled = $0; Task { await saveNotificationSettings() } }
+                    ))
                     Divider().padding(.leading, 52)
-                    settingsToggle(icon: "figure.strengthtraining.traditional", title: "Напоминания о тренировках", subtitle: "За 1 час до начала", on: $trainingReminders)
-                    settingsToggle(icon: "calendar", title: "Изменения в расписании", subtitle: "Уведомлять об изменениях", on: $scheduleChanges)
-                    settingsToggle(icon: "tag.fill", title: "Акции и предложения", subtitle: "Специальные предложения клуба", on: $promoNotifications)
+                    settingsToggle(icon: "figure.strengthtraining.traditional", title: "Напоминания о тренировках", subtitle: "За 1 час и за 10 минут до начала", on: Binding(
+                        get: { trainingReminders },
+                        set: { trainingReminders = $0; Task { await saveNotificationSettings() } }
+                    ))
+                    settingsToggle(icon: "calendar", title: "Изменения в расписании", subtitle: "Перенос и отмена тренировок", on: Binding(
+                        get: { scheduleChanges },
+                        set: { scheduleChanges = $0; Task { await saveNotificationSettings() } }
+                    ))
+                    settingsToggle(icon: "tag.fill", title: "Акции и новости", subtitle: "Специальные предложения клуба", on: Binding(
+                        get: { promoNotifications },
+                        set: { promoNotifications = $0; Task { await saveNotificationSettings() } }
+                    ))
                 }
 
                 settingsSectionTitle("Безопасность")
                 settingsCard {
-                    settingsRow(icon: "lock.fill", title: "Изменить пароль", subtitle: nil) {
-                        openURL(AppConfiguration.forgotPasswordURL)
+                    NavigationLink(value: AppRoute.changePassword) {
+                        settingsRowLabel(icon: "lock.fill", title: "Изменить пароль", subtitle: nil, showDisclosure: true)
                     }
                     Divider().padding(.leading, 52)
-                    settingsToggle(icon: "touchid", title: "Биометрия", subtitle: "Вход по отпечатку пальца", on: Binding(
-                        get: { BiometricCredentialStore.hasSavedLogin },
-                        set: { on in
-                            if !on {
-                                BiometricCredentialStore.clear()
-                                return
+                    settingsRow(icon: "number.circle.fill", title: "Код-пароль приложения", subtitle: AppPinStore.isPinEnabled ? "Включён" : "Не установлен") {
+                        showPinSettings = true
+                    }
+                    Divider().padding(.leading, 52)
+                    settingsToggle(
+                        icon: BiometryLoginUX.primaryIconName(),
+                        title: BiometryLoginUX.settingsTitle(),
+                        subtitle: BiometryLoginUX.settingsSubtitle(),
+                        on: Binding(
+                            get: { biometricLoginEnabled },
+                            set: { on in
+                                if !on {
+                                    BiometricCredentialStore.clear()
+                                    biometricLoginEnabled = false
+                                    return
+                                }
+                                enableBiometricLogin()
                             }
-                            if BiometryLoginUX.canUseBiometrics {
-                                biometricEnrollPassword = ""
-                                biometricEnrollPresented = true
-                            } else {
-                                toast = "На устройстве недоступна биометрия"
-                            }
-                        }
-                    ))
+                        )
+                    )
                     Divider().padding(.leading, 52)
                     settingsRow(icon: "shield.checkered", title: "Двухфакторная аутентификация", subtitle: nil) {
                         toast = "2FA появится в обновлении приложения"
+                    }
+                }
+
+                settingsSectionTitle("Аккаунт")
+                settingsCard {
+                    settingsDestructiveRow(
+                        icon: "person.crop.circle.badge.minus",
+                        title: "Удалить аккаунт",
+                        subtitle: "Безвозвратно удалить профиль и персональные данные"
+                    ) {
+                        showDeleteAccountConfirm = true
                     }
                 }
 
@@ -2822,8 +3483,8 @@ struct SettingsView: View {
                         toast = "Другие языки будут добавлены позже"
                     }
                     Divider().padding(.leading, 52)
-                    settingsRow(icon: "paintpalette.fill", title: "Тема", subtitle: "Светлая") {
-                        toast = "Выбор темы — в следующем обновлении"
+                    settingsRow(icon: "paintpalette.fill", title: "Тема", subtitle: (AppThemeMode(rawValue: themeModeRaw) ?? .system).label) {
+                        showThemeDialog = true
                     }
                     Divider().padding(.leading, 52)
                     settingsRow(icon: "trash.fill", title: "Очистить кэш", subtitle: nil) {
@@ -2834,39 +3495,53 @@ struct SettingsView: View {
 
                 settingsSectionTitle("Поддержка")
                 settingsCard {
-                    NavigationLink {
-                        HelpView()
-                    } label: {
-                        settingsRowLabel(icon: "questionmark.circle.fill", title: "Помощь", subtitle: nil, showDisclosure: false)
-                    }
-                    Divider().padding(.leading, 52)
-                    settingsRow(icon: "text.bubble.fill", title: "Обратная связь", subtitle: "Оцените работу клуба") {
-                        showFeedback = true
-                    }
-                    Divider().padding(.leading, 52)
-                    settingsRow(icon: "star.fill", title: "Оценить приложение", subtitle: nil) {
-                        openURL(AppConfiguration.appStoreURL)
-                    }
-                    Divider().padding(.leading, 52)
-                    NavigationLink {
-                        AboutView()
-                    } label: {
-                        settingsRowLabel(icon: "info.circle.fill", title: "О приложении", subtitle: "Версия \(AppConfiguration.appVersion)", showDisclosure: false)
+                    NavigationLink(value: AppRoute.networkInfo) {
+                        settingsRowLabel(
+                            icon: "building.2.fill",
+                            title: "О сети и контакты",
+                            subtitle: "О Доброзал, обратная связь, оценка приложения",
+                            showDisclosure: true
+                        )
                     }
                 }
 
                 settingsSectionTitle("Правовая информация")
                 settingsCard {
-                    settingsRow(icon: "doc.text.fill", title: "Пользовательское соглашение", subtitle: nil) {
-                        openURL(AppConfiguration.termsURL)
+                    NavigationLink(value: AppRoute.legalDocument(.requisites)) {
+                        settingsRowLabel(icon: "building.columns.fill", title: "Реквизиты", subtitle: "ИП Мацкова Александра Сергеевна", showDisclosure: false)
                     }
                     Divider().padding(.leading, 52)
-                    settingsRow(icon: "hand.raised.fill", title: "Политика конфиденциальности", subtitle: nil) {
-                        openURL(AppConfiguration.privacyURL)
+                    NavigationLink(value: AppRoute.legalPdf(.userAgreement)) {
+                        settingsRowLabel(icon: "doc.text.fill", title: "Пользовательское соглашение", subtitle: nil, showDisclosure: false)
+                    }
+                    Divider().padding(.leading, 52)
+                    NavigationLink(value: AppRoute.legalPdf(.privacyPolicy)) {
+                        settingsRowLabel(icon: "hand.raised.fill", title: "Политика конфиденциальности", subtitle: nil, showDisclosure: false)
+                    }
+                    Divider().padding(.leading, 52)
+                    NavigationLink(value: AppRoute.legalPdf(.dobrozalOffer)) {
+                        settingsRowLabel(icon: "doc.plaintext.fill", title: "Договор с Клубом", subtitle: nil, showDisclosure: false)
+                    }
+                    Divider().padding(.leading, 52)
+                    NavigationLink(value: AppRoute.legalPdf(.dobrozalPrivacy)) {
+                        settingsRowLabel(icon: "checkmark.seal.fill", title: "Политика обработки и защиты персональных данных Клуба", subtitle: nil, showDisclosure: false)
                     }
                 }
             }
             .padding(.bottom, 24)
+            }
+
+            if deleteAccountBusy {
+                Color.black.opacity(0.25).ignoresSafeArea()
+                ProgressView("Удаляем аккаунт…")
+                    .font(FCTypography.bodyMedium())
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radius14, style: .continuous)
+                            .fill(Theme.surface)
+                    )
+            }
         }
         .background(Theme.background)
         .fcPrimaryNavigation(title: "Настройки")
@@ -2894,78 +3569,137 @@ struct SettingsView: View {
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Закрыть") { showFeedback = false } } }
             }
         }
-        .sheet(isPresented: $biometricEnrollPresented) {
-            NavigationStack {
-                Form {
-                    Section {
-                        Text(
-                            """
-                            Введите пароль учётной записи один раз: учётные данные сохраняются в связке ключей \
-                            и доступны только с Face ID или Touch ID при нажатии «Войти по отпечатку пальца».
-                            """
-                        )
-                        .font(FCTypography.bodySmall())
-
-                        SecureField("Пароль", text: $biometricEnrollPassword)
-
-                        Button("Сохранить и включить биометрию") {
-                            Task { await confirmBiometricEnrollment() }
-                        }
-                        .disabled(biometricEnrollBusy || biometricEnrollPassword.isEmpty)
-
-                        if biometricEnrollBusy {
-                            ProgressView().frame(maxWidth: .infinity)
-                        }
-                    }
-                }
-                .navigationTitle("Биометрия")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Закрыть") {
-                            biometricEnrollPresented = false
-                            biometricEnrollPassword = ""
-                        }
-                    }
-                }
-            }
-        }
         .alert("", isPresented: Binding(get: { toast != nil }, set: { if !$0 { toast = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(toast ?? "") }
+        .alert("Удалить аккаунт?", isPresented: $showDeleteAccountConfirm) {
+            Button("Отмена", role: .cancel) {}
+            Button("Продолжить", role: .destructive) {
+                showDeleteAccountFinalConfirm = true
+            }
+        } message: {
+            Text("Ваш профиль и персональные данные (имя, email, телефон, паспортные данные) будут безвозвратно удалены с сервера. Войти в этот аккаунт снова будет невозможно.")
+        }
+        .alert("Подтвердите удаление", isPresented: $showDeleteAccountFinalConfirm) {
+            Button("Отмена", role: .cancel) {}
+            Button("Удалить навсегда", role: .destructive) {
+                Task { await performDeleteAccount() }
+            }
+        } message: {
+            Text("Это действие необратимо. Активные абонементы перестанут быть доступны через приложение.")
+        }
+        .sheet(isPresented: $showPinSettings) {
+            AppPinSettingsSheet()
+        }
+        .confirmationDialog("Тема оформления", isPresented: $showThemeDialog, titleVisibility: .visible) {
+            ForEach(AppThemeMode.allCases) { mode in
+                Button(mode.label) { themeModeRaw = mode.rawValue }
+            }
+            Button("Отмена", role: .cancel) {}
+        }
+        .onAppear {
+            biometricLoginEnabled = BiometricCredentialStore.hasSavedLogin
+            Task {
+                await loadNotificationSettings()
+                await PushNotificationService.shared.syncWithServerPreference(pushEnabled: pushEnabled)
+            }
+        }
     }
 
+    @MainActor
+    private func loadNotificationSettings() async {
+        guard !notificationSettingsLoaded else { return }
+        do {
+            let s = try await app.api.getNotificationSettings()
+            pushEnabled = s.pushEnabled
+            emailEnabled = s.emailEnabled
+            trainingReminders = s.trainingReminders
+            scheduleChanges = s.scheduleChanges
+            promoNotifications = s.promoNotifications
+            notificationSettingsLoaded = true
+        } catch {
+            notificationSettingsLoaded = true
+        }
+    }
 
     @MainActor
-    private func confirmBiometricEnrollment() async {
-        guard let mail = app.currentUser?.email, !mail.isEmpty else {
+    private func saveNotificationSettings(syncPush: Bool = false) async {
+        guard notificationSettingsLoaded, !notificationSaveBusy else { return }
+        notificationSaveBusy = true
+        defer { notificationSaveBusy = false }
+        let payload = NotificationSettings(
+            pushEnabled: pushEnabled,
+            emailEnabled: emailEnabled,
+            trainingReminders: trainingReminders,
+            scheduleChanges: scheduleChanges,
+            promoNotifications: promoNotifications
+        )
+        do {
+            let saved = try await app.api.updateNotificationSettings(payload)
+            pushEnabled = saved.pushEnabled
+            emailEnabled = saved.emailEnabled
+            trainingReminders = saved.trainingReminders
+            scheduleChanges = saved.scheduleChanges
+            promoNotifications = saved.promoNotifications
+            if syncPush {
+                await PushNotificationService.shared.syncWithServerPreference(pushEnabled: saved.pushEnabled)
+            }
+        } catch let e as FitnessAPIError {
+            toast = e.localizedDescription
+        } catch {
+            toast = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func performDeleteAccount() async {
+        guard !deleteAccountBusy else { return }
+        deleteAccountBusy = true
+        defer { deleteAccountBusy = false }
+        do {
+            try await app.deleteAccount()
+        } catch let e as FitnessAPIError {
+            toast = e.localizedDescription
+        } catch {
+            toast = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func enableBiometricLogin() {
+        guard BiometryLoginUX.canUseBiometrics else {
+            toast = "На устройстве недоступна биометрия"
+            return
+        }
+        guard let refresh = KeychainStore.get(.refreshToken), !refresh.isEmpty else {
             toast = "Войдите в аккаунт ещё раз, затем включите биометрию"
             return
         }
+        guard !biometricEnrollBusy else { return }
         biometricEnrollBusy = true
-        defer {
-            biometricEnrollBusy = false
-        }
-
-        guard !biometricEnrollPassword.isEmpty else { return }
-
-        do {
-            let r = try await app.api.login(email: mail, password: biometricEnrollPassword)
-            app.applyAuth(r)
-            try BiometricCredentialStore.save(email: mail, password: biometricEnrollPassword)
-            biometricEnrollPresented = false
-            biometricEnrollPassword = ""
-            toast = "Вход по отпечатку включён"
-        } catch let e as FitnessAPIError {
-            toast = e.localizedDescription
-        } catch BiometricCredentialStoreError.notAvailable {
-            toast = "Биометрия недоступна на устройстве"
-        } catch BiometricCredentialStoreError.keychain(let status) where status == errSecUserCanceled {
-            toast = nil
-        } catch BiometricCredentialStoreError.keychain {
-            toast = "Не удалось сохранить данные для биометрии"
-        } catch {
-            toast = error.localizedDescription
+        Task {
+            defer { biometricEnrollBusy = false }
+            let ctx = LAContext()
+            do {
+                let ok = try await ctx.evaluatePolicy(
+                    .deviceOwnerAuthenticationWithBiometrics,
+                    localizedReason: "Подтвердите включение биометрии"
+                )
+                guard ok else { return }
+                try BiometricCredentialStore.save(refreshToken: refresh)
+                biometricLoginEnabled = true
+                toast = BiometryLoginUX.settingsSubtitle() + " включён"
+            } catch let error as LAError where error.code == .userCancel {
+                ()
+            } catch BiometricCredentialStoreError.notAvailable {
+                toast = "Биометрия недоступна на устройстве"
+            } catch BiometricCredentialStoreError.keychain(let status) where status == errSecUserCanceled {
+                ()
+            } catch BiometricCredentialStoreError.keychain {
+                toast = "Не удалось сохранить данные для биометрии"
+            } catch {
+                toast = error.localizedDescription
+            }
         }
     }
 
@@ -3032,6 +3766,31 @@ struct SettingsView: View {
                 Spacer()
                 Image(systemName: "chevron.right")
                     .foregroundStyle(Theme.onSurfaceVariant)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func settingsDestructiveRow(icon: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundStyle(Theme.error)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(FCTypography.bodyLarge())
+                        .foregroundStyle(Theme.error)
+                    Text(subtitle)
+                        .font(FCTypography.bodySmall())
+                        .foregroundStyle(Theme.onSurfaceVariant)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(Theme.error.opacity(0.7))
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -3287,17 +4046,17 @@ struct AboutView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Text("Фитнес Клуб")
+                Text(AppConfiguration.appDisplayName)
                     .font(FCTypography.headlineMedium())
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.onBackground)
                 Spacer().frame(height: 8)
-                Text("Версия \(AppConfiguration.appVersion)")
+                Text("Версия \(AppConfiguration.versionLabel)")
                     .font(FCTypography.bodyLarge())
                     .foregroundStyle(Theme.onSurfaceVariant)
                 Spacer().frame(height: 32)
 
-                Text("Мобильное приложение для участников фитнес-клуба. Расписание, абонементы, бронирование и многое другое.")
+                Text("Мобильное приложение \(AppConfiguration.appDisplayName). Расписание, абонементы, бронирование и многое другое.")
                     .font(FCTypography.bodyMedium())
                     .foregroundStyle(Theme.onSurfaceVariant)
                     .multilineTextAlignment(.center)
@@ -3317,11 +4076,6 @@ struct AboutView: View {
                         .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                Spacer().frame(height: 8)
-                Text("(На Android — кнопка «Оценить в Google Play»; на iOS открываем App Store.)")
-                    .font(FCTypography.labelSmall())
-                    .foregroundStyle(Theme.onSurfaceVariant.opacity(0.75))
-                    .multilineTextAlignment(.center)
             }
             .padding(24)
             .frame(maxWidth: .infinity)
