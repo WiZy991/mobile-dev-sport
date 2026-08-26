@@ -55,18 +55,25 @@ class QrCodeViewModel @Inject constructor(
     fun onSheetOpened() {
         if (sheetVisible) return
         sheetVisible = true
-        // QR строится локально из userId — не ждём медленный API (occupancy/subscriptions по 10+ с).
+        // QR сразу из кэша; после refresh профиля пересоберём, если пришёл club_id (Wiegand).
         startQrRotation()
         startAccessStatusPolling()
         viewModelScope.launch {
+            val clubBefore = authRepository.getCurrentUser().first()?.clubId
+            runCatching { authRepository.refreshCurrentUser() }
             coroutineScope {
                 val accessDeferred = async { accessRepository.refreshAccessStatus(force = true) }
                 val blockDeferred = async { entryBlockReason(force = true) }
                 accessDeferred.await()
                 blockDeferred.await()
             }
+            if (!sheetVisible) return@launch
+            val clubAfter = authRepository.getCurrentUser().first()?.clubId
             val isInside = accessRepository.accessStatus.value.isInside
-            if (isInside != _uiState.value.isInsideGym || cachedEntryBlock != _uiState.value.entryBlockedMessage) {
+            val needRestart = isInside != _uiState.value.isInsideGym
+                || cachedEntryBlock != _uiState.value.entryBlockedMessage
+                || clubBefore != clubAfter
+            if (needRestart) {
                 _uiState.update { it.copy(isInsideGym = isInside) }
                 rotationJob?.cancel()
                 startQrRotation()
@@ -183,7 +190,7 @@ class QrCodeViewModel @Inject constructor(
                 }
 
                 val ts = System.currentTimeMillis()
-                val clubId = user.clubId
+                val clubId = user.clubId?.toString()
                 _uiState.update {
                     it.copy(
                         isLoading = false,

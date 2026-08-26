@@ -24,6 +24,10 @@ data class User(
     @SerializedName("club_name")
     val clubName: String? = null,
 
+    /** Клуб из регистрации — нужен для Wiegand QR (Седанка и др.). API отдаёт число. */
+    @SerializedName("club_id")
+    val clubId: Int? = null,
+
     /** none | pending | verified | rejected — после Сбер ID для покупки абонемента */
     @SerializedName("passport_verification_status")
     val passportVerificationStatus: String? = null,

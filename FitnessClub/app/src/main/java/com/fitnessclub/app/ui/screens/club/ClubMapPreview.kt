@@ -97,6 +97,10 @@ private const val DE_FRIES_LON = 131.999418
 private const val FORMAT_LAT = 43.305608
 private const val FORMAT_LON = 131.956621
 
+/** ТРК «Седанка Сити», ул. Полетаева 6Д. */
+private const val SEDANKA_LAT = 43.212592
+private const val SEDANKA_LON = 131.95021
+
 private const val MOSCOW_DEFAULT_LAT = 55.7558
 private const val MOSCOW_DEFAULT_LON = 37.6173
 
@@ -594,6 +598,7 @@ internal fun resolveClubCoords(
 ): Pair<Double, Double> {
     val a = address.lowercase()
     val looksFormat = "формат" in a || "центральная" in a
+    val looksSedanka = "седанка" in a || "полетаева" in a
     val looksDeFries =
         "де фриз" in a ||
             "де-фриз" in a ||
@@ -601,6 +606,7 @@ internal fun resolveClubCoords(
             "купера" in a
     val looksVladivostok =
         looksFormat ||
+            looksSedanka ||
             looksDeFries ||
             "владивосток" in a ||
             "надеждин" in a ||
@@ -615,6 +621,7 @@ internal fun resolveClubCoords(
 
     return when {
         looksFormat && (!hasRealCoords || longitude < 100.0) -> FORMAT_LAT to FORMAT_LON
+        looksSedanka && (!hasRealCoords || longitude < 100.0) -> SEDANKA_LAT to SEDANKA_LON
         looksDeFries && (!hasRealCoords || longitude < 100.0) -> DE_FRIES_LAT to DE_FRIES_LON
         looksVladivostok && (!hasRealCoords || longitude < 100.0) -> DE_FRIES_LAT to DE_FRIES_LON
         hasRealCoords -> latitude to longitude
