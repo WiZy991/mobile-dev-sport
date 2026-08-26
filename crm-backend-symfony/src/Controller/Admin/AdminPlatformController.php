@@ -58,6 +58,15 @@ final class AdminPlatformController extends AbstractController
         }
 
         $org->setIsActive(!$org->isActive());
+        if ($org->isActive() && $org->isSubscriptionExpired()) {
+            $this->em->flush();
+            $this->addFlash(
+                'warning',
+                'Флаг «активна» включён, но подписка уже истекла — вход в CRM всё равно будет блокироваться. Сначала нажмите «Продлить».'
+            );
+
+            return $this->redirectToRoute('admin_platform_organizations');
+        }
         $this->em->flush();
 
         $this->addFlash('success', $org->isActive()
@@ -88,6 +97,98 @@ final class AdminPlatformController extends AbstractController
         }
 
         $this->addFlash('success', 'Организация удалена.');
+
+        return $this->redirectToRoute('admin_platform_organizations');
+    }
+
+    #[Route('/organizations/{id}/renew', name: 'admin_platform_organization_renew', methods: ['GET', 'POST'])]
+    public function renewOrganization(int $id, Request $request): Response
+    {
+        $org = $this->em->getRepository(Organization::class)->find($id);
+        if (!$org instanceof Organization) {
+            throw $this->createNotFoundException('Организация не найдена.');
+        }
+        if ($org->getSlug() === $this->defaultOrganizationSlug) {
+            $this->addFlash('warning', 'Основную CRM продлевать здесь не нужно.');
+
+            return $this->redirectToRoute('admin_platform_organizations');
+        }
+
+        if ($request->isMethod('POST')) {
+            return $this->processRenew($org, $request);
+        }
+
+        $today = new \DateTimeImmutable('today');
+        $currentEnd = $org->getSubscriptionEndsAt();
+        $base = $currentEnd !== null && $currentEnd > $today ? $currentEnd : $today;
+        $suggested = $base->modify('+30 days');
+
+        return $this->render('admin/platform/organization_renew.html.twig', [
+            'menu' => $this->menu(),
+            'current' => 'platform',
+            'org' => $org,
+            'suggestedEndsAt' => $suggested->format('Y-m-d'),
+        ]);
+    }
+
+    private function processRenew(Organization $org, Request $request): Response
+    {
+        $endsRaw = trim((string) $request->request->get('subscription_ends_at', ''));
+        $extendDays = (int) $request->request->get('extend_days', 0);
+        $tariff = trim((string) $request->request->get('tariff', $org->getTariff()));
+        $reactivate = $request->request->has('reactivate');
+
+        if (!\in_array($tariff, ['demo', 'start', 'business', 'network'], true)) {
+            $this->addFlash('danger', 'Выберите тариф из списка.');
+
+            return $this->redirectToRoute('admin_platform_organization_renew', ['id' => $org->getId()]);
+        }
+
+        $endsAt = $endsRaw !== ''
+            ? (\DateTimeImmutable::createFromFormat('Y-m-d', $endsRaw) ?: null)
+            : null;
+
+        if ($endsAt === null && $extendDays > 0) {
+            $today = new \DateTimeImmutable('today');
+            $currentEnd = $org->getSubscriptionEndsAt();
+            $base = $currentEnd !== null && $currentEnd > $today ? $currentEnd : $today;
+            $endsAt = $base->modify('+' . max(1, min(3660, $extendDays)) . ' days');
+        }
+
+        if ($endsAt === null) {
+            $this->addFlash('danger', 'Укажите дату окончания или число дней продления.');
+
+            return $this->redirectToRoute('admin_platform_organization_renew', ['id' => $org->getId()]);
+        }
+
+        $today = new \DateTimeImmutable('today');
+        if ($endsAt <= $today) {
+            $this->addFlash('danger', 'Дата окончания должна быть позже сегодняшнего дня.');
+
+            return $this->redirectToRoute('admin_platform_organization_renew', ['id' => $org->getId()]);
+        }
+
+        $startsAt = $org->getSubscriptionStartsAt();
+        if ($startsAt === null || $org->isSubscriptionExpired()) {
+            $org->setSubscriptionStartsAt($today);
+        }
+
+        $org->setSubscriptionEndsAt($endsAt);
+        $org->setTariff($tariff);
+        if ($reactivate) {
+            $org->setIsActive(true);
+        }
+        $this->em->flush();
+
+        $this->addFlash(
+            'success',
+            sprintf(
+                'Подписка «%s» продлена до %s.%s',
+                $org->getName(),
+                $endsAt->format('d.m.Y'),
+                $reactivate ? ' Доступ в CRM включён — клиент может входить.' : ''
+            )
+        );
 
         return $this->redirectToRoute('admin_platform_organizations');
     }

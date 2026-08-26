@@ -24,8 +24,8 @@ android {
         applicationId = "ru.worldcashfit.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 33
-        versionName = "1.2.5"
+        versionCode = 34
+        versionName = "1.2.6"
 
         multiDexEnabled = true
         multiDexKeepProguard = file("multidex-config.pro")

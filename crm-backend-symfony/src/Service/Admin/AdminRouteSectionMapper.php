@@ -95,6 +95,9 @@ final class AdminRouteSectionMapper
         'admin_franchise_delete' => 'franchise',
         'admin_platform_organizations' => 'platform',
         'admin_platform_organization_new' => 'platform',
+        'admin_platform_organization_renew' => 'platform',
+        'admin_platform_organization_toggle_active' => 'platform',
+        'admin_platform_organization_delete' => 'platform',
     ];
 
     public function resolveSection(Request $request): ?string

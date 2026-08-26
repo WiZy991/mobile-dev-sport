@@ -1,0 +1,57 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM — Продление подписки{% endblock %}
+
+{% block body %}
+<div class="content-header">
+    <h1 class="h4 mb-0">Продлить подписку: {{ org.name }}</h1>
+</div>
+
+<div class="content-card" style="max-width: 520px">
+    <p class="text-secondary small mb-3">
+        Slug: <code>{{ org.slug }}</code>.
+        Сейчас:
+        {% if org.subscriptionStartsAt and org.subscriptionEndsAt %}
+            {{ org.subscriptionStartsAt|date('d.m.Y') }} — {{ org.subscriptionEndsAt|date('d.m.Y') }}
+        {% elseif org.subscriptionEndsAt %}
+            до {{ org.subscriptionEndsAt|date('d.m.Y') }}
+        {% else %}
+            срок не задан
+        {% endif %}
+        · флаг активна: {{ org.isActive ? 'да' : 'нет' }}
+        {% if org.isSubscriptionExpired %}
+            · <span class="text-warning">подписка истекла</span>
+        {% endif %}
+    </p>
+
+    <form method="post" action="{{ path('admin_platform_organization_renew', {id: org.id}) }}">
+        <div class="mb-3">
+            <label class="form-label">Быстро на N дней от сегодня или от текущей даты окончания (что позже)</label>
+            <div class="input-group">
+                <input type="number" name="extend_days" class="form-control" min="1" max="3660" value="30" placeholder="30">
+                <span class="input-group-text">дней</span>
+            </div>
+            <div class="form-text">Если заполните поле ниже «дата окончания», оно имеет приоритет над числом дней.</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Или точная дата окончания</label>
+            <input type="date" name="subscription_ends_at" class="form-control" value="{{ suggestedEndsAt }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Тариф</label>
+            <select name="tariff" class="form-select">
+                <option value="demo" {{ org.tariff == 'demo' ? 'selected' : '' }}>Демо</option>
+                <option value="start" {{ org.tariff == 'start' ? 'selected' : '' }}>Старт</option>
+                <option value="business" {{ org.tariff == 'business' ? 'selected' : '' }}>Бизнес</option>
+                <option value="network" {{ org.tariff == 'network' ? 'selected' : '' }}>Сеть</option>
+            </select>
+        </div>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="reactivate" value="1" id="reactivate" checked>
+            <label class="form-check-label" for="reactivate">Сразу включить организацию (доступ в CRM)</label>
+        </div>
+        <button type="submit" class="btn btn-primary">Продлить</button>
+        <a href="{{ path('admin_platform_organizations') }}" class="btn btn-outline-secondary ms-2">Отмена</a>
+    </form>
+</div>
+{% endblock %}
