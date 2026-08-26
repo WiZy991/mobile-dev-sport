@@ -3,16 +3,16 @@ package com.fitnessclub.app.data.qr
 /**
  * 7-значный QR для PERCo/Wiegand-26 — синхронно с CRM `WiegandEntryQrCodec` и iOS `QRCodeGenerator`.
  * Число всегда ≤ 9_999_999 < 2^24, иначе C01 обрезает код (9 цифр → ~7 «мусорных»).
+ * Формат выбирается полем клуба `entry_qr_format` (`wiegand` | `ascii`), не hardcode club_id.
  */
 object WiegandEntryQrCodec {
     private const val SLOT_MS = 15_000L
     private const val SLOT_MOD = 100
     private const val USER_MOD = 10_000
-    private val wiegandClubIds = setOf("11")
 
-    fun usesWiegandNumeric(clubId: String?): Boolean {
-        val raw = clubId?.trim().orEmpty()
-        return raw.isNotEmpty() && raw in wiegandClubIds
+    fun usesWiegandNumeric(entryQrFormat: String?): Boolean {
+        val raw = entryQrFormat?.trim().orEmpty()
+        return raw.equals("wiegand", ignoreCase = true)
     }
 
     fun encode(userId: String, timestampMs: Long): String {

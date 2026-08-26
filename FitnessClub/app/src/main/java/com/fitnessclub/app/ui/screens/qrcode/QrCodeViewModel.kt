@@ -59,7 +59,9 @@ class QrCodeViewModel @Inject constructor(
         startQrRotation()
         startAccessStatusPolling()
         viewModelScope.launch {
-            val clubBefore = authRepository.getCurrentUser().first()?.clubId
+            val before = authRepository.getCurrentUser().first()
+            val clubBefore = before?.clubId
+            val formatBefore = before?.entryQrFormat
             runCatching { authRepository.refreshCurrentUser() }
             coroutineScope {
                 val accessDeferred = async { accessRepository.refreshAccessStatus(force = true) }
@@ -68,11 +70,14 @@ class QrCodeViewModel @Inject constructor(
                 blockDeferred.await()
             }
             if (!sheetVisible) return@launch
-            val clubAfter = authRepository.getCurrentUser().first()?.clubId
+            val after = authRepository.getCurrentUser().first()
+            val clubAfter = after?.clubId
+            val formatAfter = after?.entryQrFormat
             val isInside = accessRepository.accessStatus.value.isInside
             val needRestart = isInside != _uiState.value.isInsideGym
                 || cachedEntryBlock != _uiState.value.entryBlockedMessage
                 || clubBefore != clubAfter
+                || formatBefore != formatAfter
             if (needRestart) {
                 _uiState.update { it.copy(isInsideGym = isInside) }
                 rotationJob?.cancel()
@@ -190,14 +195,14 @@ class QrCodeViewModel @Inject constructor(
                 }
 
                 val ts = System.currentTimeMillis()
-                val clubId = user.clubId?.toString()
+                val entryQrFormat = user.entryQrFormat
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         isInsideGym = insideNow,
                         userName = user.name,
                         memberId = user.id.takeLast(8).uppercase(),
-                        qrCodeData = generateQrData(user.id, clubId, ts),
+                        qrCodeData = generateQrData(user.id, entryQrFormat, ts),
                         secondsRemaining = 15,
                         entryBlockedMessage = null,
                     )
@@ -216,8 +221,8 @@ class QrCodeViewModel @Inject constructor(
         super.onCleared()
     }
 
-    private fun generateQrData(userId: String, clubId: String?, timestamp: Long): String {
-        if (com.fitnessclub.app.data.qr.WiegandEntryQrCodec.usesWiegandNumeric(clubId)) {
+    private fun generateQrData(userId: String, entryQrFormat: String?, timestamp: Long): String {
+        if (com.fitnessclub.app.data.qr.WiegandEntryQrCodec.usesWiegandNumeric(entryQrFormat)) {
             return com.fitnessclub.app.data.qr.WiegandEntryQrCodec.encode(userId, timestamp)
         }
         val uid = if (userId.lowercase().startsWith("user-")) {

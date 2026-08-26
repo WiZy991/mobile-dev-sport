@@ -161,6 +161,7 @@ class ClubController extends AbstractController
                 'max_capacity' => $c->getMaxCapacity(),
                 'image_url' => self::absolutePublicUrl($request, $c->getRegistrationImagePath()),
                 'show_in_app' => true,
+                'entry_qr_format' => $c->getEntryQrFormat(),
                 ...$legal,
             ];
         }, $clubs);
@@ -243,6 +244,7 @@ class ClubController extends AbstractController
             'longitude' => $lon,
             'image_url' => self::absolutePublicUrl($request, $club->getRegistrationImagePath()),
             'show_in_app' => $club->isShowInApp(),
+            'entry_qr_format' => $club->getEntryQrFormat(),
             'network' => [
                 'about' => $this->clubSettings->get('network_about') ?: null,
                 'social_links' => $this->socialLinksForApi(),

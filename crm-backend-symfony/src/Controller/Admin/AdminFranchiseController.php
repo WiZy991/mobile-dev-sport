@@ -129,6 +129,7 @@ class AdminFranchiseController extends AbstractController
         $club->setEmail($this->trimOrNull($request->request->get('email')));
         $club->setWorkingHours($this->trimOrNull($request->request->get('working_hours')));
         $club->setShowInApp($request->request->get('show_in_app') === '1');
+        $club->setEntryQrFormat((string) $request->request->get('entry_qr_format', Club::ENTRY_QR_ASCII));
 
         $file = $request->files->get('registration_image');
         if ($file instanceof UploadedFile && $file->isValid()) {

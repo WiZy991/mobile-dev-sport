@@ -94,6 +94,17 @@
                             </div>
                         </div>
                         <div class="col-12">
+                            <label class="form-label small d-block">Формат QR входа</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="entry_qr_format" id="entry_qr_ascii" value="ascii" {{ club.entryQrFormat != 'wiegand' ? 'checked' : '' }}>
+                                <label class="form-check-label small" for="entry_qr_ascii">Как на Купере (текст FITNESSCLUB:ENTRY)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="entry_qr_format" id="entry_qr_wiegand" value="wiegand" {{ club.entryQrFormat == 'wiegand' ? 'checked' : '' }}>
+                                <label class="form-check-label small" for="entry_qr_wiegand">Wiegand (цифры, как Седанка)</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
                             <label class="form-label small">Фото для регистрации</label>
                             {% if club.registrationImagePath %}
                                 <div class="mb-2">

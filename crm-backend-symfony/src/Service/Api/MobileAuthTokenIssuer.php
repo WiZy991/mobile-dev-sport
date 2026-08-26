@@ -63,6 +63,7 @@ final class MobileAuthTokenIssuer
             'sber_id' => $user->getSberId(),
             'club_id' => $user->getClub()?->getId(),
             'club_name' => $user->getClub()?->getName(),
+            'entry_qr_format' => $user->getClub()?->getEntryQrFormat(),
         ];
     }
 }

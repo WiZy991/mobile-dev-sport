@@ -82,6 +82,13 @@ class Club implements TenantAware
     #[ORM\Column(name: 'registration_image_path', type: 'string', length: 255, nullable: true)]
     private ?string $registrationImagePath = null;
 
+    public const ENTRY_QR_ASCII = 'ascii';
+    public const ENTRY_QR_WIEGAND = 'wiegand';
+
+    /** Формат QR входа в приложении: ascii (FITNESSCLUB:ENTRY) | wiegand (7 цифр). */
+    #[ORM\Column(name: 'entry_qr_format', type: 'string', length: 16, options: ['default' => 'ascii'])]
+    private string $entryQrFormat = self::ENTRY_QR_ASCII;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -173,5 +180,26 @@ class Club implements TenantAware
         $this->registrationImagePath = $v !== null && trim($v) !== '' ? trim($v) : null;
 
         return $this;
+    }
+
+    public function getEntryQrFormat(): string
+    {
+        return $this->entryQrFormat;
+    }
+
+    public function setEntryQrFormat(string $v): self
+    {
+        $v = strtolower(trim($v));
+        if ($v !== self::ENTRY_QR_WIEGAND) {
+            $v = self::ENTRY_QR_ASCII;
+        }
+        $this->entryQrFormat = $v;
+
+        return $this;
+    }
+
+    public function usesWiegandEntryQr(): bool
+    {
+        return $this->entryQrFormat === self::ENTRY_QR_WIEGAND;
     }
 }
