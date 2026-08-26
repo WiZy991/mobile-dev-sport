@@ -165,6 +165,8 @@ class AgentApp(tk.Tk):
             parent,
             text="Камера Dahua (IVS «Tripwire») для контроля прохода вдвоём по одному QR.\n"
             "В веб-интерфейсе камеры включите Smart Plan → IVS → Tripwire на линии входа, "
+            "цель Human, направление внутрь. Окно подсчёта лучше ≥ 8000 мс (двое успевают пройти).\n"
+            "В счётчик идут только события Start/Pulse — Stop не считается отдельным человеком.",
             "тип цели Human, направление — внутрь.",
             foreground="gray",
             wraplength=600,
@@ -303,7 +305,7 @@ class AgentApp(tk.Tk):
         cam.event_codes = self.var_cam_codes.get().strip() or "CrossLineDetection"
         cam.inbound_direction = self.var_cam_direction.get().strip()
         cam.require_human = bool(self.var_cam_human.get())
-        cam.tailgating_window_ms = max(500, _int(self.var_cam_window, 6000))
+        cam.tailgating_window_ms = max(500, _int(self.var_cam_window, 8000))
         cam.pre_roll_ms = max(0, _int(self.var_cam_preroll, 1000))
         cam.min_people = max(2, _int(self.var_cam_min, 2))
         cam.standalone_enabled = bool(self.var_cam_standalone.get())

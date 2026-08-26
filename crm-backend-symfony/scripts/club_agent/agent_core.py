@@ -439,7 +439,9 @@ class ClubAgent:
                 if now >= end:
                     break
                 self._stop.wait(min(0.2, end - now))
-            crossings = cam.crossings_between(t0 - pre_roll_ms / 1000.0, time.monotonic())
+            # Граница окна фиксированная (не «сейчас»), иначе поздние Stop после закрытия окна
+            # и гонки потоков искажают счёт. Небольшой хвост 50 мс — на погрешность таймера.
+            crossings = cam.crossings_between(t0 - pre_roll_ms / 1000.0, end + 0.05)
             count = len(crossings)
             if count >= min_people:
                 self._emit(
