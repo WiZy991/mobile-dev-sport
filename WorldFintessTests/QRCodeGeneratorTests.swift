@@ -14,9 +14,10 @@ final class QRCodeGeneratorTests: XCTestCase {
         XCTAssertEqual(payload.count, 7)
         XCTAssertTrue(payload.allSatisfy(\.isNumber))
         XCTAssertLessThanOrEqual(Int(payload) ?? Int.max, 0xFFFFFF)
-        XCTAssertTrue(QRCodeGenerator.usesWiegandNumeric(clubId: "11"))
-        XCTAssertFalse(QRCodeGenerator.usesWiegandNumeric(clubId: "2"))
-        let clubPayload = QRCodeGenerator.entryPayload(userId: "user-5133", clubId: "11", timestampMillis: 1_700_000_000_000)
+        XCTAssertTrue(QRCodeGenerator.usesWiegandNumeric(entryQrFormat: "wiegand"))
+        XCTAssertFalse(QRCodeGenerator.usesWiegandNumeric(entryQrFormat: "ascii"))
+        XCTAssertFalse(QRCodeGenerator.usesWiegandNumeric(entryQrFormat: nil))
+        let clubPayload = QRCodeGenerator.entryPayload(userId: "user-5133", entryQrFormat: "wiegand", timestampMillis: 1_700_000_000_000)
         XCTAssertEqual(clubPayload, payload)
     }
 

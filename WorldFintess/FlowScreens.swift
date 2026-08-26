@@ -2879,7 +2879,9 @@ struct EditProfileView: View {
             createdAt: u.createdAt,
             isVerified: u.isVerified,
             sberId: u.sberId,
-            clubId: u.clubId
+            clubId: u.clubId,
+            clubName: u.clubName,
+            entryQrFormat: u.entryQrFormat
         )
         do {
             let updated = try await app.api.updateProfile(u)

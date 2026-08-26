@@ -6,21 +6,32 @@ import SwiftUI
 @MainActor
 private final class QRCodeRotationModel: ObservableObject {
     @Published private(set) var payload: String?
+    @Published private(set) var qrImage: UIImage?
     @Published private(set) var secondsRemaining: Int = 0
 
     private var loopTask: Task<Void, Never>?
+    private var imageTask: Task<Void, Never>?
+    private let qrDimension: CGFloat
 
-    func activate(userId: String?) {
+    init(qrDimension: CGFloat = 240) {
+        self.qrDimension = qrDimension
+    }
+
+    func activate(userId: String?, entryQrFormat: String?) {
         loopTask?.cancel()
+        imageTask?.cancel()
         guard let userId, !userId.isEmpty else {
             payload = nil
+            qrImage = nil
             secondsRemaining = 0
             return
         }
         loopTask = Task { @MainActor in
             while !Task.isCancelled {
                 let ts = Int64(Date().timeIntervalSince1970 * 1000)
-                payload = QRCodeGenerator.entryPayload(userId: userId, timestampMillis: ts)
+                let next = QRCodeGenerator.entryPayload(userId: userId, entryQrFormat: entryQrFormat, timestampMillis: ts)
+                payload = next
+                renderImage(for: next)
                 secondsRemaining = 15
                 for _ in 0..<15 {
                     try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -31,28 +42,43 @@ private final class QRCodeRotationModel: ObservableObject {
         }
     }
 
-    func refresh(userId: String?) {
-        activate(userId: userId)
+    func refresh(userId: String?, entryQrFormat: String?) {
+        activate(userId: userId, entryQrFormat: entryQrFormat)
     }
 
     func stop() {
         loopTask?.cancel()
+        imageTask?.cancel()
         loopTask = nil
+        imageTask = nil
+    }
+
+    private func renderImage(for payload: String) {
+        imageTask?.cancel()
+        let dim = qrDimension
+        imageTask = Task { @MainActor in
+            let img = await QRCodeGenerator.imageAsync(from: payload, dimension: dim)
+            guard !Task.isCancelled else { return }
+            qrImage = img
+        }
     }
 }
 
-/// Лист FAB / быстрый вход: заголовок «Вход в зал», компактный QR («ModalBottomSheet» на Android).
+/// Лист FAB / быстрый вход-выход: компактный QR («ModalBottomSheet» на Android).
 struct QrAccessSheetContent: View {
     @EnvironmentObject private var app: WorldFitnessAppState
     var onClose: (() -> Void)?
-    @StateObject private var rotor = QRCodeRotationModel()
+    @StateObject private var rotor = QRCodeRotationModel(qrDimension: 280)
+    @State private var isInsideGym = false
+    @State private var entryBlockedMessage: String?
+    @State private var checkingAccess = true
 
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 16) {
-                    Text("Вход в зал")
+                    Text(isInsideGym ? "Выход из зала" : "Вход/выход в зал")
                         .font(FCTypography.titleLarge())
                         .fontWeight(.bold)
                         .foregroundStyle(Theme.onBackground)
@@ -65,9 +91,14 @@ struct QrAccessSheetContent: View {
 
                     sheetQrSection
 
-                    Text("Поднесите к сканеру")
+                    Text(
+                        isInsideGym
+                            ? "Поднесите к сканеру на выходе"
+                            : (entryBlockedMessage ?? "Поднесите к сканеру")
+                    )
                         .font(FCTypography.bodySmall())
-                        .foregroundStyle(Theme.onSurfaceVariant)
+                        .foregroundStyle(entryBlockedMessage == nil ? Theme.onSurfaceVariant : Theme.error)
+                        .multilineTextAlignment(.center)
 
                     if let onClose {
                         FCPrimaryButton(title: "Закрыть", isLoading: false) {
@@ -80,23 +111,27 @@ struct QrAccessSheetContent: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .onAppear {
-            rotor.activate(userId: app.currentUser?.id)
-        }
-        .onChange(of: app.currentUser?.id) { _, newId in
-            rotor.activate(userId: newId)
-        }
+        .task { await refreshGate() }
         .onDisappear { rotor.stop() }
     }
 
     @ViewBuilder
     private var sheetQrSection: some View {
-        if let payload = rotor.payload, let img = QRCodeGenerator.image(from: payload, dimension: 240) {
-            Image(uiImage: img)
-                .interpolation(.none)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 208, height: 208)
+        if checkingAccess {
+            ProgressView()
+                .tint(Theme.primary)
+        } else if let msg = entryBlockedMessage, !isInsideGym {
+            Text(msg)
+                .font(FCTypography.bodyMedium())
+                .foregroundStyle(Theme.error)
+                .multilineTextAlignment(.center)
+                .padding(16)
+                .frame(maxWidth: .infinity)
+                .background(Theme.error.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
+        } else if let img = rotor.qrImage {
+            SecureQRImageView(image: img)
+                .frame(width: 248, height: 248)
                 .padding(16)
                 .background(Theme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
@@ -116,12 +151,32 @@ struct QrAccessSheetContent: View {
                 .tint(Theme.primary)
         }
     }
+
+    private func refreshGate() async {
+        checkingAccess = true
+        defer { checkingAccess = false }
+        isInsideGym = (try? await app.api.getAccessStatus(forceRefresh: true))?.isInside ?? false
+        if isInsideGym {
+            entryBlockedMessage = nil
+            rotor.activate(userId: app.currentUser?.id, entryQrFormat: app.currentUser?.entryQrFormat)
+            return
+        }
+        entryBlockedMessage = await QrEntryGate.blockReason(api: app.api)
+        if entryBlockedMessage == nil {
+            rotor.activate(userId: app.currentUser?.id, entryQrFormat: app.currentUser?.entryQrFormat)
+        } else {
+            rotor.stop()
+        }
+    }
 }
 
 /// Полноэкранный экран: `QrCodeScreen.kt` — «Электронная карта», инструкции, обновление, таймер 15 сек.
 struct QrFullScreenView: View {
     @EnvironmentObject private var app: WorldFitnessAppState
-    @StateObject private var rotor = QRCodeRotationModel()
+    @StateObject private var rotor = QRCodeRotationModel(qrDimension: 560)
+    @State private var isInsideGym = false
+    @State private var entryBlockedMessage: String?
+    @State private var checkingAccess = true
 
     var body: some View {
         ZStack {
@@ -145,7 +200,14 @@ struct QrFullScreenView: View {
                             .foregroundStyle(Theme.onSurfaceVariant)
                     }
 
-                    Spacer().frame(height: 24)
+                    Spacer().frame(height: 16)
+
+                    Text(isInsideGym ? "Выход из зала" : "Вход/выход в зал")
+                        .font(FCTypography.titleMedium())
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.onBackground)
+
+                    Spacer().frame(height: 16)
 
                     fullScreenQrCard
 
@@ -156,9 +218,14 @@ struct QrFullScreenView: View {
                             .font(FCTypography.titleMedium())
                             .fontWeight(.semibold)
                             .foregroundStyle(Theme.onBackground)
-                        Text("Поднесите QR-код к сканеру на входе в клуб. Турникет откроется автоматически.")
+                        Text(
+                            isInsideGym
+                                ? "Поднесите QR-код к сканеру при выходе. Турникет откроется, посещение не спишется повторно."
+                                : (entryBlockedMessage
+                                    ?? "Поднесите QR-код к сканеру на входе или выходе. Турникет откроется автоматически.")
+                        )
                             .font(FCTypography.bodyMedium())
-                            .foregroundStyle(Theme.onSurfaceVariant)
+                            .foregroundStyle(entryBlockedMessage == nil || isInsideGym ? Theme.onSurfaceVariant : Theme.error)
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -167,15 +234,15 @@ struct QrFullScreenView: View {
 
                     Spacer().frame(height: 24)
 
-                    qrRefreshOutlinedButton(userId: app.currentUser?.id)
-
-                    Spacer().frame(height: 8)
-
-                    Text(qrExpiryFooter)
-                        .font(FCTypography.bodySmall())
-                        .foregroundStyle(Theme.onSurfaceVariant)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
+                    if entryBlockedMessage == nil || isInsideGym {
+                        qrRefreshOutlinedButton(userId: app.currentUser?.id)
+                        Spacer().frame(height: 8)
+                        Text(qrExpiryFooter)
+                            .font(FCTypography.bodySmall())
+                            .foregroundStyle(Theme.onSurfaceVariant)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                    }
 
                     Spacer(minLength: 24)
                 }
@@ -185,12 +252,7 @@ struct QrFullScreenView: View {
         }
         .fcPrimaryNavigation(title: "Электронная карта")
         .background(Theme.background)
-        .onAppear {
-            rotor.activate(userId: app.currentUser?.id)
-        }
-        .onChange(of: app.currentUser?.id) { _, newId in
-            rotor.activate(userId: newId)
-        }
+        .task { await refreshGate() }
         .onDisappear { rotor.stop() }
     }
 
@@ -207,33 +269,41 @@ struct QrFullScreenView: View {
             Text("Войдите в аккаунт")
                 .font(FCTypography.bodyLarge())
                 .foregroundStyle(Theme.error)
-        } else if let payload = rotor.payload, let img = QRCodeGenerator.image(from: payload, dimension: 500) {
+        } else if checkingAccess {
             ZStack {
                 Theme.surface
-                Image(uiImage: img)
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
+                ProgressView().tint(Theme.primary)
+            }
+            .frame(width: 320, height: 320)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        } else if let msg = entryBlockedMessage, !isInsideGym {
+            ZStack {
+                Theme.surface
+                Text(msg)
+                    .font(FCTypography.bodyMedium())
+                    .foregroundStyle(Theme.error)
+                    .multilineTextAlignment(.center)
                     .padding(24)
             }
-            .frame(width: 280, height: 280)
+            .frame(width: 320, height: 320)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
+        } else if let img = rotor.qrImage {
+            ZStack {
+                Theme.surface
+                SecureQRImageView(image: img)
+                    .padding(24)
+            }
+            .frame(width: 320, height: 320)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
         } else {
             ZStack {
                 Theme.surface
-                VStack(spacing: 16) {
-                    Image(systemName: "qrcode")
-                        .font(.system(size: 56))
-                        .foregroundStyle(Theme.onSurfaceVariant)
-                    Text("Не удалось загрузить QR-код")
-                        .font(FCTypography.bodyMedium())
-                        .foregroundStyle(Theme.onSurfaceVariant)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(24)
+                ProgressView()
+                    .tint(Theme.primary)
             }
-            .frame(width: 280, height: 280)
+            .frame(width: 320, height: 320)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
         }
@@ -241,7 +311,7 @@ struct QrFullScreenView: View {
 
     private func qrRefreshOutlinedButton(userId: String?) -> some View {
         Button {
-            rotor.refresh(userId: userId)
+            Task { await refreshGate() }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.clockwise")
@@ -260,5 +330,40 @@ struct QrFullScreenView: View {
         )
         .opacity(userId == nil ? 0.5 : 1)
         .disabled(userId == nil)
+    }
+
+    private func refreshGate() async {
+        checkingAccess = true
+        defer { checkingAccess = false }
+        isInsideGym = (try? await app.api.getAccessStatus(forceRefresh: true))?.isInside ?? false
+        if isInsideGym {
+            entryBlockedMessage = nil
+            rotor.activate(userId: app.currentUser?.id, entryQrFormat: app.currentUser?.entryQrFormat)
+            return
+        }
+        entryBlockedMessage = await QrEntryGate.blockReason(api: app.api)
+        if entryBlockedMessage == nil {
+            rotor.activate(userId: app.currentUser?.id, entryQrFormat: app.currentUser?.entryQrFormat)
+        } else {
+            rotor.stop()
+        }
+    }
+}
+
+enum QrEntryGate {
+    static func blockReason(api: FitnessAPI) async -> String? {
+        guard let subs = try? await api.getMySubscriptions(forceRefresh: true) else { return nil }
+        let active = subs.filter { $0.status == .active && !$0.isFrozen }
+        if active.isEmpty {
+            return "Нет активного абонемента. Оформите абонемент, чтобы войти в зал."
+        }
+        let hasVisits = active.contains { sub in
+            guard let left = sub.visitsLeft else { return true }
+            return left > 0
+        }
+        if !hasVisits {
+            return "Посещения по абонементу закончились. Купите новый или продлите текущий."
+        }
+        return nil
     }
 }

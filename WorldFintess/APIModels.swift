@@ -18,6 +18,8 @@ struct User: Codable, Identifiable, Hashable, Sendable {
     let clubId: String?
     /// Название клуба (`club_name`), показывается в шапке профиля как на Android.
     let clubName: String?
+    /// Формат QR входа клуба: `ascii` | `wiegand` (`entry_qr_format` из CRM).
+    let entryQrFormat: String?
 
     init(
         id: String,
@@ -32,7 +34,8 @@ struct User: Codable, Identifiable, Hashable, Sendable {
         isVerified: Bool = false,
         sberId: String? = nil,
         clubId: String? = nil,
-        clubName: String? = nil
+        clubName: String? = nil,
+        entryQrFormat: String? = nil
     ) {
         self.id = id
         self.email = email
@@ -47,6 +50,7 @@ struct User: Codable, Identifiable, Hashable, Sendable {
         self.sberId = sberId
         self.clubId = clubId
         self.clubName = clubName
+        self.entryQrFormat = entryQrFormat
     }
 
     init(from decoder: Decoder) throws {
@@ -71,11 +75,12 @@ struct User: Codable, Identifiable, Hashable, Sendable {
             clubId = try c.decodeIfPresent(String.self, forKey: .clubId)
         }
         clubName = try c.decodeIfPresent(String.self, forKey: .clubName)
+        entryQrFormat = try c.decodeIfPresent(String.self, forKey: .entryQrFormat)
     }
 
     enum CodingKeys: String, CodingKey {
         case id, email, phone, name, avatarUrl, bonusPoints
-        case passportVerificationStatus, dateOfBirth, createdAt, isVerified, sberId, clubId, clubName
+        case passportVerificationStatus, dateOfBirth, createdAt, isVerified, sberId, clubId, clubName, entryQrFormat
     }
 
     func encode(to encoder: Encoder) throws {
@@ -93,6 +98,7 @@ struct User: Codable, Identifiable, Hashable, Sendable {
         try c.encodeIfPresent(sberId, forKey: .sberId)
         try c.encodeIfPresent(clubId, forKey: .clubId)
         try c.encodeIfPresent(clubName, forKey: .clubName)
+        try c.encodeIfPresent(entryQrFormat, forKey: .entryQrFormat)
     }
 }
 

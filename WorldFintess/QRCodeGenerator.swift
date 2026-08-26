@@ -8,22 +8,26 @@ enum QRCodeGenerator {
     private static let wiegandSlotMs: Int64 = 15_000
     private static let wiegandSlotMod = 100
     private static let wiegandUserMod = 10_000
-    /// Клубы со считывателями PERCo в режиме Wiegand (только цифры).
-    private static let wiegandClubIds: Set<String> = ["11"]
 
     /// Формат QR: ASCII для обычных залов, 7 цифр для Wiegand-26 (PERCo).
-    static func entryPayload(userId: String, clubId: String?, timestampMillis: Int64) -> String {
-        if usesWiegandNumeric(clubId: clubId) {
+    /// `entryQrFormat` — `ascii` | `wiegand` из CRM (`entry_qr_format`).
+    static func entryPayload(userId: String, entryQrFormat: String?, timestampMillis: Int64) -> String {
+        if usesWiegandNumeric(entryQrFormat: entryQrFormat) {
             return wiegandEntryPayload(userId: userId, timestampMillis: timestampMillis)
         }
         return asciiEntryPayload(userId: userId, timestampMillis: timestampMillis)
     }
 
-    static func usesWiegandNumeric(clubId: String?) -> Bool {
-        guard let raw = clubId?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+    /// Совместимость со старыми вызовами без формата → ascii.
+    static func entryPayload(userId: String, timestampMillis: Int64) -> String {
+        entryPayload(userId: userId, entryQrFormat: nil, timestampMillis: timestampMillis)
+    }
+
+    static func usesWiegandNumeric(entryQrFormat: String?) -> Bool {
+        guard let raw = entryQrFormat?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !raw.isEmpty else {
             return false
         }
-        return wiegandClubIds.contains(raw)
+        return raw == "wiegand"
     }
 
     /// Тот же формат, что `QrCodeViewModel.generateQrData` на Android / CRM `FitnessClubEntryQrTimestamp`.
@@ -63,11 +67,6 @@ enum QRCodeGenerator {
             return String(userId.dropFirst(5))
         }
         return userId
-    }
-
-    /// Тот же формат, что `QrCodeViewModel.generateQrData` на Android / CRM `FitnessClubEntryQrTimestamp`.
-    static func entryPayload(userId: String, timestampMillis: Int64) -> String {
-        asciiEntryPayload(userId: userId, timestampMillis: timestampMillis)
     }
 
     /// 7 символов base62 — компактная метка времени под лимит PERCo (~32 символа на строку).
