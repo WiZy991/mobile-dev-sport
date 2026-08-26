@@ -6,8 +6,10 @@ use App\Entity\Club;
 use App\Entity\Product;
 use App\Entity\Promotion;
 use App\Entity\SubscriptionPlan;
+use App\Entity\User;
 use App\Service\Admin\ClubSettingsStore;
 use App\Service\Admin\ClubSocialLinks;
+use App\Service\CurrentUserResolver;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,19 +24,26 @@ class ClubController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly ClubSettingsStore $clubSettings,
         private readonly OccupancyService $occupancy,
+        private readonly CurrentUserResolver $userResolver,
     ) {}
 
     #[Route('/occupancy', name: 'api_club_occupancy', methods: ['GET'])]
-    public function occupancy(): JsonResponse
+    public function occupancy(Request $request): JsonResponse
     {
+        $preferred = $this->resolvePreferredClub($request);
+
         $maxCapacity = 100;
-        $capRaw = $this->clubSettings->get('gym_max_capacity');
-        if ($capRaw !== null && $capRaw !== '') {
-            $maxCapacity = max(10, (int) $capRaw);
+        if ($preferred instanceof Club && $preferred->getMaxCapacity() !== null && $preferred->getMaxCapacity() > 0) {
+            $maxCapacity = max(10, $preferred->getMaxCapacity());
+        } else {
+            $capRaw = $this->clubSettings->get('gym_max_capacity');
+            if ($capRaw !== null && $capRaw !== '') {
+                $maxCapacity = max(10, (int) $capRaw);
+            }
         }
 
-        // Та же логика, что в CRM: кто сейчас в зале (последнее granted = entry).
-        $current = $this->occupancy->countCurrentlyInside();
+        // Для клиента с выбранным залом — заполненность этого зала; иначе сеть целиком.
+        $current = $this->occupancy->countCurrentlyInside($preferred);
         $percentage = $maxCapacity > 0 ? min(100, (int) round($current * 100 / $maxCapacity)) : 0;
 
         return $this->json([
@@ -42,6 +51,8 @@ class ClubController extends AbstractController
             'max_capacity' => $maxCapacity,
             'percentage' => $percentage,
             'status' => $percentage < 50 ? 'low' : ($percentage < 80 ? 'medium' : 'high'),
+            'club_id' => $preferred?->getId(),
+            'club_name' => $preferred !== null ? $this->hallDisplayLabel($preferred) : null,
         ]);
     }
 
@@ -198,7 +209,7 @@ class ClubController extends AbstractController
     }
 
     #[Route('/info', name: 'api_club_info', methods: ['GET'])]
-    public function info(): JsonResponse
+    public function info(Request $request): JsonResponse
     {
         $get = function (string $key, string $default): string {
             return $this->clubSettings->get($key) ?? $default;
@@ -247,20 +258,54 @@ class ClubController extends AbstractController
         }
 
         $address = $get('address', 'г. Москва, ул. Примерная, д. 1');
-        [$lat, $lon] = $this->resolveClubCoordinates(
-            (float) $get('latitude', '55.7558'),
-            (float) $get('longitude', '37.6173'),
-            $address,
-        );
+        $lat = (float) $get('latitude', '55.7558');
+        $lon = (float) $get('longitude', '37.6173');
+        $preferredClubId = null;
+        $workingHoursPreferred = null;
+
+        // Зал, выбранный при регистрации / в профиле клиента — для главной и профиля в приложении.
+        $preferred = $this->resolvePreferredClub($request);
+        if ($preferred instanceof Club) {
+            $preferredClubId = $preferred->getId();
+            $clubName = $this->hallDisplayLabel($preferred);
+            $address = $this->hallFullAddress($preferred);
+            $known = $this->knownVenueCoordinates($preferred);
+            if ($known !== null) {
+                [$lat, $lon] = $known;
+            } else {
+                if ($preferred->getLatitude() !== null) {
+                    $lat = (float) $preferred->getLatitude();
+                }
+                if ($preferred->getLongitude() !== null) {
+                    $lon = (float) $preferred->getLongitude();
+                }
+            }
+            if ($preferred->getPhone()) {
+                $contactPhone = $preferred->getPhone();
+            }
+            if ($preferred->getEmail()) {
+                $contactEmail = $preferred->getEmail();
+            }
+            if ($preferred->getWorkingHours()) {
+                $workingHoursPreferred = $preferred->getWorkingHours();
+            }
+            if (\is_array($preferred->getAmenities()) && $preferred->getAmenities() !== []) {
+                $amenities = $preferred->getAmenities();
+            }
+        }
+
+        [$lat, $lon] = $this->resolveClubCoordinates($lat, $lon, $address);
 
         return $this->json([
             // name — название зала/площадки (может быть длинным); brand_name — бренд сети в шапке.
+            'id' => $preferredClubId !== null ? (string) $preferredClubId : null,
             'name' => $clubName,
             'brand_name' => $brandName,
             'address' => $address,
             'phone' => $contactPhone !== '' ? $contactPhone : $get('phone', '+7 (495) 123-45-67'),
             'email' => $contactEmail !== '' ? $contactEmail : $get('email', 'info@fitnessclub.ru'),
-            'working_hours' => $get('working_hours', 'Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00'),
+            'working_hours' => $workingHoursPreferred
+                ?? $get('working_hours', 'Пн-Пт: 7:00–23:00, Сб-Вс: 9:00–21:00'),
             'amenities' => $amenities,
             'latitude' => $lat,
             'longitude' => $lon,
@@ -291,6 +336,85 @@ class ClubController extends AbstractController
             ],
             ...$this->legalUrlsFromSettings(),
         ]);
+    }
+
+    /** Клуб, привязанный к аккаунту клиента (выбор при регистрации). */
+    private function resolvePreferredClub(Request $request): ?Club
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user instanceof User) {
+            return null;
+        }
+        $club = $user->getClub();
+
+        return $club instanceof Club ? $club : null;
+    }
+
+    /** Подпись зала как на главной/в профиле: «ТЦ Формат, ул. Центральная, 18». */
+    private function hallDisplayLabel(Club $club): string
+    {
+        $name = trim($club->getName());
+        $addr = trim($club->getAddress());
+        if ($name === '') {
+            return $addr !== '' ? $addr : 'Доброзал';
+        }
+        if ($addr === '') {
+            return $name;
+        }
+        if (str_contains(mb_strtolower($addr), mb_strtolower($name))) {
+            return $addr;
+        }
+        // Убираем хвост «N этаж», чтобы строка была короче на карточке.
+        $shortAddr = trim((string) preg_replace('/,\s*\d+\s*этаж.*$/iu', '', $addr));
+        if ($shortAddr === '') {
+            $shortAddr = $addr;
+        }
+
+        return $name . ', ' . $shortAddr;
+    }
+
+    /** Полный адрес для карточки клуба / карты: с городом. */
+    private function hallFullAddress(Club $club): string
+    {
+        $label = $this->hallDisplayLabel($club);
+        $lower = mb_strtolower($label);
+        if (
+            str_contains($lower, 'владивосток')
+            || str_contains($lower, 'надеждин')
+            || str_contains($lower, 'зима')
+        ) {
+            return $label;
+        }
+
+        return 'г. Владивосток, ' . $label;
+    }
+
+    /**
+     * Известные координаты площадок Доброзала (если в CRM ещё не проставлены lat/lon).
+     *
+     * @return array{0: float, 1: float}|null
+     */
+    private function knownVenueCoordinates(Club $club): ?array
+    {
+        $hay = mb_strtolower(trim($club->getName() . ' ' . $club->getAddress()));
+        if ($hay === '') {
+            return null;
+        }
+        if (str_contains($hay, 'формат') || str_contains($hay, 'центральная')) {
+            // ТЦ «Формат», ул. Центральная 18, п. Зима Южная
+            return [43.305608, 131.956621];
+        }
+        if (
+            str_contains($hay, 'купера')
+            || str_contains($hay, 'де фриз')
+            || str_contains($hay, 'де-фриз')
+            || str_contains($hay, 'дефриз')
+        ) {
+            // АТЦ «Новый Де-Фриз», ул. Купера 2
+            return [43.313906, 131.999418];
+        }
+
+        return null;
     }
 
     /**
@@ -423,18 +547,28 @@ class ClubController extends AbstractController
     private function resolveClubCoordinates(float $lat, float $lon, string $address): array
     {
         $a = mb_strtolower($address);
-        $looksVladivostok =
-            str_contains($a, 'владивосток')
-            || str_contains($a, 'де фриз')
-            || str_contains($a, 'де-фриз')
-            || str_contains($a, 'купера')
-            || str_contains($a, 'надеждин');
-
         $isMoscowPlaceholder = abs($lat - 55.7558) < 0.05 && abs($lon - 37.6173) < 0.05;
         $missing = abs($lat) < 0.01 && abs($lon) < 0.01;
+        $needsFix = $isMoscowPlaceholder || $missing || $lon < 100.0;
 
-        if ($looksVladivostok && ($isMoscowPlaceholder || $missing || $lon < 100.0)) {
-            // АТЦ «Новый Де-Фриз», ул. Купера 2
+        if (!$needsFix) {
+            return [$lat, $lon];
+        }
+
+        if (str_contains($a, 'формат') || str_contains($a, 'центральная')) {
+            return [43.305608, 131.956621];
+        }
+
+        $looksDeFries =
+            str_contains($a, 'де фриз')
+            || str_contains($a, 'де-фриз')
+            || str_contains($a, 'дефриз')
+            || str_contains($a, 'купера')
+            || str_contains($a, 'надеждин')
+            || str_contains($a, 'владивосток');
+
+        if ($looksDeFries) {
+            // АТЦ «Новый Де-Фриз», ул. Купера 2 (исторический дефолт сети)
             return [43.313906, 131.999418];
         }
 

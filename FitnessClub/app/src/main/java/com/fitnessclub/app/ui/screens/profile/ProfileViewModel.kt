@@ -47,12 +47,19 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = clubRepository.getClubInfo()) {
                 is ApiResult.Success -> {
-                    val raw = result.data.address.trim()
+                    val info = result.data
+                    // Предпочтительный зал клиента (из регистрации) приходит в name/address с бэка.
+                    val raw = info.address.trim().ifBlank { info.name.trim() }
                     _uiState.update {
                         it.copy(clubAddressLine = addressWithoutCity(raw).ifBlank { null })
                     }
                 }
-                else -> Unit
+                else -> {
+                    val fallback = _uiState.value.user?.clubName?.trim().orEmpty()
+                    if (fallback.isNotEmpty()) {
+                        _uiState.update { it.copy(clubAddressLine = fallback) }
+                    }
+                }
             }
         }
     }

@@ -93,6 +93,10 @@ private const val MAP_VIEWPORT_HEIGHT_DP = 300
 private const val DE_FRIES_LAT = 43.313906
 private const val DE_FRIES_LON = 131.999418
 
+/** ТЦ «Формат», ул. Центральная 18, п. Зима Южная. */
+private const val FORMAT_LAT = 43.305608
+private const val FORMAT_LON = 131.956621
+
 private const val MOSCOW_DEFAULT_LAT = 55.7558
 private const val MOSCOW_DEFAULT_LON = 37.6173
 
@@ -589,12 +593,18 @@ internal fun resolveClubCoords(
     address: String,
 ): Pair<Double, Double> {
     val a = address.lowercase()
-    val looksVladivostok =
-        "владивосток" in a ||
-            "де фриз" in a ||
+    val looksFormat = "формат" in a || "центральная" in a
+    val looksDeFries =
+        "де фриз" in a ||
             "де-фриз" in a ||
-            "купера" in a ||
-            "надеждин" in a
+            "дефриз" in a ||
+            "купера" in a
+    val looksVladivostok =
+        looksFormat ||
+            looksDeFries ||
+            "владивосток" in a ||
+            "надеждин" in a ||
+            "зима" in a
 
     val isMoscowPlaceholder =
         abs(latitude - MOSCOW_DEFAULT_LAT) < 0.05 &&
@@ -604,6 +614,8 @@ internal fun resolveClubCoords(
         (abs(latitude) > 0.01 || abs(longitude) > 0.01) && !isMoscowPlaceholder
 
     return when {
+        looksFormat && (!hasRealCoords || longitude < 100.0) -> FORMAT_LAT to FORMAT_LON
+        looksDeFries && (!hasRealCoords || longitude < 100.0) -> DE_FRIES_LAT to DE_FRIES_LON
         looksVladivostok && (!hasRealCoords || longitude < 100.0) -> DE_FRIES_LAT to DE_FRIES_LON
         hasRealCoords -> latitude to longitude
         else -> MOSCOW_DEFAULT_LAT to MOSCOW_DEFAULT_LON

@@ -23,15 +23,16 @@ object RegistrationVenues {
         RegistrationVenueCard(
             clubId = "1",
             title = "ТЦ Формат",
-            addressLines = "ул. Центральная 18, 2 этаж",
+            addressLines = "ул. Центральная, 18, 2 этаж",
             imageRes = R.drawable.registration_club_mall,
-            openForRegistration = false,
+            openForRegistration = true,
         ),
         RegistrationVenueCard(
             clubId = "2",
             title = "ТЦ Новый де Фриз",
-            addressLines = "ул. Купера 2, 2 этаж",
+            addressLines = "ул. Купера, 2, 2 этаж",
             imageRes = R.drawable.registration_club_kupera,
+            openForRegistration = true,
         ),
     )
 
