@@ -22,6 +22,7 @@ services:
       - ./var/secrets:/app/var/secrets:ro
       - ./etc/Apns:/app/etc/Apns:ro
       - ./public/uploads/promotions:/app/public/uploads/promotions
+      - ./public/uploads/clubs:/app/public/uploads/clubs
     networks:
       - crm_backend_net
 
