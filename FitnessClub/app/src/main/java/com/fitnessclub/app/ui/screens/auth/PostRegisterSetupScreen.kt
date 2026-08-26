@@ -1,6 +1,9 @@
 package com.fitnessclub.app.ui.screens.auth
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -52,6 +55,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -62,9 +66,6 @@ private const val STEP_BIOMETRIC = 1
  * После успешной регистрации:
  * 1) системный запрос уведомлений (Android 13+),
  * 2) предложение включить биометрию (системный BiometricPrompt).
- *
- * Не пропускаем биометрию молча: даже если отпечаток уже был
- * настроен ранее — показываем шаг (можно пропустить).
  */
 @Composable
 fun PostRegisterSetupScreen(
@@ -84,17 +85,46 @@ fun PostRegisterSetupScreen(
     var step by remember { mutableIntStateOf(STEP_NOTIFICATIONS) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var biometricPromptShown by remember { mutableStateOf(false) }
-
+    // Пересчитываем на шаге биометрии (после регистрации чужой отпечаток уже сброшен).
+    var alreadyEnabled by remember { mutableStateOf(false) }
     val canBiometric = remember { biometricStore.canUseDeviceBiometric() }
-    val alreadyEnabled = remember { biometricStore.hasStoredCredential() }
 
     fun goToBiometricOrFinish() {
-        // Биометрию всегда показываем отдельным шагом, если железо есть.
-        // Уже включённый вход — тоже показываем («уже настроено»), не прыгаем на Home молча.
         if (canBiometric) {
+            alreadyEnabled = biometricStore.hasStoredCredential()
             step = STEP_BIOMETRIC
         } else {
             onFinished()
+        }
+    }
+
+    fun launchBiometricSetup(fromButton: Boolean = false) {
+        val activity = context.findFragmentActivity()
+        if (activity == null) {
+            statusMessage = "Не удалось открыть окно биометрии"
+            return
+        }
+        scope.launch {
+            val rt = tokenManager.getRefreshToken()
+            if (rt.isNullOrBlank()) {
+                statusMessage = "Сессия не готова — настройте позже в профиле → Настройки"
+                return@launch
+            }
+            val userId = tokenManager.getUser().first()?.id
+            BiometricLoginCoordinator.startEncryptPrompt(
+                activity,
+                biometricStore,
+                rt,
+                userId = userId,
+            ) { ok, err ->
+                if (ok) {
+                    onFinished()
+                } else if (!err.isNullOrBlank()) {
+                    statusMessage = err
+                } else if (fromButton) {
+                    // Отмена — остаёмся на экране
+                }
+            }
         }
     }
 
@@ -114,40 +144,20 @@ fun PostRegisterSetupScreen(
             Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
         if (granted) {
-            // Уведомления уже разрешены (часто так, если раньше заходили в приложение) —
-            // сразу к биометрии, без лишнего экрана.
             goToBiometricOrFinish()
         } else {
             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
-    // Как на iOS: системный диалог биометрии поднимаем сразу на шаге.
+    // Системный диалог биометрии сразу после уведомлений (с паузой — Android часто глотает второй prompt).
     LaunchedEffect(step) {
         if (step != STEP_BIOMETRIC || biometricPromptShown) return@LaunchedEffect
-        if (alreadyEnabled) return@LaunchedEffect // уже включено — только UI «готово»
+        if (alreadyEnabled) return@LaunchedEffect
         if (!canBiometric) return@LaunchedEffect
-        val activity = context as? FragmentActivity ?: return@LaunchedEffect
         biometricPromptShown = true
-        val rt = tokenManager.getRefreshToken()
-        if (rt.isNullOrBlank()) {
-            statusMessage = "Сессия не готова — настройте позже в профиле → Настройки"
-            return@LaunchedEffect
-        }
-        val userId = tokenManager.getUser().first()?.id
-        BiometricLoginCoordinator.startEncryptPrompt(
-            activity,
-            biometricStore,
-            rt,
-            userId = userId,
-        ) { ok, err ->
-            if (ok) {
-                onFinished()
-            } else if (!err.isNullOrBlank()) {
-                statusMessage = err
-            }
-            // Отмена системного окна — остаёмся на экране, можно нажать «Настроить» / «Пропустить»
-        }
+        delay(400)
+        launchBiometricSetup(fromButton = false)
     }
 
     Column(
@@ -259,32 +269,8 @@ fun PostRegisterSetupScreen(
                         } else {
                             Button(
                                 onClick = {
-                                    val activity = context as? FragmentActivity
-                                    if (activity == null) {
-                                        statusMessage = "Не удалось открыть окно биометрии"
-                                        return@Button
-                                    }
-                                    scope.launch {
-                                        val rt = tokenManager.getRefreshToken()
-                                        if (rt.isNullOrBlank()) {
-                                            statusMessage =
-                                                "Сессия не готова — настройте позже в профиле"
-                                            return@launch
-                                        }
-                                        val userId = tokenManager.getUser().first()?.id
-                                        BiometricLoginCoordinator.startEncryptPrompt(
-                                            activity,
-                                            biometricStore,
-                                            rt,
-                                            userId = userId,
-                                        ) { ok, err ->
-                                            if (ok) {
-                                                onFinished()
-                                            } else if (!err.isNullOrBlank()) {
-                                                statusMessage = err
-                                            }
-                                        }
-                                    }
+                                    statusMessage = null
+                                    launchBiometricSetup(fromButton = true)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = Primary),
@@ -306,6 +292,13 @@ fun PostRegisterSetupScreen(
             }
         }
     }
+}
+
+private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
+    is FragmentActivity -> this
+    is Activity -> null
+    is ContextWrapper -> baseContext.findFragmentActivity()
+    else -> null
 }
 
 @EntryPoint

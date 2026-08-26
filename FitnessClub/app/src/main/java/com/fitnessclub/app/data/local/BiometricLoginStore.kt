@@ -34,19 +34,14 @@ class BiometricLoginStore @Inject constructor(
     fun storedUserId(): String? = prefs.getString(KEY_USER_ID, null)?.takeIf { it.isNotBlank() }
 
     /**
-     * После логина: сбрасываем биометрию только если вошёл другой пользователь.
-     * Тот же аккаунт (в т.ч. через Сбер ID) — отпечаток сохраняем.
+     * После логина/регистрации: сбрасываем биометрию, если это другой аккаунт
+     * или старая установка без привязки userId (иначе остаётся чужой refresh).
      */
     fun onAuthenticated(userId: String) {
         if (!hasStoredCredential()) return
         val stored = storedUserId()
-        if (stored != null && stored != userId) {
+        if (stored == null || stored != userId) {
             clear()
-            return
-        }
-        // Старые установки без userId — привязываем к текущему пользователю.
-        if (stored == null) {
-            prefs.edit().putString(KEY_USER_ID, userId).apply()
         }
     }
 

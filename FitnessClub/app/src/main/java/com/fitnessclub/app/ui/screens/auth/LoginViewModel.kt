@@ -110,12 +110,18 @@ class LoginViewModel @Inject constructor(
                         }
                         is ApiResult.Success -> {
                             _uiState.value = _uiState.value.copy(isLoading = false)
+                            refreshBiometricOffer()
                             _events.emit(LoginEvent.Success(result.data))
                         }
                         is ApiResult.Error -> {
+                            // Чужой/протухший refresh: сбрасываем биовход, чтобы не крутить «токен неверный».
+                            biometricLoginStore.clear()
+                            refreshBiometricOffer()
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
-                                error = result.message,
+                                error = "Вход по отпечатку больше не действует " +
+                                    "(другой аккаунт или сессия устарела). " +
+                                    "Войдите по паролю и снова включите биометрию в Настройках.",
                             )
                         }
                     }
