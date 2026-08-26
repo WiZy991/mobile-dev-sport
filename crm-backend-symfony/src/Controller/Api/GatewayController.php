@@ -807,12 +807,18 @@ class GatewayController extends AbstractController
     private function parseGatewayExitUserId(string $qr): ?int
     {
         if (WiegandEntryQrCodec::isPayload($qr)) {
+            $parsed = WiegandEntryQrCodec::parse($qr);
+            if ($parsed !== null) {
+                return $parsed['user_id'];
+            }
+            // Выход без окна времени: берём user id из нормализованной строки.
             $normalized = WiegandEntryQrCodec::normalize($qr);
             if ($normalized === null) {
                 return null;
             }
+            $userLen = \strlen($normalized) === WiegandEntryQrCodec::LEGACY_LENGTH ? 5 : 4;
 
-            return (int) substr($normalized, 0, 5);
+            return (int) substr($normalized, 0, $userLen);
         }
 
         $parts = explode(':', $qr);

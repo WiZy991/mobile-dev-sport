@@ -5,22 +5,27 @@ declare(strict_types=1);
 namespace App\Service\Integration;
 
 /**
- * Компактный 9-значный QR для считывателей PERCo в режиме Wiegand.
+ * Компактный 7-значный QR для считывателей PERCo в режиме Wiegand-26.
  *
- * Формат: UUUUUTTTC
- * - UUUUU — user id % 100000 (5 цифр)
- * - TTT   — слот времени floor(ms / 15s) % 1000 (3 цифры)
- * - C     — контрольная цифра (Luhn mod 10 по первым 8 цифрам)
+ * Формат: UUUUTTC
+ * - UUUU — user id % 10000 (4 цифры)
+ * - TT   — слот времени floor(ms / 15s) % 100 (2 цифры)
+ * - C    — контрольная цифра (Luhn mod 10 по первым 6 цифрам)
+ *
+ * Число всегда ≤ 9_999_999 < 2^24, поэтому Wiegand-26 не обрезает код
+ * (9-значный формат давал обрезку вида 51338580 → 1006932).
  *
  * Синхронно с QRCodeGenerator (iOS) и QrCodeViewModel (Android).
  */
 final class WiegandEntryQrCodec
 {
     public const SLOT_MS = 15_000;
-    public const SLOT_MOD = 1000;
-    public const USER_MOD = 100_000;
-    public const LENGTH = 9;
-    public const MIN_WIEGAND_LEN = 5;
+    public const SLOT_MOD = 100;
+    public const USER_MOD = 10_000;
+    public const LENGTH = 7;
+    public const MIN_WIEGAND_LEN = 4;
+    /** Старый 9-значный формат (до лимита Wiegand-26) — ещё принимаем, если пришла полная строка. */
+    public const LEGACY_LENGTH = 9;
 
     public static function normalize(string $qr): ?string
     {
@@ -29,11 +34,14 @@ final class WiegandEntryQrCodec
             return null;
         }
         $len = \strlen($q);
-        if ($len < self::MIN_WIEGAND_LEN || $len > self::LENGTH) {
-            return null;
+        if ($len >= self::MIN_WIEGAND_LEN && $len <= self::LENGTH) {
+            return str_pad($q, self::LENGTH, '0', \STR_PAD_LEFT);
+        }
+        if ($len > self::LENGTH && $len <= self::LEGACY_LENGTH) {
+            return str_pad($q, self::LEGACY_LENGTH, '0', \STR_PAD_LEFT);
         }
 
-        return str_pad($q, self::LENGTH, '0', \STR_PAD_LEFT);
+        return null;
     }
 
     public static function isPayload(string $qr): bool
@@ -50,7 +58,7 @@ final class WiegandEntryQrCodec
     {
         $uid = $userId % self::USER_MOD;
         $slot = intdiv(max(0, $timestampMs), self::SLOT_MS) % self::SLOT_MOD;
-        $body = \sprintf('%05d%03d', $uid, $slot);
+        $body = \sprintf('%04d%02d', $uid, $slot);
         $check = self::checksumDigit($body);
 
         return $body . (string) $check;
@@ -66,8 +74,12 @@ final class WiegandEntryQrCodec
             return null;
         }
 
-        $userId = (int) substr($q, 0, 5);
-        $timeSegment = substr($q, 5, 3);
+        if (\strlen($q) === self::LEGACY_LENGTH) {
+            return self::parseLegacyNine($q, $nowMs);
+        }
+
+        $userId = (int) substr($q, 0, 4);
+        $timeSegment = substr($q, 4, 2);
         $slot = (int) $timeSegment;
         $timestampMs = self::resolveTimestampMs($slot, $nowMs);
         if ($timestampMs === null) {
@@ -81,25 +93,27 @@ final class WiegandEntryQrCodec
         ];
     }
 
-    public static function verifyChecksum(string $nineDigits): bool
+    public static function verifyChecksum(string $digits): bool
     {
-        $q = self::normalize($nineDigits);
+        $q = self::normalize($digits);
         if ($q === null) {
             return false;
         }
+        $bodyLen = \strlen($q) - 1;
 
-        return self::checksumDigit(substr($q, 0, 8)) === (int) $q[8];
+        return self::checksumDigit(substr($q, 0, $bodyLen)) === (int) $q[$bodyLen];
     }
 
-    public static function checksumDigit(string $eightDigits): int
+    public static function checksumDigit(string $bodyDigits): int
     {
-        if (\strlen($eightDigits) !== 8 || !ctype_digit($eightDigits)) {
+        if ($bodyDigits === '' || !ctype_digit($bodyDigits)) {
             return 0;
         }
 
         $sum = 0;
-        $rev = strrev($eightDigits);
-        for ($i = 0; $i < 8; ++$i) {
+        $rev = strrev($bodyDigits);
+        $len = \strlen($rev);
+        for ($i = 0; $i < $len; ++$i) {
             $n = (int) $rev[$i];
             if ($i % 2 === 0) {
                 $n *= 2;
@@ -133,5 +147,42 @@ final class WiegandEntryQrCodec
         }
 
         return null;
+    }
+
+    /**
+     * @return array{user_id: int, timestamp_ms: int, time_segment: string}|null
+     */
+    private static function parseLegacyNine(string $q, ?int $nowMs): ?array
+    {
+        $userId = (int) substr($q, 0, 5);
+        $timeSegment = substr($q, 5, 3);
+        $slot = (int) $timeSegment;
+        // Старый SLOT_MOD = 1000
+        $nowMs ??= (int) round(microtime(true) * 1000);
+        $currentBase = intdiv($nowMs, self::SLOT_MS);
+        $timestampMs = null;
+        for ($offset = -3; $offset <= 3; ++$offset) {
+            $base = $currentBase + $offset;
+            if ($base < 0) {
+                continue;
+            }
+            if ($base % 1000 !== $slot) {
+                continue;
+            }
+            $candidate = $base * self::SLOT_MS;
+            if (abs($nowMs - $candidate) <= self::SLOT_MS + 5_000) {
+                $timestampMs = $candidate;
+                break;
+            }
+        }
+        if ($timestampMs === null) {
+            return null;
+        }
+
+        return [
+            'user_id' => $userId,
+            'timestamp_ms' => $timestampMs,
+            'time_segment' => $timeSegment,
+        ];
     }
 }

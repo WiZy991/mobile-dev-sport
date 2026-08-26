@@ -28,11 +28,11 @@ def _looks_like_numeric_reader_payload(qr: str) -> bool:
     return q.isdigit() and len(q) <= 24
 
 
-def _luhn_check_digit(eight_digits: str) -> int:
-    if len(eight_digits) != 8 or not eight_digits.isdigit():
+def _luhn_check_digit(body_digits: str) -> int:
+    if not body_digits or not body_digits.isdigit():
         return 0
     total = 0
-    for i, ch in enumerate(reversed(eight_digits)):
+    for i, ch in enumerate(reversed(body_digits)):
         n = int(ch)
         if i % 2 == 0:
             n *= 2
@@ -44,16 +44,23 @@ def _luhn_check_digit(eight_digits: str) -> int:
 
 def _normalize_wiegand_qr(qr: str) -> str | None:
     """
-    PERCo Wiegand часто отрезает ведущие нули (9 цифр в QR → 8 в C01).
-    Дополняем слева до 9 и проверяем контрольную цифру (как WiegandEntryQrCodec в CRM).
+    Wiegand-26: приложение отдаёт 7 цифр (UUUUTTC), C01 может срезать ведущие нули.
+    Старый 9-значный формат ещё принимаем, если checksum сходится (полная строка).
     """
     q = (qr or "").strip()
-    if not q.isdigit() or len(q) < 5 or len(q) > 9:
+    if not q.isdigit():
         return None
-    padded = q.zfill(9)
-    if _luhn_check_digit(padded[:8]) != int(padded[8]):
+    if 4 <= len(q) <= 7:
+        padded = q.zfill(7)
+        if _luhn_check_digit(padded[:6]) == int(padded[6]):
+            return padded
         return None
-    return padded
+    if 8 <= len(q) <= 9:
+        padded = q.zfill(9)
+        if _luhn_check_digit(padded[:8]) == int(padded[8]):
+            return padded
+        return None
+    return None
 
 
 def _is_wiegand_entry_qr(qr: str) -> bool:
@@ -61,7 +68,7 @@ def _is_wiegand_entry_qr(qr: str) -> bool:
 
 
 def _normalize_access_qr(qr: str) -> str:
-    """FITNESSCLUB без изменений; Wiegand — дополнение нулей до 9 цифр для CRM."""
+    """FITNESSCLUB без изменений; Wiegand — дополнение нулей до 7 (или legacy 9) цифр для CRM."""
     q = (qr or "").strip()
     if q.startswith("FITNESSCLUB:"):
         return q
@@ -272,9 +279,9 @@ class ClubAgent:
         ):
             self._emit(
                 "warning",
-                "Строка не FITNESSCLUB: и не Wiegand-QR (5–9 цифр с контрольной суммой) — в CRM не отправляем "
+                "Строка не FITNESSCLUB: и не Wiegand-QR (7 цифр UUUUTTC, ≤24 bit) — в CRM не отправляем "
                 "(галочка «Только QR FITNESSCLUB» на вкладке CRM). "
-                "Для PERCo Wiegand обновите приложение iOS/Android (9 цифр в QR; PERCo может отдать 8).",
+                "Для PERCo Wiegand обновите приложение iOS/Android (7 цифр в QR).",
             )
             if _looks_like_numeric_reader_payload(qr) and not _is_wiegand_entry_qr(qr):
                 self._emit("info", _hint_full_fitnessclub_qr())

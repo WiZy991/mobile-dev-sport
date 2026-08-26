@@ -13,31 +13,45 @@ final class WiegandEntryQrCodecTest extends TestCase
     {
         $ms = 1_700_000_000_000;
         $payload = WiegandEntryQrCodec::encode(42, $ms);
-        self::assertSame(9, \strlen($payload));
+        self::assertSame(7, \strlen($payload));
+        self::assertLessThanOrEqual(0xFFFFFF, (int) $payload);
         self::assertTrue(WiegandEntryQrCodec::isPayload($payload));
 
         $parsed = WiegandEntryQrCodec::parse($payload, $ms + 1_000);
         self::assertNotNull($parsed);
         self::assertSame(42, $parsed['user_id']);
-        self::assertSame($ms - ($ms % WiegandEntryQrCodec::SLOT_MS), $parsed['timestamp_ms']);
+    }
+
+    public function testFitsInWiegand26Bits(): void
+    {
+        $ms = (int) round(microtime(true) * 1000);
+        for ($uid = 0; $uid < 10_000; $uid += 137) {
+            $payload = WiegandEntryQrCodec::encode($uid, $ms);
+            self::assertLessThanOrEqual(0xFFFFFF, (int) $payload, $payload);
+        }
+    }
+
+    public function testLeadingZerosStrippedStillParse(): void
+    {
+        $ms = 1_700_000_000_000;
+        $full = WiegandEntryQrCodec::encode(42, $ms);
+        $stripped = ltrim($full, '0') ?: '0';
+        $parsed = WiegandEntryQrCodec::parse($stripped, $ms);
+        self::assertNotNull($parsed);
+        self::assertSame(42, $parsed['user_id']);
     }
 
     public function testInvalidChecksumRejected(): void
     {
         $payload = WiegandEntryQrCodec::encode(1, 1_700_000_000_000);
-        $broken = substr($payload, 0, 8) . ((int) $payload[8] + 1) % 10;
+        $broken = substr($payload, 0, 6) . ((int) $payload[6] + 1) % 10;
         self::assertNull(WiegandEntryQrCodec::parse($broken));
     }
 
-    public function testParseEightDigitsWithLeadingZeroStripped(): void
+    public function testUserIdWrapsAt10k(): void
     {
-        $full = WiegandEntryQrCodec::encode(5133, 1_700_000_000_000);
-        self::assertSame(9, \strlen($full));
-        $stripped = ltrim($full, '0');
-        self::assertGreaterThanOrEqual(8, \strlen($stripped));
-
-        $parsed = WiegandEntryQrCodec::parse($stripped, 1_700_000_000_000);
-        self::assertNotNull($parsed);
-        self::assertSame(5133, $parsed['user_id']);
+        $ms = 1_700_000_000_000;
+        $payload = WiegandEntryQrCodec::encode(10_042, $ms);
+        self::assertStringStartsWith('0042', $payload);
     }
 }

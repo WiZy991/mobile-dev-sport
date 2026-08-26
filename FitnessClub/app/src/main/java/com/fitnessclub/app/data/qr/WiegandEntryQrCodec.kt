@@ -1,12 +1,13 @@
 package com.fitnessclub.app.data.qr
 
 /**
- * 9-значный QR для PERCo/Wiegand — синхронно с CRM `WiegandEntryQrCodec` и iOS `QRCodeGenerator`.
+ * 7-значный QR для PERCo/Wiegand-26 — синхронно с CRM `WiegandEntryQrCodec` и iOS `QRCodeGenerator`.
+ * Число всегда ≤ 9_999_999 < 2^24, иначе C01 обрезает код (9 цифр → ~7 «мусорных»).
  */
 object WiegandEntryQrCodec {
     private const val SLOT_MS = 15_000L
-    private const val SLOT_MOD = 1000
-    private const val USER_MOD = 100_000
+    private const val SLOT_MOD = 100
+    private const val USER_MOD = 10_000
     private val wiegandClubIds = setOf("11")
 
     fun usesWiegandNumeric(clubId: String?): Boolean {
@@ -18,15 +19,15 @@ object WiegandEntryQrCodec {
         val uid = normalizedUserId(userId).toIntOrNull() ?: 0
         val userPart = uid % USER_MOD
         val slot = ((timestampMs.coerceAtLeast(0) / SLOT_MS) % SLOT_MOD).toInt()
-        val body = "%05d%03d".format(userPart, slot)
+        val body = "%04d%02d".format(userPart, slot)
         val check = luhnCheckDigit(body)
         return body + check
     }
 
-    fun luhnCheckDigit(eightDigits: String): Int {
-        if (eightDigits.length != 8 || !eightDigits.all { it.isDigit() }) return 0
+    fun luhnCheckDigit(bodyDigits: String): Int {
+        if (bodyDigits.isEmpty() || !bodyDigits.all { it.isDigit() }) return 0
         var sum = 0
-        val rev = eightDigits.reversed()
+        val rev = bodyDigits.reversed()
         for (i in rev.indices) {
             var n = rev[i].digitToInt()
             if (i % 2 == 0) {
