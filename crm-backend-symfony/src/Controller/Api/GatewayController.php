@@ -311,7 +311,7 @@ class GatewayController extends AbstractController
         $peopleCount = max(2, (int) ($data['people_count'] ?? 2));
         $details = is_array($data['details'] ?? null) ? $data['details'] : [];
 
-        $user = $this->resolveUserFromQr($qr, $data['user_id'] ?? null);
+        $user = $this->resolveUserFromQr($qr, $data['user_id'] ?? null, $club);
 
         $alarm = (new AccessAlarm())
             ->setClub($club)
@@ -339,22 +339,40 @@ class GatewayController extends AbstractController
         ]);
     }
 
-    private function resolveUserFromQr(string $qr, mixed $userIdInput): ?User
+    private function resolveUserFromQr(string $qr, mixed $userIdInput, ?Club $club = null): ?User
     {
-        $userId = 0;
-        $parts = explode(':', $qr);
-        if (count($parts) >= 3 && $parts[0] === 'FITNESSCLUB' && $parts[1] === 'ENTRY') {
-            $ext = $parts[2];
-            $userId = str_starts_with($ext, 'user-') ? (int) substr($ext, 5) : (int) $ext;
-        }
+        // Wiegand (Седанка и др.) + FITNESSCLUB:ENTRY — тот же разбор, что на входе/выходе.
+        $userId = $this->parseGatewayExitUserId($qr) ?? 0;
         if ($userId <= 0 && $userIdInput !== null) {
             $userId = (int) $userIdInput;
         }
-        if ($userId <= 0) {
-            return null;
+        if ($userId > 0) {
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if ($user instanceof User) {
+                return $user;
+            }
         }
 
-        return $this->em->getRepository(User::class)->find($userId);
+        // Запасной путь: недавний granted entry с тем же QR (если checksum/окно времени уже не сошлись).
+        if ($club instanceof Club && $qr !== '') {
+            $log = $this->em->getRepository(AccessLog::class)->createQueryBuilder('l')
+                ->andWhere('l.club = :club')
+                ->andWhere('l.rawData = :qr')
+                ->andWhere('l.result = :granted')
+                ->andWhere('l.user IS NOT NULL')
+                ->setParameter('club', $club)
+                ->setParameter('qr', mb_substr($qr, 0, 255))
+                ->setParameter('granted', 'granted')
+                ->orderBy('l.createdAt', 'DESC')
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getOneOrNullResult();
+            if ($log instanceof AccessLog && $log->getUser() instanceof User) {
+                return $log->getUser();
+            }
+        }
+
+        return null;
     }
 
     private function findRecentEntryLog(Club $club, ?User $user): ?AccessLog

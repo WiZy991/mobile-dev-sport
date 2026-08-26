@@ -28,4 +28,7 @@ data class SberCallbackRequest(
     val redirectUri: String,
     @SerializedName("state")
     val state: String,
+    /** Зал, выбранный на шаге регистрации перед Сбер ID. */
+    @SerializedName("club_id")
+    val clubId: String? = null,
 )

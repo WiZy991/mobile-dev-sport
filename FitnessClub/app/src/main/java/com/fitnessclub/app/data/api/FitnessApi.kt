@@ -139,7 +139,9 @@ interface FitnessApi {
     
     // Club info
     @GET("club/info")
-    suspend fun getClubInfo(): Response<ClubInfo>
+    suspend fun getClubInfo(
+        @Query("club_id") clubId: String? = null,
+    ): Response<ClubInfo>
 
     @GET("club/promotions")
     suspend fun getClubPromotions(): Response<List<ClubPromotion>>
@@ -183,7 +185,9 @@ interface FitnessApi {
     suspend fun createGuestPass(@Body request: CreateGuestPassRequest): Response<GuestPass>
     
     @GET("club/occupancy")
-    suspend fun getClubOccupancy(): Response<GymOccupancy>
+    suspend fun getClubOccupancy(
+        @Query("club_id") clubId: String? = null,
+    ): Response<GymOccupancy>
     
     // Lockers
     @GET("lockers")

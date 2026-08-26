@@ -389,6 +389,7 @@ class LoginViewModel @Inject constructor(
                 codeVerifier = verifier,
                 redirectUri = sberRedirectUri,
                 state = state,
+                clubId = authFlowStore.peekPendingRegistrationClubId(),
             ).collect { result ->
                 when (result) {
                     is ApiResult.Loading -> {
@@ -397,6 +398,7 @@ class LoginViewModel @Inject constructor(
                     is ApiResult.Success -> {
                         sberCodeVerifier = null
                         authFlowStore.clearPendingSberVerifier()
+                        authFlowStore.consumePendingRegistrationClubId()
                         val welcome = if (welcomeAfterSberLogin) {
                             welcomeAfterSberLogin = false
                             "Аккаунт создан, добро пожаловать!"

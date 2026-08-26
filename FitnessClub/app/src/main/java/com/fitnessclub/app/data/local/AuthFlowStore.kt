@@ -24,6 +24,7 @@ class AuthFlowStore @Inject constructor(
 ) {
     private val completedKey = booleanPreferencesKey("has_completed_registration")
     private val sberVerifierKey = stringPreferencesKey("pending_sber_code_verifier")
+    private val pendingClubKey = stringPreferencesKey("pending_registration_club_id")
 
     val hasCompletedRegistration: Flow<Boolean> =
         context.authFlowPrefs.data.map { prefs -> prefs[completedKey] == true }
@@ -55,6 +56,33 @@ class AuthFlowStore @Inject constructor(
     suspend fun clearPendingSberVerifier() {
         context.authFlowPrefs.edit { prefs ->
             prefs.remove(sberVerifierKey)
+        }
+    }
+
+    /** Зал, выбранный перед «Регистрация через Сбер ID» — переживает уход в браузер. */
+    suspend fun savePendingRegistrationClubId(clubId: String) {
+        val id = clubId.trim()
+        if (id.isEmpty()) return
+        context.authFlowPrefs.edit { prefs ->
+            prefs[pendingClubKey] = id
+        }
+    }
+
+    suspend fun peekPendingRegistrationClubId(): String? =
+        context.authFlowPrefs.data.map { prefs -> prefs[pendingClubKey] }.first()
+
+    suspend fun consumePendingRegistrationClubId(): String? {
+        var clubId: String? = null
+        context.authFlowPrefs.edit { prefs ->
+            clubId = prefs[pendingClubKey]
+            prefs.remove(pendingClubKey)
+        }
+        return clubId?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    suspend fun clearPendingRegistrationClubId() {
+        context.authFlowPrefs.edit { prefs ->
+            prefs.remove(pendingClubKey)
         }
     }
 }

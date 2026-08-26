@@ -160,10 +160,12 @@ fun NavGraph(
                     onContinueToRegister = {
                         navController.navigate(RegisterRoutes.FORM)
                     },
-                    onRequestSberRegistration = {
-                        navController.navigate(Screen.Login.createRoute(startSber = true)) {
-                            popUpTo(navController.graph.id) { inclusive = true }
-                            launchSingleTop = true
+                    onRequestSberRegistration = { clubId ->
+                        viewModel.prepareSberRegistration(clubId) {
+                            navController.navigate(Screen.Login.createRoute(startSber = true)) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     },
                 )

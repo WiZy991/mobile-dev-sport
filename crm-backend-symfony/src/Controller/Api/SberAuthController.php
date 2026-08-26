@@ -11,6 +11,7 @@ use App\Service\Api\SberIdUserinfoJsonLogger;
 use App\Service\Api\SberMobileAuthService;
 use App\Service\Api\SberOAuthPkceStateService;
 use App\Service\CurrentUserResolver;
+use App\Service\MobileClientPayloadApplier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -30,6 +31,7 @@ class SberAuthController extends AbstractController
         private readonly SberIdProfileApplicator $sberProfile,
         private readonly SberIdTokenValidator $sberTokenValidator,
         private readonly SberIdUserinfoJsonLogger $sberUserinfoLogger,
+        private readonly MobileClientPayloadApplier $mobileClientPayloadApplier,
         private readonly string $nativeRedirectUri,
         private readonly string $nativeAppBridgeUri,
         private readonly string $sberClientId,
@@ -256,6 +258,12 @@ class SberAuthController extends AbstractController
 
         $this->sberProfile->apply($user, $merged);
         $this->markSberVerified($user, $claims, $sub, $merged, $tokens, $userinfoError);
+
+        // Зал, выбранный в приложении перед «Регистрация через Сбер ID».
+        $clubRaw = $data['club_id'] ?? $data['clubId'] ?? null;
+        if ($clubRaw !== null && $clubRaw !== '') {
+            $this->mobileClientPayloadApplier->applyRegistrationPayload($user, ['club_id' => $clubRaw]);
+        }
 
         $this->em->persist($user);
         $this->em->flush();

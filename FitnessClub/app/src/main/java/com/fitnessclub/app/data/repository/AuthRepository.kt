@@ -71,6 +71,7 @@ class AuthRepository @Inject constructor(
         codeVerifier: String,
         redirectUri: String,
         state: String,
+        clubId: String? = null,
     ): Flow<ApiResult<User>> = flow {
         emit(ApiResult.Loading)
         try {
@@ -80,6 +81,7 @@ class AuthRepository @Inject constructor(
                     codeVerifier = codeVerifier,
                     redirectUri = redirectUri,
                     state = state,
+                    clubId = clubId?.trim()?.takeIf { it.isNotEmpty() },
                 )
             )
             if (response.isSuccessful && response.body() != null) {
@@ -87,7 +89,16 @@ class AuthRepository @Inject constructor(
                 tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
                 tokenManager.saveUser(authResponse.user)
                 onAuthenticated()
-                emit(ApiResult.Success(authResponse.user))
+                // Если бэкенд ещё не принял club_id — дотягиваем PUT /profile.
+                val pendingClub = clubId?.trim()?.toIntOrNull()
+                if (pendingClub != null && pendingClub > 0 && authResponse.user.clubId != pendingClub) {
+                    when (val patched = setPreferredClub(pendingClub)) {
+                        is ApiResult.Success -> emit(ApiResult.Success(patched.data))
+                        else -> emit(ApiResult.Success(authResponse.user))
+                    }
+                } else {
+                    emit(ApiResult.Success(authResponse.user))
+                }
             } else {
                 emit(ApiResult.Error(authErrorMessage(response, "Не удалось завершить вход через Сбер ID"), response.code()))
             }
@@ -247,6 +258,28 @@ class AuthRepository @Inject constructor(
                 ApiResult.Success(updated)
             } else {
                 ApiResult.Error(authErrorMessage(response, "Не удалось сохранить профиль"), response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+        }
+    }
+
+    /** Привязать зал клиента (выбор при регистрации). */
+    suspend fun setPreferredClub(clubId: Int): ApiResult<User> {
+        val current = tokenManager.getUser().first()
+            ?: return ApiResult.Error("Профиль не загружен")
+        if (clubId <= 0) {
+            return ApiResult.Error("Некорректный клуб")
+        }
+        val payload = current.copy(clubId = clubId)
+        return try {
+            val response = api.updateProfile(payload)
+            if (response.isSuccessful && response.body() != null) {
+                val updated = response.body()!!
+                tokenManager.saveUser(updated)
+                ApiResult.Success(updated)
+            } else {
+                ApiResult.Error(authErrorMessage(response, "Не удалось сохранить клуб"), response.code())
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Неизвестная ошибка")

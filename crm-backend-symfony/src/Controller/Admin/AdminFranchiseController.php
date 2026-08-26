@@ -3,10 +3,13 @@
 namespace App\Controller\Admin;
 
 use App\Entity\AccessAlarm;
+use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\GatewayCommand;
+use App\Entity\User;
 use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\ClubDeletionService;
+use App\Service\Integration\WiegandEntryQrCodec;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -79,6 +82,22 @@ class AdminFranchiseController extends AbstractController
             ->setMaxResults(20)
             ->getQuery()
             ->getResult();
+
+        // Старые тревоги с Wiegand QR сохранялись без user — дотягиваем ФИО из rawData.
+        $backfilled = false;
+        foreach ($recentAlarms as $alarm) {
+            if (!$alarm instanceof AccessAlarm || $alarm->getUser() instanceof User) {
+                continue;
+            }
+            $user = $this->resolveClientFromEntryQr((string) ($alarm->getRawData() ?? ''), $club);
+            if ($user instanceof User) {
+                $alarm->setUser($user);
+                $backfilled = true;
+            }
+        }
+        if ($backfilled) {
+            $this->em->flush();
+        }
 
         return $this->render('admin/franchise/edit.html.twig', [
             'menu' => $this->adminMenuBuilder->buildFor($this->getUser()),
@@ -271,5 +290,59 @@ class AdminFranchiseController extends AbstractController
         $s = trim((string) ($v ?? ''));
 
         return $s === '' ? null : $s;
+    }
+
+    /**
+     * Восстановление клиента из QR тревоги (Wiegand / FITNESSCLUB:ENTRY) или AccessLog.
+     */
+    private function resolveClientFromEntryQr(string $qr, Club $club): ?User
+    {
+        if ($qr === '') {
+            return null;
+        }
+
+        $userId = 0;
+        if (WiegandEntryQrCodec::isPayload($qr)) {
+            $parsed = WiegandEntryQrCodec::parse($qr);
+            if ($parsed !== null) {
+                $userId = (int) $parsed['user_id'];
+            } else {
+                $normalized = WiegandEntryQrCodec::normalize($qr);
+                if ($normalized !== null) {
+                    $userLen = \strlen($normalized) === WiegandEntryQrCodec::LEGACY_LENGTH ? 5 : 4;
+                    $userId = (int) substr($normalized, 0, $userLen);
+                }
+            }
+        } else {
+            $parts = explode(':', $qr);
+            if (\count($parts) >= 3 && $parts[0] === 'FITNESSCLUB' && $parts[1] === 'ENTRY') {
+                $ext = $parts[2];
+                $userId = str_starts_with($ext, 'user-') ? (int) substr($ext, 5) : (int) $ext;
+            }
+        }
+
+        if ($userId > 0) {
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if ($user instanceof User) {
+                return $user;
+            }
+        }
+
+        $log = $this->em->getRepository(AccessLog::class)->createQueryBuilder('l')
+            ->andWhere('l.club = :club')
+            ->andWhere('l.rawData = :qr')
+            ->andWhere('l.result = :granted')
+            ->andWhere('l.user IS NOT NULL')
+            ->setParameter('club', $club)
+            ->setParameter('qr', mb_substr($qr, 0, 255))
+            ->setParameter('granted', 'granted')
+            ->orderBy('l.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $log instanceof AccessLog && $log->getUser() instanceof User
+            ? $log->getUser()
+            : null;
     }
 }

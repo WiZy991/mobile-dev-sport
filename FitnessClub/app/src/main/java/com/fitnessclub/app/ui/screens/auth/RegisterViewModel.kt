@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.ClubItem
 import com.fitnessclub.app.data.config.Brand
+import com.fitnessclub.app.data.local.AuthFlowStore
 import com.fitnessclub.app.data.model.RegisterRequest
 import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
@@ -151,7 +152,8 @@ object ReferralSourceOptions {
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val clubRepository: ClubRepository
+    private val clubRepository: ClubRepository,
+    private val authFlowStore: AuthFlowStore,
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(RegisterUiState())
@@ -210,6 +212,21 @@ class RegisterViewModel @Inject constructor(
                 state.clubs
             }
             state.copy(selectedClub = club, clubs = merged, clubError = null)
+        }
+    }
+
+    /** Перед уходом в Сбер ID — зафиксировать выбранный зал (иначе на сервер уйдёт без club_id). */
+    fun prepareSberRegistration(clubId: String, onReady: () -> Unit) {
+        viewModelScope.launch {
+            authFlowStore.savePendingRegistrationClubId(clubId)
+            val club = _uiState.value.clubs.find { it.id == clubId }
+                ?: RegistrationVenues.orderedCards
+                    .find { it.clubId == clubId }
+                    ?.let { RegistrationVenues.toClubItem(it) }
+            if (club != null) {
+                onClubSelected(club)
+            }
+            onReady()
         }
     }
 

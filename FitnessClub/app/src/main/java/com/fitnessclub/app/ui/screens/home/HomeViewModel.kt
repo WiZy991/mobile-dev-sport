@@ -113,7 +113,8 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun loadOccupancySuspend() {
         try {
-            val res = api.getClubOccupancy()
+            val clubId = clubRepository.preferredClubIdQuery()
+            val res = api.getClubOccupancy(clubId)
             if (res.isSuccessful) {
                 res.body()?.let { occ ->
                     _uiState.update {
