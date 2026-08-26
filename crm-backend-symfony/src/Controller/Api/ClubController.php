@@ -130,28 +130,41 @@ class ClubController extends AbstractController
         return $url;
     }
 
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        $clubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+        $clubs = $this->em->getRepository(Club::class)->findBy(
+            ['showInApp' => true],
+            ['name' => 'ASC']
+        );
         if (empty($clubs)) {
-            // Пустая таблица clubs (частый случай после миграций без сида): отдаём один «виртуальный»
-            // клуб из настроек CRM — тот же источник, что и GET /club/info.
-            return $this->json([$this->defaultClubListItemFromSettings()]);
+            // Нет клубов с галочкой «Показывать в приложении» — пустой список для регистрации.
+            return $this->json([]);
         }
         $legal = $this->legalUrlsFromSettings();
-        $list = array_map(fn (Club $c) => [
-            'id' => (string) $c->getId(),
-            'name' => $c->getName(),
-            'address' => $c->getAddress(),
-            'phone' => $c->getPhone(),
-            'email' => $c->getEmail(),
-            'working_hours' => $c->getWorkingHours(),
-            'latitude' => $c->getLatitude() ?? 0.0,
-            'longitude' => $c->getLongitude() ?? 0.0,
-            'amenities' => $c->getAmenities() ?? [],
-            'max_capacity' => $c->getMaxCapacity(),
-            ...$legal,
-        ], $clubs);
+        $list = array_map(function (Club $c) use ($legal, $request) {
+            [$lat, $lon] = $this->resolveClubCoordinates(
+                (float) ($c->getLatitude() ?? 0.0),
+                (float) ($c->getLongitude() ?? 0.0),
+                $c->getAddress(),
+            );
+
+            return [
+                'id' => (string) $c->getId(),
+                'name' => $c->getName(),
+                'address' => $c->getAddress(),
+                'phone' => $c->getPhone(),
+                'email' => $c->getEmail(),
+                'working_hours' => $c->getWorkingHours(),
+                'latitude' => $lat,
+                'longitude' => $lon,
+                'amenities' => $c->getAmenities() ?? [],
+                'max_capacity' => $c->getMaxCapacity(),
+                'image_url' => self::absolutePublicUrl($request, $c->getRegistrationImagePath()),
+                'show_in_app' => true,
+                ...$legal,
+            ];
+        }, $clubs);
+
         return $this->json($list);
     }
 
@@ -204,7 +217,7 @@ class ClubController extends AbstractController
         ];
     }
 
-    public function show(int $id): JsonResponse
+    public function show(int $id, Request $request): JsonResponse
     {
         $club = $this->em->getRepository(Club::class)->find($id);
         if (!$club) {
@@ -228,6 +241,8 @@ class ClubController extends AbstractController
             'amenities' => $club->getAmenities(),
             'latitude' => $lat,
             'longitude' => $lon,
+            'image_url' => self::absolutePublicUrl($request, $club->getRegistrationImagePath()),
+            'show_in_app' => $club->isShowInApp(),
             'network' => [
                 'about' => $this->clubSettings->get('network_about') ?: null,
                 'social_links' => $this->socialLinksForApi(),

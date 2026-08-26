@@ -60,7 +60,7 @@
         <div class="col-lg-7">
             <div class="content-card mb-3">
                 <div class="mb-2 text-primary small fw-semibold text-uppercase">Параметры клуба и СКУД</div>
-                <form method="post" action="{{ path('admin_franchise_save', {id: club.id}) }}">
+                <form method="post" action="{{ path('admin_franchise_save', {id: club.id}) }}" enctype="multipart/form-data">
                     <div class="row g-2 mb-2">
                         <div class="col-md-7">
                             <label class="form-label small">Название</label>
@@ -71,8 +71,41 @@
                             <input type="text" class="form-control form-control-sm" value="{{ club.id }}" disabled>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small">Адрес</label>
-                            <input type="text" name="address" class="form-control form-control-sm" value="{{ club.address }}">
+                            <label class="form-label small">Адрес (город, улица, этаж)</label>
+                            <input type="text" name="address" class="form-control form-control-sm" value="{{ club.address }}" placeholder="г. Владивосток, ул. …">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Телефон</label>
+                            <input type="text" name="phone" class="form-control form-control-sm" value="{{ club.phone }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Email</label>
+                            <input type="email" name="email" class="form-control form-control-sm" value="{{ club.email }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Часы работы</label>
+                            <input type="text" name="working_hours" class="form-control form-control-sm" value="{{ club.workingHours }}" placeholder="Пн–Вс: 7:00–23:00">
+                        </div>
+                        <div class="col-12">
+                            <input type="hidden" name="show_in_app" value="0">
+                            <div class="form-check mt-1">
+                                <input class="form-check-input" type="checkbox" name="show_in_app" value="1" id="show_in_app" {{ club.showInApp ? 'checked' : '' }}>
+                                <label class="form-check-label small" for="show_in_app">Показывать в приложении (выбор зала при регистрации)</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">Фото для регистрации</label>
+                            {% if club.registrationImagePath %}
+                                <div class="mb-2">
+                                    <img src="{{ club.registrationImagePath }}" alt="" style="max-height: 120px; border-radius: 8px;">
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" name="remove_registration_image" value="1" id="remove_registration_image">
+                                        <label class="form-check-label small" for="remove_registration_image">Удалить текущее фото</label>
+                                    </div>
+                                </div>
+                            {% endif %}
+                            <input type="file" name="registration_image" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.webp,image/*">
+                            <div class="form-text small">jpg / png / webp — карточка на экране «Выберите зал»</div>
                         </div>
                     </div>
 

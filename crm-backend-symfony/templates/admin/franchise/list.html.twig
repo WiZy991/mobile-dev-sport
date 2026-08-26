@@ -25,6 +25,7 @@
                     <tr>
                         <th>Клуб</th>
                         <th>Адрес</th>
+                        <th>В приложении</th>
                         <th>Шлюз</th>
                         <th>PERCo</th>
                         <th>В зале</th>
@@ -37,6 +38,13 @@
                     <tr>
                         <td><strong>{{ r.club.name }}</strong></td>
                         <td class="text-secondary small">{{ r.club.address }}</td>
+                        <td>
+                            {% if r.club.showInApp %}
+                                <span class="badge bg-success">да</span>
+                            {% else %}
+                                <span class="badge bg-secondary">нет</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if not r.has_token %}
                                 <span class="badge bg-secondary">токен не задан</span>

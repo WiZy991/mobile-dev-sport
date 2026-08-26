@@ -74,6 +74,14 @@ class Club implements TenantAware
     #[ORM\Column(name: 'trainer_rental_amount_rub', type: 'integer', nullable: true)]
     private ?int $trainerRentalAmountRub = null;
 
+    /** Показывать клуб в мобильном приложении (регистрация / список залов). */
+    #[ORM\Column(name: 'show_in_app', type: 'boolean', options: ['default' => false])]
+    private bool $showInApp = false;
+
+    /** Относительный путь к фото карточки регистрации (`/uploads/clubs/...`). */
+    #[ORM\Column(name: 'registration_image_path', type: 'string', length: 255, nullable: true)]
+    private ?string $registrationImagePath = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -139,6 +147,30 @@ class Club implements TenantAware
     public function setTrainerRentalAmountRub(?int $v): self
     {
         $this->trainerRentalAmountRub = $v !== null && $v > 0 ? $v : null;
+
+        return $this;
+    }
+
+    public function isShowInApp(): bool
+    {
+        return $this->showInApp;
+    }
+
+    public function setShowInApp(bool $v): self
+    {
+        $this->showInApp = $v;
+
+        return $this;
+    }
+
+    public function getRegistrationImagePath(): ?string
+    {
+        return $this->registrationImagePath;
+    }
+
+    public function setRegistrationImagePath(?string $v): self
+    {
+        $this->registrationImagePath = $v !== null && trim($v) !== '' ? trim($v) : null;
 
         return $this;
     }

@@ -13,6 +13,7 @@ use App\Service\Integration\WiegandEntryQrCodec;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -122,6 +123,25 @@ class AdminFranchiseController extends AbstractController
         $address = trim((string) $request->request->get('address', ''));
         if ($address !== '') {
             $club->setAddress($address);
+        }
+
+        $club->setPhone($this->trimOrNull($request->request->get('phone')));
+        $club->setEmail($this->trimOrNull($request->request->get('email')));
+        $club->setWorkingHours($this->trimOrNull($request->request->get('working_hours')));
+        $club->setShowInApp($request->request->get('show_in_app') === '1');
+
+        $file = $request->files->get('registration_image');
+        if ($file instanceof UploadedFile && $file->isValid()) {
+            try {
+                $club->setRegistrationImagePath($this->storeClubRegistrationImage($file));
+            } catch (\Throwable $e) {
+                $this->addFlash('danger', $e->getMessage());
+
+                return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
+            }
+        }
+        if ($request->request->get('remove_registration_image') === '1') {
+            $club->setRegistrationImagePath(null);
         }
 
         $club->setPercoBaseUrl($this->trimOrNull($request->request->get('perco_base_url')));
@@ -344,5 +364,33 @@ class AdminFranchiseController extends AbstractController
         return $log instanceof AccessLog && $log->getUser() instanceof User
             ? $log->getUser()
             : null;
+    }
+
+    private function storeClubRegistrationImage(UploadedFile $file): string
+    {
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        $ext = strtolower(pathinfo($file->getClientOriginalName(), \PATHINFO_EXTENSION));
+        if (!\in_array($ext, $allowed, true)) {
+            try {
+                $g = strtolower((string) ($file->guessExtension() ?: ''));
+                if (\in_array($g, $allowed, true)) {
+                    $ext = $g;
+                }
+            } catch (\Throwable) {
+            }
+        }
+        if (!\in_array($ext, $allowed, true)) {
+            throw new \RuntimeException('Формат фото клуба: jpg, png, webp.');
+        }
+
+        $uploadsDir = $this->getParameter('kernel.project_dir') . '/public/uploads/clubs';
+        if (!is_dir($uploadsDir) && !mkdir($uploadsDir, 0775, true) && !is_dir($uploadsDir)) {
+            throw new \RuntimeException('Не удалось создать директорию для фото клубов.');
+        }
+
+        $filename = 'club_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $file->move($uploadsDir, $filename);
+
+        return '/uploads/clubs/' . $filename;
     }
 }
