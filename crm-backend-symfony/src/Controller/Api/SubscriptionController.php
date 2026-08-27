@@ -41,9 +41,14 @@ class SubscriptionController extends AbstractController
     #[Route('', name: 'api_subscriptions_list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve($request);
-        if (!$user) {
-            return $this->json([]);
+        $auth = $this->userResolver->resolveAuthState($request);
+        $user = $auth['user'];
+        if (!$user instanceof User) {
+            // Раньше отдавали [] при протухшем токене — приложение думало, что абонементов нет.
+            return $this->json([
+                'error' => $auth['message'] ?? 'Unauthorized',
+                'code' => $auth['code'] ?? 'unauthorized',
+            ], 401);
         }
 
         $subs = $this->em->createQueryBuilder()

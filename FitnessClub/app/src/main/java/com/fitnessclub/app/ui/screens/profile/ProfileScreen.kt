@@ -56,9 +56,11 @@ fun ProfileScreen(
         uiState.subscriptions.filter { sub ->
             when {
                 preferredClubId == null || preferredClubId <= 0 -> true
-                sub.clubId != null -> sub.clubId == preferredClubId
-                // Старые абонементы без club_id — не показываем в чужом зале.
-                else -> false
+                // Привязан к залу — только выбранный клуб.
+                sub.clubId != null && sub.clubId > 0 -> sub.clubId == preferredClubId
+                // null club_id = наследие «действует в любом зале» (см. Subscription::$club).
+                // Раньше фильтр их прятал везде — после обновы «пропали» абонементы до перелогина.
+                else -> true
             }
         }
     }
