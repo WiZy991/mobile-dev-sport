@@ -56,9 +56,9 @@ fun ProfileScreen(
         uiState.subscriptions.filter { sub ->
             when {
                 preferredClubId == null || preferredClubId <= 0 -> true
-                // Только абонементы выбранного зала (без club_id не показываем —
-                // иначе чужой зал видит годовой с Купера).
-                else -> sub.clubId != null && sub.clubId > 0 && sub.clubId == preferredClubId
+                sub.clubId != null && sub.clubId > 0 -> sub.clubId == preferredClubId
+                // null club_id = legacy «любой зал»; после backfill с платежа станет привязан.
+                else -> true
             }
         }
     }

@@ -68,6 +68,51 @@ class SubscriptionController extends AbstractController
                 $changed = true;
             }
         }
+
+        // Проставить club_id с оплаченного платежа, если абонемент ещё «без зала»
+        // (иначе в профиле после смены клуба фильтр ведёт себя непредсказуемо).
+        $orphanIds = [];
+        foreach ($subs as $sub) {
+            if ($sub instanceof Subscription && $sub->getId() && $sub->getClub() === null) {
+                $orphanIds[] = (int) $sub->getId();
+            }
+        }
+        if ($orphanIds !== []) {
+            $payRows = $this->em->getConnection()->executeQuery(
+                'SELECT p.subscription_id AS sid, p.club_id AS cid
+                 FROM payments p
+                 INNER JOIN (
+                     SELECT subscription_id, MAX(id) AS max_id
+                     FROM payments
+                     WHERE subscription_id IN (' . implode(',', $orphanIds) . ')
+                       AND club_id IS NOT NULL
+                       AND status = \'paid\'
+                     GROUP BY subscription_id
+                 ) latest ON latest.max_id = p.id'
+            )->fetchAllAssociative();
+            $clubIdBySub = [];
+            foreach ($payRows as $row) {
+                $clubIdBySub[(int) $row['sid']] = (int) $row['cid'];
+            }
+            if ($clubIdBySub !== []) {
+                $clubRepo = $this->em->getRepository(Club::class);
+                foreach ($subs as $sub) {
+                    if (!$sub instanceof Subscription || $sub->getClub() !== null) {
+                        continue;
+                    }
+                    $cid = $clubIdBySub[(int) $sub->getId()] ?? 0;
+                    if ($cid <= 0) {
+                        continue;
+                    }
+                    $club = $clubRepo->find($cid);
+                    if ($club instanceof Club) {
+                        $sub->setClub($club);
+                        $changed = true;
+                    }
+                }
+            }
+        }
+
         if ($changed) {
             $this->em->flush();
         }
