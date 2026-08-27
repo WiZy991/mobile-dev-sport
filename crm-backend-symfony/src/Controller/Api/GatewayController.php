@@ -107,19 +107,12 @@ class GatewayController extends AbstractController
             return $this->handleStaffEntry($club, $entryParsed['parts'], $log);
         }
 
-        // Wiegand (7 цифр): тренер с арендой на этот зал или клиент.
+        // Wiegand (7 цифр): в payload нет признака «клиент/тренер» — только id % 10000.
+        // Разные приложения дают одинаковые цифры; при коллизии с клиентом приоритет — тренер
+        // с активной арендой на этот зал (иначе staffapp блокировался бы из‑за чужого абонемента).
         if ($entryParsed['kind'] === 'wiegand') {
             $uidMod = (int) $entryParsed['user_id'];
             $staffMatches = $this->findStaffWithValidRentalByWiegandMod($club, $uidMod);
-            /** @var User|null $clientPeek */
-            $clientPeek = $this->em->getRepository(User::class)->find($uidMod);
-            $clientLikely = $clientPeek instanceof User
-                && !$clientPeek->isBlocked()
-                && $this->subscriptionGateResolver->resolveForEntry($clientPeek, $club)[1] === null;
-
-            if ($staffMatches !== [] && $clientLikely) {
-                return $this->denied($log, 'ambiguous_qr', 409, ['club_id' => $club->getId()]);
-            }
             if (\count($staffMatches) > 1) {
                 return $this->denied($log, 'ambiguous_qr', 409, ['club_id' => $club->getId()]);
             }
@@ -286,12 +279,7 @@ class GatewayController extends AbstractController
             }
             $uidMod = (int) $parsed['user_id'];
             $staffMatches = $this->findStaffWithValidRentalByWiegandMod($club, $uidMod);
-            /** @var User|null $user */
-            $user = $this->em->getRepository(User::class)->find($uidMod);
-            $clientLikely = $user instanceof User && !$user->isBlocked()
-                && $this->subscriptionGateResolver->resolveForEntry($user, $club)[1] === null;
-
-            if ($staffMatches !== [] && $clientLikely) {
+            if (\count($staffMatches) > 1) {
                 return $this->denied($log, 'ambiguous_qr', 409, ['club_id' => $club->getId()]);
             }
             if ($staffMatches !== []) {
@@ -805,7 +793,7 @@ class GatewayController extends AbstractController
                 'staff_rental_wrong_club' => 'Аренда оформлена на другой зал',
                 'staff_not_approved' => 'Учётная запись тренера не одобрена',
                 'staff_not_found' => 'Тренер не найден',
-                'ambiguous_qr' => 'QR совпадает у клиента и тренера — обратитесь в клуб',
+                'ambiguous_qr' => 'Конфликт QR (несколько аккаунтов с одним кодом) — обратитесь в клуб',
                 default => null,
             },
         ], $extra), $status);
