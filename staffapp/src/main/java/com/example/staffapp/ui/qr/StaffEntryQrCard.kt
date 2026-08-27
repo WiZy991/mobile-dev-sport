@@ -120,7 +120,7 @@ fun StaffEntryQrCard(
                             onClick = { onSelectClub(club.clubId) },
                             label = {
                                 Text(
-                                    club.name.ifBlank { club.title },
+                                    club.shortName,
                                     maxLines = 1,
                                 )
                             },

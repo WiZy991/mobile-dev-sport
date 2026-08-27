@@ -127,12 +127,40 @@ data class RentalClubOption(
     /** ascii | wiegand — как у клиентского клуба. */
     val entryQrFormat: String? = null,
 ) {
+    /**
+     * Короткая подпись без дубля «название · город, название».
+     * Если в CRM name уже = «ТЦ …, Купера 2», а address = «г. Владивосток, ТЦ …» — показываем name.
+     */
     val title: String
-        get() = if (address.isNotBlank() && !name.contains(address, ignoreCase = true)) {
-            "$name · $address"
-        } else {
-            name.ifBlank { address }
+        get() = compactHallLabel(name, address)
+
+    /** Короткое имя для чипов QR. */
+    val shortName: String
+        get() = name.trim().ifBlank { title }
+}
+
+/** Склеивает name/address зала без повторов. */
+fun compactHallLabel(name: String?, address: String?): String {
+    val n = name?.trim().orEmpty()
+    val a = address?.trim().orEmpty()
+    when {
+        n.isBlank() -> return a
+        a.isBlank() -> return n
+        // address уже включает название («г. Владивосток, ТЦ …») — берём короткое name
+        a.contains(n, ignoreCase = true) -> return n
+        n.contains(a, ignoreCase = true) -> return n
+    }
+    val aNoCity = a
+        .replace(Regex("""^г\.\s*[^,]+,\s*""", RegexOption.IGNORE_CASE), "")
+        .trim()
+    if (aNoCity.isNotBlank()) {
+        when {
+            aNoCity.equals(n, ignoreCase = true) -> return n
+            aNoCity.contains(n, ignoreCase = true) -> return n
+            n.contains(aNoCity, ignoreCase = true) -> return n
         }
+    }
+    return "$n · $a"
 }
 
 data class RentalPlan(

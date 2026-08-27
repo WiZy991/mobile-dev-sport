@@ -56,7 +56,8 @@ class StaffApiClient(private val baseUrl: String) {
     }
 
     fun setActiveRentalClub(token: String, clubId: Int): StaffOnboarding {
-        val conn = openConnection("/api/v1/staff/rental/active-club", "PATCH")
+        // POST: HttpURLConnection/прокси часто ломают PATCH → 404 «API нет».
+        val conn = openConnection("/api/v1/staff/rental/active-club", "POST")
         conn.setRequestProperty("Authorization", "Bearer $token")
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
         conn.doOutput = true
