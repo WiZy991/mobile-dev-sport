@@ -5,6 +5,18 @@ enum AppRoute: Hashable {
     case adminHub
     case adminSection(String)
     case clientDetail(Int)
+    case entryQr
+    case rental
+    case feedback
+    case trainerProfile
+    case legalPdf(String)
+}
+
+enum StaffAuthGate: Equatable {
+    case checking
+    case work
+    case onboarding
+    case trainerProfile
 }
 
 @Observable
@@ -16,6 +28,9 @@ final class AppEnvironment {
     var session: StaffSession?
     var roleConfig: RoleConfig?
     var isAuthenticated: Bool = false
+    var authGate: StaffAuthGate = .checking
+    /// Ошибка проверки onboarding (не открываем Work «вслепую»).
+    var authGateError: String?
     var navigationPath: [AppRoute] = []
     var pendingWorkTab: WorkTab?
 
@@ -28,6 +43,33 @@ final class AppEnvironment {
         self.session = sessionStore.loadSession()
         self.roleConfig = sessionStore.loadConfig()
         self.isAuthenticated = session != nil && roleConfig != nil
+        self.authGate = self.isAuthenticated ? .checking : .checking
+    }
+
+    func resolveAuthGate() async {
+        guard isAuthenticated else {
+            authGate = .checking
+            authGateError = nil
+            return
+        }
+        authGate = .checking
+        authGateError = nil
+        do {
+            let onboarding = try await withRefresh { token in
+                try await apiClient.loadOnboarding(token: token)
+            }
+            if onboarding.status == "active" {
+                authGate = .work
+            } else if onboarding.status == "needs_profile" {
+                authGate = .trainerProfile
+            } else {
+                authGate = .onboarding
+            }
+        } catch {
+            // Как Android MainActivity: при сбое маршрутизации не пускаем в Work.
+            authGateError = UserFacingError.message(error)
+            authGate = .checking
+        }
     }
 
     func withRefresh<T>(_ action: (String) async throws -> T) async throws -> T {
@@ -53,6 +95,7 @@ final class AppEnvironment {
         sessionStore.saveSession(newSession)
         sessionStore.saveConfig(config)
         isAuthenticated = true
+        authGate = .checking
     }
 
     func logout() {
@@ -60,6 +103,8 @@ final class AppEnvironment {
         session = nil
         roleConfig = nil
         isAuthenticated = false
+        authGate = .checking
+        authGateError = nil
         navigationPath = []
         pendingWorkTab = nil
     }

@@ -3,6 +3,8 @@ import SwiftUI
 struct LoginView: View {
     @Bindable var controller: LoginController
     @FocusState private var focusedField: Field?
+    @State private var passwordVisible = false
+    @State private var openLegalPdf: StaffLegalPdf?
 
     private enum Field: Hashable {
         case email, name, password
@@ -11,15 +13,15 @@ struct LoginView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Доброзал.Админ")
+                Text("Доброзал")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
-                Text("Вход для сотрудников")
+                Text("Приложение для специалистов и сотрудников Клуба")
                     .font(.title3)
                     .foregroundStyle(.white.opacity(0.9))
 
-                VStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 12) {
                     TextField("Email", text: $controller.email)
                         .textFieldStyle(.roundedBorder)
                         .textInputAutocapitalization(.never)
@@ -38,14 +40,44 @@ struct LoginView: View {
                         .submitLabel(.next)
                         .onSubmit { focusedField = .password }
 
-                    SecureField("Пароль", text: $controller.password)
-                        .textFieldStyle(.roundedBorder)
+                    HStack {
+                        Group {
+                            if passwordVisible {
+                                TextField("Пароль", text: $controller.password)
+                            } else {
+                                SecureField("Пароль", text: $controller.password)
+                            }
+                        }
                         .textContentType(.password)
                         .focused($focusedField, equals: .password)
                         .submitLabel(.go)
                         .onSubmit { submitLogin() }
+                        Button {
+                            passwordVisible.toggle()
+                        } label: {
+                            Image(systemName: passwordVisible ? "eye.slash" : "eye")
+                                .foregroundStyle(StaffColors.onSurfaceVariant)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(Color(uiColor: .systemBackground))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
 
-                    rolePicker
+                    Text("Войдите в приложение или создайте новый аккаунт, чтобы получить доступ к функциям для специалистов или сотрудников Клуба.")
+                        .font(.footnote)
+                        .foregroundStyle(StaffColors.onSurfaceVariant)
+
+                    Text("Продолжая использовать приложение, Вы принимаете условия")
+                        .font(.caption2)
+                        .foregroundStyle(StaffColors.onSurfaceVariant)
+                    Button("Пользовательского соглашения") { openLegalPdf = .userAgreement }
+                        .font(.caption2)
+                    Text("и подтверждаете ознакомление с")
+                        .font(.caption2)
+                        .foregroundStyle(StaffColors.onSurfaceVariant)
+                    Button("Политикой конфиденциальности") { openLegalPdf = .privacy }
+                        .font(.caption2)
 
                     if !controller.configSummary.isEmpty {
                         Text(controller.configSummary)
@@ -84,6 +116,11 @@ struct LoginView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(StaffColors.primary)
+        .sheet(item: $openLegalPdf) { doc in
+            NavigationStack {
+                LegalPdfView(doc: doc) { openLegalPdf = nil }
+            }
+        }
         .onAppear { controller.tryAutoLogin() }
     }
 
@@ -95,30 +132,5 @@ struct LoginView: View {
     private func submitRegister() {
         focusedField = nil
         controller.register()
-    }
-
-    private var rolePicker: some View {
-        Menu {
-            ForEach(controller.roles) { role in
-                Button(role.label) {
-                    controller.selectedRole = role
-                }
-            }
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Должность")
-                        .font(.caption)
-                        .foregroundStyle(StaffColors.onSurfaceVariant)
-                    Text(controller.selectedRole?.label ?? "")
-                        .foregroundStyle(StaffColors.onBackground)
-                }
-                Spacer()
-                Image(systemName: "chevron.up.chevron.down")
-                    .foregroundStyle(StaffColors.onSurfaceVariant)
-            }
-            .padding(12)
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.4)))
-        }
     }
 }

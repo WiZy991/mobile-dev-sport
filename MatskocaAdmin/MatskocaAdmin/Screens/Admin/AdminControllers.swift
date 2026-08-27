@@ -175,9 +175,15 @@ final class ClientDetailController {
         let sub = client.subscription
         var subMeta = ""
         if let sub {
-            subMeta = sub.status
+            subMeta = UiLabels.subscriptionStatus(sub.status)
             if let end = sub.endDate, !end.isEmpty { subMeta += " · до \(end)" }
             if sub.visitsTotal > 0 { subMeta += "\nВизиты: \(sub.visitsUsed)/\(sub.visitsTotal)" }
+        }
+        let active = client.recentBookings.filter(\.isUpcoming).map {
+            ListCardUi(title: $0.title, meta: $0.meta)
+        }
+        let completed = client.recentBookings.filter { !$0.isUpcoming }.map {
+            ListCardUi(title: $0.title, meta: $0.meta)
         }
         state = ClientDetailUi(
             title: client.name,
@@ -188,7 +194,9 @@ final class ClientDetailController {
             isBlocked: client.isBlocked,
             subscriptionTitle: sub?.plan ?? "",
             subscriptionMeta: subMeta,
-            bookings: client.recentBookings.map { ListCardUi(title: $0.title, meta: $0.meta) },
+            activeBookings: active,
+            completedBookings: completed,
+            bookingTab: active.isEmpty ? .completed : .active,
             tickets: client.recentTickets.map { ListCardUi(title: $0.title, meta: $0.meta) },
             loading: false,
             showCallButton: !client.phone.isEmpty

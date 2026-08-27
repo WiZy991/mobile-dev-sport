@@ -4,6 +4,9 @@ struct StaffScheduleTabContent: View {
     let schedule: ScheduleTabUi
     let onDaySelected: (String) -> Void
     let onTypeFilterSelected: (String?) -> Void
+    var onSessionTap: ((ScheduleSessionUi) -> Void)? = nil
+    var onPrevPeriod: (() -> Void)? = nil
+    var onNextPeriod: (() -> Void)? = nil
 
     var body: some View {
         if schedule.denied {
@@ -11,6 +14,26 @@ struct StaffScheduleTabContent: View {
                 .padding(16)
         } else {
             VStack(spacing: 0) {
+                if onPrevPeriod != nil || onNextPeriod != nil || !schedule.monthLabel.isEmpty {
+                    HStack {
+                        Button(action: { onPrevPeriod?() }) {
+                            Image(systemName: "chevron.left")
+                                .foregroundStyle(StaffColors.onSurfaceVariant)
+                        }
+                        .disabled(onPrevPeriod == nil)
+                        Text(schedule.monthLabel.isEmpty ? "Расписание" : schedule.monthLabel)
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                        Button(action: { onNextPeriod?() }) {
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(StaffColors.onSurfaceVariant)
+                        }
+                        .disabled(onNextPeriod == nil)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(StaffColors.surface)
+                }
                 if !schedule.days.isEmpty {
                     StaffScheduleDateSelector(days: schedule.days, onDaySelected: onDaySelected)
                 }
@@ -28,7 +51,8 @@ struct StaffScheduleTabContent: View {
                         Image(systemName: "calendar.badge.exclamationmark")
                             .font(.system(size: 64))
                             .foregroundStyle(StaffColors.onSurfaceVariant)
-                        Text("Нет тренировок на выбранную дату")
+                        Text("Нет тренировок на выбранную дату.\nНажмите +, чтобы создать запись.")
+                            .multilineTextAlignment(.center)
                             .font(.body)
                             .foregroundStyle(StaffColors.onSurfaceVariant)
                     }
@@ -38,7 +62,13 @@ struct StaffScheduleTabContent: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(schedule.sessions) { session in
-                                StaffScheduleSessionCard(session: session)
+                                Button {
+                                    onSessionTap?(session)
+                                } label: {
+                                    StaffScheduleSessionCard(session: session)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(onSessionTap == nil || session.trainingId == nil)
                             }
                         }
                         .padding(16)

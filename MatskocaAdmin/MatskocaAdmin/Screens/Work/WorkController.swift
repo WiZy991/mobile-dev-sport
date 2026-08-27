@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import UIKit
+import UserNotifications
 
 @Observable
 @MainActor
@@ -8,22 +10,40 @@ final class WorkController {
     private let env: AppEnvironment
 
     private var appData: StaffAppData?
+    private var lastOnboarding: StaffOnboarding?
     private var allowedSections: [String] = []
     private var scheduleData: ScheduleData?
+    private var scheduleFromDate: String?
     private var selectedScheduleDate: String?
     private var selectedScheduleTypeFilter: String?
     private var selectedSupportFilter: String?
     private var clientsSearchQuery = ""
+    private var clientsData: [ClientSummary] = []
+    private var assignDialogSession: ScheduleSessionUi?
     private var loadGeneration = 0
     private var initialDataLoaded = false
+    private var profileLoadGeneration = 0
 
     private static let homeSections: Set<String> = [
         "bookings", "clients", "tasks", "subscriptions", "schedule", "app_support",
+    ]
+    private static let hiddenAppSections: Set<String> = ["visits", "subscriptions"]
+    private static let monthNames = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
     ]
 
     var onOpenAdmin: (() -> Void)?
     var onOpenClient: ((Int) -> Void)?
     var onOpenAdminSection: ((String) -> Void)?
+    var onOpenEntryQr: (() -> Void)?
+    var onOpenRental: (() -> Void)?
+    var onOpenFeedback: (() -> Void)?
+    var onOpenTrainerProfile: (() -> Void)?
+    var onOpenLegalPdf: ((StaffLegalPdf) -> Void)?
+
+    /// Сессия из assign-диалога — источник правды для «Изменить время» (в т.ч. с главной).
+    var assignSessionForEdit: ScheduleSessionUi? { assignDialogSession }
 
     init(env: AppEnvironment, initialTab: WorkTab = .home) {
         self.env = env
@@ -39,6 +59,7 @@ final class WorkController {
     }
 
     func onResume() {
+        refreshNotificationPermissionBanner()
         if env.session != nil, allowedSections.contains("app_support") {
             pollUnreadNotifications()
         }
@@ -65,6 +86,28 @@ final class WorkController {
         switch actionId {
         case "open_admin":
             onOpenAdmin?()
+        case "open_entry_qr":
+            onOpenEntryQr?()
+        case "open_rental":
+            onOpenRental?()
+        case "open_feedback":
+            onOpenFeedback?()
+        case "open_trainer_profile", "edit_trainer_profile":
+            onOpenTrainerProfile?()
+        case "open_user_agreement":
+            onOpenLegalPdf?(.userAgreement)
+        case "open_privacy":
+            onOpenLegalPdf?(.privacy)
+        case "open_pro_offer", "open_offer":
+            onOpenLegalPdf?(.proOffer)
+        case "open_docs":
+            openExternalUrl(state.profile.docsUrl)
+        case "open_legal_pro_offer":
+            onOpenLegalPdf?(.proOffer)
+        case "open_legal_privacy":
+            onOpenLegalPdf?(.dobrozalPrivacy)
+        case "enable_notifications":
+            requestOrOpenNotificationSettings()
         case "retry":
             selectTab(state.selectedTab)
         case "mark_notifications_read":
@@ -75,7 +118,12 @@ final class WorkController {
                 self.showSupportTab()
             }
         default:
-            if actionId.hasPrefix("ticket_status:") {
+            if actionId.hasPrefix("set_active_club:") {
+                let idStr = actionId.replacingOccurrences(of: "set_active_club:", with: "")
+                if let clubId = Int(idStr) {
+                    setActiveRentalClub(clubId)
+                }
+            } else if actionId.hasPrefix("ticket_status:") {
                 let parts = actionId.split(separator: ":")
                 if parts.count == 3, let ticketId = Int(parts[1]) {
                     updateTicketStatus(ticketId, status: String(parts[2]))
@@ -90,6 +138,27 @@ final class WorkController {
     }
 
     func handleListCardClick(_ card: ListCardUi) {
+        if let trainingId = card.trainingId, !trainingId.isEmpty {
+            if let date = card.trainingDate, !date.isEmpty {
+                selectedScheduleDate = date
+            }
+            ensureScheduleWindowContains(selectedScheduleDate)
+            if state.showScheduleNav {
+                selectTab(.schedule)
+            }
+            if let item = scheduleData?.items.first(where: { $0.id == trainingId }) {
+                openAssignDialog(for: scheduleToSession(item))
+            } else {
+                Task { @MainActor in
+                    do {
+                        let schedule = try await self.loadScheduleCached(forceRefresh: true)
+                        guard let item = schedule.items.first(where: { $0.id == trainingId }) else { return }
+                        self.openAssignDialog(for: self.scheduleToSession(item))
+                    } catch {}
+                }
+            }
+            return
+        }
         if let clientId = card.clientId {
             onOpenClient?(clientId)
             return
@@ -105,6 +174,7 @@ final class WorkController {
     }
 
     func handleProfileSectionClick(_ sectionKey: String) {
+        if Self.hiddenAppSections.contains(sectionKey) { return }
         switch sectionKey {
         case "schedule":
             if state.showScheduleNav { selectTab(.schedule) }
@@ -157,8 +227,168 @@ final class WorkController {
             self.env.registerPushIfLoggedIn()
             self.pollUnreadNotifications()
             self.updateNavVisibility()
+            await self.refreshEntryQrState()
             self.refreshActiveTab()
         }
+    }
+
+    private func refreshEntryQrState() async {
+        do {
+            let onboarding = try await env.withRefresh { token in
+                try await env.apiClient.loadOnboarding(token: token)
+            }
+            // Как Android WorkActivity: если статус ушёл с active — выходим из Work.
+            if onboarding.status != "active" {
+                await env.resolveAuthGate()
+                return
+            }
+            lastOnboarding = onboarding
+            let staffId = [
+                onboarding.staffUserId,
+                appData?.employeeId,
+                state.home.entryQrStaffUserId,
+            ].compactMap { $0 }.first { $0 > 0 } ?? 0
+            applyHomeEntryQr(staffUserId: staffId, onboarding: onboarding)
+            applyProfileRentalState(onboarding)
+        } catch {
+            // QR optional if onboarding endpoint fails
+        }
+    }
+
+    private func applyHomeEntryQr(staffUserId: Int, onboarding: StaffOnboarding) {
+        let paidClubs = onboarding.rentalClubs.filter(\.rentalActive)
+        let hasPaidButInactive = onboarding.requiresRental &&
+            !paidClubs.isEmpty &&
+            !onboarding.activeClubRentalOk
+        let active = StaffRentalAccess.canShowEntryQr(
+            staffUserId: staffUserId,
+            status: onboarding.status,
+            requiresRental: onboarding.requiresRental,
+            rentalPaidUntilIso: onboarding.activeClubPaidUntil,
+            rentalActiveFromServer: onboarding.rentalActive,
+            activeClubRentalOk: onboarding.activeClubRentalOk
+        )
+        let blocked = StaffRentalAccess.entryQrBlockedMessage(
+            staffUserId: staffUserId,
+            status: onboarding.status,
+            requiresRental: onboarding.requiresRental,
+            rentalPaidUntilIso: onboarding.activeClubPaidUntil,
+            hasPaidClubsButWrongActive: hasPaidButInactive
+        )
+        let isTrainer = primaryRole() == "ROLE_TRAINER" || onboarding.requiresRental
+        state.home.showEntryQr = isTrainer
+        state.home.entryQrStaffUserId = staffUserId > 0 ? staffUserId : state.home.entryQrStaffUserId
+        state.home.entryQrActive = active
+        state.home.entryQrBlockedMessage = blocked
+        state.home.entryQrFormat = onboarding.resolvedEntryQrFormat
+    }
+
+    private func applyProfileRentalState(_ onboarding: StaffOnboarding) {
+        let active = onboarding.activeClub
+        state.profile.rentalPaidUntilLabel = formatRentalUntil(
+            active?.paidUntil ?? onboarding.rentalPaidUntil,
+            title: active?.title
+        )
+        state.profile.paidRentalClubs = onboarding.rentalClubs.filter(\.rentalActive)
+        state.profile.activeClubId = onboarding.activeClubId
+        state.profile.offerUrl = onboarding.offerUrl
+        state.profile.privacyUrl = onboarding.privacyUrl
+        state.profile.docsUrl = onboarding.docsUrl
+    }
+
+    private func formatRentalUntil(_ iso: String?, title: String?) -> String? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let day = String(iso.prefix(10))
+        if let title, !title.isEmpty {
+            return "Активен: \(title) · до \(day)"
+        }
+        return "Оплачено до \(day)"
+    }
+
+    private func setActiveRentalClub(_ clubId: Int) {
+        runAsyncForTab(.profile) {
+            let onboarding = try await self.env.withRefresh { token in
+                try await self.env.apiClient.setActiveRentalClub(token: token, clubId: clubId)
+            }
+            self.lastOnboarding = onboarding
+            self.applyProfileRentalState(onboarding)
+            let staffId = onboarding.staffUserId ?? self.state.home.entryQrStaffUserId
+            self.applyHomeEntryQr(staffUserId: staffId, onboarding: onboarding)
+            self.state.statusMessage = "Адрес обновлён"
+        }
+    }
+
+    func createTrainingSession(
+        name: String,
+        type: String,
+        date: Date,
+        startTime: Date,
+        durationMinutes: Int,
+        room: String,
+        maxParticipants: Int
+    ) async throws {
+        let cal = Calendar.current
+        let day = cal.dateComponents([.year, .month, .day], from: date)
+        let time = cal.dateComponents([.hour, .minute], from: startTime)
+        guard let y = day.year, let m = day.month, let d = day.day,
+              let hour = time.hour, let minute = time.minute else {
+            throw StaffApiError.parseFailed("Некорректная дата")
+        }
+        if durationMinutes <= 0 {
+            throw StaffApiError.parseFailed("Выберите длительность занятия")
+        }
+        var startComponents = DateComponents()
+        startComponents.year = y
+        startComponents.month = m
+        startComponents.day = d
+        startComponents.hour = hour
+        startComponents.minute = minute
+        guard let start = cal.date(from: startComponents),
+              let end = cal.date(byAdding: .minute, value: durationMinutes, to: start) else {
+            throw StaffApiError.parseFailed("Некорректная дата")
+        }
+        let endParts = cal.dateComponents([.year, .month, .day, .hour, .minute], from: end)
+        // Как Android: занятие не должно переходить через полночь.
+        if endParts.year != y || endParts.month != m || endParts.day != d || !endParts.isAfterSameDay(hour: hour, minute: minute) {
+            throw StaffApiError.parseFailed("Занятие должно заканчиваться в тот же день. Уменьшите длительность или измените время начала.")
+        }
+        if start < Date() {
+            throw StaffApiError.parseFailed("Нельзя создать занятие в прошлом. Проверьте дату и время.")
+        }
+        let dateLabel = String(format: "%04d-%02d-%02d", y, m, d)
+        let startTimeLabel = String(format: "%02d:%02d", hour, minute)
+        let endTimeLabel = String(format: "%02d:%02d", endParts.hour ?? 0, endParts.minute ?? 0)
+        // Wall-clock как Android: `yyyy-MM-dd'T'HH:mm:ss` без TZ-сдвига.
+        let startAtIso = "\(dateLabel)T\(startTimeLabel):00"
+        let endAtIso = "\(dateLabel)T\(endTimeLabel):00"
+        let roomTrimmed = room.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nameTrimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedName = nameTrimmed.isEmpty ? "Персональная тренировка" : nameTrimmed
+        _ = type
+        _ = maxParticipants
+        let created = try await env.withRefresh { token in
+            try await env.apiClient.createTraining(
+                token: token,
+                name: resolvedName,
+                type: "personal",
+                startAtIso: startAtIso,
+                endAtIso: endAtIso,
+                room: roomTrimmed.isEmpty ? nil : roomTrimmed,
+                maxParticipants: 1
+            )
+        }
+        scheduleData = nil
+        let focusDate = created.date.isEmpty ? dateLabel : created.date
+        selectedScheduleDate = focusDate
+        ensureScheduleWindowContains(focusDate)
+        if state.selectedTab == .schedule {
+            let schedule = try await loadScheduleCached(forceRefresh: true)
+            renderSchedule(schedule)
+        } else {
+            showScheduleTab()
+        }
+        openAssignDialog(for: scheduleToSession(created))
+        state.statusMessage = "Занятие создано"
     }
 
     private func refreshActiveTab() {
@@ -198,24 +428,48 @@ final class WorkController {
     private func showHomeTab() {
         state.screenTitle = "Главная"
         state.errorMessage = nil
-        state.home = HomeTabUi(loading: appData == nil)
+        let preservedQr = state.home
+        let isTrainer = primaryRole() == "ROLE_TRAINER"
+            || (env.roleConfig?.roles ?? []).contains("ROLE_TRAINER")
+        state.home = HomeTabUi(
+            showEntryQr: preservedQr.showEntryQr,
+            entryQrStaffUserId: preservedQr.entryQrStaffUserId,
+            entryQrActive: preservedQr.entryQrActive,
+            entryQrBlockedMessage: preservedQr.entryQrBlockedMessage,
+            entryQrFormat: preservedQr.entryQrFormat,
+            needNotificationsPermission: preservedQr.needNotificationsPermission,
+            loading: appData == nil
+        )
+        refreshNotificationPermissionBanner()
         guard let data = appData else { return }
 
         let role = primaryRole()
-        let showAdmin = !(env.roleConfig?.adminSections.isEmpty ?? true) || allowedSections.contains("admin")
+        let showAdmin = env.roleConfig?.adminActions.contains("admin.write") == true
+            || role == "ROLE_ADMIN"
+            || role == "ROLE_SUPER_ADMIN"
+            || role == "ROLE_MANAGER"
+            || !(env.roleConfig?.adminSections.isEmpty ?? true)
+            || allowedSections.contains("admin")
         let metrics = data.metrics.map { MetricUi(label: UiLabels.metricTitle($0.key), value: String($0.value)) }
         state.home = HomeTabUi(
             greeting: "Здравствуйте, \(data.employeeName)",
             roleTitle: UiLabels.roleTitle(role),
             metrics: metrics,
             showAdminButton: showAdmin,
+            showEntryQr: state.home.showEntryQr || isTrainer,
+            entryQrStaffUserId: state.home.entryQrStaffUserId,
+            entryQrActive: state.home.entryQrActive,
+            entryQrBlockedMessage: state.home.entryQrBlockedMessage,
+            entryQrFormat: state.home.entryQrFormat,
+            needNotificationsPermission: state.home.needNotificationsPermission,
             loading: true
         )
+        refreshNotificationPermissionBanner()
 
         let homeSection: String? = switch role {
         case "ROLE_TRAINER": "bookings"
         case "ROLE_MANAGER": "tasks"
-        case "ROLE_FINANCE": "subscriptions"
+        case "ROLE_FINANCE": "clients"
         case "ROLE_SUPPORT": "app_support"
         case "ROLE_SUPER_ADMIN", "ROLE_ADMIN": "schedule"
         default: allowedSections.first { Self.homeSections.contains($0) }
@@ -228,6 +482,13 @@ final class WorkController {
                 }
                 guard self.state.selectedTab == .home else { return }
                 let items = tickets.items.filter { $0.status == "new" }.prefix(5).map { self.ticketToCard($0) }
+                self.state.home.sections = [
+                    HomeSectionUi(
+                        title: "Новые обращения: \(tickets.newCount)",
+                        items: Array(items),
+                        emptyMessage: items.isEmpty ? "Новых обращений нет" : nil
+                    ),
+                ]
                 self.state.home.sectionTitle = "Новые обращения: \(tickets.newCount)"
                 self.state.home.items = Array(items)
                 self.state.home.emptyMessage = items.isEmpty ? "Новых обращений нет" : nil
@@ -238,21 +499,28 @@ final class WorkController {
                 if role == "ROLE_TRAINER", self.sectionAllowed("schedule") {
                     let schedule = try await self.loadScheduleCached()
                     guard self.state.selectedTab == .home else { return }
-                    let today = self.todayDate()
-                    let filtered = schedule.items.filter { $0.date == today }
-                    let items = (filtered.isEmpty ? Array(schedule.items.prefix(5)) : filtered).map { self.scheduleToCard($0) }
-                    self.state.home.sectionTitle = "Ваши тренировки сегодня"
-                    self.state.home.items = items
-                    self.state.home.emptyMessage = items.isEmpty ? "Нет тренировок" : nil
+                    let sections = self.trainerHomeSections(schedule)
+                    self.state.home.sections = sections
+                    self.state.home.sectionTitle = sections.first?.title
+                    self.state.home.items = sections.first?.items ?? []
+                    self.state.home.emptyMessage = sections.first?.emptyMessage
                     self.state.home.loading = false
                 } else {
                     let items = try await self.env.withRefresh { token in
                         try await self.env.apiClient.loadList(token: token, section: homeSection)
                     }
                     guard self.state.selectedTab == .home else { return }
+                    let cards = items.prefix(8).map { self.feedToCard($0) }
+                    self.state.home.sections = [
+                        HomeSectionUi(
+                            title: UiLabels.sectionTitle(homeSection),
+                            items: Array(cards),
+                            emptyMessage: cards.isEmpty ? "Нет данных" : nil
+                        ),
+                    ]
                     self.state.home.sectionTitle = UiLabels.sectionTitle(homeSection)
-                    self.state.home.items = items.prefix(8).map { self.feedToCard($0) }
-                    self.state.home.emptyMessage = items.isEmpty ? "Нет данных" : nil
+                    self.state.home.items = Array(cards)
+                    self.state.home.emptyMessage = cards.isEmpty ? "Нет данных" : nil
                     self.state.home.loading = false
                 }
             }
@@ -260,15 +528,49 @@ final class WorkController {
             runAsyncForTab(.home) {
                 let schedule = try await self.loadScheduleCached(forceRefresh: false)
                 guard self.state.selectedTab == .home else { return }
-                let items = schedule.items.prefix(5).map { self.scheduleToCard($0) }
+                let items = schedule.items.prefix(5).map { self.scheduleToCard($0, includeDate: true) }
+                self.state.home.sections = [
+                    HomeSectionUi(
+                        title: "Ближайшие тренировки",
+                        items: Array(items),
+                        emptyMessage: items.isEmpty ? "Нет тренировок" : nil
+                    ),
+                ]
                 self.state.home.sectionTitle = "Ближайшие тренировки"
-                self.state.home.items = items
+                self.state.home.items = Array(items)
                 self.state.home.emptyMessage = items.isEmpty ? "Нет тренировок" : nil
                 self.state.home.loading = false
             }
         } else {
             state.home.loading = false
         }
+    }
+
+    private func trainerHomeSections(_ schedule: ScheduleData) -> [HomeSectionUi] {
+        let today = todayDate()
+        let tomorrow = tomorrowDate()
+        let todayItems = schedule.items.filter { $0.date == today }.map { scheduleToCard($0) }
+        let tomorrowItems = schedule.items.filter { $0.date == tomorrow }.map { scheduleToCard($0) }
+        var sections: [HomeSectionUi] = [
+            HomeSectionUi(
+                title: "Записи на сегодня",
+                items: todayItems,
+                emptyMessage: todayItems.isEmpty ? "На сегодня записей нет — можно отдохнуть" : nil
+            ),
+        ]
+        if !tomorrowItems.isEmpty {
+            sections.append(HomeSectionUi(title: "Записи на завтра", items: tomorrowItems))
+        }
+        if todayItems.isEmpty && tomorrowItems.isEmpty {
+            let upcoming = schedule.items
+                .filter { $0.date > today }
+                .prefix(5)
+                .map { scheduleToCard($0, includeDate: true) }
+            if !upcoming.isEmpty {
+                sections.append(HomeSectionUi(title: "Ближайшие записи", items: Array(upcoming)))
+            }
+        }
+        return sections
     }
 
     private func showScheduleTab() {
@@ -287,13 +589,38 @@ final class WorkController {
         }
         runAsyncForTab(.schedule) {
             let schedule = try await self.loadScheduleCached(forceRefresh: true)
-            if self.selectedScheduleDate == nil {
-                self.selectedScheduleDate = schedule.days.first { $0.date == self.todayDate() }?.date
-                    ?? schedule.days.first?.date
+            let dates = schedule.days.map(\.date)
+            if self.selectedScheduleDate == nil || !(dates.contains(self.selectedScheduleDate ?? "")) {
+                self.selectedScheduleDate = dates.first { $0 == self.todayDate() } ?? dates.first
             }
             self.scheduleData = schedule
             guard self.state.selectedTab == .schedule else { return }
             self.renderSchedule(schedule)
+        }
+    }
+
+    func shiftSchedulePeriod(_ days: Int) {
+        let formatter = Self.dayFormatter
+        let current = scheduleFromDate.flatMap { formatter.date(from: $0) } ?? Date()
+        guard let newFrom = Calendar.current.date(byAdding: .day, value: days, to: current) else { return }
+        let today = formatter.string(from: Date())
+        let newFromStr = formatter.string(from: newFrom)
+        scheduleFromDate = newFromStr == today ? nil : newFromStr
+        selectedScheduleDate = nil
+        scheduleData = nil
+        showScheduleTab()
+    }
+
+    private func ensureScheduleWindowContains(_ dateIso: String?) {
+        guard let dateIso,
+              let target = Self.dayFormatter.date(from: dateIso) else { return }
+        let windowStart = scheduleFromDate.flatMap { Self.dayFormatter.date(from: $0) } ?? Date()
+        let cal = Calendar.current
+        let windowEnd = cal.date(byAdding: .day, value: 14, to: windowStart) ?? windowStart
+        if target < cal.startOfDay(for: windowStart) || target >= cal.startOfDay(for: windowEnd) {
+            let today = Self.dayFormatter.string(from: Date())
+            scheduleFromDate = dateIso == today ? nil : dateIso
+            scheduleData = nil
         }
     }
 
@@ -313,13 +640,34 @@ final class WorkController {
         }
         let dayItems = schedule.items
             .filter { $0.date == selectedScheduleDate }
+            .filter { $0.type != "group" }
             .filter { typeFilter == nil || $0.type == typeFilter }
         state.schedule = ScheduleTabUi(
             days: days,
             sessions: dayItems.map { scheduleToSession($0) },
+            monthLabel: scheduleMonthLabel(schedule.days.map(\.date)),
             selectedTypeFilter: typeFilter,
             loading: false
         )
+    }
+
+    private func scheduleMonthLabel(_ dates: [String]) -> String {
+        let formatter = Self.dayFormatter
+        guard let first = dates.first.flatMap({ formatter.date(from: $0) }) else { return "" }
+        let last = dates.last.flatMap { formatter.date(from: $0) } ?? first
+        let firstMonth = Self.monthNames[Calendar.current.component(.month, from: first) - 1]
+        let lastMonth = Self.monthNames[Calendar.current.component(.month, from: last) - 1]
+        let firstYear = Calendar.current.component(.year, from: first)
+        let lastYear = Calendar.current.component(.year, from: last)
+        let firstMonthValue = Calendar.current.component(.month, from: first)
+        let lastMonthValue = Calendar.current.component(.month, from: last)
+        if firstMonthValue == lastMonthValue && firstYear == lastYear {
+            return "\(firstMonth) \(firstYear)"
+        }
+        if firstYear == lastYear {
+            return "\(firstMonth) — \(lastMonth) \(firstYear)"
+        }
+        return "\(firstMonth) \(firstYear) — \(lastMonth) \(lastYear)"
     }
 
     private func showSupportTab() {
@@ -371,10 +719,12 @@ final class WorkController {
 
     private func showClientsTab() {
         state.screenTitle = "Клиенты"
-        state.clients = ClientsTabUi(query: clientsSearchQuery, loading: true)
+        let onlyActive = state.clients.onlyActiveBooking
+        state.clients = ClientsTabUi(query: clientsSearchQuery, onlyActiveBooking: onlyActive, loading: true)
         state.errorMessage = nil
         guard sectionAllowed("clients") else {
             state.clients = ClientsTabUi(
+                onlyActiveBooking: onlyActive,
                 denied: true,
                 deniedMessage: initialDataLoaded
                     ? "Раздел «Клиенты» недоступен для вашей должности."
@@ -387,28 +737,51 @@ final class WorkController {
     }
 
     private func loadClientsList(_ query: String) {
+        let onlyActive = state.clients.onlyActiveBooking
         state.clients.query = query
         state.clients.loading = true
         state.clients.summary = ""
+        state.clients.onlyActiveBooking = onlyActive
         runAsyncForTab(.clients) {
             let clients = try await self.env.withRefresh { token in
                 try await self.env.apiClient.loadClients(token: token, query: query)
             }
             guard self.state.selectedTab == .clients else { return }
-            self.state.clients = ClientsTabUi(
-                query: query,
-                summary: clients.isEmpty ? "" : "Найдено: \(clients.count)",
-                items: clients.map { client in
-                    ListCardUi(
-                        title: client.name.isEmpty ? "Клиент #\(client.id)" : client.name,
-                        subtitle: [client.email, client.phone].filter { !$0.isEmpty }.joined(separator: "\n"),
-                        meta: "Открыть карточку",
-                        clientId: client.id
-                    )
-                },
-                loading: false
-            )
+            self.clientsData = clients
+            self.renderClientsList()
         }
+    }
+
+    private func renderClientsList() {
+        let onlyActive = state.clients.onlyActiveBooking
+        let visible = clientsData
+            .filter { !onlyActive || $0.hasActiveBooking }
+            .sorted {
+                if $0.hasActiveBooking != $1.hasActiveBooking {
+                    return $0.hasActiveBooking && !$1.hasActiveBooking
+                }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        state.clients = ClientsTabUi(
+            query: clientsSearchQuery,
+            summary: visible.isEmpty ? "" : "Найдено: \(visible.count)",
+            items: visible.map { client in
+                ListCardUi(
+                    title: client.name.isEmpty ? "Клиент #\(client.id)" : client.name,
+                    meta: "Открыть карточку",
+                    badge: client.hasActiveBooking ? "Есть запись" : nil,
+                    badgeColor: .success,
+                    clientId: client.id
+                )
+            },
+            onlyActiveBooking: onlyActive,
+            loading: false
+        )
+    }
+
+    func toggleClientsActiveFilter() {
+        state.clients.onlyActiveBooking.toggle()
+        renderClientsList()
     }
 
     private func showProfileTab() {
@@ -416,25 +789,86 @@ final class WorkController {
         env.roleConfig = config
         let data = appData
         let sections = allowedSections.isEmpty ? (config?.appSections ?? []) : allowedSections
-        let adminAvailable = !(config?.adminSections.isEmpty ?? true) || sections.contains("admin")
+        let role = primaryRole()
+        let adminAvailable = config?.adminActions.contains("admin.write") == true
+            || ["ROLE_ADMIN", "ROLE_SUPER_ADMIN", "ROLE_MANAGER"].contains(role)
+        let showTrainerEdit = role == "ROLE_TRAINER"
+            || (config?.roles ?? []).contains("ROLE_TRAINER")
         state.screenTitle = "Профиль"
         state.profile = ProfileTabUi(
             name: data?.employeeName ?? env.session?.userEmail ?? "",
             email: data?.employeeEmail ?? "",
-            roleTitle: UiLabels.roleTitle(primaryRole()),
+            roleTitle: UiLabels.roleTitle(role),
+            phone: state.profile.phone,
+            specialization: state.profile.specialization,
+            description: state.profile.description,
+            photoUrl: state.profile.photoUrl,
             sections: sections
-                .filter { !["home", "profile", "admin"].contains($0) }
+                .filter {
+                    !["home", "profile", "admin"].contains($0) && !Self.hiddenAppSections.contains($0)
+                }
+                .reduce(into: [String]()) { result, key in
+                    if !result.contains(key) { result.append(key) }
+                }
                 .map { key in
                     ProfileSectionUi(key: key, title: UiLabels.sectionTitle(key), hint: SectionHints.forSection(key))
                 },
             adminAvailable: adminAvailable,
             showAdminButton: adminAvailable,
+            showTrainerProfileEdit: showTrainerEdit,
+            showClubEntryQr: showTrainerEdit,
+            showRentalManage: showTrainerEdit,
+            showFeedback: true,
+            rentalPaidUntilLabel: formatRentalUntil(
+                lastOnboarding?.activeClub?.paidUntil ?? lastOnboarding?.rentalPaidUntil,
+                title: lastOnboarding?.activeClub?.title
+            ) ?? state.profile.rentalPaidUntilLabel,
+            paidRentalClubs: lastOnboarding?.rentalClubs.filter(\.rentalActive) ?? state.profile.paidRentalClubs,
+            activeClubId: lastOnboarding?.activeClubId ?? state.profile.activeClubId,
+            offerUrl: lastOnboarding?.offerUrl ?? state.profile.offerUrl,
+            privacyUrl: lastOnboarding?.privacyUrl ?? state.profile.privacyUrl,
+            docsUrl: lastOnboarding?.docsUrl ?? state.profile.docsUrl,
             loading: data == nil
         )
         state.errorMessage = nil
 
+        if showTrainerEdit {
+            profileLoadGeneration += 1
+            let generation = profileLoadGeneration
+            Task { @MainActor in
+                do {
+                    let onboarding = try await env.withRefresh { token in
+                        try await env.apiClient.loadOnboarding(token: token)
+                    }
+                    lastOnboarding = onboarding
+                    let trainerProfile = try await env.withRefresh { token in
+                        try await env.apiClient.loadTrainerProfile(token: token)
+                    }
+                    guard generation == profileLoadGeneration, state.selectedTab == .profile else { return }
+                    if !trainerProfile.name.isEmpty {
+                        state.profile.name = trainerProfile.name
+                    }
+                    let national = RussianPhoneMask.normalizeNationalDigits(trainerProfile.phone)
+                    state.profile.phone = national.count == 10
+                        ? RussianPhoneMask.formatMask(national)
+                        : trainerProfile.phone
+                    state.profile.specialization = trainerProfile.specialization
+                    state.profile.description = trainerProfile.description
+                    state.profile.photoUrl = trainerProfile.photoUrl
+                    applyProfileRentalState(onboarding)
+                } catch {
+                    // Trainer card is optional; failures must not block the tab.
+                }
+            }
+        } else if lastOnboarding == nil {
+            Task { await refreshEntryQrState() }
+        } else if let onboarding = lastOnboarding {
+            applyProfileRentalState(onboarding)
+        }
+
         let extraSections = sections.filter {
             !["home", "profile", "schedule", "dashboard", "admin", "clients", "app_support"].contains($0)
+                && !Self.hiddenAppSections.contains($0)
         }
         if let section = extraSections.first {
             runAsyncForTab(.profile) {
@@ -510,20 +944,29 @@ final class WorkController {
         }
     }
 
-    private func scheduleToCard(_ item: ScheduleItem) -> ListCardUi {
+    private func scheduleToCard(_ item: ScheduleItem, includeDate: Bool = false) -> ListCardUi {
         let clients = item.clientNames.isEmpty
             ? (item.participants.isEmpty ? "нет записей" : item.participants)
             : item.clientNames.joined(separator: ", ")
+        let datePrefix: String = {
+            guard includeDate else { return "" }
+            let label = item.dayLabel.isEmpty ? item.date : item.dayLabel
+            return "\(label) · "
+        }()
         return ListCardUi(
-            title: "\(item.startTime)–\(item.endTime)  \(item.title)",
+            title: "\(datePrefix)\(item.startTime)–\(item.endTime)  \(item.title)",
             subtitle: "Клиенты: \(clients)",
-            meta: "\(UiLabels.trainingType(item.type)) · \(item.trainer) · \(item.room)"
+            meta: "\(UiLabels.trainingType(item.type)) · \(item.trainer) · \(item.room)",
+            trainingId: item.id,
+            trainingDate: item.date
         )
     }
 
     private func scheduleToSession(_ item: ScheduleItem) -> ScheduleSessionUi {
         let (booked, max) = parseParticipants(item.participants)
         return ScheduleSessionUi(
+            trainingId: item.id,
+            date: item.date,
             title: item.title,
             type: item.type,
             typeLabel: UiLabels.trainingType(item.type),
@@ -532,10 +975,182 @@ final class WorkController {
             durationMinutes: durationMinutes(item.startTime, item.endTime),
             trainer: item.trainer,
             room: item.room,
-            bookedCount: booked,
-            maxParticipants: max,
-            clientNames: item.clientNames
+            bookedCount: item.currentParticipants ?? booked,
+            maxParticipants: item.maxParticipants ?? max,
+            clientNames: item.clientNames,
+            bookings: item.bookings.map { b in
+                let cid: Int? = {
+                    guard let raw = b.clientId, !raw.isEmpty else { return nil }
+                    if raw.hasPrefix("user-") {
+                        return Int(raw.dropFirst(5))
+                    }
+                    return Int(raw)
+                }()
+                return ScheduleBookingUi(id: b.id, clientName: b.clientName, clientId: cid)
+            }
         )
+    }
+
+    func openAssignDialog(for session: ScheduleSessionUi) {
+        guard let trainingId = session.trainingId, !trainingId.isEmpty else { return }
+        assignDialogSession = session
+        state.assignDialog = AssignClientDialogUi(
+            trainingId: trainingId,
+            sessionTitle: "\(session.startTime) \(session.title)",
+            booked: session.bookings.map { b in
+                ListCardUi(title: b.clientName, meta: b.id, clientId: b.clientId)
+            }
+        )
+        searchAssignClients()
+    }
+
+    func dismissAssignDialog() {
+        state.assignDialog = nil
+        assignDialogSession = nil
+    }
+
+    func onAssignQueryChange(_ query: String) {
+        state.assignDialog?.query = query
+    }
+
+    func searchAssignClients() {
+        guard var dialog = state.assignDialog else { return }
+        dialog.loading = true
+        dialog.errorMessage = nil
+        state.assignDialog = dialog
+        let query = dialog.query
+        Task { @MainActor in
+            do {
+                let clients = try await env.withRefresh { token in
+                    try await env.apiClient.loadClients(token: token, query: query)
+                }
+                guard state.assignDialog?.trainingId == dialog.trainingId else { return }
+                state.assignDialog?.clients = clients.map { c in
+                    ListCardUi(
+                        title: c.name.isEmpty ? "Клиент #\(c.id)" : c.name,
+                        subtitle: [c.email, c.phone].filter { !$0.isEmpty }.joined(separator: " · "),
+                        clientId: c.id
+                    )
+                }
+                state.assignDialog?.loading = false
+            } catch {
+                state.assignDialog?.loading = false
+                state.assignDialog?.errorMessage = UserFacingError.message(error)
+            }
+        }
+    }
+
+    func bookAssignClient(_ clientId: Int) {
+        guard let dialog = state.assignDialog else { return }
+        let trainingId = dialog.trainingId
+        state.assignDialog?.loading = true
+        Task { @MainActor in
+            do {
+                try await env.withRefresh { token in
+                    try await env.apiClient.bookClientOnTraining(
+                        token: token,
+                        trainingId: trainingId,
+                        clientId: clientId
+                    )
+                }
+                scheduleData = nil
+                let schedule = try await loadScheduleCached(forceRefresh: true)
+                if state.selectedTab == .schedule {
+                    renderSchedule(schedule)
+                }
+                if let item = schedule.items.first(where: { $0.id == trainingId }) {
+                    openAssignDialog(for: scheduleToSession(item))
+                } else {
+                    state.assignDialog = nil
+                    assignDialogSession = nil
+                }
+                state.statusMessage = "Клиент записан"
+            } catch {
+                state.assignDialog?.loading = false
+                state.assignDialog?.errorMessage = UserFacingError.message(error)
+            }
+        }
+    }
+
+    func cancelAssignBooking(_ bookingId: String) {
+        guard state.assignDialog != nil else { return }
+        state.assignDialog?.loading = true
+        Task { @MainActor in
+            do {
+                let trainingRemoved = try await env.withRefresh { token in
+                    try await env.apiClient.cancelStaffBooking(token: token, bookingId: bookingId)
+                }
+                scheduleData = nil
+                state.assignDialog = nil
+                assignDialogSession = nil
+                if state.selectedTab == .schedule {
+                    showScheduleTab()
+                }
+                state.statusMessage = trainingRemoved
+                    ? "Запись снята, занятие убрано из расписания"
+                    : "Запись снята"
+            } catch {
+                state.assignDialog?.loading = false
+                state.assignDialog?.errorMessage = UserFacingError.message(error)
+            }
+        }
+    }
+
+    func updateTrainingSession(
+        trainingId: String,
+        name: String,
+        date: Date,
+        startTime: Date,
+        durationMinutes: Int,
+        room: String
+    ) async throws {
+        let cal = Calendar.current
+        let day = cal.dateComponents([.year, .month, .day], from: date)
+        let time = cal.dateComponents([.hour, .minute], from: startTime)
+        guard let y = day.year, let m = day.month, let d = day.day,
+              let hour = time.hour, let minute = time.minute else {
+            throw StaffApiError.parseFailed("Некорректная дата")
+        }
+        if durationMinutes <= 0 {
+            throw StaffApiError.parseFailed("Выберите длительность занятия")
+        }
+        var startComponents = DateComponents()
+        startComponents.year = y
+        startComponents.month = m
+        startComponents.day = d
+        startComponents.hour = hour
+        startComponents.minute = minute
+        guard let start = cal.date(from: startComponents),
+              let end = cal.date(byAdding: .minute, value: durationMinutes, to: start) else {
+            throw StaffApiError.parseFailed("Некорректная дата")
+        }
+        let endParts = cal.dateComponents([.year, .month, .day, .hour, .minute], from: end)
+        if endParts.year != y || endParts.month != m || endParts.day != d || !endParts.isAfterSameDay(hour: hour, minute: minute) {
+            throw StaffApiError.parseFailed("Занятие должно заканчиваться в тот же день. Уменьшите длительность или измените время начала.")
+        }
+        let dateLabel = String(format: "%04d-%02d-%02d", y, m, d)
+        let startTimeLabel = String(format: "%02d:%02d", hour, minute)
+        let endTimeLabel = String(format: "%02d:%02d", endParts.hour ?? 0, endParts.minute ?? 0)
+        let roomTrimmed = room.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nameTrimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedName = nameTrimmed.isEmpty ? "Персональная тренировка" : nameTrimmed
+        let updated = try await env.withRefresh { token in
+            try await env.apiClient.updateTraining(
+                token: token,
+                trainingId: trainingId,
+                name: resolvedName,
+                startAtIso: "\(dateLabel)T\(startTimeLabel):00",
+                endAtIso: "\(dateLabel)T\(endTimeLabel):00",
+                room: roomTrimmed.isEmpty ? nil : roomTrimmed
+            )
+        }
+        scheduleData = nil
+        selectedScheduleDate = updated.date.isEmpty ? dateLabel : updated.date
+        ensureScheduleWindowContains(selectedScheduleDate)
+        if state.selectedTab == .schedule {
+            showScheduleTab()
+        }
+        state.statusMessage = "Занятие обновлено"
     }
 
     private func parseDayLabel(_ label: String) -> (String, String) {
@@ -597,29 +1212,78 @@ final class WorkController {
     }
 
     private func primaryRole() -> String {
-        let roles = env.roleConfig?.roles ?? []
+        let roles = Array(Set((env.roleConfig?.roles ?? []) + (appData?.roles ?? [])))
         let priority = [
             "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_TRAINER", "ROLE_MANAGER",
             "ROLE_SUPPORT", "ROLE_FINANCE", "ROLE_VIEWER",
         ]
-        return priority.first { roles.contains($0) } ?? roles.first ?? "ROLE_VIEWER"
+        return priority.first { roles.contains($0) }
+            ?? roles.first { $0 != "ROLE_STAFF" }
+            ?? "ROLE_VIEWER"
     }
 
     private func todayDate() -> String {
-        let cal = Calendar.current
-        let y = cal.component(.year, from: Date())
-        let m = cal.component(.month, from: Date())
-        let d = cal.component(.day, from: Date())
-        return String(format: "%04d-%02d-%02d", y, m, d)
+        Self.dayFormatter.string(from: Date())
     }
+
+    private func tomorrowDate() -> String {
+        let cal = Calendar.current
+        let day = cal.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        return Self.dayFormatter.string(from: day)
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     private func loadScheduleCached(forceRefresh: Bool = false) async throws -> ScheduleData {
         if !forceRefresh, let scheduleData { return scheduleData }
+        let from = scheduleFromDate
         let data = try await env.withRefresh { token in
-            try await env.apiClient.loadSchedule(token: token)
+            try await env.apiClient.loadSchedule(token: token, from: from)
         }
         scheduleData = data
         return data
+    }
+
+    private func openExternalUrl(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let url = URL(string: trimmed) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    private func requestOrOpenNotificationSettings() {
+        Task { @MainActor in
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            switch settings.authorizationStatus {
+            case .notDetermined:
+                _ = try? await UNUserNotificationCenter.current()
+                    .requestAuthorization(options: [.alert, .sound, .badge])
+                refreshNotificationPermissionBanner()
+            case .denied:
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    await UIApplication.shared.open(url)
+                }
+                refreshNotificationPermissionBanner()
+            default:
+                refreshNotificationPermissionBanner()
+            }
+        }
+    }
+
+    private func refreshNotificationPermissionBanner() {
+        Task { @MainActor in
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            let enabled = settings.authorizationStatus == .authorized
+                || settings.authorizationStatus == .provisional
+                || settings.authorizationStatus == .ephemeral
+            state.home.needNotificationsPermission = !enabled
+        }
     }
 
     private func runAsync(_ message: String, action: @escaping () async throws -> Void) {
@@ -653,5 +1317,13 @@ final class WorkController {
                 }
             }
         }
+    }
+}
+
+private extension DateComponents {
+    func isAfterSameDay(hour: Int, minute: Int) -> Bool {
+        let eh = self.hour ?? 0
+        let em = self.minute ?? 0
+        return eh > hour || (eh == hour && em > minute)
     }
 }

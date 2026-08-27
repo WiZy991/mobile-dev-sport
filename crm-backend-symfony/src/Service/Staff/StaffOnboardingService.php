@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Staff;
 
+use App\Entity\Club;
 use App\Entity\Organization;
 use App\Entity\StaffUser;
 use App\Entity\Trainer;
@@ -202,6 +203,8 @@ final class StaffOnboardingService
             'rental_active' => $rentalActive,
             'active_club_id' => $activeClub?->getId(),
             'active_club' => $activeClubRow,
+            'entry_qr_format' => $activeClub?->getEntryQrFormat()
+                ?? ($activeClubRow['entry_qr_format'] ?? Club::ENTRY_QR_ASCII),
             'rental_clubs' => $clubs,
             'rental_days' => StaffClubRentalService::RENTAL_DAYS,
             'offer_accepted_at' => $user->getOfferAcceptedAt()?->format('Y-m-d\TH:i:s'),

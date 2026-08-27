@@ -15,8 +15,10 @@ struct RoleConfig: Codable, Equatable {
 }
 
 struct StaffAppData {
+    let employeeId: Int
     let employeeName: String
     let employeeEmail: String
+    let roles: [String]
     let sections: [String]
     let metrics: [String: Int]
 }
@@ -41,6 +43,7 @@ struct ScheduleDay {
 }
 
 struct ScheduleItem {
+    let id: String?
     let title: String
     let trainer: String
     let type: String
@@ -53,6 +56,16 @@ struct ScheduleItem {
     let room: String
     let clientNames: [String]
     let participants: String
+    var maxParticipants: Int?
+    var currentParticipants: Int?
+    var bookings: [ScheduleBookingRow] = []
+}
+
+struct ScheduleBookingRow {
+    let id: String
+    let clientName: String
+    let clientId: String?
+    let status: String
 }
 
 struct ScheduleData {
@@ -86,6 +99,7 @@ struct ClientSummary {
     let name: String
     let email: String
     let phone: String
+    var hasActiveBooking: Bool = false
 }
 
 struct ClientSubscription {
@@ -99,6 +113,7 @@ struct ClientSubscription {
 struct ClientDetailRow {
     let title: String
     let meta: String
+    var isUpcoming: Bool = false
 }
 
 struct ClientDetail {

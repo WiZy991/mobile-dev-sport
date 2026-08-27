@@ -19,7 +19,7 @@ final class LoginController {
     private var autoLoginStarted = false
 
     private let roleOptions: [RoleOptionUi] = [
-        RoleOptionUi(label: "Тренер", role: "ROLE_TRAINER"),
+        RoleOptionUi(label: "Специалист", role: "ROLE_TRAINER"),
         RoleOptionUi(label: "Менеджер", role: "ROLE_MANAGER"),
         RoleOptionUi(label: "Финансы", role: "ROLE_FINANCE"),
         RoleOptionUi(label: "Наблюдатель", role: "ROLE_VIEWER"),
@@ -78,12 +78,25 @@ final class LoginController {
     }
 
     func register() {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            errorMessage = "Укажите имя"
+            return
+        }
+        guard !trimmedEmail.isEmpty else {
+            errorMessage = "Введите email"
+            return
+        }
+        guard !password.isEmpty else {
+            errorMessage = "Введите пароль"
+            return
+        }
         runAsync(status: "Регистрация...") {
             let session = try await self.env.apiClient.register(
-                email: self.email.trimmingCharacters(in: .whitespacesAndNewlines),
-                name: self.name.trimmingCharacters(in: .whitespacesAndNewlines),
-                password: self.password,
-                role: self.selectedRole?.role ?? self.roleOptions[0].role
+                email: trimmedEmail,
+                name: trimmedName,
+                password: self.password
             )
             self.env.session = session
             self.env.sessionStore.saveSession(session)

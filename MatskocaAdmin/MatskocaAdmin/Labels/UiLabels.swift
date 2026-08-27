@@ -2,7 +2,7 @@ import Foundation
 
 enum UiLabels {
     private static let roleMap: [String: String] = [
-        "ROLE_TRAINER": "Тренер",
+        "ROLE_TRAINER": "Специалист",
         "ROLE_MANAGER": "Менеджер",
         "ROLE_FINANCE": "Финансы",
         "ROLE_VIEWER": "Наблюдатель",
@@ -58,6 +58,9 @@ enum UiLabels {
         case "clients": return "Клиенты"
         case "bookings": return "Записи"
         case "subscriptions": return "Абонементы"
+        case "my_bookings_today": return "Записи сегодня"
+        case "my_bookings_week": return "Записи на 7 дней"
+        case "my_clients_active": return "Клиенты с записью"
         case "tasks_open": return "Открытые задачи"
         case "tasks_done": return "Закрытые задачи"
         case "all_clients": return "Всего клиентов"
@@ -118,6 +121,27 @@ enum UiLabels {
         case "group": return "Групповая"
         case "extra": return "Услуга"
         default: return "Занятие"
+        }
+    }
+
+    static func subscriptionStatus(_ status: String) -> String {
+        switch status {
+        case "active": return "Активен"
+        case "expired": return "Истёк"
+        case "frozen": return "Заморожен"
+        case "cancelled", "canceled": return "Отменён"
+        case "pending": return "Ожидает оплаты"
+        default: return status
+        }
+    }
+
+    static func paymentStatus(_ status: String) -> String {
+        switch status.lowercased() {
+        case "paid", "succeeded", "success": return "Оплачено"
+        case "pending", "waiting", "new": return "Ожидает оплаты"
+        case "failed", "error": return "Ошибка"
+        case "cancelled", "canceled": return "Отменён"
+        default: return status
         }
     }
 }

@@ -160,10 +160,6 @@ struct ClientDetailView: View {
                         if controller.state.isBlocked {
                             StaffInfoBanner(text: "Клиент заблокирован", color: StaffColors.error)
                         }
-                        StaffListCard(item: ListCardUi(
-                            title: "Бонусы",
-                            subtitle: "\(controller.state.bonusPoints) баллов"
-                        ))
                         StaffSectionTitle(title: "Абонемент")
                         StaffListCard(item: ListCardUi(
                             title: controller.state.subscriptionTitle.isEmpty ? "Нет активного абонемента" : controller.state.subscriptionTitle,
@@ -180,11 +176,33 @@ struct ClientDetailView: View {
                                 }
                             }
                         }
-                        StaffSectionTitle(title: "Последние записи")
-                        if controller.state.bookings.isEmpty {
-                            StaffEmptyState(message: "Нет записей", icon: "calendar")
+                        StaffSectionTitle(title: "Записи")
+                        HStack(spacing: 8) {
+                            bookingChip(
+                                "Активные (\(controller.state.activeBookings.count))",
+                                selected: controller.state.bookingTab == .active
+                            ) {
+                                controller.state.bookingTab = .active
+                            }
+                            bookingChip(
+                                "Завершённые (\(controller.state.completedBookings.count))",
+                                selected: controller.state.bookingTab == .completed
+                            ) {
+                                controller.state.bookingTab = .completed
+                            }
+                        }
+                        let bookings = controller.state.bookingTab == .active
+                            ? controller.state.activeBookings
+                            : controller.state.completedBookings
+                        if bookings.isEmpty {
+                            StaffEmptyState(
+                                message: controller.state.bookingTab == .active
+                                    ? "Нет активных записей"
+                                    : "Нет завершённых записей",
+                                icon: "calendar"
+                            )
                         } else {
-                            ForEach(controller.state.bookings) { StaffListCard(item: $0) }
+                            ForEach(bookings) { StaffListCard(item: $0) }
                         }
                         StaffSectionTitle(title: "Обращения")
                         if controller.state.tickets.isEmpty {
@@ -212,5 +230,18 @@ struct ClientDetailView: View {
         }
         .staffToolbarStyle()
         .onAppear { controller.loadClient() }
+    }
+
+    private func bookingChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(selected ? StaffColors.primary : StaffColors.primary.opacity(0.12))
+                .foregroundStyle(selected ? StaffColors.onPrimary : StaffColors.primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
