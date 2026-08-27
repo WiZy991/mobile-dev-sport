@@ -2108,6 +2108,12 @@ class AdminController extends AbstractController
         $description = is_string($description) ? trim($description) : '';
         $description = $description !== '' ? $description : null;
         $phone = $this->normalizeTrainerPhone($request->request->get('phone'));
+        $email = $this->normalizeTrainerEmail($request->request->get('email'));
+        if ($email !== null && $this->trainerEmailTaken($email)) {
+            $this->addFlash('danger', 'Этот email уже указан у другого тренера.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+        }
 
         $publicationStatus = Trainer::normalizePublicationStatus(
             $request->request->get('publication_status'),
@@ -2118,6 +2124,7 @@ class AdminController extends AbstractController
             ->setName($name)
             ->setSpecialization($specialization)
             ->setPhone($phone)
+            ->setEmail($email)
             ->setRating($rating)
             ->setDescription($description)
             ->setPublicationStatus($publicationStatus);
@@ -2282,10 +2289,17 @@ class AdminController extends AbstractController
         $description = is_string($description) ? trim($description) : '';
         $description = $description !== '' ? $description : null;
         $phone = $this->normalizeTrainerPhone($request->request->get('phone'));
+        $email = $this->normalizeTrainerEmail($request->request->get('email'));
+        if ($email !== null && $this->trainerEmailTaken($email, $trainer->getId())) {
+            $this->addFlash('danger', 'Этот email уже указан у другого тренера.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+        }
 
         $trainer->setName((string) $request->request->get('name'))
             ->setSpecialization($request->request->get('specialization') ?: null)
             ->setPhone($phone)
+            ->setEmail($email)
             ->setDescription($description);
         $ratingRaw = $request->request->get('rating');
         $trainer->setRating($ratingRaw !== '' && $ratingRaw !== null ? (float) $ratingRaw : null);
@@ -2323,6 +2337,33 @@ class AdminController extends AbstractController
         }
 
         return '+' . $digits;
+    }
+
+    private function normalizeTrainerEmail(mixed $raw): ?string
+    {
+        if (!\is_string($raw)) {
+            return null;
+        }
+        $email = mb_strtolower(trim($raw));
+        if ($email === '' || !filter_var($email, \FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        return $email;
+    }
+
+    private function trainerEmailTaken(string $email, ?int $exceptTrainerId = null): bool
+    {
+        $qb = $this->em->createQueryBuilder()
+            ->select('COUNT(t.id)')
+            ->from(Trainer::class, 't')
+            ->where('LOWER(t.email) = :email')
+            ->setParameter('email', mb_strtolower($email));
+        if ($exceptTrainerId !== null && $exceptTrainerId > 0) {
+            $qb->andWhere('t.id != :except')->setParameter('except', $exceptTrainerId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
 
     #[Route('/trainings/{id}/delete', name: 'admin_training_delete', methods: ['POST'])]

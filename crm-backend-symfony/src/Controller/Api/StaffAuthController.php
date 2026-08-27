@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\StaffNotification;
 use App\Entity\StaffUser;
+use App\Entity\Trainer;
 use App\Service\Api\StaffMobileAuthTokenIssuer;
 use App\Service\Staff\StaffEventNotifier;
 use App\Service\Staff\StaffOnboardingService;
@@ -30,12 +31,20 @@ final class StaffAuthController extends AbstractController
     public function register(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true) ?? [];
-        $email = trim((string) ($data['email'] ?? ''));
+        $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         $name = trim((string) ($data['name'] ?? 'Новый тренер'));
         $password = (string) ($data['password'] ?? '');
 
         if ($email === '' || $password === '') {
             return $this->json(['error' => 'Укажите email и password', 'code' => 'missing_credentials'], 400);
+        }
+        if (!filter_var($email, \FILTER_VALIDATE_EMAIL)) {
+            return $this->json(['error' => 'Некорректный email', 'code' => 'invalid_email'], 400);
+        }
+
+        $trainer = $this->findTrainerByEmail($email);
+        if ($trainer instanceof Trainer) {
+            return $this->registerClaimingTrainer($trainer, $email, $name, $password);
         }
 
         $existing = $this->em->getRepository(StaffUser::class)->findOneBy(['email' => $email]);
@@ -67,11 +76,84 @@ final class StaffAuthController extends AbstractController
         return $this->json($issued, 201);
     }
 
+    /**
+     * Email совпал с карточкой тренера в CRM → сразу одобренный StaffUser + вход.
+     */
+    private function registerClaimingTrainer(
+        Trainer $trainer,
+        string $email,
+        string $name,
+        string $password,
+    ): JsonResponse {
+        $linked = $this->em->getRepository(StaffUser::class)->findOneBy(['trainer' => $trainer]);
+        $byEmail = $this->em->getRepository(StaffUser::class)->findOneBy(['email' => $email]);
+
+        if ($linked instanceof StaffUser && $byEmail instanceof StaffUser && $linked->getId() !== $byEmail->getId()) {
+            return $this->json([
+                'error' => 'Эта карточка тренера уже привязана к другому аккаунту',
+                'code' => 'trainer_already_linked',
+            ], 409);
+        }
+
+        $user = $linked ?? $byEmail;
+        $isNew = false;
+        if (!$user instanceof StaffUser) {
+            $isNew = true;
+            $user = (new StaffUser())
+                ->setEmail($email)
+                ->setRoles(['ROLE_TRAINER']);
+            $this->em->persist($user);
+        }
+
+        $displayName = $name !== '' && $name !== 'Новый тренер'
+            ? $name
+            : ($trainer->getName() !== '' ? $trainer->getName() : $email);
+
+        $user
+            ->setEmail($email)
+            ->setName($displayName)
+            ->setRoles(['ROLE_TRAINER'])
+            ->setRegistrationStatus(StaffUser::REGISTRATION_APPROVED)
+            ->setIsActive(true)
+            ->setTrainer($trainer);
+
+        if ($trainer->getOrganization() !== null) {
+            $user->setOrganization($trainer->getOrganization());
+        }
+        if ($trainer->getEmail() === null || $trainer->getEmail() === '') {
+            $trainer->setEmail($email);
+        }
+
+        $user->setPassword($this->passwordHasher->hashPassword($user, $password));
+        $this->em->flush();
+
+        $issued = $this->tokens->issue($user, $isNew);
+        $issued['onboarding'] = $this->onboarding->serialize($user);
+        $issued['claimed_trainer'] = true;
+
+        return $this->json($issued, $isNew ? 201 : 200);
+    }
+
+    private function findTrainerByEmail(string $email): ?Trainer
+    {
+        /** @var Trainer|null $trainer */
+        $trainer = $this->em->createQueryBuilder()
+            ->select('t')
+            ->from(Trainer::class, 't')
+            ->where('LOWER(t.email) = :email')
+            ->setParameter('email', mb_strtolower($email))
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $trainer instanceof Trainer ? $trainer : null;
+    }
+
     #[Route('/login', name: 'api_staff_auth_login', methods: ['POST'])]
     public function login(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true) ?? [];
-        $email = trim((string) ($data['email'] ?? ''));
+        $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         $password = (string) ($data['password'] ?? '');
 
         $user = $this->em->getRepository(StaffUser::class)->findOneBy(['email' => $email]);

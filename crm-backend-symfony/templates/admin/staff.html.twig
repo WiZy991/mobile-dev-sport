@@ -56,6 +56,10 @@
             <label class="form-label small text-secondary">Телефон</label>
             <input type="tel" name="phone" class="form-control form-control-sm" placeholder="+7 (___) ___-__-__" inputmode="tel" maxlength="18" data-phone-mask>
         </div>
+        <div class="col-md-3">
+            <label class="form-label small text-secondary">Email (вход в приложение специалиста)</label>
+            <input type="email" name="email" class="form-control form-control-sm" placeholder="trainer@example.com" autocomplete="off">
+        </div>
         <div class="col-12">
             <label class="form-label small text-secondary">О себе (для приложения)</label>
             <textarea name="description" class="form-control form-control-sm" rows="3" placeholder="Кратко о опыте, подходе к тренировкам — текст увидят клиенты в карточке тренера."></textarea>
@@ -75,6 +79,7 @@
                 <th style="width:3rem">ID</th>
                 <th style="width:5.5rem">Фото</th>
                 <th>Имя</th>
+                <th>Email</th>
                 <th>Специализация</th>
                 <th>Рейтинг</th>
                 <th>В приложении</th>
@@ -122,6 +127,7 @@
                         {{ t.name }}
                         <a href="{{ path('admin_section', {section: 'schedule'}) }}?date={{ "now"|date("Y-m-d") }}" class="btn btn-sm btn-outline-secondary ms-1 py-0" title="Расписание">📅</a>
                     </td>
+                    <td class="small">{{ t.email ?? '—' }}</td>
                     <td>{{ t.specialization ?? '—' }}</td>
                     <td>{{ t.rating is not null ? t.rating : '—' }}</td>
                     <td>
@@ -157,7 +163,7 @@
                 </tr>
                 {% if admin_can_coach() %}
                 <tr class="collapse" id="edit-trainer-{{ t.id }}">
-                        <td colspan="7" class="bg-dark py-2">
+                        <td colspan="8" class="bg-dark py-2">
                             <form method="post" action="{{ path('admin_trainer_update', {id: t.id}) }}" class="row g-2 align-items-end">
                                 <div class="col-md-2">
                                     <label class="form-label small mb-0">Имя</label>
@@ -182,6 +188,10 @@
                                 <div class="col-md-2">
                                     <label class="form-label small mb-0">Телефон</label>
                                     <input type="tel" name="phone" class="form-control form-control-sm" value="{{ t.phone ?? '' }}" placeholder="+7 (___) ___-__-__" inputmode="tel" maxlength="18" data-phone-mask>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Email (staffapp)</label>
+                                    <input type="email" name="email" class="form-control form-control-sm" value="{{ t.email ?? '' }}" placeholder="trainer@example.com" autocomplete="off">
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label small mb-0">О себе (для приложения)</label>

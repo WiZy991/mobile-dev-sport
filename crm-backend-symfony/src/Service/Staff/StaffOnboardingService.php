@@ -280,6 +280,7 @@ final class StaffOnboardingService
         $trainer = (new Trainer())
             ->setName($user->getName() !== '' ? $user->getName() : $user->getEmail())
             ->setSpecialization('') // пусто — пока тренер не выберет из справочника (п.16/17)
+            ->setEmail($user->getEmail())
             ->setPublicationStatus(Trainer::STATUS_MODERATION)
             ->setOrganization($org);
         $this->em->persist($trainer);

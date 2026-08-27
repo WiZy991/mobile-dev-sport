@@ -43,6 +43,10 @@ class Trainer implements TenantAware
     #[ORM\Column(type: 'string', length: 50, nullable: true)]
     private ?string $phone = null;
 
+    /** Email для входа в staffapp (совпадение при «Регистрация»). */
+    #[ORM\Column(type: 'string', length: 180, nullable: true)]
+    private ?string $email = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -120,6 +124,19 @@ class Trainer implements TenantAware
     public function setPhone(?string $phone): self
     {
         $this->phone = $phone;
+        return $this;
+    }
+
+    public function getEmail(): ?string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(?string $email): self
+    {
+        $email = $email !== null ? trim($email) : null;
+        $this->email = ($email === null || $email === '') ? null : mb_strtolower($email);
+
         return $this;
     }
 
