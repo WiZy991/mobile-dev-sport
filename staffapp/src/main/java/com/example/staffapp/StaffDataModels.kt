@@ -124,6 +124,8 @@ data class RentalClubOption(
     val rentalActive: Boolean = false,
     val isActiveClub: Boolean = false,
     val days: Int = 30,
+    /** ascii | wiegand — как у клиентского клуба. */
+    val entryQrFormat: String? = null,
 ) {
     val title: String
         get() = if (address.isNotBlank() && !name.contains(address, ignoreCase = true)) {

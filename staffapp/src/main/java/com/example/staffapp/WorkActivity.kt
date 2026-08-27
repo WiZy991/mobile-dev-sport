@@ -638,12 +638,17 @@ class WorkActivity : ComponentActivity() {
                 entryQrStaffUserId = staffUserId.takeIf { it > 0 } ?: uiState.home.entryQrStaffUserId,
                 entryQrActive = active,
                 entryQrBlockedMessage = blocked,
+                entryQrFormat = onboarding.activeClub?.entryQrFormat,
+                entryQrHallLabel = onboarding.activeClub?.title
+                    ?: onboarding.activeClub?.name,
+                entryQrPaidClubs = paidClubs,
+                entryQrActiveClubId = onboarding.activeClubId,
             ),
         )
     }
 
     private fun setActiveRentalClub(clubId: Int) {
-        runAsyncForTab(WorkUiState.TAB_PROFILE, "Меняем зал...") {
+        runAsyncForTab(uiState.selectedTab, "Меняем зал...") {
             val onboarding = withRefresh { token -> apiClient.setActiveRentalClub(token, clubId) }
             lastOnboarding = onboarding
             runOnUiThread {

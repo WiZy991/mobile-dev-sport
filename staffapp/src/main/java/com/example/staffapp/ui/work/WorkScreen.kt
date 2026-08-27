@@ -168,6 +168,11 @@ fun WorkScreen(
                 staffUserId = state.home.entryQrStaffUserId,
                 rentalActive = state.home.entryQrActive,
                 blockedMessage = state.home.entryQrBlockedMessage,
+                entryQrFormat = state.home.entryQrFormat,
+                hallLabel = state.home.entryQrHallLabel,
+                paidRentalClubs = state.home.entryQrPaidClubs,
+                activeClubId = state.home.entryQrActiveClubId,
+                onSelectClub = { clubId -> onAction("set_active_club:$clubId") },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             Spacer(modifier = Modifier.height(24.dp))

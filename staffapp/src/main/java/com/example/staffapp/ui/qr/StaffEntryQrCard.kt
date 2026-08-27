@@ -2,16 +2,21 @@ package com.example.staffapp.ui.qr
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.staffapp.RentalClubOption
 import com.example.staffapp.ui.components.StaffInfoBanner
 import com.example.staffapp.ui.theme.StaffOnSurfaceVariant
 import com.example.staffapp.ui.theme.StaffPrimary
@@ -43,17 +49,22 @@ fun StaffEntryQrCard(
     blockedMessage: String?,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    entryQrFormat: String? = null,
+    hallLabel: String? = null,
+    paidRentalClubs: List<RentalClubOption> = emptyList(),
+    activeClubId: Int? = null,
+    onSelectClub: ((Int) -> Unit)? = null,
 ) {
     var secondsLeft by remember { mutableIntStateOf(15) }
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-    LaunchedEffect(staffUserId, rentalActive) {
+    LaunchedEffect(staffUserId, rentalActive, entryQrFormat) {
         if (!rentalActive || staffUserId <= 0) {
             bitmap = null
             return@LaunchedEffect
         }
         while (isActive) {
-            val payload = buildStaffEntryQr(staffUserId, System.currentTimeMillis())
+            val payload = buildStaffEntryQr(staffUserId, System.currentTimeMillis(), entryQrFormat)
             bitmap = encodeStaffQrBitmap(payload, if (compact) 512 else 720)
             secondsLeft = 15
             repeat(15) {
@@ -82,6 +93,45 @@ fun StaffEntryQrCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
+            if (!hallLabel.isNullOrBlank()) {
+                Text(
+                    "Зал: $hallLabel",
+                    color = StaffOnSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            if (paidRentalClubs.size > 1 && onSelectClub != null) {
+                Text(
+                    "На какой зал QR",
+                    color = StaffOnSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    paidRentalClubs.forEach { club ->
+                        val selected = club.clubId == activeClubId
+                        FilterChip(
+                            selected = selected,
+                            onClick = { onSelectClub(club.clubId) },
+                            label = {
+                                Text(
+                                    club.name.ifBlank { club.title },
+                                    maxLines = 1,
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = StaffPrimary.copy(alpha = 0.18f),
+                                selectedLabelColor = StaffPrimary,
+                            ),
+                        )
+                    }
+                }
+            }
             if (!rentalActive || staffUserId <= 0) {
                 StaffInfoBanner(
                     blockedMessage
@@ -119,7 +169,14 @@ fun StaffEntryQrCard(
     }
 }
 
-fun buildStaffEntryQr(staffUserId: Int, timestampMs: Long): String {
+fun buildStaffEntryQr(
+    staffUserId: Int,
+    timestampMs: Long,
+    entryQrFormat: String? = null,
+): String {
+    if (WiegandEntryQrCodec.usesWiegandNumeric(entryQrFormat)) {
+        return WiegandEntryQrCodec.encode(staffUserId, timestampMs)
+    }
     return "FITNESSCLUB:STAFF:$staffUserId:${encodeTimestampBase62(timestampMs)}"
 }
 

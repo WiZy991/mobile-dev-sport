@@ -833,6 +833,7 @@ private fun parseOnboarding(json: JSONObject): StaffOnboarding {
                 rentalActive = row.optBoolean("rental_active", false),
                 isActiveClub = row.optBoolean("is_active_club", false),
                 days = row.optInt("days", 30).coerceAtLeast(1),
+                entryQrFormat = row.optString("entry_qr_format").takeIf { it.isNotBlank() },
             )
         }
     }

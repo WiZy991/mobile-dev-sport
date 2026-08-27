@@ -107,6 +107,28 @@ class GatewayController extends AbstractController
             return $this->handleStaffEntry($club, $entryParsed['parts'], $log);
         }
 
+        // Wiegand (7 цифр): тренер с арендой на этот зал или клиент.
+        if ($entryParsed['kind'] === 'wiegand') {
+            $uidMod = (int) $entryParsed['user_id'];
+            $staffMatches = $this->findStaffWithValidRentalByWiegandMod($club, $uidMod);
+            /** @var User|null $clientPeek */
+            $clientPeek = $this->em->getRepository(User::class)->find($uidMod);
+            $clientLikely = $clientPeek instanceof User
+                && !$clientPeek->isBlocked()
+                && $this->subscriptionGateResolver->resolveForEntry($clientPeek, $club)[1] === null;
+
+            if ($staffMatches !== [] && $clientLikely) {
+                return $this->denied($log, 'ambiguous_qr', 409, ['club_id' => $club->getId()]);
+            }
+            if (\count($staffMatches) > 1) {
+                return $this->denied($log, 'ambiguous_qr', 409, ['club_id' => $club->getId()]);
+            }
+            if ($staffMatches !== []) {
+                return $this->grantStaffEntryValidated($club, $staffMatches[0], $log);
+            }
+            // Иначе — клиентский путь ниже (тот же user_id / timestamp из Wiegand).
+        }
+
         $userId = $entryParsed['user_id'];
         $timestamp = $entryParsed['timestamp_ms'];
         $timeSegment = $entryParsed['time_segment'];
@@ -255,6 +277,26 @@ class GatewayController extends AbstractController
         $parts = explode(':', $qr);
         if (count($parts) >= 3 && $parts[0] === 'FITNESSCLUB' && $parts[1] === 'STAFF') {
             return $this->handleStaffExit($club, $parts, $log);
+        }
+
+        if (WiegandEntryQrCodec::isPayload($qr)) {
+            $parsed = WiegandEntryQrCodec::parse($qr);
+            if ($parsed === null) {
+                return $this->denied($log, 'invalid_format', 400);
+            }
+            $uidMod = (int) $parsed['user_id'];
+            $staffMatches = $this->findStaffWithValidRentalByWiegandMod($club, $uidMod);
+            /** @var User|null $user */
+            $user = $this->em->getRepository(User::class)->find($uidMod);
+            $clientLikely = $user instanceof User && !$user->isBlocked()
+                && $this->subscriptionGateResolver->resolveForEntry($user, $club)[1] === null;
+
+            if ($staffMatches !== [] && $clientLikely) {
+                return $this->denied($log, 'ambiguous_qr', 409, ['club_id' => $club->getId()]);
+            }
+            if ($staffMatches !== []) {
+                return $this->grantStaffExit($club, $staffMatches[0], $log);
+            }
         }
 
         $userId = $this->parseGatewayExitUserId($qr);
@@ -559,6 +601,35 @@ class GatewayController extends AbstractController
             ]);
         }
 
+        return $this->grantStaffEntryValidated($club, $staff, $log);
+    }
+
+    /**
+     * Wiegand / ascii STAFF после проверки окна времени: approval + аренда на зал.
+     */
+    private function grantStaffEntryValidated(
+        Club $club,
+        StaffUser $staff,
+        AccessLog $log,
+    ): JsonResponse {
+        $dup = $this->occupancyService->findRecentGrantedByRawQr($log->getRawData(), self::QR_DEDUPE_SECONDS);
+        if ($dup !== null) {
+            $passage = ($dup['event_type'] === 'exit') ? 'exit' : 'entry';
+
+            return $this->json($this->grantedPayload($club, [
+                'access_granted' => true,
+                'reason' => 'ok',
+                'passage' => $passage,
+                'duplicate' => true,
+                'success' => true,
+                'user' => [
+                    'id' => 'staff-' . $staff->getId(),
+                    'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                    'phone' => $staff->getTrainer()?->getPhone(),
+                ],
+            ]));
+        }
+
         if ($staff->getRegistrationStatus() !== StaffUser::REGISTRATION_APPROVED) {
             return $this->denied($log, 'staff_not_approved', 403);
         }
@@ -590,6 +661,44 @@ class GatewayController extends AbstractController
     }
 
     /**
+     * StaffUser с id % 10000 == $uidMod и действующей арендой на $club.
+     *
+     * @return list<StaffUser>
+     */
+    private function findStaffWithValidRentalByWiegandMod(Club $club, int $uidMod): array
+    {
+        if ($uidMod < 0 || $uidMod >= WiegandEntryQrCodec::USER_MOD) {
+            return [];
+        }
+
+        /** @var list<StaffUser> $candidates */
+        $candidates = $this->em->createQueryBuilder()
+            ->select('s')
+            ->from(StaffUser::class, 's')
+            ->where('MOD(s.id, :modBase) = :uidMod')
+            ->setParameter('modBase', WiegandEntryQrCodec::USER_MOD)
+            ->setParameter('uidMod', $uidMod)
+            ->getQuery()
+            ->getResult();
+
+        $out = [];
+        foreach ($candidates as $staff) {
+            if (!$staff instanceof StaffUser) {
+                continue;
+            }
+            if ($staff->getRegistrationStatus() !== StaffUser::REGISTRATION_APPROVED) {
+                continue;
+            }
+            if ($staff->requiresTrainerRental() && !$this->clubRentals->hasValidRentalForClub($staff, $club)) {
+                continue;
+            }
+            $out[] = $staff;
+        }
+
+        return $out;
+    }
+
+    /**
      * @param string[] $parts
      */
     private function handleStaffExit(Club $club, array $parts, AccessLog $log): JsonResponse
@@ -602,6 +711,11 @@ class GatewayController extends AbstractController
         /** @var StaffUser|null $staff */
         $staff = $staffId > 0 ? $this->em->getRepository(StaffUser::class)->find($staffId) : null;
 
+        return $this->grantStaffExit($club, $staff, $log);
+    }
+
+    private function grantStaffExit(Club $club, ?StaffUser $staff, AccessLog $log): JsonResponse
+    {
         $log->setResult('granted')->setReason('ok');
         $this->em->persist($log);
         $this->em->flush();
@@ -691,6 +805,7 @@ class GatewayController extends AbstractController
                 'staff_rental_wrong_club' => 'Аренда оформлена на другой зал',
                 'staff_not_approved' => 'Учётная запись тренера не одобрена',
                 'staff_not_found' => 'Тренер не найден',
+                'ambiguous_qr' => 'QR совпадает у клиента и тренера — обратитесь в клуб',
                 default => null,
             },
         ], $extra), $status);
@@ -773,6 +888,7 @@ class GatewayController extends AbstractController
      *     time_segment?: string,
      *     parts?: list<string>
      * }|null
+     * kind: guest|staff|wiegand|entry
      */
     private function parseGatewayEntryQr(string $qr): ?array
     {
@@ -783,7 +899,7 @@ class GatewayController extends AbstractController
             }
 
             return [
-                'kind' => 'entry',
+                'kind' => 'wiegand',
                 'user_id' => $parsed['user_id'],
                 'timestamp_ms' => $parsed['timestamp_ms'],
                 'time_segment' => $parsed['time_segment'],

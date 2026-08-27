@@ -22,6 +22,11 @@ class StaffEntryQrActivity : ComponentActivity() {
     private var staffUserId by mutableStateOf(0)
     private var rentalActive by mutableStateOf(false)
     private var blockedMessage by mutableStateOf<String?>("Проверяем оплату аренды…")
+    private var entryQrFormat by mutableStateOf<String?>(null)
+    private var hallLabel by mutableStateOf<String?>(null)
+    private var paidRentalClubs by mutableStateOf<List<RentalClubOption>>(emptyList())
+    private var activeClubId by mutableStateOf<Int?>(null)
+    private var selectingClub by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,11 +46,69 @@ class StaffEntryQrActivity : ComponentActivity() {
                     staffUserId = staffUserId,
                     rentalActive = rentalActive,
                     blockedMessage = blockedMessage,
+                    entryQrFormat = entryQrFormat,
+                    hallLabel = hallLabel,
+                    paidRentalClubs = paidRentalClubs,
+                    activeClubId = activeClubId,
+                    onSelectClub = { clubId -> selectClub(clubId) },
                     onBack = { finish() },
                 )
             }
         }
         loadAccess()
+    }
+
+    private fun applyOnboarding(onboarding: StaffOnboarding, id: Int) {
+        val paidClubs = onboarding.rentalClubs.filter { it.rentalActive }
+        val hasPaidButInactive = onboarding.requiresRental &&
+            paidClubs.isNotEmpty() &&
+            !onboarding.activeClubRentalOk
+        val active = StaffRentalAccess.canShowEntryQr(
+            staffUserId = id,
+            status = onboarding.status,
+            requiresRental = onboarding.requiresRental,
+            rentalPaidUntilIso = onboarding.activeClubPaidUntil,
+            rentalActiveFromServer = onboarding.rentalActive,
+            activeClubRentalOk = onboarding.activeClubRentalOk,
+        )
+        staffUserId = id
+        rentalActive = active
+        blockedMessage = StaffRentalAccess.entryQrBlockedMessage(
+            staffUserId = id,
+            status = onboarding.status,
+            requiresRental = onboarding.requiresRental,
+            rentalPaidUntilIso = onboarding.activeClubPaidUntil,
+            hasPaidClubsButWrongActive = hasPaidButInactive,
+        )
+        entryQrFormat = onboarding.activeClub?.entryQrFormat
+        hallLabel = onboarding.activeClub?.title ?: onboarding.activeClub?.name
+        paidRentalClubs = paidClubs
+        activeClubId = onboarding.activeClubId
+    }
+
+    private fun selectClub(clubId: Int) {
+        if (selectingClub || clubId <= 0 || clubId == activeClubId) return
+        selectingClub = true
+        blockedMessage = "Меняем зал…"
+        thread {
+            try {
+                val onboarding = withRefresh { apiClient.setActiveRentalClub(it, clubId) }
+                var id = listOfNotNull(
+                    onboarding.staffUserId?.takeIf { it > 0 },
+                    intent.getIntExtra(EXTRA_STAFF_USER_ID, 0).takeIf { it > 0 },
+                    staffUserId.takeIf { it > 0 },
+                ).firstOrNull() ?: 0
+                runOnUiThread {
+                    applyOnboarding(onboarding, id)
+                    selectingClub = false
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    selectingClub = false
+                    blockedMessage = UserFacingError.message(e)
+                }
+            }
+        }
     }
 
     private fun loadAccess() {
@@ -63,29 +126,8 @@ class StaffEntryQrActivity : ComponentActivity() {
                     }.getOrNull()?.takeIf { it > 0 }?.let { id = it }
                 }
 
-                val paidClubs = onboarding.rentalClubs.filter { it.rentalActive }
-                val hasPaidButInactive = onboarding.requiresRental &&
-                    paidClubs.isNotEmpty() &&
-                    !onboarding.activeClubRentalOk
-                val active = StaffRentalAccess.canShowEntryQr(
-                    staffUserId = id,
-                    status = onboarding.status,
-                    requiresRental = onboarding.requiresRental,
-                    rentalPaidUntilIso = onboarding.activeClubPaidUntil,
-                    rentalActiveFromServer = onboarding.rentalActive,
-                    activeClubRentalOk = onboarding.activeClubRentalOk,
-                )
-
                 runOnUiThread {
-                    staffUserId = id
-                    rentalActive = active
-                    blockedMessage = StaffRentalAccess.entryQrBlockedMessage(
-                        staffUserId = id,
-                        status = onboarding.status,
-                        requiresRental = onboarding.requiresRental,
-                        rentalPaidUntilIso = onboarding.activeClubPaidUntil,
-                        hasPaidClubsButWrongActive = hasPaidButInactive,
-                    )
+                    applyOnboarding(onboarding, id)
                 }
             } catch (e: Exception) {
                 val fallbackId = intent.getIntExtra(EXTRA_STAFF_USER_ID, 0)

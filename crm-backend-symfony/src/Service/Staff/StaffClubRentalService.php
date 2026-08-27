@@ -247,6 +247,7 @@ final class StaffClubRentalService
                 'rental_active' => $active,
                 'is_active_club' => $activeId !== null && $activeId === $club->getId(),
                 'days' => self::RENTAL_DAYS,
+                'entry_qr_format' => $club->getEntryQrFormat(),
             ];
         }
 
