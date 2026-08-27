@@ -210,7 +210,7 @@ final class StaffClubRentalService
         if (!$club instanceof Club) {
             return [
                 'error' => ['error' => 'Клуб не найден', 'code' => 'club_not_found'],
-                'status' => 404,
+                'status' => 400,
             ];
         }
         if (!$this->hasValidRentalForClub($staff, $club)) {

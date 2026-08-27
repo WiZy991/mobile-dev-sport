@@ -39,7 +39,23 @@ object UserFacingError {
 
             lower.contains("http 403") || lower.contains("403") || lower.contains("forbidden") ->
                 "У вас нет прав для этого действия."
-            lower.contains("no route found") || Regex("""\b404\b""").containsMatchIn(lower) ->
+
+            // Реальный «маршрута нет» — только No route found / Symfony. Не путать с club_not_found.
+            lower.contains("no route found") || lower.contains("cannot find the \"") ->
+                "На CRM ещё нет этого API. Задеплойте свежий crm-backend-symfony (migrate + перезапуск контейнера)."
+
+            // Любой HTTP с русским текстом ошибки с сервера — показываем его (в т.ч. 404 club_not_found).
+            raw.startsWith("HTTP ") -> {
+                val clean = stripApiCode(detail)
+                when {
+                    hasCyrillic(clean) -> clean
+                    Regex("""\b404\b""").containsMatchIn(lower) ->
+                        "На CRM ещё нет этого API. Задеплойте свежий crm-backend-symfony (migrate + перезапуск контейнера)."
+                    else -> "Ошибка CRM: $raw"
+                }
+            }
+
+            Regex("""\b404\b""").containsMatchIn(lower) ->
                 "На CRM ещё нет этого API. Задеплойте свежий crm-backend-symfony (migrate + перезапуск контейнера)."
             lower.contains("http 500") || lower.contains("500") || lower.contains("internal server error") ->
                 "Ошибка сервера CRM. Уже разбираемся, попробуйте позже."
@@ -49,10 +65,6 @@ object UserFacingError {
                 "Сервер вернул техническую ошибку. Проверьте, что backend запущен."
             lower.contains("json parse") || lower.contains("empty response") ->
                 "Не удалось прочитать ответ CRM. Запустите backend:\ncd crm-backend-symfony\nphp -S 0.0.0.0:8000 -t public public/index.php"
-            raw.startsWith("HTTP ") -> {
-                val clean = stripApiCode(detail)
-                if (hasCyrillic(clean)) clean else "Ошибка CRM: $raw"
-            }
             raw.isBlank() -> "Не удалось выполнить запрос. Повторите попытку."
             hasCyrillic(raw) -> raw
             else -> "Не удалось загрузить данные. Повторите попытку."

@@ -406,6 +406,11 @@ api_staff_rental_init:
   controller: App\Controller\Api\StaffRentalController::init
   methods: [POST]
 
+api_staff_rental_active_club:
+  path: /api/v1/staff/rental/active-club
+  controller: App\Controller\Api\StaffRentalController::activeClub
+  methods: [PATCH, POST]
+
 api_staff_rental_payments:
   path: /api/v1/staff/rental/payments
   controller: App\Controller\Api\StaffRentalController::payments
