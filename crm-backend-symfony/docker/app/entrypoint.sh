@@ -4,7 +4,7 @@ set -eu
 cd /app
 
 # Каталоги загрузок (том с хоста может быть пустым / root-owned).
-mkdir -p /app/public/uploads/clubs /app/public/uploads/promotions /app/var/cache /app/var/log
+mkdir -p /app/public/uploads/clubs /app/public/uploads/promotions /app/public/uploads/trainers /app/var/cache /app/var/log
 chown -R www-data:www-data /app/public/uploads /app/var || true
 
 php bin/console cache:clear --no-interaction || true

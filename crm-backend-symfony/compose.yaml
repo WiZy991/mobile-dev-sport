@@ -17,12 +17,13 @@ services:
       database:
         condition: service_healthy
     # ENTRYPOINT сам делает migrate + supervisord; CMD пустой.
-    # Секреты / uploads с хоста.
+    # Секреты / uploads с хоста (иначе фото тренеров пропадают при recreate контейнера).
     volumes:
       - ./var/secrets:/app/var/secrets:ro
       - ./etc/Apns:/app/etc/Apns:ro
       - ./public/uploads/promotions:/app/public/uploads/promotions
       - ./public/uploads/clubs:/app/public/uploads/clubs
+      - ./public/uploads/trainers:/app/public/uploads/trainers
     networks:
       - crm_backend_net
 
