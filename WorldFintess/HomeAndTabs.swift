@@ -1054,13 +1054,15 @@ struct ProfileTabView: View {
 
     private var clubFilteredSubscriptions: [Subscription] {
         guard let preferred = preferredClubId else { return subscriptions }
-        // Только абонементы выбранного зала. Без club_id не показываем —
-        // иначе годовой с Купера «висит» после переключения на другой клуб.
         return subscriptions.filter { sub in
-            guard let sid = sub.clubId?.trimmingCharacters(in: .whitespacesAndNewlines), !sid.isEmpty else {
-                return false
+            let sid = sub.clubId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            // Привязан к залу — только этот клуб.
+            if !sid.isEmpty {
+                return sid == preferred
             }
-            return sid == preferred
+            // Без club_id — legacy «любой зал» (на турникете тоже пускает везде).
+            // Покажем во всех preferred, пока CRM не проставит club_id с платежа.
+            return true
         }
     }
 
