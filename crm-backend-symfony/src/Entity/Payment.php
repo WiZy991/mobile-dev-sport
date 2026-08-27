@@ -33,7 +33,7 @@ class Payment
     #[ORM\JoinColumn(name: 'staff_user_id', nullable: true, onDelete: 'SET NULL')]
     private ?StaffUser $staffUser = null;
 
-    /** Клуб аренды (TYPE_TRAINER_RENTAL). */
+    /** Клуб покупки (абонемент) или аренды (TYPE_TRAINER_RENTAL). */
     #[ORM\ManyToOne(targetEntity: Club::class)]
     #[ORM\JoinColumn(name: 'club_id', nullable: true, onDelete: 'SET NULL')]
     private ?Club $club = null;

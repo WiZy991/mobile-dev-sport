@@ -2,6 +2,7 @@
 
 namespace App\Service\Payment;
 
+use App\Entity\Club;
 use App\Entity\Payment;
 use App\Entity\SubscriptionPlan;
 use App\Entity\User;
@@ -27,12 +28,32 @@ class SubscriptionPaymentInitService
     /**
      * @return array{payment: Payment}|array{error: array<string, mixed>, status: int}
      */
-    public function init(User $user, SubscriptionPlan $plan, string $promoCodeRaw, string $deepLinkScheme = 'dobrozal'): array
-    {
+    public function init(
+        User $user,
+        SubscriptionPlan $plan,
+        string $promoCodeRaw,
+        string $deepLinkScheme = 'dobrozal',
+        mixed $clubIdRaw = null,
+    ): array {
         $sberGate = $this->checkSberGate($user);
         if ($sberGate !== null) {
             return $sberGate;
         }
+
+        $issueClub = $this->resolveIssueClub($user, $clubIdRaw);
+        if ($issueClub === null) {
+            return [
+                'error' => [
+                    'error' => 'Укажите клуб для покупки абонемента',
+                    'code' => 'club_required',
+                ],
+                'status' => 400,
+            ];
+        }
+
+        // Предпочтительный зал в профиле = зал этой покупки (главная/QR/заполненность).
+        $user->setClub($issueClub);
+        $this->em->flush();
 
         $quote = $this->quoteService->quote($plan, $promoCodeRaw, false, $user);
 
@@ -43,7 +64,7 @@ class SubscriptionPaymentInitService
             ];
         }
 
-        $reusable = $this->findReusablePendingPayment($user, $plan, $quote->amountKopecks);
+        $reusable = $this->findReusablePendingPayment($user, $plan, $quote->amountKopecks, $issueClub);
         if ($reusable !== null) {
             return ['payment' => $reusable];
         }
@@ -52,6 +73,7 @@ class SubscriptionPaymentInitService
             ->setUser($user)
             ->setType(Payment::TYPE_SUBSCRIPTION)
             ->setSubscriptionPlan($plan)
+            ->setClub($issueClub)
             ->setPromoCode($quote->promo)
             ->setAmountKopecks($quote->amountKopecks)
             ->setDiscountAmount($quote->discountAmount)
@@ -108,17 +130,49 @@ class SubscriptionPaymentInitService
         return ['payment' => $payment];
     }
 
+    private function resolveIssueClub(User $user, mixed $clubIdRaw): ?Club
+    {
+        $cid = 0;
+        if ($clubIdRaw !== null && $clubIdRaw !== '') {
+            $cid = (int) $clubIdRaw;
+        }
+        if ($cid > 0) {
+            $club = $this->em->getRepository(Club::class)->find($cid);
+
+            return $club instanceof Club ? $club : null;
+        }
+
+        $preferred = $user->getClub();
+        if ($preferred instanceof Club) {
+            return $preferred;
+        }
+
+        $clubRepo = $this->em->getRepository(Club::class);
+        if ((int) $clubRepo->count([]) === 1) {
+            $only = $clubRepo->findOneBy([]);
+
+            return $only instanceof Club ? $only : null;
+        }
+
+        return null;
+    }
+
     /**
      * Повторный «Купить» без оплаты — вернуть тот же pending, не плодить заказы в Альфе.
      */
-    private function findReusablePendingPayment(User $user, SubscriptionPlan $plan, int $amountKopecks): ?Payment
-    {
+    private function findReusablePendingPayment(
+        User $user,
+        SubscriptionPlan $plan,
+        int $amountKopecks,
+        Club $club,
+    ): ?Payment {
         /** @var Payment|null $existing */
         $existing = $this->em->createQueryBuilder()
             ->select('p')
             ->from(Payment::class, 'p')
             ->where('p.user = :user')
             ->andWhere('p.subscriptionPlan = :plan')
+            ->andWhere('p.club = :club')
             ->andWhere('p.type = :type')
             ->andWhere('p.status = :pending')
             ->andWhere('p.amountKopecks = :amount')
@@ -126,6 +180,7 @@ class SubscriptionPaymentInitService
             ->andWhere('p.expiresAt IS NULL OR p.expiresAt > :now')
             ->setParameter('user', $user)
             ->setParameter('plan', $plan)
+            ->setParameter('club', $club)
             ->setParameter('type', Payment::TYPE_SUBSCRIPTION)
             ->setParameter('pending', Payment::STATUS_PENDING)
             ->setParameter('amount', $amountKopecks)

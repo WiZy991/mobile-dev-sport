@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.PurchaseSubscriptionOutcome
 import com.fitnessclub.app.data.repository.SubscriptionRepository
@@ -11,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -33,37 +35,48 @@ data class SubscriptionPlansUiState(
 class SubscriptionPlansViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
     private val clubRepository: ClubRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
-    
+
     private val _uiState = MutableStateFlow(SubscriptionPlansUiState())
     val uiState: StateFlow<SubscriptionPlansUiState> = _uiState.asStateFlow()
-    
+
     init {
         loadPlans()
         loadClubPurchaseContext()
     }
 
+    fun refreshClubContext() {
+        loadClubPurchaseContext()
+    }
+
     private fun loadClubPurchaseContext() {
         viewModelScope.launch {
+            val userClubId = authRepository.getCurrentUser().first()?.clubId
             val context = when (val result = clubRepository.getClubInfo()) {
                 is ApiResult.Success -> {
                     val club = result.data
+                    val idFromInfo = club.id?.toIntOrNull()
                     ClubPurchaseContext(
                         clubName = club.name.ifBlank { "Ваш клуб" },
+                        clubId = idFromInfo ?: userClubId,
                         visitingRulesUrl = club.visitingRulesUrl,
                         safetyRulesUrl = club.safetyRulesUrl,
                     )
                 }
-                else -> ClubPurchaseContext(clubName = "Ваш клуб")
+                else -> ClubPurchaseContext(
+                    clubName = "Ваш клуб",
+                    clubId = userClubId,
+                )
             }
             _uiState.update { it.copy(clubPurchaseContext = context) }
         }
     }
-    
+
     fun loadPlans() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            
+
             runCatching {
                 when (val result = subscriptionRepository.getSubscriptionPlansSuspend()) {
                     is ApiResult.Success -> {
@@ -96,7 +109,7 @@ class SubscriptionPlansViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun applyPromoCode(code: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isApplyingPromo = true, error = null) }
@@ -122,7 +135,7 @@ class SubscriptionPlansViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun removePromoCode() {
         _uiState.update {
             it.copy(
@@ -153,7 +166,7 @@ class SubscriptionPlansViewModel @Inject constructor(
         val catalog = plan.catalogPrice
         return if (final < catalog) catalog else null
     }
-    
+
     fun purchasePlan(
         plan: SubscriptionPlan,
         onPaymentRequired: (paymentId: Int, paymentUrl: String) -> Unit,
@@ -163,6 +176,11 @@ class SubscriptionPlansViewModel @Inject constructor(
         if (_uiState.value.isLoading) {
             return
         }
+        val clubId = _uiState.value.clubPurchaseContext.clubId
+        if (clubId == null || clubId <= 0) {
+            onError("Сначала выберите клуб для покупки")
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
@@ -170,6 +188,7 @@ class SubscriptionPlansViewModel @Inject constructor(
                 val result = subscriptionRepository.purchaseSubscription(
                     planId = plan.safeId,
                     promoCode = _uiState.value.appliedPromoCode,
+                    clubId = clubId,
                 )
             ) {
                 is PurchaseSubscriptionOutcome.PaymentRequired -> {

@@ -227,7 +227,10 @@ data class PurchaseSubscriptionRequest(
     @com.google.gson.annotations.SerializedName("plan_id")
     val planId: String,
     @com.google.gson.annotations.SerializedName("promo_code")
-    val promoCode: String? = null
+    val promoCode: String? = null,
+    /** Зал, к которому привяжется абонемент после оплаты. */
+    @com.google.gson.annotations.SerializedName("club_id")
+    val clubId: Int? = null,
 )
 
 data class PromoCodeRequest(

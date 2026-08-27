@@ -44,6 +44,9 @@ object RegistrationVenues {
 
     val orderedCards: List<RegistrationVenueCard> = allCards.filter { it.openForRegistration }
 
+    fun cardByClubId(clubId: String): RegistrationVenueCard? =
+        allCards.find { it.clubId == clubId }
+
     fun toClubItem(card: RegistrationVenueCard): ClubItem = ClubItem(
         id = card.clubId,
         name = card.title,

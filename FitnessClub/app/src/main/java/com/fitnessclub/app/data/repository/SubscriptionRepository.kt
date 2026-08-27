@@ -120,12 +120,17 @@ class SubscriptionRepository @Inject constructor(
         }
     }
 
-    suspend fun purchaseSubscription(planId: String, promoCode: String? = null): PurchaseSubscriptionOutcome {
+    suspend fun purchaseSubscription(
+        planId: String,
+        promoCode: String? = null,
+        clubId: Int? = null,
+    ): PurchaseSubscriptionOutcome {
         return try {
             val response = api.initSubscriptionPayment(
                 com.fitnessclub.app.data.api.PurchaseSubscriptionRequest(
                     planId = planId,
                     promoCode = promoCode,
+                    clubId = clubId,
                 )
             )
             if (response.isSuccessful && response.body() != null) {

@@ -263,7 +263,10 @@ fun MainScreen(
                     },
                     onNavigateToAbout = {
                         navController.navigate(Screen.About.route)
-                    }
+                    },
+                    onNavigateToSelectClub = {
+                        navController.navigate(Screen.SelectPreferredClub.route)
+                    },
                 )
             }
         }

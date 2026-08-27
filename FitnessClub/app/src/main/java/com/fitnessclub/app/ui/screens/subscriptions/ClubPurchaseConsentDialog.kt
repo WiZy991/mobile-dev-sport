@@ -37,6 +37,7 @@ import com.fitnessclub.app.ui.theme.Primary
 
 data class ClubPurchaseContext(
     val clubName: String,
+    val clubId: Int? = null,
     val visitingRulesUrl: String? = null,
     val safetyRulesUrl: String? = null,
 )

@@ -80,7 +80,7 @@ class PaymentFulfillmentService
             $sub->setPromoCode($promo);
         }
 
-        $issueClub = $user->getClub();
+        $issueClub = $payment->getClub() ?? $user->getClub();
         if ($issueClub === null) {
             $clubRepo = $this->em->getRepository(Club::class);
             if ((int) $clubRepo->count([]) === 1) {
@@ -88,6 +88,9 @@ class PaymentFulfillmentService
             }
         }
         $sub->setClub($issueClub);
+        if ($issueClub !== null && $user->getClub() === null) {
+            $user->setClub($issueClub);
+        }
 
         $this->em->persist($sub);
         $this->em->flush();

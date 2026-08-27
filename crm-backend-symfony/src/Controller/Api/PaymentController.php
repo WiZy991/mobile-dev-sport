@@ -132,6 +132,7 @@ class PaymentController extends AbstractController
         $data = json_decode($request->getContent(), true) ?? [];
         $planIdRaw = (string) ($data['plan_id'] ?? $data['planId'] ?? '');
         $promoCodeRaw = trim((string) ($data['promo_code'] ?? $data['promoCode'] ?? ''));
+        $clubIdRaw = $data['club_id'] ?? $data['clubId'] ?? null;
 
         $plan = $this->quoteService->findPlan($planIdRaw);
         if (!$plan) {
@@ -143,6 +144,7 @@ class PaymentController extends AbstractController
             $plan,
             $promoCodeRaw,
             $this->resolveDeepLinkScheme($request),
+            $clubIdRaw,
         );
         if (isset($result['error'])) {
             return $this->json($result['error'], $result['status']);

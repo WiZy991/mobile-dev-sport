@@ -45,6 +45,7 @@ fun SubscriptionPlansScreen(
     onPurchaseSuccess: () -> Unit = {},
     onOpenLegalDocument: (LegalDocumentType) -> Unit = {},
     onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
+    onChangeClub: () -> Unit = {},
     viewModel: SubscriptionPlansViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -56,6 +57,11 @@ fun SubscriptionPlansScreen(
     val uriHandler = LocalUriHandler.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    // После возврата с выбора клуба — обновить подпись зала.
+    LaunchedEffect(Unit) {
+        viewModel.refreshClubContext()
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -116,6 +122,49 @@ fun SubscriptionPlansScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.background(MaterialTheme.colorScheme.background),
                 ) {
+                    item {
+                        Card(
+                            onClick = onChangeClub,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        ) {
+                            Row(
+                                Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = Primary,
+                                )
+                                Column(Modifier.padding(horizontal = 12.dp).weight(1f)) {
+                                    Text(
+                                        "Клуб для покупки",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        uiState.clubPurchaseContext.clubName.ifBlank { "Выберите клуб" },
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                    Text(
+                                        "Абонемент действует только в этом зале",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                TextButton(onClick = onChangeClub) {
+                                    Text("Сменить")
+                                }
+                            }
+                        }
+                    }
+
                     // Applied promo code
                     if (uiState.appliedPromoCode != null) {
                         item {

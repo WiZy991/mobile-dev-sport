@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,7 +41,8 @@ fun ProfileScreen(
     onNavigateToDocuments: () -> Unit = {},
     onNavigateToPurchaseHistory: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
-    onNavigateToAbout: () -> Unit = {}
+    onNavigateToAbout: () -> Unit = {},
+    onNavigateToSelectClub: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -47,15 +51,26 @@ fun ProfileScreen(
     var cancelTarget by remember { mutableStateOf<Subscription?>(null) }
     var showSubscriptionHistory by remember { mutableStateOf(false) }
 
-    val activeSubscriptions = remember(uiState.subscriptions) {
-        uiState.subscriptions.filter {
+    val preferredClubId = uiState.preferredClubId ?: uiState.user?.clubId
+    val clubSubscriptions = remember(uiState.subscriptions, preferredClubId) {
+        uiState.subscriptions.filter { sub ->
+            when {
+                preferredClubId == null || preferredClubId <= 0 -> true
+                sub.clubId != null -> sub.clubId == preferredClubId
+                // Старые абонементы без club_id — не показываем в чужом зале.
+                else -> false
+            }
+        }
+    }
+    val activeSubscriptions = remember(clubSubscriptions) {
+        clubSubscriptions.filter {
             it.status == SubscriptionStatus.ACTIVE ||
                 it.status == SubscriptionStatus.FROZEN ||
                 it.status == SubscriptionStatus.PENDING
         }
     }
-    val archivedSubscriptions = remember(uiState.subscriptions) {
-        uiState.subscriptions.filterNot {
+    val archivedSubscriptions = remember(clubSubscriptions) {
+        clubSubscriptions.filterNot {
             it.status == SubscriptionStatus.ACTIVE ||
                 it.status == SubscriptionStatus.FROZEN ||
                 it.status == SubscriptionStatus.PENDING
@@ -63,6 +78,7 @@ fun ProfileScreen(
     }
     
     LaunchedEffect(Unit) {
+        viewModel.refresh()
         viewModel.events.collect { event ->
             when (event) {
                 is ProfileEvent.LoggedOut -> onLogout()
@@ -133,6 +149,11 @@ fun ProfileScreen(
                         phone = uiState.user?.phone ?: "",
                         onEditClick = onNavigateToEditProfile
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    SwitchClubButton(
+                        currentClubLabel = uiState.clubAddressLine,
+                        onClick = onNavigateToSelectClub,
+                    )
                 }
                 
                 // Gamification (streak & achievements)
@@ -164,6 +185,15 @@ fun ProfileScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 8.dp)
                     )
+                    val hallHint = uiState.clubAddressLine
+                    if (!hallHint.isNullOrBlank()) {
+                        Text(
+                            text = "Только для: $hallHint",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                 }
 
                 if (uiState.isLoadingSubscriptions && activeSubscriptions.isEmpty() && archivedSubscriptions.isEmpty()) {
@@ -240,7 +270,7 @@ fun ProfileScreen(
                         }
                     }
                 }
-                
+
                 // Menu items
                 item {
                     Text(
@@ -480,6 +510,74 @@ private fun QuickActionButton(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun SwitchClubButton(
+    currentClubLabel: String?,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(Primary, PrimaryVariant, Color(0xFFFF8F5A)),
+                ),
+            )
+            .clickable(onClick = onClick)
+            .padding(1.5.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.5.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(listOf(Primary.copy(alpha = 0.2f), Primary.copy(alpha = 0.08f))),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SwapHoriz,
+                    contentDescription = null,
+                    tint = Primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Выбрать другой клуб",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                val hint = currentClubLabel?.takeIf { it.isNotBlank() }
+                Text(
+                    text = if (hint != null) "Сейчас: $hint" else "Сменить зал для абонементов и покупки",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Primary,
+            )
+        }
     }
 }
 

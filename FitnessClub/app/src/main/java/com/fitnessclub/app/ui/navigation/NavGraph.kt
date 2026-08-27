@@ -26,6 +26,7 @@ import com.fitnessclub.app.ui.screens.auth.RegisterScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterSurveyScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterViewModel
 import com.fitnessclub.app.ui.screens.club.ClubInfoScreen
+import com.fitnessclub.app.ui.screens.club.SelectPreferredClubScreen
 import com.fitnessclub.app.ui.screens.clubs.ClubsScreen
 import com.fitnessclub.app.ui.screens.documents.DocumentsScreen
 import com.fitnessclub.app.ui.screens.diary.TrainingDiaryScreen
@@ -278,6 +279,16 @@ fun NavGraph(
                     navController.navigate(Screen.LegalDocument.createRoute(type))
                 },
                 onOpenLegalPdf = openLegalPdf,
+                onChangeClub = {
+                    navController.navigate(Screen.SelectPreferredClub.route)
+                },
+            )
+        }
+
+        composable(Screen.SelectPreferredClub.route) {
+            SelectPreferredClubScreen(
+                onBack = { navController.popBackStack() },
+                onSelected = { navController.popBackStack() },
             )
         }
 

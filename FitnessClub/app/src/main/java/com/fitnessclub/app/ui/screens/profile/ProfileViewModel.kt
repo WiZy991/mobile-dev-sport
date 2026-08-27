@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -50,14 +51,23 @@ class ProfileViewModel @Inject constructor(
                     val info = result.data
                     // Предпочтительный зал клиента (из регистрации) приходит в name/address с бэка.
                     val raw = info.address.trim().ifBlank { info.name.trim() }
+                    val preferredId = info.id?.toIntOrNull()
+                        ?: authRepository.getCurrentUser().first()?.clubId
                     _uiState.update {
-                        it.copy(clubAddressLine = addressWithoutCity(raw).ifBlank { null })
+                        it.copy(
+                            clubAddressLine = addressWithoutCity(raw).ifBlank { null },
+                            preferredClubId = preferredId,
+                        )
                     }
                 }
                 else -> {
-                    val fallback = _uiState.value.user?.clubName?.trim().orEmpty()
-                    if (fallback.isNotEmpty()) {
-                        _uiState.update { it.copy(clubAddressLine = fallback) }
+                    val user = authRepository.getCurrentUser().first()
+                    val fallback = user?.clubName?.trim().orEmpty()
+                    _uiState.update {
+                        it.copy(
+                            clubAddressLine = fallback.ifBlank { it.clubAddressLine },
+                            preferredClubId = user?.clubId ?: it.preferredClubId,
+                        )
                     }
                 }
             }
@@ -67,7 +77,12 @@ class ProfileViewModel @Inject constructor(
     private fun loadProfile() {
         viewModelScope.launch {
             authRepository.getCurrentUser().collect { user ->
-                _uiState.value = _uiState.value.copy(user = user)
+                _uiState.update {
+                    it.copy(
+                        user = user,
+                        preferredClubId = user?.clubId ?: it.preferredClubId,
+                    )
+                }
             }
         }
         viewModelScope.launch {
@@ -181,6 +196,8 @@ data class ProfileUiState(
     val user: User? = null,
     /** Адрес клуба без города — над ФИО. */
     val clubAddressLine: String? = null,
+    /** Выбранный зал — абонементы в профиле фильтруются по нему. */
+    val preferredClubId: Int? = null,
     val subscriptions: List<Subscription> = emptyList(),
     val isLoadingSubscriptions: Boolean = false,
     val error: String? = null,

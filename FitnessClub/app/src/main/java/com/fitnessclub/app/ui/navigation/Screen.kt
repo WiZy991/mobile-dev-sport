@@ -56,6 +56,7 @@ sealed class Screen(val route: String) {
         fun createRoute(clubId: String) = "club/$clubId"
     }
     data object Clubs : Screen("clubs")
+    data object SelectPreferredClub : Screen("select_preferred_club")
     data object GuestPass : Screen("guest_pass")
     data object Documents : Screen("documents")
     data object PurchaseHistory : Screen("purchase_history")
