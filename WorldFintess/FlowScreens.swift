@@ -124,6 +124,7 @@ struct SubscriptionPlansView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 16) {
+                        clubPurchaseContextCard
                         if let code = appliedPromo {
                             promoAppliedCard(code: code)
                         }
@@ -157,6 +158,7 @@ struct SubscriptionPlansView: View {
             }
         }
         .task { await load() }
+        .task(id: app.currentUser?.clubId) { await refreshClubDisplayName() }
         .sheet(item: $consentPlan) { wrapped in
             ClubPurchaseConsentSheet(
                 clubName: clubDisplayName,
@@ -376,6 +378,41 @@ struct SubscriptionPlansView: View {
         .clipShape(Capsule())
     }
 
+    private var clubPurchaseContextCard: some View {
+        Button {
+            onNavigate(.selectPreferredClub)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Theme.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Клуб для покупки")
+                        .font(FCTypography.labelMedium())
+                        .foregroundStyle(Theme.onSurfaceVariant)
+                    Text(clubDisplayName.isEmpty ? "Выберите клуб" : clubDisplayName)
+                        .font(FCTypography.titleMedium())
+                        .fontWeight(.bold)
+                        .foregroundStyle(Theme.onBackground)
+                        .lineLimit(2)
+                    Text("Абонемент действует только в этом зале")
+                        .font(FCTypography.bodySmall())
+                        .foregroundStyle(Theme.onSurfaceVariant)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Сменить")
+                    .font(FCTypography.labelLarge())
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.primary)
+            }
+            .padding(16)
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
+            .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
+        }
+        .buttonStyle(.plain)
+    }
+
     private var subscriptionInfoCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
@@ -412,10 +449,7 @@ struct SubscriptionPlansView: View {
         isLoading = true
         loadError = nil
         defer { isLoading = false }
-        if let info = try? await app.api.getClubInfo() {
-            let brand = info.resolvedBrandName
-            clubDisplayName = brand
-        }
+        await refreshClubDisplayName()
         do {
             let list = try await app.api.getSubscriptionPlans()
             let valid = list.filter { !$0.safeId.isEmpty && !$0.safeName.isEmpty }
@@ -428,6 +462,25 @@ struct SubscriptionPlansView: View {
         } catch {
             loadError = error.localizedDescription
             plans = []
+        }
+    }
+
+    private func refreshClubDisplayName() async {
+        if let name = app.currentUser?.clubName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            clubDisplayName = name
+        }
+        if let clubId = app.currentUser?.clubId?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !clubId.isEmpty,
+           let details = try? await app.api.getClubDetails(id: clubId)
+        {
+            let hall = details.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !hall.isEmpty {
+                clubDisplayName = hall
+                return
+            }
+        }
+        if clubDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            clubDisplayName = AppConfiguration.appDisplayName
         }
     }
 
@@ -546,7 +599,11 @@ struct SubscriptionPlansView: View {
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
-        let outcome = await app.api.purchaseSubscriptionParsed(planId: plan.safeId, promoCode: appliedPromo)
+        let outcome = await app.api.purchaseSubscriptionParsed(
+            planId: plan.safeId,
+            promoCode: appliedPromo,
+            clubId: app.currentUser?.clubId
+        )
         switch outcome {
         case .success:
             purchaseSheetPlan = nil
@@ -1037,7 +1094,11 @@ struct ShopView: View {
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
-        let outcome = await app.api.purchaseSubscriptionParsed(planId: plan.safeId, promoCode: nil)
+        let outcome = await app.api.purchaseSubscriptionParsed(
+            planId: plan.safeId,
+            promoCode: nil,
+            clubId: app.currentUser?.clubId
+        )
         switch outcome {
         case .success:
             purchaseSheetPlan = nil

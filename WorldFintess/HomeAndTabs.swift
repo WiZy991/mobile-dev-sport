@@ -1,6 +1,18 @@
 import SwiftUI
 import UIKit
 
+fileprivate extension Error {
+    /// Pull-to-refresh / `.task` cancellation — не показывать пользователю.
+    var isBenignCancellation: Bool {
+        if self is CancellationError { return true }
+        if let url = self as? URLError, url.code == .cancelled { return true }
+        let ns = self as NSError
+        if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return true }
+        let msg = localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return msg == "cancelled" || msg == "canceled"
+    }
+}
+
 fileprivate extension Color {
     /// Парсинг hex как `parsePromoColor` в `HomeScreen.kt`.
     static func fcFromPromoHex(_ hex: String?, fallback: Color) -> Color {
@@ -20,30 +32,23 @@ struct HomeTabView: View {
     var go: (AppRoute) -> Void
     var openQrSheet: () -> Void
     var switchToProfileTab: () -> Void
-    var switchToScheduleTab: () -> Void
+    /// Вкладка реально на экране (не скрыта opacity в MainShell).
+    var isActive: Bool = true
 
-    /// Как начальное состояние `HomeUiState.promotions`.
-    private static let defaultPromotions: [ClubPromotion] = [
-        ClubPromotion(
-            id: "default",
-            title: "СКИДКА 20%!",
-            subtitle: "на все карты 12 и 6 месяцев",
-            imageUrl: nil,
-            buttonText: "Подробнее",
-            actionType: "shop",
-            actionValue: nil,
-            bgFrom: "#F97316",
-            bgTo: "#3B82F6",
-            sortOrder: 100
-        ),
-    ]
-
-    @State private var promotions: [ClubPromotion] = Self.defaultPromotions
+    @State private var promotions: [ClubPromotion] = []
+    @State private var promotionsReady = false
     @State private var promoIndex = 0
     @State private var unread = 0
     @State private var upcoming: [UpcomingRow] = []
     @State private var occ: GymOccupancy?
-    @State private var isLoading = false
+    @State private var isInsideGym = false
+    @State private var brandName = AppConfiguration.appDisplayName
+    @State private var clubHallName = ""
+
+    private var preferredClubId: String? {
+        let fromUser = app.currentUser?.clubId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return fromUser.isEmpty ? nil : fromUser
+    }
 
     struct UpcomingRow: Identifiable {
         let id: String
@@ -58,7 +63,7 @@ struct HomeTabView: View {
             VStack(alignment: .leading, spacing: 0) {
                 fcHomeTopBar
                 VStack(alignment: .leading, spacing: 0) {
-                    if !promotions.isEmpty {
+                    if promotionsReady && !promotions.isEmpty {
                         promoBannerCarousel
                     }
                     occupancyCardAlways
@@ -67,20 +72,31 @@ struct HomeTabView: View {
                         sectionTitle("Ближайшие тренировки")
                         upcomingScroll
                     }
-                    sectionTitle("Специальные предложения")
-                    offersScroll
                 }
                 .padding(.bottom, 100)
             }
         }
         .background(Theme.background)
-        .task { await load() }
+        .task(id: isActive) {
+            guard isActive else { return }
+            await load(forceRefresh: true)
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                guard !Task.isCancelled else { return }
+                await loadOcc(forceRefresh: true)
+            }
+        }
+        .task(id: app.currentUser?.clubId) {
+            guard isActive else { return }
+            await loadClubInfo(forceRefresh: true)
+            await loadOcc(forceRefresh: true)
+        }
         .task(id: promoIndex) {
             guard promotions.count > 1 else { return }
             try? await Task.sleep(nanoseconds: 4_500_000_000)
             promoIndex = (promoIndex + 1) % promotions.count
         }
-        .refreshable { await load() }
+        .refreshable { await load(forceRefresh: true) }
     }
 
     private var fcHomeTopBar: some View {
@@ -92,12 +108,18 @@ struct HomeTabView: View {
                     .font(.title3)
                     .foregroundStyle(Theme.onPrimary)
             }
-            Spacer()
-            Text("FitnessClub")
-                .font(FCTypography.titleLarge())
-                .fontWeight(.bold)
-                .foregroundStyle(Theme.onPrimary)
-            Spacer()
+            .frame(width: 36, alignment: .leading)
+
+            Spacer(minLength: 8)
+
+            BrandHeader(
+                brandName: brandName,
+                textColor: Theme.onPrimary,
+                logoSize: 32
+            )
+
+            Spacer(minLength: 8)
+
             Button {
                 go(.notifications)
             } label: {
@@ -116,9 +138,10 @@ struct HomeTabView: View {
                     }
                 }
             }
+            .frame(width: 36, alignment: .trailing)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(Theme.primary)
     }
 
@@ -220,6 +243,11 @@ struct HomeTabView: View {
         let maxC = occ?.maxCapacity
         let pct = occ?.percentage ?? 0
         let statusStr = occ?.status ?? ""
+        let displayName: String? = {
+            let raw = clubHallName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !raw.isEmpty else { return nil }
+            return raw.count <= 36 ? raw : String(raw.prefix(35)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+        }()
 
         let bg: Color = {
             switch statusStr {
@@ -229,51 +257,67 @@ struct HomeTabView: View {
             }
         }()
 
-        return HStack(alignment: .center, spacing: 16) {
-            FCOccupancyRing(percentage: pct, status: statusStr)
-                .frame(width: 64, height: 64)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Заполненность зала")
-                    .font(FCTypography.titleMedium())
-                    .fontWeight(.semibold)
-                if let current, let maxC {
-                    Text("\(current) из \(maxC) человек")
-                        .font(FCTypography.bodyMedium())
-                        .foregroundStyle(Theme.onSurfaceVariant)
-                } else {
-                    Text("Загрузка...")
-                        .font(FCTypography.bodyMedium())
+        return Button {
+            if let clubId = preferredClubId {
+                go(.clubDetail(clubId))
+            } else {
+                go(.clubInfo)
+            }
+        } label: {
+            HStack(alignment: .center, spacing: 16) {
+                FCOccupancyRing(percentage: pct, status: statusStr)
+                    .frame(width: 64, height: 64)
+                VStack(alignment: .leading, spacing: 4) {
+                    if let displayName {
+                        Text(displayName)
+                            .font(FCTypography.titleSmall())
+                            .fontWeight(.bold)
+                            .foregroundStyle(Theme.onSurface)
+                            .lineLimit(1)
+                    }
+                    Text("Заполненность зала")
+                        .font(FCTypography.titleMedium())
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.onSurface)
+                    if let current, let maxC {
+                        Text("\(current) из \(maxC) человек")
+                            .font(FCTypography.bodyMedium())
+                            .foregroundStyle(Theme.onSurfaceVariant)
+                    } else {
+                        Text("Загрузка...")
+                            .font(FCTypography.bodyMedium())
+                            .foregroundStyle(Theme.onSurfaceVariant)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    Task { await loadOcc() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
                         .foregroundStyle(Theme.onSurfaceVariant)
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Button {
-                Task { await loadOcc() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
+                .buttonStyle(.plain)
+                Image(systemName: "chevron.right")
                     .foregroundStyle(Theme.onSurfaceVariant)
             }
+            .padding(16)
+            .background(bg)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radius18, style: .continuous))
+            .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
         }
-        .padding(16)
-        .background(bg)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.radius18, style: .continuous))
-        .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
+        .buttonStyle(.plain)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
     }
 
     private var quickMenuCard: some View {
         VStack(spacing: 0) {
-            quickMenuRow(icon: "qrcode", title: "Вход в зал", subtitle: "Показать QR-код для прохода") {
+            quickMenuRow(
+                icon: "qrcode",
+                title: "Вход/выход в зал",
+                subtitle: isInsideGym ? "Показать QR-код для выхода" : "Показать QR-код для прохода"
+            ) {
                 openQrSheet()
-            }
-            dividerInset
-            quickMenuRow(icon: "person.fill", title: "Записаться на персональную тренировку", subtitle: "Индивидуальное занятие с тренером") {
-                go(.personalTraining)
-            }
-            dividerInset
-            quickMenuRow(icon: "calendar", title: "Расписание", subtitle: "Групповые программы") {
-                switchToScheduleTab()
             }
             dividerInset
             quickMenuRow(icon: "cart.fill", title: "Приобрести", subtitle: "Карты, Абонементы, Услуги") {
@@ -284,12 +328,12 @@ struct HomeTabView: View {
                 go(.clubs)
             }
             dividerInset
-            quickMenuRow(icon: "lock.open.fill", title: "Шкафчики", subtitle: "Бронирование и QR-код для открытия") {
-                go(.lockers)
-            }
-            dividerInset
             quickMenuRow(icon: "person.3.fill", title: "Наша команда", subtitle: "Опытные тренеры") {
                 go(.trainers)
+            }
+            dividerInset
+            quickMenuRow(icon: "book.fill", title: "Дневник тренировок", subtitle: "Личные записи и прогресс") {
+                go(.trainingDiary)
             }
         }
         .padding(.vertical, 8)
@@ -380,106 +424,75 @@ struct HomeTabView: View {
         }
     }
 
-    private var offersScroll: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                offerCard(title: "Пробная тренировка", desc: "Бесплатно для новых клиентов", button: "Получить") {
-                    go(.shop)
-                }
-                offerCard(title: "Приведи друга", desc: "500 бонусов за каждого друга", button: "Узнать больше") {
-                    go(.referral)
-                }
-                offerCard(title: "-20% на годовой", desc: "При покупке до конца месяца", button: "Купить") {
-                    go(.shop)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+    private func load(forceRefresh: Bool = false) async {
+        // Не блокируем UI общим isLoading — секции обновляются по мере ответов.
+        async let n: Void = loadNotif(forceRefresh: forceRefresh)
+        async let o: Void = loadOcc(forceRefresh: forceRefresh)
+        async let a: Void = loadAccessStatus(forceRefresh: forceRefresh)
+        async let p: Void = loadPromotions(forceRefresh: forceRefresh)
+        async let b: Void = loadBookings(forceRefresh: forceRefresh)
+        async let c: Void = loadClubInfo(forceRefresh: forceRefresh)
+        _ = await (n, o, a, p, b, c)
+    }
+
+    private func loadClubInfo(forceRefresh: Bool = false) async {
+        _ = forceRefresh
+        if let clubId = preferredClubId,
+           let details = try? await app.api.getClubDetails(id: clubId) {
+            let hall = details.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            clubHallName = hall.isEmpty ? (app.currentUser?.clubName ?? AppConfiguration.appDisplayName) : hall
+        } else if let name = app.currentUser?.clubName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !name.isEmpty {
+            clubHallName = name
+        }
+        guard let info = try? await app.api.getClubInfo() else { return }
+        brandName = info.resolvedBrandName
+        if clubHallName.isEmpty {
+            let hall = info.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            clubHallName = hall.isEmpty ? brandName : hall
         }
     }
 
-    private func offerCard(title: String, desc: String, button: String, action: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(FCTypography.titleSmall())
-                .fontWeight(.bold)
-            Text(desc)
-                .font(FCTypography.bodySmall())
-                .foregroundStyle(Theme.onSurfaceVariant)
-            Spacer().frame(height: 8)
-            FCSecondaryButton(title: button, action: action)
+    private func loadNotif(forceRefresh: Bool = false) async {
+        if let count = try? await app.api.getUnreadNotificationsCount(forceRefresh: forceRefresh) {
+            unread = count
+            return
         }
-        .padding(16)
-        .frame(width: 180, alignment: .leading)
-        .background(Theme.accentOrange.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
-        .shadow(color: Color.black.opacity(0.06), radius: 2, x: 0, y: 1)
-    }
-
-    private func load() async {
-        isLoading = true
-        defer { isLoading = false }
-        async let n: Void = loadNotif()
-        async let o: Void = loadOcc()
-        async let p: Void = loadPromotions()
-        async let b: Void = loadBookings()
-        _ = await (n, o, p, b)
-    }
-
-    private func loadNotif() async {
-        guard let list = try? await app.api.getNotifications() else { return }
+        guard let list = try? await app.api.getNotifications(forceRefresh: forceRefresh) else { return }
         unread = list.filter { !$0.isRead }.count
     }
 
-    private func loadOcc() async {
-        occ = try? await app.api.getClubOccupancy()
+    private func loadOcc(forceRefresh: Bool = false) async {
+        occ = try? await app.api.getClubOccupancy(clubId: preferredClubId, forceRefresh: forceRefresh)
     }
 
-    private func loadPromotions() async {
+    private func loadAccessStatus(forceRefresh: Bool = false) async {
+        isInsideGym = (try? await app.api.getAccessStatus(forceRefresh: forceRefresh))?.isInside ?? false
+    }
+
+    private func loadPromotions(forceRefresh: Bool = false) async {
+        defer { promotionsReady = true }
         do {
-            let list = try await app.api.getClubPromotions()
-            let sorted = list.sorted { ($0.sortOrder ?? 100) < ($1.sortOrder ?? 100) }
-            if !sorted.isEmpty {
-                promotions = sorted
-                promoIndex = 0
-                return
-            }
-        } catch {}
-        await loadPromoFallbackFromClubInfo()
+            let list = try await app.api.getClubPromotions(forceRefresh: forceRefresh)
+            let sorted = list
+                .sorted { ($0.sortOrder ?? 100) < ($1.sortOrder ?? 100) }
+                .filter { !isLegacyDemoPromo(title: $0.title, subtitle: $0.subtitle) }
+            promotions = sorted
+            promoIndex = 0
+        } catch {
+            promotions = []
+            promoIndex = 0
+        }
     }
 
-    private func loadPromoFallbackFromClubInfo() async {
-        guard let info = try? await app.api.getClubInfo() else {
-            promotions = Self.defaultPromotions
-            promoIndex = 0
-            return
-        }
-        let title = info.promoTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !title.isEmpty else {
-            promotions = Self.defaultPromotions
-            promoIndex = 0
-            return
-        }
-        let subtitleRaw = info.promoSubtitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        promotions = [
-            ClubPromotion(
-                id: "club-info",
-                title: title,
-                subtitle: subtitleRaw.isEmpty ? nil : subtitleRaw,
-                imageUrl: nil,
-                buttonText: "Подробнее",
-                actionType: "shop",
-                actionValue: nil,
-                bgFrom: "#F97316",
-                bgTo: "#3B82F6",
-                sortOrder: 100
-            ),
-        ]
-        promoIndex = 0
+    private func isLegacyDemoPromo(title: String?, subtitle: String?) -> Bool {
+        let t = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let s = (subtitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return t.contains("СКИДКА 20%") || (t == "СКИДКА 20%!" && s.contains("12 и 6"))
     }
 
-    private func loadBookings() async {
-        guard let bookings = try? await app.api.getMyBookings() else { return }
+    private func loadBookings(forceRefresh: Bool = false) async {
+        guard let bookings = try? await app.api.getMyBookings(upcoming: true, forceRefresh: forceRefresh) else { return }
         let rows = bookings
             .filter { $0.status.lowercased() != "cancelled" }
             .sorted { $0.training.startTime < $1.training.startTime }
@@ -839,7 +852,7 @@ struct MyBookingsTabView: View {
         }
         .background(Theme.background)
         .task { await load() }
-        .refreshable { await load() }
+        .refreshable { await load(forceRefresh: true) }
         .alert("Отменить запись?", isPresented: Binding(
             get: { cancelId != nil },
             set: { if !$0 { cancelId = nil } }
@@ -992,13 +1005,14 @@ struct MyBookingsTabView: View {
         return "\(date) в \(time)"
     }
 
-    private func load() async {
+    private func load(forceRefresh: Bool = false) async {
         isLoading = true
         networkError = nil
         defer { isLoading = false }
         do {
-            bookings = try await app.api.getMyBookings()
+            bookings = try await app.api.getMyBookings(forceRefresh: forceRefresh)
         } catch {
+            if Task.isCancelled || error.isBenignCancellation { return }
             networkError = error.localizedDescription
         }
     }
@@ -1006,8 +1020,9 @@ struct MyBookingsTabView: View {
     private func cancel(_ id: String) async {
         do {
             try await app.api.cancelBooking(id: id)
-            await load()
+            await load(forceRefresh: true)
         } catch {
+            if Task.isCancelled || error.isBenignCancellation { return }
             networkError = error.localizedDescription
         }
     }
@@ -1020,10 +1035,38 @@ struct ProfileTabView: View {
     var go: (AppRoute) -> Void
     @State private var subscriptions: [Subscription] = []
     @State private var stats: UserStats?
-    @State private var isLoading = false
+    @State private var isLoadingSubscriptions = false
     @State private var profileError: String?
     @State private var showLogoutConfirm = false
     @State private var sberBusy = false
+    @State private var freezeTarget: Subscription?
+    @State private var freezeDaysInput = ""
+    @State private var showFreezeDialog = false
+    @State private var cancelTarget: Subscription?
+    @State private var showErrorAlert = false
+    @State private var showBonusComingSoon = false
+    @State private var showSubscriptionHistory = false
+
+    private var preferredClubId: String? {
+        let raw = app.currentUser?.clubId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return raw.isEmpty || raw == "0" ? nil : raw
+    }
+
+    private var clubFilteredSubscriptions: [Subscription] {
+        guard let preferred = preferredClubId else { return subscriptions }
+        return subscriptions.filter { sub in
+            guard let sid = sub.clubId, !sid.isEmpty else { return true }
+            return sid == preferred
+        }
+    }
+
+    private var activeSubscriptions: [Subscription] {
+        clubFilteredSubscriptions.filter { $0.status == .active || $0.status == .frozen || $0.status == .pending }
+    }
+
+    private var archivedSubscriptions: [Subscription] {
+        clubFilteredSubscriptions.filter { !($0.status == .active || $0.status == .frozen || $0.status == .pending) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1047,9 +1090,6 @@ struct ProfileTabView: View {
 
             ZStack {
                 Theme.background
-                if isLoading {
-                    ProgressView()
-                }
                 ScrollView {
                     VStack(spacing: 16) {
                         if let profileError {
@@ -1058,7 +1098,14 @@ struct ProfileTabView: View {
                                 .foregroundStyle(Theme.error)
                         }
                         if let u = app.currentUser {
+                            if let club = u.clubName, !club.isEmpty {
+                                clubHeaderRow(club)
+                            }
+                            switchClubButton(currentLabel: u.clubName)
                             profileUserCard(u)
+                            if !(u.isVerified || u.passportVerificationStatus == "verified") {
+                                sberVerifyCard
+                            }
                         }
                         if let stats {
                             gamificationCard(stats)
@@ -1068,13 +1115,12 @@ struct ProfileTabView: View {
                             .font(FCTypography.titleMedium())
                             .fontWeight(.bold)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        if subscriptions.isEmpty && !isLoading {
-                            emptySubsCard
-                        } else {
-                            ForEach(subscriptions, id: \.id) { s in
-                                profileSubscriptionCard(s)
-                            }
+                        if isLoadingSubscriptions && subscriptions.isEmpty {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
                         }
+                        subscriptionsSection
                         Text("Настройки")
                             .font(FCTypography.titleMedium())
                             .fontWeight(.bold)
@@ -1085,11 +1131,16 @@ struct ProfileTabView: View {
                     .padding(16)
                     .padding(.bottom, 24)
                 }
+                .refreshable { await refreshProfile() }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .task { await load() }
-        .refreshable { await load() }
+        // Всегда с сервера: счётчик посещений / visits_used не должен жить на 45с кэше.
+        .task(id: app.subscriptionsRevision) { await load(forceRefresh: true) }
+        .task(id: app.currentUser?.clubId) { await load(forceRefresh: true) }
+        .onChange(of: profileError) { _, err in
+            showErrorAlert = err != nil
+        }
         .alert("Выйти из аккаунта?", isPresented: $showLogoutConfirm) {
             Button("Отмена", role: .cancel) {}
             Button("Выйти", role: .destructive) {
@@ -1098,78 +1149,222 @@ struct ProfileTabView: View {
         } message: {
             Text("Вы уверены, что хотите выйти?")
         }
+        .alert("Заморозить абонемент", isPresented: $showFreezeDialog) {
+            TextField("Дни", text: $freezeDaysInput)
+                .keyboardType(.numberPad)
+            Button("Заморозить") {
+                guard let target = freezeTarget,
+                      let days = Int(freezeDaysInput.filter(\.isNumber)),
+                      days > 0,
+                      days <= target.freezeDaysLeft else { return }
+                Task { await freeze(target.id, days) }
+            }
+            Button("Отмена", role: .cancel) {
+                freezeTarget = nil
+            }
+        } message: {
+            if let target = freezeTarget {
+                Text("Укажите количество дней заморозки (доступно: \(target.freezeDaysLeft)):")
+            } else {
+                Text("Укажите количество дней заморозки:")
+            }
+        }
+        .alert("Отменить абонемент?", isPresented: Binding(
+            get: { cancelTarget != nil },
+            set: { if !$0 { cancelTarget = nil } }
+        )) {
+            Button("Отменить", role: .destructive) {
+                guard let target = cancelTarget else { return }
+                Task { await cancelSubscription(target.id) }
+            }
+            Button("Назад", role: .cancel) { cancelTarget = nil }
+        } message: {
+            Text("Доступ в клуб по этому абонементу будет закрыт. Отменить можно только активный или замороженный абонемент.")
+        }
+        .alert("Ошибка", isPresented: $showErrorAlert) {
+            Button("OK") { profileError = nil }
+        } message: {
+            Text(profileError ?? "")
+        }
+        .alert("Бонусная программа", isPresented: $showBonusComingSoon) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Бонусная программа и приглашение друзей скоро появятся в приложении.")
+        }
+    }
+
+    private func clubHeaderRow(_ club: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "dumbbell.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.primary)
+            Text(club)
+                .font(FCTypography.titleMedium())
+                .fontWeight(.bold)
+                .foregroundStyle(Theme.primary)
+                .lineLimit(1)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 4)
+    }
+
+    private func switchClubButton(currentLabel: String?) -> some View {
+        Button {
+            go(.selectPreferredClub)
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Theme.primary.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Theme.primary)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Выбрать другой клуб")
+                        .font(FCTypography.titleSmall())
+                        .fontWeight(.bold)
+                        .foregroundStyle(Theme.onBackground)
+                    Text(
+                        (currentLabel?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : "Сейчас: \($0)" }
+                            ?? "Сменить зал для абонементов и покупки"
+                    )
+                    .font(FCTypography.bodySmall())
+                    .foregroundStyle(Theme.onSurfaceVariant)
+                    .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.onSurfaceVariant)
+            }
+            .padding(14)
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Theme.primary, Theme.primary.opacity(0.5)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func profileUserCard(_ u: User) -> some View {
-        ZStack(alignment: .topTrailing) {
-            VStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.primary)
-                        .frame(width: 80, height: 80)
-                    Text(String(u.name.prefix(1)).uppercased())
-                        .font(FCTypography.headlineLarge())
-                        .fontWeight(.bold)
-                        .foregroundStyle(Theme.onPrimary)
-                }
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(Theme.primary)
+                    .frame(width: 64, height: 64)
+                Text(String(u.name.prefix(1)).uppercased())
+                    .font(FCTypography.headlineMedium())
+                    .fontWeight(.bold)
+                    .foregroundStyle(Theme.onPrimary)
+            }
+            VStack(alignment: .leading, spacing: 6) {
                 Text(u.name)
-                    .font(FCTypography.titleLarge())
+                    .font(FCTypography.titleMedium())
                     .fontWeight(.bold)
                     .foregroundStyle(Theme.onBackground)
+                    .lineLimit(2)
                 Label(u.email, systemImage: "envelope.fill")
-                    .font(FCTypography.bodyMedium())
+                    .font(FCTypography.bodySmall())
                     .foregroundStyle(Theme.onSurfaceVariant)
+                    .lineLimit(1)
                 Label(u.phone, systemImage: "phone.fill")
-                    .font(FCTypography.bodyMedium())
+                    .font(FCTypography.bodySmall())
                     .foregroundStyle(Theme.onSurfaceVariant)
-
-                if u.isVerified || u.passportVerificationStatus == "verified" {
-                    Label("Верифицирован через Сбер ID", systemImage: "checkmark.seal.fill")
-                        .font(FCTypography.bodyMedium())
-                        .foregroundStyle(Theme.success)
-                } else {
-                    Button {
-                        Task { await verifyWithSberFromProfile() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            if sberBusy {
-                                ProgressView()
-                                    .scaleEffect(0.85)
-                            }
-                            Text(sberBusy ? "Подождите…" : "Подтвердить через Сбер ID")
-                                .font(FCTypography.bodyMedium())
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundStyle(Theme.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(sberBusy)
-                }
-
-                Divider()
-                HStack {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(Theme.warning)
-                    Text("\(u.bonusPoints) бонусов")
-                        .font(FCTypography.titleMedium())
-                        .fontWeight(.bold)
-                        .foregroundStyle(Theme.onBackground)
-                }
+                    .lineLimit(1)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
             Button {
                 go(.editProfile)
             } label: {
                 Image(systemName: "pencil")
                     .foregroundStyle(Theme.primary)
             }
-            .padding(12)
+            .buttonStyle(.plain)
         }
+        .padding(16)
+        .frame(maxWidth: .infinity)
         .background(Theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: Theme.radius20, style: .continuous))
         .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+    }
+
+    private var sberVerifyCard: some View {
+        Button {
+            Task { await verifyWithSberFromProfile() }
+        } label: {
+            HStack(spacing: 12) {
+                if sberBusy {
+                    ProgressView()
+                        .scaleEffect(0.85)
+                } else {
+                    Image(systemName: "checkmark.seal")
+                        .foregroundStyle(Theme.primary)
+                }
+                Text(sberBusy ? "Подождите…" : "Подтвердить аккаунт через Сбер ID")
+                    .font(FCTypography.bodyMedium())
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.primary)
+                Spacer()
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .background(Theme.primary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(sberBusy)
+    }
+
+    @ViewBuilder
+    private var subscriptionsSection: some View {
+        if activeSubscriptions.isEmpty && archivedSubscriptions.isEmpty && !isLoadingSubscriptions {
+            emptySubsCard
+        } else {
+            if !activeSubscriptions.isEmpty {
+                ForEach(activeSubscriptions, id: \.id) { s in
+                    profileSubscriptionCard(s)
+                }
+            } else if !isLoadingSubscriptions {
+                Text("Сейчас нет активных абонементов")
+                    .font(FCTypography.bodyMedium())
+                    .foregroundStyle(Theme.onSurfaceVariant)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Theme.surfaceVariant.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius12, style: .continuous))
+            }
+            if !archivedSubscriptions.isEmpty {
+                Button {
+                    showSubscriptionHistory.toggle()
+                } label: {
+                    Text(showSubscriptionHistory
+                        ? "Скрыть историю абонементов (\(archivedSubscriptions.count))"
+                        : "Показать историю абонементов (\(archivedSubscriptions.count))")
+                        .font(FCTypography.labelLarge())
+                        .foregroundStyle(Theme.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+            }
+            if showSubscriptionHistory {
+                ForEach(archivedSubscriptions, id: \.id) { s in
+                    profileSubscriptionCard(s)
+                }
+            }
+        }
     }
 
     private func gamificationCard(_ st: UserStats) -> some View {
@@ -1230,7 +1425,7 @@ struct ProfileTabView: View {
         HStack {
             profileQuickIcon("qrcode", "QR-код") { go(.qrCode) }
             profileQuickIcon("cart.fill", "Купить") { go(.subscriptionPlans) }
-            profileQuickIcon("person.3.fill", "Друзьям") { go(.referral) }
+            profileQuickIcon("person.3.fill", "Друзьям") { showBonusComingSoon = true }
             profileQuickIcon("bell.fill", "Уведомления") { go(.notifications) }
         }
         .frame(maxWidth: .infinity)
@@ -1258,18 +1453,20 @@ struct ProfileTabView: View {
 
     private var emptySubsCard: some View {
         VStack(spacing: 12) {
-            Text("Нет абонементов")
+            Image(systemName: "creditcard.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(Theme.onSurfaceVariant)
+            Text("У вас нет активных абонементов")
                 .font(FCTypography.bodyMedium())
                 .foregroundStyle(Theme.onSurfaceVariant)
-            FCPrimaryButton(title: "Выбрать тариф") {
+            FCPrimaryButton(title: "Купить абонемент") {
                 go(.subscriptionPlans)
             }
         }
         .padding(24)
         .frame(maxWidth: .infinity)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.radius20, style: .continuous))
-        .shadow(color: Color.black.opacity(0.06), radius: 2, x: 0, y: 1)
+        .background(Theme.surfaceVariant.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radius16, style: .continuous))
     }
 
     private func profileSubscriptionCard(_ s: Subscription) -> some View {
@@ -1281,6 +1478,17 @@ struct ProfileTabView: View {
                     .foregroundStyle(Theme.onBackground)
                 Spacer()
                 subscriptionStatusChip(s.status)
+            }
+            if let club = s.clubName, !club.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.primary)
+                    Text(club)
+                        .font(FCTypography.bodyMedium())
+                        .fontWeight(.medium)
+                        .foregroundStyle(Theme.primary)
+                }
             }
             HStack {
                 VStack(alignment: .leading) {
@@ -1296,7 +1504,7 @@ struct ProfileTabView: View {
                     Text("Окончание")
                         .font(FCTypography.labelSmall())
                         .foregroundStyle(Theme.onSurfaceVariant)
-                    Text(String(s.endDate.prefix(10)))
+                    Text(s.formattedEndDate)
                         .font(FCTypography.bodyMedium())
                         .foregroundStyle(Theme.onBackground)
                 }
@@ -1308,19 +1516,63 @@ struct ProfileTabView: View {
                     .font(FCTypography.bodySmall())
                     .foregroundStyle(Theme.onSurfaceVariant)
             }
-            if s.status == .active, s.freezeDaysLeft > 0 {
-                Button("Заморозить") {
-                    Task { await freeze(s.id, 7) }
-                }
-                .font(FCTypography.labelLarge())
-                .foregroundStyle(Theme.primary)
+            if s.freezeDaysTotal > 0 {
+                Text("Дней заморозки: \(s.freezeDaysLeft) из \(s.freezeDaysTotal)")
+                    .font(FCTypography.bodySmall())
+                    .foregroundStyle(Theme.onSurfaceVariant)
             }
-            if s.isFrozen {
-                Button("Разморозить") {
-                    Task { await unfreeze(s.id) }
+            if s.status == .active, s.freezeDaysLeft > 0 {
+                Button {
+                    freezeTarget = s
+                    let defaultDays = min(7, s.freezeDaysLeft)
+                    freezeDaysInput = "\(max(defaultDays, 1))"
+                    showFreezeDialog = true
+                } label: {
+                    HStack {
+                        Image(systemName: "snowflake")
+                        Text("Заморозить")
+                    }
+                    .font(FCTypography.labelLarge())
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.surfaceVariant.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius12, style: .continuous))
                 }
-                .font(FCTypography.labelLarge())
-                .foregroundStyle(Theme.accentBlue)
+                .buttonStyle(.plain)
+            }
+            if s.isFrozen || s.status == .frozen {
+                Button {
+                    Task { await unfreeze(s.id) }
+                } label: {
+                    HStack {
+                        Image(systemName: "play.fill")
+                        Text("Разморозить")
+                    }
+                    .font(FCTypography.labelLarge())
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.onPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            if (s.status == .active || s.status == .frozen) {
+                let canCancelManually = s.visitsLeft.map { $0 > 0 } ?? true
+                if canCancelManually {
+                    Button {
+                        cancelTarget = s
+                    } label: {
+                        Text("Отменить абонемент")
+                            .font(FCTypography.labelLarge())
+                            .foregroundStyle(Theme.error)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .padding(16)
@@ -1333,9 +1585,10 @@ struct ProfileTabView: View {
         let (text, color): (String, Color) = {
             switch st {
             case .active: return ("Активен", Theme.success)
-            case .frozen: return ("Заморозка", Theme.accentBlue)
-            case .expired: return ("Истёк", Theme.onSurfaceVariant)
+            case .frozen: return ("Заморожен", Theme.accentBlue)
+            case .expired: return ("Истёк", Theme.error)
             case .pending: return ("Ожидание", Theme.warning)
+            case .cancelled: return ("Отменён", Theme.error)
             }
         }()
         return Text(text)
@@ -1349,28 +1602,29 @@ struct ProfileTabView: View {
 
     private var profileMenuCard: some View {
         VStack(spacing: 0) {
-            menuRow("Гостевой пропуск") { go(.guestPass) }
-            Divider().padding(.leading, 16)
-            menuRow("Уведомления") { go(.notifications) }
-            Divider().padding(.leading, 16)
-            menuRow("Настройки") { go(.settings) }
-            Divider().padding(.leading, 16)
-            menuRow("Документы") { go(.documents) }
-            Divider().padding(.leading, 16)
-            menuRow("История покупок") { go(.purchaseHistory) }
-            Divider().padding(.leading, 16)
-            menuRow("Помощь") { go(.help) }
-            Divider().padding(.leading, 16)
-            menuRow("О приложении") { go(.about) }
+            menuRow("Уведомления", icon: "bell.fill") { go(.notifications) }
+            Divider().padding(.leading, 52)
+            menuRow("Документы", icon: "doc.fill") { go(.documents) }
+            Divider().padding(.leading, 52)
+            menuRow("История покупок", icon: "clock.fill") { go(.purchaseHistory) }
+            Divider().padding(.leading, 52)
+            menuRow("Настройки", icon: "gearshape.fill") { go(.settings) }
+            Divider().padding(.leading, 52)
+            menuRow("Помощь", icon: "questionmark.circle.fill") { go(.help) }
+            Divider().padding(.leading, 52)
+            menuRow("О приложении", icon: "info.circle.fill") { go(.about) }
         }
         .background(Theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: Theme.radius20, style: .continuous))
         .shadow(color: Color.black.opacity(0.06), radius: 2, x: 0, y: 1)
     }
 
-    private func menuRow(_ title: String, action: @escaping () -> Void) -> some View {
+    private func menuRow(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack {
+            HStack(spacing: 16) {
+                Image(systemName: icon)
+                    .foregroundStyle(Theme.primary)
+                    .frame(width: 24)
                 Text(title)
                     .font(FCTypography.bodyLarge())
                     .foregroundStyle(Theme.onSurface)
@@ -1402,39 +1656,80 @@ struct ProfileTabView: View {
         } catch let e as FitnessAPIError {
             profileError = e.localizedDescription
         } catch {
+            if Task.isCancelled || error.isBenignCancellation { return }
             profileError = error.localizedDescription
         }
     }
 
-    private func load() async {
-        isLoading = true
-        defer { isLoading = false }
-        async let subs: Void = loadSubs()
-        async let st: Void = loadStats()
+    private func load(forceRefresh: Bool = false) async {
+        profileError = nil
+        async let subs: Void = loadSubs(forceRefresh: forceRefresh)
+        async let st: Void = loadStats(forceRefresh: forceRefresh)
         _ = await (subs, st)
     }
 
-    private func loadSubs() async {
-        guard let s = try? await app.api.getMySubscriptions() else { return }
-        subscriptions = s
+    /// Pull-to-refresh: сбрасываем кэш и тянем абонементы + статистику посещений заново.
+    private func refreshProfile() async {
+        app.api.invalidateGetCache(pathPrefix: "subscriptions")
+        app.api.invalidateGetCache(pathPrefix: "user/stats")
+        await load(forceRefresh: true)
     }
 
-    private func loadStats() async {
-        stats = try? await app.api.getUserStats()
+    private func loadSubs(forceRefresh: Bool = false) async {
+        isLoadingSubscriptions = true
+        defer { isLoadingSubscriptions = false }
+        do {
+            let list = try await app.api.getMySubscriptions(forceRefresh: forceRefresh)
+            guard !Task.isCancelled else { return }
+            subscriptions = list
+        } catch {
+            // Pull-to-refresh отменяет предыдущий .task — это не ошибка для пользователя.
+            if Task.isCancelled || error.isBenignCancellation { return }
+            profileError = error.localizedDescription
+        }
+    }
+
+    private func loadStats(forceRefresh: Bool = false) async {
+        do {
+            let st = try await app.api.getUserStats(forceRefresh: forceRefresh)
+            guard !Task.isCancelled else { return }
+            stats = st
+        } catch {
+            if Task.isCancelled || error.isBenignCancellation { return }
+        }
     }
 
     private func freeze(_ id: String, _ days: Int) async {
         do {
             _ = try await app.api.freezeSubscription(id: id, days: days)
-            await loadSubs()
-        } catch { profileError = error.localizedDescription }
+            freezeTarget = nil
+            await loadSubs(forceRefresh: true)
+        } catch {
+            if Task.isCancelled || error.isBenignCancellation { return }
+            profileError = error.localizedDescription
+        }
     }
 
     private func unfreeze(_ id: String) async {
         do {
             _ = try await app.api.unfreezeSubscription(id: id)
-            await loadSubs()
-        } catch { profileError = error.localizedDescription }
+            await loadSubs(forceRefresh: true)
+        } catch {
+            if Task.isCancelled || error.isBenignCancellation { return }
+            profileError = error.localizedDescription
+        }
+    }
+
+    private func cancelSubscription(_ id: String) async {
+        do {
+            _ = try await app.api.cancelSubscription(id: id)
+            cancelTarget = nil
+            await loadSubs(forceRefresh: true)
+        } catch {
+            cancelTarget = nil
+            if Task.isCancelled || error.isBenignCancellation { return }
+            profileError = error.localizedDescription
+        }
     }
 }
 

@@ -638,6 +638,8 @@ struct Subscription: Codable, Identifiable, Hashable, Sendable {
     let price: Double
     let description: String?
     let clubName: String?
+    /// Клуб абонемента (`club_id` в CRM). nil / 0 — legacy, показываем в любом preferred клубе.
+    let clubId: String?
 
     var visitsLeft: Int? {
         guard let t = visitsTotal else { return nil }
@@ -653,7 +655,7 @@ struct Subscription: Codable, Identifiable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, type, startDate, endDate, status, visitsTotal, visitsUsed
-        case freezeDaysTotal, freezeDaysUsed, isFrozen, price, description, clubName
+        case freezeDaysTotal, freezeDaysUsed, isFrozen, price, description, clubName, clubId
     }
 
     init(from decoder: Decoder) throws {
@@ -677,6 +679,12 @@ struct Subscription: Codable, Identifiable, Hashable, Sendable {
             ?? 0
         description = try c.decodeIfPresent(String.self, forKey: .description)
         clubName = try c.decodeIfPresent(String.self, forKey: .clubName)
+        if let i = try? c.decode(Int.self, forKey: .clubId) {
+            clubId = i > 0 ? String(i) : nil
+        } else {
+            let s = try c.decodeIfPresent(String.self, forKey: .clubId)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            clubId = (s?.isEmpty == false && s != "0") ? s : nil
+        }
     }
 }
 
@@ -769,6 +777,31 @@ extension Booking: Identifiable {}
 struct PurchaseSubscriptionRequest: Codable, Sendable {
     let planId: String
     let promoCode: String?
+    let clubId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case planId, promoCode, clubId
+    }
+
+    init(planId: String, promoCode: String?, clubId: String? = nil) {
+        self.planId = planId
+        self.promoCode = promoCode
+        self.clubId = clubId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(planId, forKey: .planId)
+        try c.encodeIfPresent(promoCode, forKey: .promoCode)
+        if let clubId, !clubId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // CRM принимает число или строку; шлём строку как Android int через JSON number если возможно.
+            if let n = Int(clubId), n > 0 {
+                try c.encode(n, forKey: .clubId)
+            } else {
+                try c.encode(clubId, forKey: .clubId)
+            }
+        }
+    }
 }
 
 struct SubscriptionPurchaseErrorBody: Codable, Sendable {
