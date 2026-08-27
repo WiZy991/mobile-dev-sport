@@ -189,6 +189,58 @@ final class StaffClubRentalService
         return $rental;
     }
 
+    /**
+     * Абсолютная дата окончания Unlim (конец дня по Владивостоку), как после оплаты.
+     * null — снять аренду по этому залу.
+     */
+    public function setPaidUntilDate(StaffUser $staff, Club $club, ?\DateTimeImmutable $untilDate): void
+    {
+        if ($untilDate === null) {
+            $rental = $this->findRental($staff, $club);
+            if ($rental === null) {
+                return;
+            }
+            $this->em->remove($rental);
+            $this->em->flush();
+
+            if ($staff->getActiveClub()?->getId() === $club->getId()) {
+                $staff->setActiveClub(null);
+                foreach ($this->rentalsForStaff($staff) as $other) {
+                    if ($other->isValid()) {
+                        $staff->setActiveClub($other->getClub());
+                        break;
+                    }
+                }
+            }
+
+            $this->syncLegacyPaidUntil($staff);
+            $this->em->flush();
+
+            return;
+        }
+
+        $paidUntil = new \DateTimeImmutable(
+            $untilDate->format('Y-m-d') . ' 23:59:59',
+            ClubTimezone::zone(),
+        );
+
+        $rental = $this->findRental($staff, $club);
+        if ($rental === null) {
+            $rental = new StaffClubRental($staff, $club, $paidUntil);
+            $this->em->persist($rental);
+        } else {
+            $rental->setPaidUntil($paidUntil);
+        }
+
+        if ($staff->getActiveClub() === null && $rental->isValid()) {
+            $staff->setActiveClub($club);
+        }
+
+        $this->em->flush();
+        $this->syncLegacyPaidUntil($staff);
+        $this->em->flush();
+    }
+
     public function syncLegacyPaidUntil(StaffUser $staff): void
     {
         $max = null;

@@ -60,6 +60,20 @@
             <label class="form-label small text-secondary">Email (вход в приложение специалиста)</label>
             <input type="email" name="email" class="form-control form-control-sm" placeholder="trainer@example.com" autocomplete="off">
         </div>
+        {% if rentalClubs is defined and rentalClubs|length > 0 %}
+        <div class="col-12">
+            <label class="form-label small text-secondary mb-1">Аренда Unlim (перенос из другого зала) — до даты включительно</label>
+            <div class="row g-2">
+                {% for club in rentalClubs %}
+                <div class="col-md-4 col-lg-3">
+                    <label class="form-label small text-secondary mb-0">{{ club.name }}</label>
+                    <input type="date" name="rental_until[{{ club.id }}]" class="form-control form-control-sm" title="Пусто = без аренды">
+                </div>
+                {% endfor %}
+            </div>
+            <p class="small text-secondary mb-0 mt-1">Нужен email. В приложении сроки работают так же, как после оплаты аренды.</p>
+        </div>
+        {% endif %}
         <div class="col-12">
             <label class="form-label small text-secondary">О себе (для приложения)</label>
             <textarea name="description" class="form-control form-control-sm" rows="3" placeholder="Кратко о опыте, подходе к тренировкам — текст увидят клиенты в карточке тренера."></textarea>
@@ -83,6 +97,7 @@
                 <th>Специализация</th>
                 <th>Рейтинг</th>
                 <th>В приложении</th>
+                <th>Аренда Unlim</th>
                 <th></th>
             </tr>
             </thead>
@@ -90,6 +105,7 @@
             {% for t in trainers %}
                 {% set pub = t.publicationStatus %}
                 {% set photoSrc = trainers.trainer_photo_src(t.photoUrl)|trim %}
+                {% set rentalMap = rentalsByTrainerId[t.id]|default({}) %}
                 <tr>
                     <td>{{ t.id }}</td>
                     <td>
@@ -150,6 +166,17 @@
                         </form>
                         {% endif %}
                     </td>
+                    <td class="small">
+                        {% if rentalMap is not empty and rentalClubs is defined %}
+                            {% for club in rentalClubs %}
+                                {% if rentalMap[club.id] is defined %}
+                                    <div>{{ club.name }} до {{ rentalMap[club.id]|date('d.m.Y') }}</div>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-secondary">—</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if admin_can_coach() %}
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#edit-trainer-{{ t.id }}">Изменить</button>
@@ -163,7 +190,7 @@
                 </tr>
                 {% if admin_can_coach() %}
                 <tr class="collapse" id="edit-trainer-{{ t.id }}">
-                        <td colspan="8" class="bg-dark py-2">
+                        <td colspan="9" class="bg-dark py-2">
                             <form method="post" action="{{ path('admin_trainer_update', {id: t.id}) }}" class="row g-2 align-items-end">
                                 <div class="col-md-2">
                                     <label class="form-label small mb-0">Имя</label>
@@ -197,6 +224,22 @@
                                     <label class="form-label small mb-0">О себе (для приложения)</label>
                                     <textarea name="description" class="form-control form-control-sm" rows="3" placeholder="Текст для клиентов в приложении">{{ t.description ?? '' }}</textarea>
                                 </div>
+                                {% if rentalClubs is defined and rentalClubs|length > 0 %}
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">Аренда Unlim по залам (до даты включительно)</label>
+                                    <div class="row g-2">
+                                        {% for club in rentalClubs %}
+                                        <div class="col-md-4 col-lg-3">
+                                            <label class="form-label small text-secondary mb-0">{{ club.name }}</label>
+                                            <input type="date" name="rental_until[{{ club.id }}]" class="form-control form-control-sm"
+                                                   value="{{ rentalMap[club.id]|default('') }}"
+                                                   title="Пустое поле снимает аренду по этому залу">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    <p class="small text-secondary mb-0 mt-1">Как после покупки в приложении: QR, турникет, список залов. Очистите дату — аренда по залу снимется. Нужен email.</p>
+                                </div>
+                                {% endif %}
                                 <div class="col-md-2">
                                     <button type="submit" class="btn btn-sm btn-success">Сохранить</button>
                                 </div>
@@ -207,7 +250,7 @@
                 {% endif %}
             {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-secondary">
+                    <td colspan="9" class="text-center text-secondary">
                         Персонал пока не добавлен.
                     </td>
                 </tr>

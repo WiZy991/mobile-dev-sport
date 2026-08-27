@@ -43,11 +43,13 @@ use App\Service\Api\SubscriptionLifecycleService;
 use App\Service\Admin\ClubModuleRegistry;
 use App\Service\Admin\ClubSettingsStore;
 use App\Service\Admin\ClubSocialLinks;
+use App\Service\ClubTimezone;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
 use App\Service\Reports\OccupancyService;
 use App\Service\Reports\VisitPeriodResolver;
 use App\Service\Reports\VisitReportService;
+use App\Service\Staff\StaffClubRentalService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -55,6 +57,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -82,6 +85,8 @@ class AdminController extends AbstractController
         private readonly OnboardingQuestCatalog $onboardingQuestCatalog,
         private readonly TrainingScheduleNotifier $trainingScheduleNotifier,
         private readonly PromoBroadcastNotifier $promoBroadcastNotifier,
+        private readonly StaffClubRentalService $staffClubRental,
+        private readonly UserPasswordHasherInterface $passwordHasher,
     ) {}
 
     private function buildMenu(): array
@@ -2133,6 +2138,7 @@ class AdminController extends AbstractController
 
         $this->em->persist($trainer);
         $this->em->flush();
+        $this->applyTrainerRentalDatesFromRequest($trainer, $request);
         $this->addFlash('success', 'Тренер добавлен. В приложении виден только статус «Опубликован».');
 
         return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
@@ -2310,9 +2316,139 @@ class AdminController extends AbstractController
             ));
         }
         $this->em->flush();
+        $this->applyTrainerRentalDatesFromRequest($trainer, $request);
         $this->addFlash('success', 'Тренер обновлён.');
 
         return $this->redirectToRoute('admin_section', ['section' => 'trainers']);
+    }
+
+    /**
+     * StaffUser, привязанный к карточке тренера (по trainer_id или email).
+     */
+    private function findStaffUserForTrainer(Trainer $trainer): ?StaffUser
+    {
+        $linked = $this->em->getRepository(StaffUser::class)->findOneBy(['trainer' => $trainer]);
+        if ($linked instanceof StaffUser) {
+            return $linked;
+        }
+        $email = $trainer->getEmail();
+        if ($email === null || $email === '') {
+            return null;
+        }
+
+        $byEmail = $this->em->getRepository(StaffUser::class)->findOneBy([
+            'email' => mb_strtolower(trim($email)),
+        ]);
+
+        return $byEmail instanceof StaffUser ? $byEmail : null;
+    }
+
+    /**
+     * Создать одобренный StaffUser для миграции аренды (пароль задаст тренер при регистрации).
+     */
+    private function ensureStaffUserForTrainer(Trainer $trainer): ?StaffUser
+    {
+        $existing = $this->findStaffUserForTrainer($trainer);
+        if ($existing instanceof StaffUser) {
+            if ($existing->getTrainer() === null) {
+                $existing->setTrainer($trainer);
+            }
+            if ($existing->getRegistrationStatus() !== StaffUser::REGISTRATION_APPROVED) {
+                $existing->setRegistrationStatus(StaffUser::REGISTRATION_APPROVED);
+            }
+            $roles = $existing->getRoles();
+            if (!\in_array('ROLE_TRAINER', $roles, true)) {
+                $roles[] = 'ROLE_TRAINER';
+                $existing->setRoles($roles);
+            }
+            $this->em->flush();
+
+            return $existing;
+        }
+
+        $email = $trainer->getEmail();
+        if ($email === null || trim($email) === '') {
+            return null;
+        }
+
+        $user = (new StaffUser())
+            ->setEmail($email)
+            ->setName($trainer->getName() !== '' ? $trainer->getName() : $email)
+            ->setRoles(['ROLE_TRAINER'])
+            ->setRegistrationStatus(StaffUser::REGISTRATION_APPROVED)
+            ->setIsActive(true)
+            ->setTrainer($trainer);
+        $user->setPassword($this->passwordHasher->hashPassword($user, bin2hex(random_bytes(24))));
+        $this->em->persist($user);
+        $this->em->flush();
+
+        return $user;
+    }
+
+    /**
+     * Поля rental_until[clubId]=YYYY-MM-DD в форме тренера → StaffClubRental (как после оплаты Unlim).
+     * Пустое поле снимает аренду по залу.
+     */
+    private function applyTrainerRentalDatesFromRequest(Trainer $trainer, Request $request): void
+    {
+        if (!$request->request->has('rental_until')) {
+            return;
+        }
+        $raw = $request->request->all('rental_until');
+        if (!\is_array($raw)) {
+            return;
+        }
+
+        $settingAny = false;
+        foreach ($raw as $dateStr) {
+            if (\is_string($dateStr) && trim($dateStr) !== '') {
+                $settingAny = true;
+                break;
+            }
+        }
+
+        $staff = $this->findStaffUserForTrainer($trainer);
+        if ($staff === null) {
+            if (!$settingAny) {
+                return;
+            }
+            $staff = $this->ensureStaffUserForTrainer($trainer);
+            if ($staff === null) {
+                $this->addFlash(
+                    'warning',
+                    'Аренду Unlim не сохранили: укажите email тренера — без него нет входа в приложение специалиста.',
+                );
+
+                return;
+            }
+        } elseif ($staff->getTrainer() === null) {
+            $staff->setTrainer($trainer);
+            $this->em->flush();
+        }
+
+        foreach ($this->staffClubRental->catalogClubs($staff) as $club) {
+            $clubId = $club->getId();
+            if ($clubId === null) {
+                continue;
+            }
+            $key = (string) $clubId;
+            if (!\array_key_exists($key, $raw) && !\array_key_exists($clubId, $raw)) {
+                continue;
+            }
+            $dateStr = $raw[$key] ?? $raw[$clubId] ?? '';
+            $dateStr = \is_string($dateStr) ? trim($dateStr) : '';
+            if ($dateStr === '') {
+                $this->staffClubRental->setPaidUntilDate($staff, $club, null);
+                continue;
+            }
+            try {
+                $until = new \DateTimeImmutable($dateStr, ClubTimezone::zone());
+            } catch (\Exception) {
+                $this->addFlash('warning', sprintf('Некорректная дата аренды для «%s».', $club->getName()));
+                continue;
+            }
+            $this->staffClubRental->setPaidUntilDate($staff, $club, $until);
+        }
     }
 
     /** Нормализация телефона тренера: `+7XXXXXXXXXX` или null. */
@@ -3701,11 +3837,28 @@ class AdminController extends AbstractController
 
         if ($section === 'trainers') {
             $trainers = $this->em->getRepository(Trainer::class)->findBy([], ['id' => 'ASC']);
+            $rentalClubs = $this->staffClubRental->catalogClubs();
+            $rentalsByTrainerId = [];
+            foreach ($trainers as $trainer) {
+                $staff = $this->findStaffUserForTrainer($trainer);
+                if ($staff === null) {
+                    continue;
+                }
+                $map = [];
+                foreach ($this->staffClubRental->rentalsForStaff($staff) as $rental) {
+                    $map[$rental->getClub()->getId()] = $rental->getPaidUntil()->format('Y-m-d');
+                }
+                if ($map !== []) {
+                    $rentalsByTrainerId[$trainer->getId()] = $map;
+                }
+            }
 
             return $this->render('admin/staff.html.twig', [
                 'menu' => $menu,
                 'current' => $section,
                 'trainers' => $trainers,
+                'rentalClubs' => $rentalClubs,
+                'rentalsByTrainerId' => $rentalsByTrainerId,
             ]);
         }
 
