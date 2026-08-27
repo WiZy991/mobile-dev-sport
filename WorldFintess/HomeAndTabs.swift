@@ -1054,8 +1054,12 @@ struct ProfileTabView: View {
 
     private var clubFilteredSubscriptions: [Subscription] {
         guard let preferred = preferredClubId else { return subscriptions }
+        // Только абонементы выбранного зала. Без club_id не показываем —
+        // иначе годовой с Купера «висит» после переключения на другой клуб.
         return subscriptions.filter { sub in
-            guard let sid = sub.clubId, !sid.isEmpty else { return true }
+            guard let sid = sub.clubId?.trimmingCharacters(in: .whitespacesAndNewlines), !sid.isEmpty else {
+                return false
+            }
             return sid == preferred
         }
     }
