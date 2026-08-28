@@ -117,7 +117,7 @@ final class OccupancyService
     }
 
     /**
-     * @return list<array{user: User, entered_at: \DateTimeImmutable, club_id: ?int}>
+     * @return list<array{user: User, entered_at: \DateTimeImmutable, club_id: ?int, club_name: ?string}>
      */
     public function listCurrentlyInside(?Club $club = null, int $limit = 200): array
     {
@@ -142,6 +142,23 @@ final class OccupancyService
             $byId[$u->getId()] = $u;
         }
 
+        $clubIds = [];
+        foreach ($rows as $r) {
+            $clubRaw = $r['club_id'] ?? null;
+            if ($clubRaw !== null && $clubRaw !== '') {
+                $clubIds[] = (int) $clubRaw;
+            }
+        }
+        $clubIds = array_values(array_unique($clubIds));
+        $clubsById = [];
+        if ($clubIds !== []) {
+            /** @var Club[] $clubs */
+            $clubs = $this->em->getRepository(Club::class)->findBy(['id' => $clubIds]);
+            foreach ($clubs as $c) {
+                $clubsById[$c->getId()] = $c;
+            }
+        }
+
         $result = [];
         foreach ($rows as $r) {
             $user = $byId[(int) $r['user_id']] ?? null;
@@ -149,10 +166,13 @@ final class OccupancyService
                 continue;
             }
             $clubRaw = $r['club_id'] ?? null;
+            $clubId = $clubRaw !== null && $clubRaw !== '' ? (int) $clubRaw : null;
+            $clubEntity = $clubId !== null ? ($clubsById[$clubId] ?? null) : null;
             $result[] = [
                 'user' => $user,
                 'entered_at' => new \DateTimeImmutable((string) $r['entered_at'], new \DateTimeZone('UTC')),
-                'club_id' => $clubRaw !== null && $clubRaw !== '' ? (int) $clubRaw : null,
+                'club_id' => $clubId,
+                'club_name' => $clubEntity?->getName(),
             ];
         }
 

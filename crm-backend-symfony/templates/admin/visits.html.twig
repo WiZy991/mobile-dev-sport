@@ -36,8 +36,9 @@
                 <table class="table table-sm table-dark align-middle mb-0">
                     <thead class="sticky-top">
                         <tr>
-                            <th style="width: 50%;">Клиент</th>
+                            <th>Клиент</th>
                             <th>Телефон</th>
+                            <th>Клуб</th>
                             <th class="text-end">Зашёл</th>
                             {% if admin_can_mutate() %}<th class="text-end" style="width: 7rem;"></th>{% endif %}
                         </tr>
@@ -49,6 +50,7 @@
                                     <a href="{{ path('admin_client_show', {id: row.user.id}) }}" class="link-light text-decoration-none">{{ row.user.name }}</a>
                                 </td>
                                 <td>{{ row.user.phone }}</td>
+                                <td>{{ row.club_name|default('—') }}</td>
                                 <td class="text-end">{{ row.entered_at|date('H:i', 'Asia/Vladivostok') }}</td>
                                 {% if admin_can_mutate() %}
                                 <td class="text-end">
