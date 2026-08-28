@@ -19,14 +19,21 @@ use Symfony\Contracts\Cache\ItemInterface;
  * Логика: за окно присутствия для каждого клиента берём ПОСЛЕДНЕЕ granted-событие.
  * Если оно entry — клиент в зале; если exit — вышел.
  *
- * Важно: события с club_id = NULL (legacy / старые логи) считаются тем же залом,
- * что и текущий шлюз. Иначе вход без клуба + выход с club_id оставляют человека «в зале».
+ * Окно суток: с 23:15 UTC до следующих 23:15 UTC (не полночь).
+ * Максимум в зале: 3 часа с последнего входа (потом авто-exit в лог; QR-выход не трогаем).
  *
- * Время в access_logs и окно «сегодня» — UTC wall-clock (как до эксперимента с TZ).
+ * access_logs.created_at — UTC.
  */
 final class OccupancyService
 {
     private const COUNT_CACHE_TTL_SECONDS = 5;
+
+    /** Сброс «суток зала» по UTC. */
+    public const DAY_RESET_HOUR = 23;
+    public const DAY_RESET_MINUTE = 15;
+
+    /** Автоматический выход, если не было QR-выхода. */
+    public const MAX_STAY_SECONDS = 3 * 3600;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -36,30 +43,44 @@ final class OccupancyService
     }
 
     /**
-     * Окно «сегодня» в UTC — совпадает с AccessLog::createdAt (всегда UTC).
-     *
-     * @return array{from: string, to: string}
-     */
-    private function todayWindow(): array
-    {
-        $tz = new \DateTimeZone('UTC');
-        $start = new \DateTimeImmutable('today', $tz);
-        $end = $start->modify('+1 day');
-
-        return [
-            'from' => $start->format('Y-m-d H:i:s'),
-            'to' => $end->format('Y-m-d H:i:s'),
-        ];
-    }
-
-    /**
-     * То же окно, что и счётчик — вход/выход и «в зале» не расходятся.
+     * Окно присутствия: [прошлые 23:15 UTC; следующие 23:15 UTC).
      *
      * @return array{from: string, to: string}
      */
     private function presenceWindow(): array
     {
-        return $this->todayWindow();
+        $utc = new \DateTimeZone('UTC');
+        $now = new \DateTimeImmutable('now', $utc);
+        $resetToday = $now->setTime(self::DAY_RESET_HOUR, self::DAY_RESET_MINUTE, 0);
+
+        if ($now < $resetToday) {
+            $from = $resetToday->modify('-1 day');
+            $to = $resetToday;
+        } else {
+            $from = $resetToday;
+            $to = $resetToday->modify('+1 day');
+        }
+
+        return [
+            'from' => $from->format('Y-m-d H:i:s'),
+            'to' => $to->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    /** Нижняя граница «свежего» входа (сейчас − 3 часа), UTC. */
+    private function minFreshEntryAtUtc(): string
+    {
+        return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
+            ->modify('-' . self::MAX_STAY_SECONDS . ' seconds')
+            ->format('Y-m-d H:i:s');
+    }
+
+    private function entryStillFresh(string $createdAtUtc): bool
+    {
+        $at = new \DateTimeImmutable($createdAtUtc, new \DateTimeZone('UTC'));
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+
+        return ($now->getTimestamp() - $at->getTimestamp()) < self::MAX_STAY_SECONDS;
     }
 
     /**
@@ -86,7 +107,7 @@ final class OccupancyService
 
         return (int) $this->cache->get($cacheKey, function (ItemInterface $item) use ($club): int {
             $item->expiresAfter(self::COUNT_CACHE_TTL_SECONDS);
-            $sql = $this->buildCurrentlyInsideSql($club, selectColumns: 'COUNT(*) AS cnt');
+            $sql = $this->buildCurrentlyInsideSql($club, selectColumns: 'COUNT(*) AS cnt', stayFilter: 'fresh');
             $row = $this->connection()->executeQuery($sql['sql'], $sql['params'])->fetchAssociative();
 
             return (int) ($row['cnt'] ?? 0);
@@ -103,6 +124,7 @@ final class OccupancyService
             selectColumns: 't.user_id AS user_id, t.last_at AS entered_at, t.last_club_id AS club_id',
             orderBy: 'entered_at DESC',
             limit: $limit,
+            stayFilter: 'fresh',
         );
 
         $rows = $this->connection()->executeQuery($sql['sql'], $sql['params'])->fetchAllAssociative();
@@ -182,6 +204,57 @@ final class OccupancyService
         return $count;
     }
 
+    /**
+     * Авто-выход: последнее событие — entry старше 3 часов (в текущем окне суток).
+     * QR-выход / entry toggle не меняются — только дописываем exit в лог.
+     *
+     * @return int число созданных exit
+     */
+    public function autoExitStaleInside(?Club $club = null): int
+    {
+        $sql = $this->buildCurrentlyInsideSql(
+            $club,
+            selectColumns: 't.user_id AS user_id, t.last_at AS entered_at, t.last_club_id AS club_id',
+            orderBy: 'entered_at ASC',
+            limit: 500,
+            stayFilter: 'stale',
+        );
+        $rows = $this->connection()->executeQuery($sql['sql'], $sql['params'])->fetchAllAssociative();
+        if ($rows === []) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($rows as $r) {
+            $user = $this->em->find(User::class, (int) $r['user_id']);
+            if (!$user instanceof User) {
+                continue;
+            }
+            $rowClub = $club;
+            $clubRaw = $r['club_id'] ?? null;
+            if ($rowClub === null && $clubRaw !== null && $clubRaw !== '') {
+                $rowClub = $this->em->find(Club::class, (int) $clubRaw);
+            }
+            $log = (new AccessLog())
+                ->setUser($user)
+                ->setClub($rowClub instanceof Club ? $rowClub : null)
+                ->setRawData('AUTO:MAX_STAY:' . $user->getId())
+                ->setDeviceId('crm-auto-exit')
+                ->setEventType('exit')
+                ->setResult('granted')
+                ->setReason('auto_max_stay_3h');
+            $this->em->persist($log);
+            ++$count;
+        }
+
+        if ($count > 0) {
+            $this->em->flush();
+            $this->invalidateCountCache($club);
+        }
+
+        return $count;
+    }
+
     private function invalidateCountCache(?Club $club = null): void
     {
         try {
@@ -189,8 +262,6 @@ final class OccupancyService
             if ($club?->getId() !== null) {
                 $this->cache->delete('occupancy.count.' . $club->getId());
             }
-            // На всякий случай — ключи по другим клубам тоже (вход без club_id / смена клуба).
-            // Дешёво: filesystem/redis delete missing keys.
         } catch (\Throwable) {
         }
     }
@@ -202,7 +273,7 @@ final class OccupancyService
     }
 
     /**
-     * Последнее событие по user_id (не по паре user+club) — иначе NULL-club «залипает».
+     * @param 'fresh'|'stale'|'any' $stayFilter fresh = ≤3ч; stale = >3ч (для авто-exit); any = без фильтра
      *
      * @return array{sql: string, params: array<string, mixed>}
      */
@@ -211,8 +282,8 @@ final class OccupancyService
         string $selectColumns,
         ?string $orderBy = null,
         ?int $limit = null,
+        string $stayFilter = 'fresh',
     ): array {
-        // То же окно, что у isUserCurrentlyInside — иначе CRM и турникет расходятся.
         $window = $this->presenceWindow();
         $scope = $this->clubScopeSql($club);
         $params = [
@@ -220,7 +291,14 @@ final class OccupancyService
             'to' => $window['to'],
         ] + $scope['params'];
 
-        // Последнее событие за окно: window function (MySQL 8) — быстрее, чем MAX(id)+JOIN на больших access_logs.
+        $staySql = '';
+        if ($stayFilter === 'fresh' || $stayFilter === 'stale') {
+            $params['min_entry'] = $this->minFreshEntryAtUtc();
+            $staySql = $stayFilter === 'fresh'
+                ? ' AND ranked.created_at >= :min_entry'
+                : ' AND ranked.created_at < :min_entry';
+        }
+
         $inner = 'SELECT ranked.user_id AS user_id,
                          ranked.event_type AS last_type,
                          DATE_FORMAT(ranked.created_at, \'%Y-%m-%d %H:%i:%s\') AS last_at,
@@ -235,7 +313,7 @@ final class OccupancyService
                         AND al.created_at < :to' . $scope['sql'] . '
                   ) ranked
                   WHERE ranked.rn = 1
-                    AND ranked.event_type = \'entry\'';
+                    AND ranked.event_type = \'entry\'' . $staySql;
 
         $sql = "SELECT $selectColumns FROM ($inner) t";
 
@@ -249,12 +327,15 @@ final class OccupancyService
         return ['sql' => $sql, 'params' => $params];
     }
 
-    /** Сейчас ли клиент в зале — то же правило, что и счётчик (с учётом NULL club_id). */
+    /** Сейчас ли клиент в зале — то же правило, что и счётчик (окно + ≤3 ч). */
     public function isUserCurrentlyInside(User $user, ?Club $club = null): bool
     {
         $row = $this->lastGrantedEventRow($user, $club);
+        if ($row === null || ($row['event_type'] ?? '') !== 'entry') {
+            return false;
+        }
 
-        return $row !== null && ($row['event_type'] ?? '') === 'entry';
+        return $this->entryStillFresh((string) $row['created_at']);
     }
 
     /**
@@ -387,7 +468,6 @@ final class OccupancyService
             'to' => $window['to'],
         ] + $scope['params'];
 
-        // Один лёгкий запрос: последнее событие + даты entry/exit через условные MAX.
         $sql = 'SELECT
                     (SELECT event_type
                      FROM access_logs
@@ -397,6 +477,14 @@ final class OccupancyService
                        AND created_at < :to' . $scope['sql'] . '
                      ORDER BY created_at DESC, id DESC
                      LIMIT 1) AS last_type,
+                    (SELECT created_at
+                     FROM access_logs
+                     WHERE result = \'granted\'
+                       AND user_id = :user_id
+                       AND created_at >= :from
+                       AND created_at < :to' . $scope['sql'] . '
+                     ORDER BY created_at DESC, id DESC
+                     LIMIT 1) AS last_at,
                     MAX(CASE WHEN event_type = \'entry\' THEN created_at END) AS last_entry_at,
                     MAX(CASE WHEN event_type = \'exit\' THEN created_at END) AS last_exit_at
                 FROM access_logs
@@ -408,9 +496,12 @@ final class OccupancyService
         $row = $this->connection()->executeQuery($sql, $params)->fetchAssociative() ?: [];
         $lastEntry = !empty($row['last_entry_at']) ? new \DateTimeImmutable((string) $row['last_entry_at']) : null;
         $lastExit = !empty($row['last_exit_at']) ? new \DateTimeImmutable((string) $row['last_exit_at']) : null;
+        $isInside = ($row['last_type'] ?? '') === 'entry'
+            && !empty($row['last_at'])
+            && $this->entryStillFresh((string) $row['last_at']);
 
         return [
-            'is_inside' => (($row['last_type'] ?? '') === 'entry'),
+            'is_inside' => $isInside,
             'club_id' => $club?->getId(),
             'last_entry_at' => $lastEntry?->format(\DateTimeInterface::ATOM),
             'last_exit_at' => $lastExit?->format(\DateTimeInterface::ATOM),
