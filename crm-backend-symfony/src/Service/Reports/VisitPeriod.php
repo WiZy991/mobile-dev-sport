@@ -27,23 +27,33 @@ final readonly class VisitPeriod
 
     public function dateFromYmd(): string
     {
-        return $this->from->format('Y-m-d');
+        return $this->from
+            ->setTimezone(new \DateTimeZone(\App\Service\ClubTimezone::ID))
+            ->format('Y-m-d');
     }
 
     /** Последний включительный день периода (для отображения и CSV). */
     public function dateToYmdInclusive(): string
     {
-        return $this->toExclusive->modify('-1 day')->format('Y-m-d');
+        return $this->toExclusive
+            ->setTimezone(new \DateTimeZone(\App\Service\ClubTimezone::ID))
+            ->modify('-1 day')
+            ->format('Y-m-d');
     }
 
     public function dateFromDisplay(): string
     {
-        return $this->from->format('d.m.Y');
+        return $this->from
+            ->setTimezone(new \DateTimeZone(\App\Service\ClubTimezone::ID))
+            ->format('d.m.Y');
     }
 
     public function dateToDisplay(): string
     {
-        return $this->toExclusive->modify('-1 day')->format('d.m.Y');
+        return $this->toExclusive
+            ->setTimezone(new \DateTimeZone(\App\Service\ClubTimezone::ID))
+            ->modify('-1 day')
+            ->format('d.m.Y');
     }
 
     /**

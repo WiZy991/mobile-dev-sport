@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Reports;
 
+use App\Service\ClubTimezone;
+
 /**
  * Разбор периода отчёта: месяц, квартал или произвольные даты.
+ * Границы — календарь Владивостока, в UTC для сравнения с access_logs.
  */
 final class VisitPeriodResolver
 {
@@ -28,15 +31,17 @@ final class VisitPeriodResolver
      */
     private function resolveMonth(array $query): VisitPeriod
     {
-        $today = new \DateTimeImmutable('today');
-        $monthRaw = isset($query['month']) && is_string($query['month']) ? trim($query['month']) : $today->format('Y-m');
+        $todayLocal = new \DateTimeImmutable('today', ClubTimezone::zone());
+        $monthRaw = isset($query['month']) && is_string($query['month']) ? trim($query['month']) : $todayLocal->format('Y-m');
         if (!preg_match('/^\d{4}-\d{2}$/', $monthRaw)) {
-            $monthRaw = $today->format('Y-m');
+            $monthRaw = $todayLocal->format('Y-m');
         }
 
-        $from = new \DateTimeImmutable($monthRaw . '-01');
-        $toExclusive = $from->modify('first day of next month');
-        $label = $this->formatMonthLabel($from);
+        $fromLocal = new \DateTimeImmutable($monthRaw . '-01 00:00:00', ClubTimezone::zone());
+        $toLocal = $fromLocal->modify('first day of next month');
+        $from = $this->toUtc($fromLocal);
+        $toExclusive = $this->toUtc($toLocal);
+        $label = $this->formatMonthLabel($fromLocal);
 
         return new VisitPeriod(
             type: VisitPeriod::TYPE_MONTH,
@@ -52,26 +57,28 @@ final class VisitPeriodResolver
      */
     private function resolveQuarter(array $query): VisitPeriod
     {
-        $today = new \DateTimeImmutable('today');
-        $year = isset($query['year']) && is_numeric($query['year']) ? (int) $query['year'] : (int) $today->format('Y');
-        $quarter = isset($query['quarter']) && is_numeric($query['quarter']) ? (int) $query['quarter'] : (int) ceil((int) $today->format('n') / 3);
+        $todayLocal = new \DateTimeImmutable('today', ClubTimezone::zone());
+        $year = isset($query['year']) && is_numeric($query['year']) ? (int) $query['year'] : (int) $todayLocal->format('Y');
+        $quarter = isset($query['quarter']) && is_numeric($query['quarter'])
+            ? (int) $query['quarter']
+            : (int) ceil((int) $todayLocal->format('n') / 3);
 
         if ($year < 2000 || $year > 2100) {
-            $year = (int) $today->format('Y');
+            $year = (int) $todayLocal->format('Y');
         }
         if ($quarter < 1 || $quarter > 4) {
-            $quarter = (int) ceil((int) $today->format('n') / 3);
+            $quarter = (int) ceil((int) $todayLocal->format('n') / 3);
         }
 
         $startMonth = ($quarter - 1) * 3 + 1;
-        $from = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $startMonth));
-        $toExclusive = $from->modify('+3 months');
+        $fromLocal = new \DateTimeImmutable(sprintf('%04d-%02d-01 00:00:00', $year, $startMonth), ClubTimezone::zone());
+        $toLocal = $fromLocal->modify('+3 months');
         $label = sprintf('%d квартал %d', $quarter, $year);
 
         return new VisitPeriod(
             type: VisitPeriod::TYPE_QUARTER,
-            from: $from,
-            toExclusive: $toExclusive,
+            from: $this->toUtc($fromLocal),
+            toExclusive: $this->toUtc($toLocal),
             label: $label,
             year: $year,
             quarter: $quarter,
@@ -83,39 +90,48 @@ final class VisitPeriodResolver
      */
     private function resolveCustom(array $query): VisitPeriod
     {
-        $today = new \DateTimeImmutable('today');
-        $fromRaw = isset($query['date_from']) && is_string($query['date_from']) ? trim($query['date_from']) : $today->modify('-7 days')->format('Y-m-d');
-        $toRaw = isset($query['date_to']) && is_string($query['date_to']) ? trim($query['date_to']) : $today->format('Y-m-d');
+        $todayLocal = new \DateTimeImmutable('today', ClubTimezone::zone());
+        $fromRaw = isset($query['date_from']) && is_string($query['date_from'])
+            ? trim($query['date_from'])
+            : $todayLocal->modify('-7 days')->format('Y-m-d');
+        $toRaw = isset($query['date_to']) && is_string($query['date_to'])
+            ? trim($query['date_to'])
+            : $todayLocal->format('Y-m-d');
 
         try {
-            $from = new \DateTimeImmutable($fromRaw);
+            $fromLocal = new \DateTimeImmutable($fromRaw . ' 00:00:00', ClubTimezone::zone());
         } catch (\Exception) {
-            $from = $today->modify('-7 days');
+            $fromLocal = $todayLocal->modify('-7 days');
         }
 
         try {
-            $toInclusive = new \DateTimeImmutable($toRaw);
+            $toInclusiveLocal = new \DateTimeImmutable($toRaw . ' 00:00:00', ClubTimezone::zone());
         } catch (\Exception) {
-            $toInclusive = $today;
+            $toInclusiveLocal = $todayLocal;
         }
 
-        if ($toInclusive < $from) {
-            [$from, $toInclusive] = [$toInclusive, $from];
+        if ($toInclusiveLocal < $fromLocal) {
+            [$fromLocal, $toInclusiveLocal] = [$toInclusiveLocal, $fromLocal];
         }
 
-        $toExclusive = $toInclusive->modify('+1 day');
+        $toExclusiveLocal = $toInclusiveLocal->modify('+1 day');
         $label = sprintf(
             '%s — %s',
-            $from->format('d.m.Y'),
-            $toInclusive->format('d.m.Y'),
+            $fromLocal->format('d.m.Y'),
+            $toInclusiveLocal->format('d.m.Y'),
         );
 
         return new VisitPeriod(
             type: VisitPeriod::TYPE_CUSTOM,
-            from: $from,
-            toExclusive: $toExclusive,
+            from: $this->toUtc($fromLocal),
+            toExclusive: $this->toUtc($toExclusiveLocal),
             label: $label,
         );
+    }
+
+    private function toUtc(\DateTimeImmutable $local): \DateTimeImmutable
+    {
+        return $local->setTimezone(new \DateTimeZone('UTC'));
     }
 
     private function formatMonthLabel(\DateTimeImmutable $from): string

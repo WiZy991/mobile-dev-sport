@@ -3264,11 +3264,14 @@ class AdminController extends AbstractController
     public function exportVisits(Request $request): StreamedResponse
     {
         $period = $this->visitPeriodResolver->resolve($request->query->all());
-        $qb = $this->em->createQueryBuilder()
-            ->select('a')
+        $clubTz = ClubTimezone::zone();
+
+        /** @var list<AccessLog> $visits */
+        $visits = $this->em->createQueryBuilder()
+            ->select('a', 'c', 'au')
             ->from(AccessLog::class, 'a')
             ->leftJoin('a.club', 'c')
-            ->addSelect('c')
+            ->leftJoin('a.user', 'au')
             ->where('a.result = :result')
             ->andWhere('a.eventType = :eventType')
             ->andWhere('a.createdAt >= :from')
@@ -3277,31 +3280,114 @@ class AdminController extends AbstractController
             ->setParameter('eventType', 'entry')
             ->setParameter('from', $period->from)
             ->setParameter('to', $period->toExclusive)
-            ->orderBy('a.createdAt', 'DESC');
-        $visits = $qb->getQuery()->getResult();
+            ->orderBy('a.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
 
-        $response = new StreamedResponse(function () use ($visits) {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($handle, ['ID', 'Клиент', 'Телефон', 'Клуб', 'Устройство', 'Дата и время'], ';');
-            foreach ($visits as $v) {
-                $user = $v->getUser();
-                $club = $v->getClub();
-                fputcsv($handle, [
-                    $v->getId(),
-                    $user ? $user->getName() : '—',
-                    $user ? $user->getPhone() : '—',
-                    $club ? $club->getName() : '—',
-                    $v->getDeviceId() ?? '—',
-                    $v->getCreatedAt()->format('d.m.Y H:i:s'),
-                ], ';');
+        // Плоские строки до StreamedResponse — иначе lazy/EM в колбэке даёт пустой файл.
+        /** @var array<int, array{name: string, rows: list<list<string|int>>}> $byClub */
+        $byClub = [];
+        $allRows = [];
+        foreach ($visits as $v) {
+            $user = $v->getUser();
+            $club = $v->getClub();
+            $clubKey = $club?->getId() ?? 0;
+            $clubName = $club?->getName() ?? 'Без клуба';
+            if (!isset($byClub[$clubKey])) {
+                $byClub[$clubKey] = ['name' => $clubName, 'rows' => []];
             }
-            fclose($handle);
+            $row = [
+                $v->getId() ?? 0,
+                $user?->getName() ?: '—',
+                $user?->getPhone() ?: '—',
+                $clubName,
+                $v->getDeviceId() ?? '—',
+                $v->getCreatedAt()->setTimezone($clubTz)->format('d.m.Y H:i:s'),
+            ];
+            $byClub[$clubKey]['rows'][] = $row;
+            $allRows[] = $row;
+        }
+
+        uasort($byClub, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+
+        $usedTitles = ['Все клубы' => true];
+        $clubSheets = [];
+        foreach ($byClub as $clubBlock) {
+            $title = $this->excelSheetTitle($clubBlock['name'], $usedTitles);
+            $usedTitles[$title] = true;
+            $clubSheets[] = ['title' => $title, 'rows' => $clubBlock['rows']];
+        }
+
+        $filename = sprintf(
+            'visits_%s_%s.xlsx',
+            $period->dateFromYmd(),
+            $period->dateToYmdInclusive(),
+        );
+
+        $response = new StreamedResponse(function () use ($clubSheets, $allRows): void {
+            $spreadsheet = new Spreadsheet();
+            $headers = ['ID', 'Клиент', 'Телефон', 'Клуб', 'Устройство', 'Дата и время (Владивосток)'];
+
+            $summary = $spreadsheet->getActiveSheet();
+            $summary->setTitle('Все клубы');
+            $summary->fromArray($headers, null, 'A1');
+            $r = 2;
+            foreach ($allRows as $row) {
+                $summary->fromArray($row, null, 'A' . $r);
+                ++$r;
+            }
+            foreach (range('A', 'F') as $col) {
+                $summary->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            foreach ($clubSheets as $clubSheet) {
+                $sheet = $spreadsheet->createSheet();
+                $sheet->setTitle($clubSheet['title']);
+                $sheet->fromArray($headers, null, 'A1');
+                $r = 2;
+                foreach ($clubSheet['rows'] as $row) {
+                    $sheet->fromArray($row, null, 'A' . $r);
+                    ++$r;
+                }
+                foreach (range('A', 'F') as $col) {
+                    $sheet->getColumnDimension($col)->setAutoSize(true);
+                }
+            }
+
+            $spreadsheet->setActiveSheetIndex(0);
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
         });
-        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
-        $response->headers->set('Content-Disposition', 'attachment; filename="visits_' . $period->dateFromYmd() . '_' . $period->dateToYmdInclusive() . '.csv"');
+        $response->headers->set(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
 
         return $response;
+    }
+
+    /**
+     * Имя листа Excel ≤31 символа, без запрещённых символов, уникальное.
+     *
+     * @param array<string, true> $usedTitles
+     */
+    private function excelSheetTitle(string $name, array $usedTitles): string
+    {
+        $title = preg_replace('/[\\\\\\/\\?\\*\\[\\]:]/u', ' ', $name) ?? 'Клуб';
+        $title = trim(preg_replace('/\\s+/u', ' ', $title) ?? '') ?: 'Клуб';
+        if (mb_strlen($title) > 31) {
+            $title = mb_substr($title, 0, 31);
+        }
+        $base = $title;
+        $n = 2;
+        while (isset($usedTitles[$title])) {
+            $suffix = ' (' . $n . ')';
+            $title = mb_substr($base, 0, max(1, 31 - mb_strlen($suffix))) . $suffix;
+            ++$n;
+        }
+
+        return $title;
     }
 
     #[Route('/selfservice/export', name: 'admin_selfservice_export', methods: ['GET'])]
