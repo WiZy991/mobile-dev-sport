@@ -12,6 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Центральная рассылка уведомлений персоналу CRM (in-app + FCM).
+ * Учётки с ролью тренера (без admin/manager) пуши в «Специалист» не получают.
  */
 final class StaffEventNotifier
 {
@@ -70,6 +71,10 @@ final class StaffEventNotifier
         string $body,
         ?string $referenceId,
     ): void {
+        $recipients = array_values(array_filter(
+            $recipients,
+            fn (StaffUser $staff) => $this->receivesSpecialistPush($staff),
+        ));
         if ($recipients === []) {
             return;
         }
@@ -95,6 +100,20 @@ final class StaffEventNotifier
             $body,
             ['type' => $type, 'referenceId' => $referenceId ?? '']
         );
+    }
+
+    /**
+     * Тренеры без admin/manager — без пушей и in-app в приложении специалиста.
+     * Админ+тренер по-прежнему получает уведомления.
+     */
+    private function receivesSpecialistPush(StaffUser $staff): bool
+    {
+        $roles = $staff->getRoles();
+        if (!\in_array('ROLE_TRAINER', $roles, true)) {
+            return true;
+        }
+
+        return array_intersect($roles, self::ADMIN_ROLES) !== [];
     }
 
     private function staffPush(): FcmPushSender
