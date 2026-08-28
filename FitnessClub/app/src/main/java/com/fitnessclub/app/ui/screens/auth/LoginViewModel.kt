@@ -15,6 +15,7 @@ import com.fitnessclub.app.data.model.LoginHintResult
 import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.data.repository.ClubRepository
+import com.fitnessclub.app.data.repository.isSessionRejected
 import com.fitnessclub.app.data.repository.loginPasswordRequiredMessage
 import com.fitnessclub.app.data.repository.passwordNotSetHintMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -93,28 +94,29 @@ class LoginViewModel @Inject constructor(
 
     fun loginWithBiometric(activity: FragmentActivity) {
         if (!biometricLoginStore.hasStoredCredential()) return
-        BiometricLoginCoordinator.startDecryptPrompt(activity, biometricLoginStore) { rt, err ->
+        BiometricLoginCoordinator.startDecryptPrompt(activity, biometricLoginStore) { rt, err, broken ->
             if (rt == null) {
-                if (!err.isNullOrBlank()) {
-                    viewModelScope.launch {
-                        _uiState.value = _uiState.value.copy(error = err, isLoading = false)
-                    }
+                if (broken) {
+                    biometricLoginStore.clear()
                 }
+                refreshBiometricOffer()
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = err?.takeIf { it.isNotBlank() },
+                )
                 return@startDecryptPrompt
             }
             viewModelScope.launch {
-                authRepository.restoreSessionWithRefreshToken(rt).collect { result ->
-                    when (result) {
-                        is ApiResult.Loading -> {
-                            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-                        }
-                        is ApiResult.Success -> {
-                            _uiState.value = _uiState.value.copy(isLoading = false)
-                            refreshBiometricOffer()
-                            _events.emit(LoginEvent.Success(result.data))
-                        }
-                        is ApiResult.Error -> {
-                            // Чужой/протухший refresh: сбрасываем биовход, чтобы не крутить «токен неверный».
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                when (val result = authRepository.restoreSessionForBiometric(rt)) {
+                    is ApiResult.Success -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+                        refreshBiometricOffer()
+                        _events.emit(LoginEvent.Success(result.data))
+                    }
+                    is ApiResult.Error -> {
+                        if (result.isSessionRejected()) {
+                            // Сессию отозвал сервер — расшифрованный токен уже не поможет.
                             biometricLoginStore.clear()
                             refreshBiometricOffer()
                             _uiState.value = _uiState.value.copy(
@@ -123,8 +125,17 @@ class LoginViewModel @Inject constructor(
                                     "(другой аккаунт или сессия устарела). " +
                                     "Войдите по паролю и снова включите биометрию в Настройках.",
                             )
+                        } else {
+                            // Сеть или сбой сервера: биовход сохраняем, иначе пользователь
+                            // теряет отпечаток из-за одной неудачной попытки.
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                error = "Не удалось связаться с сервером. " +
+                                    "Проверьте интернет и попробуйте ещё раз.",
+                            )
                         }
                     }
+                    is ApiResult.Loading -> Unit
                 }
             }
         }

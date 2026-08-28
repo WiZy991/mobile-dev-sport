@@ -221,8 +221,10 @@ class SettingsViewModel @Inject constructor(
                     rt,
                     userId = userId,
                 ) { ok, err ->
+                    // Ключ пересоздаётся до подтверждения, поэтому при отмене состояние
+                    // переключателя тоже нужно вернуть к «выключено».
+                    refreshBiometricUi()
                     if (ok) {
-                        refreshBiometricUi()
                         onMessage("Вход по отпечатку включён")
                     } else if (!err.isNullOrBlank()) {
                         onMessage(err)

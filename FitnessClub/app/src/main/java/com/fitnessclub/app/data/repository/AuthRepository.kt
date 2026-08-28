@@ -253,6 +253,24 @@ class AuthRepository @Inject constructor(
         }
     }
     
+    /**
+     * Вход по отпечатку. Если сохранённый в биометрии refresh уже не принимается сервером,
+     * пробуем refresh текущей сессии с диска: пользователь только что подтвердил личность,
+     * и терять биовход из-за разошедшихся токенов незачем.
+     */
+    suspend fun restoreSessionForBiometric(storedRefreshToken: String): ApiResult<User> {
+        val first = restoreSessionOnce(storedRefreshToken)
+        if (first !is ApiResult.Error || !first.isSessionRejected()) {
+            return first
+        }
+        val diskRefresh = tokenManager.getRefreshToken()?.trim().orEmpty()
+        if (diskRefresh.isEmpty() || diskRefresh == storedRefreshToken.trim()) {
+            return first
+        }
+        val second = restoreSessionOnce(diskRefresh)
+        return if (second is ApiResult.Error && second.isSessionRejected()) first else second
+    }
+
     fun isLoggedIn(): Flow<Boolean> = tokenManager.isLoggedIn()
 
     /**
@@ -486,6 +504,14 @@ class AuthRepository @Inject constructor(
         }
     }
 }
+
+/** Сервер явно отверг сессию (в отличие от офлайна, таймаута или 5xx). */
+fun ApiResult.Error.isSessionRejected(): Boolean =
+    code == 401 || code == 403 ||
+        authCode == "invalid_refresh" ||
+        authCode == "token_expired" ||
+        authCode == "invalid_token" ||
+        authCode == "user_blocked"
 
 internal fun passwordNotSetHintMessage(): String =
     "Аккаунт с этим email уже есть в клубе, но пароль ещё не задан.\n\n" +

@@ -1,5 +1,6 @@
 package com.fitnessclub.app.data.local
 
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -66,21 +67,33 @@ object BiometricLoginCoordinator {
         prompt.authenticate(info, BiometricPrompt.CryptoObject(cipher))
     }
 
+    /**
+     * [broken] = ключ/данные восстановить нельзя (сменились отпечатки на устройстве, повреждён blob).
+     * Только в этом случае вызывающему стоит стирать сохранённый вход; отмена, таймаут
+     * и временная блокировка сенсора биовход не сбрасывают.
+     */
     fun startDecryptPrompt(
         activity: FragmentActivity,
         store: BiometricLoginStore,
-        onDone: (refreshToken: String?, errorMessage: String?) -> Unit,
+        onDone: (refreshToken: String?, errorMessage: String?, broken: Boolean) -> Unit,
     ) {
         val cipher = try {
             store.prepareDecryptCipher()
+        } catch (_: KeyPermanentlyInvalidatedException) {
+            onDone(
+                null,
+                "Список отпечатков на устройстве изменился. Войдите по паролю и включите биометрию заново.",
+                true,
+            )
+            return
         } catch (e: Exception) {
-            onDone(null, e.message ?: "Нет сохранённого входа")
+            onDone(null, e.message ?: "Нет сохранённого входа", true)
             return
         }
         val ct = try {
             store.loadCipherTextBytes()
         } catch (e: Exception) {
-            onDone(null, e.message)
+            onDone(null, e.message, true)
             return
         }
         val executor = ContextCompat.getMainExecutor(activity)
@@ -92,13 +105,13 @@ object BiometricLoginCoordinator {
                     try {
                         val c = result.cryptoObject?.cipher
                         if (c == null) {
-                            onDone(null, "Ошибка расшифровки")
+                            onDone(null, "Ошибка расшифровки", true)
                             return
                         }
                         val plain = c.doFinal(ct)
-                        onDone(String(plain, Charsets.UTF_8), null)
+                        onDone(String(plain, Charsets.UTF_8), null, false)
                     } catch (e: Exception) {
-                        onDone(null, e.message ?: "Ошибка расшифровки")
+                        onDone(null, e.message ?: "Ошибка расшифровки", true)
                     }
                 }
 
@@ -106,14 +119,14 @@ object BiometricLoginCoordinator {
                     if (errorCode == BiometricPrompt.ERROR_USER_CANCELED ||
                         errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON
                     ) {
-                        onDone(null, null)
+                        onDone(null, null, false)
                     } else {
-                        onDone(null, errString.toString())
+                        onDone(null, errString.toString(), false)
                     }
                 }
 
                 override fun onAuthenticationFailed() {
-                    onDone(null, "Отпечаток не распознан")
+                    onDone(null, "Отпечаток не распознан", false)
                 }
             },
         )

@@ -163,7 +163,9 @@ class AuthController extends AbstractController
             );
             $this->em->flush();
 
-            return $this->json($this->mobileTokens->issue($existing, true));
+            // Не ротируем refresh: он же лежит в биометрическом хранилище приложения,
+            // иначе после этого шага вход по отпечатку перестаёт работать.
+            return $this->json($this->mobileTokens->issue($existing, false));
         }
 
         $user = (new User())
