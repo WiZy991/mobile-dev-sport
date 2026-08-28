@@ -29,6 +29,14 @@ data class SubscriptionPlansUiState(
     val isApplyingPromo: Boolean = false,
     val purchaseSuccess: Boolean = false,
     val clubPurchaseContext: ClubPurchaseContext = ClubPurchaseContext(clubName = "Ваш клуб"),
+    val isSavingPassport: Boolean = false,
+)
+
+/** Состояние шага паспорта перед согласием/оплатой. */
+data class PurchasePassportGate(
+    val plan: SubscriptionPlan,
+    val needDateOfBirth: Boolean,
+    val initialDobDisplay: String,
 )
 
 @HiltViewModel
@@ -167,10 +175,70 @@ class SubscriptionPlansViewModel @Inject constructor(
         return if (final < catalog) catalog else null
     }
 
+    /** После подтверждения цены: паспорт (если нет) → согласие с документами → Альфа. */
+    fun beginPurchaseAfterPriceConfirm(
+        plan: SubscriptionPlan,
+        onReadyForConsent: (SubscriptionPlan) -> Unit,
+        onNeedPassport: (PurchasePassportGate) -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val user = authRepository.refreshCurrentUser()
+                ?: authRepository.getCurrentUser().first()
+            if (user == null) {
+                onError("Профиль не загружен. Войдите снова.")
+                return@launch
+            }
+            if (user.isPassportCompleteForPurchase()) {
+                onReadyForConsent(plan)
+            } else {
+                onNeedPassport(
+                    PurchasePassportGate(
+                        plan = plan,
+                        needDateOfBirth = user.dateOfBirth.isNullOrBlank(),
+                        initialDobDisplay = isoDateToDisplay(user.dateOfBirth),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun savePassportThenContinue(
+        result: PurchasePassportResult,
+        onSaved: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        if (_uiState.value.isSavingPassport) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingPassport = true) }
+            when (
+                val saved = authRepository.savePassportForPurchase(
+                    series = result.series,
+                    number = result.number,
+                    issuedBy = result.issuedBy,
+                    issueDateIso = result.issueDateIso,
+                    registrationAddress = result.registrationAddress,
+                    dateOfBirthIso = result.dateOfBirthIso,
+                )
+            ) {
+                is ApiResult.Success -> {
+                    _uiState.update { it.copy(isSavingPassport = false) }
+                    onSaved()
+                }
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(isSavingPassport = false) }
+                    onError(saved.message ?: "Не удалось сохранить паспортные данные")
+                }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
     fun purchasePlan(
         plan: SubscriptionPlan,
         onPaymentRequired: (paymentId: Int, paymentUrl: String) -> Unit,
         onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
+        onPassportRequired: (String) -> Unit = {},
         onError: (String) -> Unit,
     ) {
         if (_uiState.value.isLoading) {
@@ -204,11 +272,25 @@ class SubscriptionPlansViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false) }
                     onVerificationRequired(result.authorizeUrl, result.message)
                 }
+                is PurchaseSubscriptionOutcome.PassportRequired -> {
+                    _uiState.update { it.copy(isLoading = false) }
+                    onPassportRequired(result.message)
+                }
                 is PurchaseSubscriptionOutcome.Error -> {
                     _uiState.update { it.copy(isLoading = false) }
                     onError(result.message)
                 }
             }
         }
+    }
+}
+
+private fun isoDateToDisplay(iso: String?): String {
+    if (iso.isNullOrBlank()) return ""
+    return try {
+        val d = java.time.LocalDate.parse(iso.take(10))
+        d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+    } catch (_: Exception) {
+        iso
     }
 }

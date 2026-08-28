@@ -40,6 +40,17 @@ class SubscriptionPaymentInitService
             return $sberGate;
         }
 
+        if (!$user->hasRequiredDataForSubscription()) {
+            return [
+                'error' => [
+                    'error' => 'Для покупки абонемента заполните паспортные данные в приложении',
+                    'code' => 'passport_required',
+                    'message' => 'Для покупки абонемента заполните паспортные данные. Разлогиниваться не нужно — укажите их на шаге перед оплатой.',
+                ],
+                'status' => 400,
+            ];
+        }
+
         $issueClub = $this->resolveIssueClub($user, $clubIdRaw);
         if ($issueClub === null) {
             return [

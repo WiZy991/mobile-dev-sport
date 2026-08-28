@@ -48,8 +48,7 @@ data class PassportDraft(
 
 enum class RegisterFormStep(val title: String, val index: Int) {
     PERSONAL("Личные данные", 1),
-    PASSPORT("Паспорт", 2),
-    ACCOUNT("Пароль и согласие", 3),
+    ACCOUNT("Пароль и согласие", 2),
     ;
 
     companion object {
@@ -383,8 +382,7 @@ class RegisterViewModel @Inject constructor(
     fun goToPreviousFormStep() {
         val prev = when (_uiState.value.formStep) {
             RegisterFormStep.PERSONAL -> return
-            RegisterFormStep.PASSPORT -> RegisterFormStep.PERSONAL
-            RegisterFormStep.ACCOUNT -> RegisterFormStep.PASSPORT
+            RegisterFormStep.ACCOUNT -> RegisterFormStep.PERSONAL
         }
         _uiState.update {
             it.copy(
@@ -405,8 +403,7 @@ class RegisterViewModel @Inject constructor(
         }
         if (step == RegisterFormStep.LAST) return true
         val next = when (step) {
-            RegisterFormStep.PERSONAL -> RegisterFormStep.PASSPORT
-            RegisterFormStep.PASSPORT -> RegisterFormStep.ACCOUNT
+            RegisterFormStep.PERSONAL -> RegisterFormStep.ACCOUNT
             RegisterFormStep.ACCOUNT -> RegisterFormStep.ACCOUNT
         }
         _uiState.update {
@@ -473,13 +470,11 @@ class RegisterViewModel @Inject constructor(
     /** Валидация полей формы. Возвращает готовый запрос (с данными опросника) или null при ошибке. */
     private fun validateAndBuild(): RegisterRequest? {
         val personal = validateStep(RegisterFormStep.PERSONAL)
-        val passport = validateStep(RegisterFormStep.PASSPORT)
         val account = validateStep(RegisterFormStep.ACCOUNT)
-        val merged = personal.merge(passport).merge(account)
+        val merged = personal.merge(account)
         if (merged.hasError) {
             val targetStep = when {
                 personal.hasError -> RegisterFormStep.PERSONAL
-                passport.hasError -> RegisterFormStep.PASSPORT
                 else -> RegisterFormStep.ACCOUNT
             }
             applyValidationErrors(
@@ -493,19 +488,12 @@ class RegisterViewModel @Inject constructor(
         val state = _uiState.value
         val birthIso = parseToIsoDate(state.birthDateDisplay)!!
         val phoneApi = phoneForApi(state.phoneNationalDigits)
-        val passportIssueIso = parseToIsoDate(state.passport.issuedDateDisplay)!!
 
         val fullName = listOf(state.lastName, state.firstName, state.middleName)
             .filter { it.isNotBlank() }
             .joinToString(" ")
 
-        val address = listOf(
-            state.passport.region,
-            state.passport.city,
-            state.passport.streetHouse
-        ).filter { it.isNotBlank() }
-            .joinToString(", ")
-
+        // Паспорт — не на регистрации: обязателен перед покупкой абонемента.
         return RegisterRequest(
             email = state.email,
             password = state.password,
@@ -514,11 +502,11 @@ class RegisterViewModel @Inject constructor(
             registrationType = "client",
             dateOfBirth = birthIso,
             gender = state.gender!!.apiValue,
-            passportSeries = state.passport.series,
-            passportNumber = state.passport.number,
-            passportIssuedBy = state.passport.issuedBy,
-            passportIssueDate = passportIssueIso,
-            registrationAddress = address,
+            passportSeries = null,
+            passportNumber = null,
+            passportIssuedBy = null,
+            passportIssueDate = null,
+            registrationAddress = null,
             promoCode = state.promoCode.takeIf { it.isNotBlank() },
             newsletter = false,
             clubId = state.selectedClub?.id,
@@ -619,19 +607,6 @@ class RegisterViewModel @Inject constructor(
                     errors = errors.copy(genderError = "Выберите пол")
                 }
             }
-            RegisterFormStep.PASSPORT -> {
-                if (!state.passport.isCompleteForRegister()) {
-                    val p = state.passport
-                    val msg = when {
-                        p.series.length != 4 || p.number.length != 6 ->
-                            "Серия паспорта — 4 цифры, номер — 6 цифр"
-                        else -> "Заполните все поля паспорта"
-                    }
-                    errors = errors.copy(passportError = msg)
-                } else if (parseToIsoDate(state.passport.issuedDateDisplay) == null) {
-                    errors = errors.copy(passportError = "Неверная дата выдачи паспорта")
-                }
-            }
             RegisterFormStep.ACCOUNT -> {
                 if (state.password.isBlank()) {
                     errors = errors.copy(passwordError = "Введите пароль")
@@ -677,7 +652,6 @@ class RegisterViewModel @Inject constructor(
         val detail = errors.firstMessage()
         return when (step) {
             RegisterFormStep.PERSONAL -> detail ?: "Заполните личные данные"
-            RegisterFormStep.PASSPORT -> detail ?: "Заполните паспортные данные"
             RegisterFormStep.ACCOUNT -> detail ?: "Заполните пароль и подтвердите согласие"
         }
     }

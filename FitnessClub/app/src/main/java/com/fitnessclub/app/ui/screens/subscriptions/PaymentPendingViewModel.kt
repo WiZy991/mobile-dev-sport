@@ -12,7 +12,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -106,7 +105,7 @@ class PaymentPendingViewModel @Inject constructor(
     private suspend fun refreshSessionIfPossible(): Boolean {
         val refreshToken = tokenManager.getRefreshToken()?.trim().orEmpty()
         if (refreshToken.isEmpty()) return false
-        return when (val result = authRepository.restoreSessionWithRefreshToken(refreshToken).first { it !is ApiResult.Loading }) {
+        return when (val result = authRepository.restoreSessionOnce(refreshToken)) {
             is ApiResult.Success -> true
             else -> false
         }

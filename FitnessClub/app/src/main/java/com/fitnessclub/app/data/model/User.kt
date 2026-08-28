@@ -38,10 +38,37 @@ data class User(
     
     @SerializedName("date_of_birth")
     val dateOfBirth: String? = null,
+
+    @SerializedName("passport_series")
+    val passportSeries: String? = null,
+
+    @SerializedName("passport_number")
+    val passportNumber: String? = null,
+
+    @SerializedName("passport_issued_by")
+    val passportIssuedBy: String? = null,
+
+    @SerializedName("passport_issue_date")
+    val passportIssueDate: String? = null,
+
+    @SerializedName("registration_address")
+    val registrationAddress: String? = null,
     
     @SerializedName("created_at")
     val createdAt: String? = null
-)
+) {
+    /** Достаточно данных, чтобы купить абонемент (без повторной регистрации). */
+    fun isPassportCompleteForPurchase(): Boolean {
+        val series = passportSeries?.filter { it.isDigit() }.orEmpty()
+        val number = passportNumber?.filter { it.isDigit() }.orEmpty()
+        return series.length == 4 &&
+            number.length == 6 &&
+            !passportIssuedBy.isNullOrBlank() &&
+            !passportIssueDate.isNullOrBlank() &&
+            !registrationAddress.isNullOrBlank() &&
+            !dateOfBirth.isNullOrBlank()
+    }
+}
 
 data class AuthResponse(
     @SerializedName("token")
@@ -86,6 +113,12 @@ data class ChangePasswordRequest(
 
     @SerializedName("new_password")
     val newPassword: String,
+)
+
+/** Частичный PUT /user/profile — только переданные поля (без паспорта). */
+data class ProfilePatchRequest(
+    @SerializedName("club_id")
+    val clubId: Int? = null,
 )
 
 data class RegisterRequest(

@@ -21,7 +21,6 @@ import com.fitnessclub.app.ui.screens.auth.LoginScreen
 import com.fitnessclub.app.ui.screens.auth.LoginViewModel
 import com.fitnessclub.app.ui.screens.auth.PostRegisterSetupScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterClubPickScreen
-import com.fitnessclub.app.ui.screens.auth.RegisterPassportScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterSurveyScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterViewModel
@@ -62,11 +61,20 @@ fun NavGraph(
 ) {
     val startDestination = if (isLoggedIn) Screen.Home.route else Screen.Login.route
 
+    // После логина уводим с экрана входа на главную.
+    // На холодном старте уже в Home — повторный navigate с popUpTo даёт «вторую анимацию запуска».
     LaunchedEffect(isLoggedIn) {
         if (!isLoggedIn) return@LaunchedEffect
-        navController.navigate(Screen.Home.route) {
-            popUpTo(navController.graph.id) { inclusive = true }
-            launchSingleTop = true
+        val route = navController.currentBackStackEntry?.destination?.route
+            ?: navController.currentDestination?.route
+        val onAuthScreen = route == Screen.Login.route ||
+            route?.startsWith("login") == true ||
+            route?.startsWith("register") == true
+        if (onAuthScreen) {
+            navController.navigate(Screen.Home.route) {
+                popUpTo(navController.graph.id) { inclusive = true }
+                launchSingleTop = true
+            }
         }
         PaymentDeepLinkBus.events.collect { uri ->
             val paymentId = uri.getQueryParameter("payment_id")?.toIntOrNull()
@@ -181,9 +189,6 @@ fun NavGraph(
                     onNavigateToLogin = {
                         navController.popBackStack(Screen.Login.route, inclusive = false)
                     },
-                    onNavigateToPassport = {
-                        navController.navigate(RegisterRoutes.PASSPORT)
-                    },
                     onOpenLegalPdf = openLegalPdf,
                     onRegisterSuccess = {
                         navController.navigate(RegisterRoutes.SETUP) {
@@ -204,16 +209,6 @@ fun NavGraph(
                             launchSingleTop = true
                         }
                     },
-                )
-            }
-            composable(RegisterRoutes.PASSPORT) {
-                val parentEntry = remember {
-                    navController.getBackStackEntry(Screen.Register.route)
-                }
-                val viewModel: RegisterViewModel = hiltViewModel(parentEntry)
-                RegisterPassportScreen(
-                    viewModel = viewModel,
-                    onBack = { navController.popBackStack() },
                 )
             }
         }

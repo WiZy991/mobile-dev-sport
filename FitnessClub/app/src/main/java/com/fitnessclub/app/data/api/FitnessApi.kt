@@ -35,6 +35,10 @@ interface FitnessApi {
     
     @PUT("user/profile")
     suspend fun updateProfile(@Body user: User): Response<User>
+
+    /** Частичное обновление профиля (например, только club_id) — без паспортных полей. */
+    @PUT("user/profile")
+    suspend fun patchProfile(@Body body: ProfilePatchRequest): Response<User>
     
     @GET("user/stats")
     suspend fun getUserStats(): Response<UserStats>

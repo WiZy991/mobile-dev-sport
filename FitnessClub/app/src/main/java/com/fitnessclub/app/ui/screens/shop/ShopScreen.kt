@@ -30,6 +30,8 @@ import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.ui.screens.legal.LegalPdfScreen
 import com.fitnessclub.app.ui.screens.subscriptions.ClubPurchaseConsentDialog
+import com.fitnessclub.app.ui.screens.subscriptions.PurchasePassportDialog
+import com.fitnessclub.app.ui.screens.subscriptions.PurchasePassportGate
 import com.fitnessclub.app.ui.screens.subscriptions.SubscriptionPurchaseConfirmDialog
 import com.fitnessclub.app.ui.theme.*
 import kotlinx.coroutines.launch
@@ -65,6 +67,8 @@ fun ShopScreen(
     val uiState by viewModel.uiState.collectAsState()
     val selectedCategory = uiState.selectedCategory
     var showPurchasePlan by remember { mutableStateOf<SubscriptionPlan?>(null) }
+    var showPassportGate by remember { mutableStateOf<PurchasePassportGate?>(null) }
+    var passportFormError by remember { mutableStateOf<String?>(null) }
     var showLegalConsentForPlan by remember { mutableStateOf<SubscriptionPlan?>(null) }
     var purchaseError by remember { mutableStateOf<String?>(null) }
     var pdfOverlay by remember { mutableStateOf<LegalPdfAsset?>(null) }
@@ -186,7 +190,7 @@ fun ShopScreen(
         }
     }
 
-    if (pdfOverlay == null && showLegalConsentForPlan == null) {
+    if (pdfOverlay == null && showLegalConsentForPlan == null && showPassportGate == null) {
         showPurchasePlan?.let { plan ->
             val listPrice = plan.originalPrice?.takeIf { it > plan.price }
             SubscriptionPurchaseConfirmDialog(
@@ -205,7 +209,47 @@ fun ShopScreen(
                 },
                 onConfirm = {
                     showPurchasePlan = null
-                    showLegalConsentForPlan = plan
+                    viewModel.beginPurchaseAfterPriceConfirm(
+                        plan = plan,
+                        onReadyForConsent = { showLegalConsentForPlan = it },
+                        onNeedPassport = {
+                            passportFormError = null
+                            showPassportGate = it
+                        },
+                        onError = { msg ->
+                            purchaseError = msg
+                            showPurchasePlan = plan
+                            scope.launch { snackbarHostState.showSnackbar(msg) }
+                        },
+                    )
+                },
+            )
+        }
+    }
+
+    if (pdfOverlay == null && showLegalConsentForPlan == null) {
+        showPassportGate?.let { gate ->
+            PurchasePassportDialog(
+                initialDateOfBirthDisplay = gate.initialDobDisplay,
+                needDateOfBirth = gate.needDateOfBirth,
+                isLoading = uiState.isSavingPassport,
+                error = passportFormError,
+                onDismiss = {
+                    if (!uiState.isSavingPassport) {
+                        showPassportGate = null
+                        passportFormError = null
+                    }
+                },
+                onConfirm = { result ->
+                    passportFormError = null
+                    viewModel.savePassportThenContinue(
+                        result = result,
+                        onSaved = {
+                            showPassportGate = null
+                            showLegalConsentForPlan = gate.plan
+                        },
+                        onError = { msg -> passportFormError = msg },
+                    )
                 },
             )
         }
@@ -220,20 +264,36 @@ fun ShopScreen(
                 onOpenExternalUrl = { openExternalUrl(context, it) },
                 onConfirm = {
                     purchaseError = null
-                    showLegalConsentForPlan = null
                     viewModel.purchaseSubscriptionPlan(
                         plan = plan,
                         onPaymentRequired = { paymentId, paymentUrl ->
+                            showLegalConsentForPlan = null
                             showPurchasePlan = null
                             onNavigateToPayment(paymentId)
                             openPaymentUrl(context, paymentUrl)
                         },
                         onVerificationRequired = { url, message ->
+                            showLegalConsentForPlan = null
                             showPurchasePlan = null
                             scope.launch { snackbarHostState.showSnackbar(message) }
                             openExternalUrl(context, url)
                         },
-                        onError = { msg -> purchaseError = msg },
+                        onPassportRequired = { msg ->
+                            showLegalConsentForPlan = null
+                            passportFormError = msg
+                            viewModel.beginPurchaseAfterPriceConfirm(
+                                plan = plan,
+                                onReadyForConsent = { showLegalConsentForPlan = it },
+                                onNeedPassport = { showPassportGate = it },
+                                onError = { err ->
+                                    scope.launch { snackbarHostState.showSnackbar(err) }
+                                },
+                            )
+                        },
+                        onError = { msg ->
+                            purchaseError = msg
+                            scope.launch { snackbarHostState.showSnackbar(msg) }
+                        },
                     )
                 }
             )

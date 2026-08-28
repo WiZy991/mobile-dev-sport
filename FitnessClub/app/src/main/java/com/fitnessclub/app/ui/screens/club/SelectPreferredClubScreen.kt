@@ -151,6 +151,16 @@ fun SelectPreferredClubScreen(
                             }
                         }
                     }
+                    uiState.error?.takeIf { it.isNotBlank() }?.let { err ->
+                        item {
+                            Text(
+                                text = err,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                    }
                     items(uiState.clubs, key = { it.id }) { club ->
                         val display = remember(club.id, club.name, club.address) {
                             clubDisplayFor(club)

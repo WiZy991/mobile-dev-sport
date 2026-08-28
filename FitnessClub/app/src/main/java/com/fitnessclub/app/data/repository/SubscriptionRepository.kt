@@ -160,6 +160,13 @@ class SubscriptionRepository @Inject constructor(
                                 ?: "Требуется верификация через Сбер ID. После успеха вернитесь и нажмите «Купить» снова.",
                         )
                     }
+                    parsed?.code == "passport_required" -> {
+                        PurchaseSubscriptionOutcome.PassportRequired(
+                            message = parsed.message
+                                ?: parsed.error
+                                ?: "Для покупки заполните паспортные данные",
+                        )
+                    }
                     else -> {
                         val msg = humanizeApiError(
                             httpCode = response.code(),
@@ -255,6 +262,7 @@ private fun humanizeApiError(
         "user_blocked" -> return "Аккаунт заблокирован. Обратитесь в клуб."
         "token_expired", "invalid_token" -> return "Сессия истекла. Выйдите и войдите в приложение снова."
         "missing_token" -> return "Войдите в приложение, чтобы оплатить абонемент."
+        "passport_required" -> return "Для покупки абонемента заполните паспортные данные"
     }
 
     when (parsedError?.trim()) {

@@ -59,7 +59,7 @@ final class MobileClientPayloadApplier
      */
     public function applyProfilePatch(User $user, array $data): void
     {
-        if ($user->isPassportLockedFromClientEdit() && $this->hasPassportPatchKeys($data)) {
+        if ($user->isPassportLockedFromClientEdit() && $this->hasPassportChangingPatch($user, $data)) {
             throw new \DomainException('passport_locked');
         }
         if (\array_key_exists('date_of_birth', $data)) {
@@ -158,6 +158,58 @@ final class MobileClientPayloadApplier
     {
         foreach (['passport_series', 'passport_number', 'passport_issued_by', 'passport_issue_date'] as $key) {
             if (\array_key_exists($key, $data)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Блокируем только реальную смену паспорта. Полный PUT профиля с теми же полями
+     * (например, смена клуба) не должен давать passport_locked.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function hasPassportChangingPatch(User $user, array $data): bool
+    {
+        if (!$this->hasPassportPatchKeys($data)) {
+            return false;
+        }
+
+        if (\array_key_exists('passport_series', $data)) {
+            $v = trim((string) ($data['passport_series'] ?? ''));
+            $current = trim((string) ($user->getPassportSeries() ?? ''));
+            if ($v !== $current) {
+                return true;
+            }
+        }
+        if (\array_key_exists('passport_number', $data)) {
+            $v = trim((string) ($data['passport_number'] ?? ''));
+            $current = trim((string) ($user->getPassportNumber() ?? ''));
+            if ($v !== $current) {
+                return true;
+            }
+        }
+        if (\array_key_exists('passport_issued_by', $data)) {
+            $v = trim((string) ($data['passport_issued_by'] ?? ''));
+            $current = trim((string) ($user->getPassportIssuedBy() ?? ''));
+            if ($v !== $current) {
+                return true;
+            }
+        }
+        if (\array_key_exists('passport_issue_date', $data)) {
+            $pid = $data['passport_issue_date'];
+            $incoming = null;
+            if ($pid !== null && $pid !== '') {
+                try {
+                    $incoming = (new \DateTimeImmutable(trim((string) $pid)))->format('Y-m-d');
+                } catch (\Throwable) {
+                    return true;
+                }
+            }
+            $current = $user->getPassportIssueDate()?->format('Y-m-d');
+            if ($incoming !== $current) {
                 return true;
             }
         }

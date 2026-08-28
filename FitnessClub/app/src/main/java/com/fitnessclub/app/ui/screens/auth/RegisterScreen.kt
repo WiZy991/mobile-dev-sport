@@ -99,7 +99,6 @@ import com.fitnessclub.app.ui.theme.PrimaryVariant
 fun RegisterScreen(
     viewModel: RegisterViewModel,
     onNavigateToLogin: () -> Unit,
-    onNavigateToPassport: () -> Unit,
     onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
     onRegisterSuccess: () -> Unit,
     onChangeClub: () -> Unit,
@@ -218,13 +217,6 @@ fun RegisterScreen(
                     viewModel = viewModel,
                     birthPickerOpen = { birthPickerOpen = true },
                     focusManager = focusManager,
-                )
-                RegisterFormStep.PASSPORT -> RegisterPassportStep(
-                    uiState = uiState,
-                    onOpenPassport = {
-                        viewModel.clearPassportError()
-                        onNavigateToPassport()
-                    },
                 )
                 RegisterFormStep.ACCOUNT -> RegisterAccountStep(
                     uiState = uiState,

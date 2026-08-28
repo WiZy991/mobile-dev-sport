@@ -377,9 +377,15 @@ class User implements TenantAware
 
     public function hasRequiredDataForSubscription(): bool
     {
-        return $this->passportSeries !== null && $this->passportSeries !== ''
-            && $this->passportNumber !== null && $this->passportNumber !== ''
-            && $this->dateOfBirth !== null;
+        $series = preg_replace('/\D+/', '', (string) ($this->passportSeries ?? '')) ?? '';
+        $number = preg_replace('/\D+/', '', (string) ($this->passportNumber ?? '')) ?? '';
+
+        return strlen($series) === 4
+            && strlen($number) === 6
+            && $this->dateOfBirth !== null
+            && $this->passportIssuedBy !== null && trim($this->passportIssuedBy) !== ''
+            && $this->passportIssueDate !== null
+            && $this->registrationAddress !== null && trim($this->registrationAddress) !== '';
     }
 
     public function getAvatarUrl(): ?string

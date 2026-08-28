@@ -14,5 +14,8 @@ sealed class PurchaseSubscriptionOutcome {
     /** Сервер вернул 403 — нужно пройти Сбер ID, затем повторить покупку. */
     data class VerificationRequired(val authorizeUrl: String, val message: String) : PurchaseSubscriptionOutcome()
 
+    /** Нет паспортных данных — показать форму перед оплатой и повторить. */
+    data class PassportRequired(val message: String) : PurchaseSubscriptionOutcome()
+
     data class Error(val message: String, val httpCode: Int? = null) : PurchaseSubscriptionOutcome()
 }

@@ -6,15 +6,19 @@ import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.ClubShopConfig
 import com.fitnessclub.app.data.model.ClubShopCounts
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.ProductRepository
 import com.fitnessclub.app.data.repository.PurchaseSubscriptionOutcome
 import com.fitnessclub.app.data.repository.SubscriptionRepository
 import com.fitnessclub.app.ui.screens.subscriptions.ClubPurchaseContext
+import com.fitnessclub.app.ui.screens.subscriptions.PurchasePassportGate
+import com.fitnessclub.app.ui.screens.subscriptions.PurchasePassportResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,6 +30,7 @@ data class ShopUiState(
     val visibleCategories: List<ShopCategory> = ShopCategory.entries.toList(),
     val selectedCategory: ShopCategory = ShopCategory.SUBSCRIPTIONS,
     val isPurchasing: Boolean = false,
+    val isSavingPassport: Boolean = false,
     val error: String? = null,
     val purchaseMessage: String? = null,
     val clubPurchaseContext: ClubPurchaseContext = ClubPurchaseContext(clubName = "Ваш клуб"),
@@ -36,6 +41,7 @@ class ShopViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val clubRepository: ClubRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     private var shopConfig: ClubShopConfig? = null
@@ -181,10 +187,69 @@ class ShopViewModel @Inject constructor(
 
     fun planForItem(itemId: String): SubscriptionPlan? = _uiState.value.subscriptionPlansByItemId[itemId]
 
+    fun beginPurchaseAfterPriceConfirm(
+        plan: SubscriptionPlan,
+        onReadyForConsent: (SubscriptionPlan) -> Unit,
+        onNeedPassport: (PurchasePassportGate) -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val user = authRepository.refreshCurrentUser()
+                ?: authRepository.getCurrentUser().first()
+            if (user == null) {
+                onError("Профиль не загружен. Войдите снова.")
+                return@launch
+            }
+            if (user.isPassportCompleteForPurchase()) {
+                onReadyForConsent(plan)
+            } else {
+                onNeedPassport(
+                    PurchasePassportGate(
+                        plan = plan,
+                        needDateOfBirth = user.dateOfBirth.isNullOrBlank(),
+                        initialDobDisplay = isoDateToDisplay(user.dateOfBirth),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun savePassportThenContinue(
+        result: PurchasePassportResult,
+        onSaved: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        if (_uiState.value.isSavingPassport) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingPassport = true) }
+            when (
+                val saved = authRepository.savePassportForPurchase(
+                    series = result.series,
+                    number = result.number,
+                    issuedBy = result.issuedBy,
+                    issueDateIso = result.issueDateIso,
+                    registrationAddress = result.registrationAddress,
+                    dateOfBirthIso = result.dateOfBirthIso,
+                )
+            ) {
+                is ApiResult.Success -> {
+                    _uiState.update { it.copy(isSavingPassport = false) }
+                    onSaved()
+                }
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(isSavingPassport = false) }
+                    onError(saved.message ?: "Не удалось сохранить паспортные данные")
+                }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
     fun purchaseSubscriptionPlan(
         plan: SubscriptionPlan,
         onPaymentRequired: (paymentId: Int, paymentUrl: String) -> Unit,
         onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
+        onPassportRequired: (String) -> Unit = {},
         onError: (String) -> Unit,
     ) {
         viewModelScope.launch {
@@ -211,11 +276,25 @@ class ShopViewModel @Inject constructor(
                     _uiState.update { it.copy(isPurchasing = false) }
                     onVerificationRequired(result.authorizeUrl, result.message)
                 }
+                is PurchaseSubscriptionOutcome.PassportRequired -> {
+                    _uiState.update { it.copy(isPurchasing = false) }
+                    onPassportRequired(result.message)
+                }
                 is PurchaseSubscriptionOutcome.Error -> {
                     _uiState.update { it.copy(isPurchasing = false) }
                     onError(result.message)
                 }
             }
+        }
+    }
+
+    private fun isoDateToDisplay(iso: String?): String {
+        if (iso.isNullOrBlank()) return ""
+        return try {
+            val d = java.time.LocalDate.parse(iso.take(10))
+            d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+        } catch (_: Exception) {
+            iso
         }
     }
 

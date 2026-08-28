@@ -60,23 +60,43 @@ class SelectPreferredClubViewModel @Inject constructor(
             onDone(false)
             return
         }
+        if (_uiState.value.isSaving) {
+            return
+        }
+        if (clubId == _uiState.value.selectedClubId) {
+            onDone(true)
+            return
+        }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, error = null) }
+            _uiState.update {
+                it.copy(isSaving = true, error = null, selectedClubId = clubId)
+            }
             when (val result = authRepository.setPreferredClub(id)) {
                 is ApiResult.Success -> {
                     _uiState.update {
-                        it.copy(isSaving = false, selectedClubId = clubId)
+                        it.copy(
+                            isSaving = false,
+                            selectedClubId = result.data.clubId?.toString() ?: clubId,
+                        )
                     }
                     onDone(true)
                 }
                 is ApiResult.Error -> {
+                    val previous = authRepository.getCurrentUser().first()?.clubId?.toString()
                     _uiState.update {
-                        it.copy(isSaving = false, error = result.message)
+                        it.copy(
+                            isSaving = false,
+                            selectedClubId = previous,
+                            error = result.message ?: "Не удалось сохранить клуб",
+                        )
                     }
                     onDone(false)
                 }
                 else -> {
-                    _uiState.update { it.copy(isSaving = false) }
+                    val previous = authRepository.getCurrentUser().first()?.clubId?.toString()
+                    _uiState.update {
+                        it.copy(isSaving = false, selectedClubId = previous)
+                    }
                     onDone(false)
                 }
             }

@@ -51,6 +51,8 @@ fun SubscriptionPlansScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showPromoDialog by remember { mutableStateOf(false) }
     var showPurchaseDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
+    var showPassportGate by remember { mutableStateOf<PurchasePassportGate?>(null) }
+    var passportFormError by remember { mutableStateOf<String?>(null) }
     var showLegalConsentDialog by remember { mutableStateOf<SubscriptionPlan?>(null) }
     var pdfOverlay by remember { mutableStateOf<LegalPdfAsset?>(null) }
     val context = LocalContext.current
@@ -254,7 +256,7 @@ fun SubscriptionPlansScreen(
     
     // Purchase dialog
     var purchaseError by remember { mutableStateOf<String?>(null) }
-    if (pdfOverlay == null && showLegalConsentDialog == null) {
+    if (pdfOverlay == null && showLegalConsentDialog == null && showPassportGate == null) {
         showPurchaseDialog?.let { plan ->
             val discountedPrice = viewModel.discountedPrice(plan)
             val strikePrice = viewModel.strikeThroughPrice(plan)
@@ -271,7 +273,47 @@ fun SubscriptionPlansScreen(
                 },
                 onConfirm = {
                     showPurchaseDialog = null
-                    showLegalConsentDialog = plan
+                    viewModel.beginPurchaseAfterPriceConfirm(
+                        plan = plan,
+                        onReadyForConsent = { showLegalConsentDialog = it },
+                        onNeedPassport = {
+                            passportFormError = null
+                            showPassportGate = it
+                        },
+                        onError = { msg ->
+                            purchaseError = msg
+                            showPurchaseDialog = plan
+                            scope.launch { snackbarHostState.showSnackbar(msg) }
+                        },
+                    )
+                },
+            )
+        }
+    }
+
+    if (pdfOverlay == null && showLegalConsentDialog == null) {
+        showPassportGate?.let { gate ->
+            PurchasePassportDialog(
+                initialDateOfBirthDisplay = gate.initialDobDisplay,
+                needDateOfBirth = gate.needDateOfBirth,
+                isLoading = uiState.isSavingPassport,
+                error = passportFormError,
+                onDismiss = {
+                    if (!uiState.isSavingPassport) {
+                        showPassportGate = null
+                        passportFormError = null
+                    }
+                },
+                onConfirm = { result ->
+                    passportFormError = null
+                    viewModel.savePassportThenContinue(
+                        result = result,
+                        onSaved = {
+                            showPassportGate = null
+                            showLegalConsentDialog = gate.plan
+                        },
+                        onError = { msg -> passportFormError = msg },
+                    )
                 },
             )
         }
@@ -302,6 +344,18 @@ fun SubscriptionPlansScreen(
                                 snackbarHostState.showSnackbar(message)
                             }
                             openExternalUrl(context, url)
+                        },
+                        onPassportRequired = { msg ->
+                            showLegalConsentDialog = null
+                            passportFormError = msg
+                            viewModel.beginPurchaseAfterPriceConfirm(
+                                plan = plan,
+                                onReadyForConsent = { showLegalConsentDialog = it },
+                                onNeedPassport = { showPassportGate = it },
+                                onError = { err ->
+                                    scope.launch { snackbarHostState.showSnackbar(err) }
+                                },
+                            )
                         },
                         onError = { msg ->
                             purchaseError = msg

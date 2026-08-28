@@ -10,19 +10,24 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.fragment.app.FragmentActivity
 import androidx.core.view.WindowCompat
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.os.LocaleListCompat
 import com.fitnessclub.app.data.local.AppLanguage
 import com.fitnessclub.app.data.local.AppSettingsStore
 import com.fitnessclub.app.data.local.ThemeMode
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.runtime.LaunchedEffect
 import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.push.PushTokenRegistrar
@@ -80,22 +85,37 @@ class MainActivity : FragmentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    var sessionReady by remember { mutableStateOf(false) }
                     val navController = rememberNavController()
                     val isLoggedIn by authRepository.isLoggedIn().collectAsState(initial = false)
 
-                    RequestNotificationPermission(enabled = isLoggedIn)
-
-                    LaunchedEffect(isLoggedIn) {
-                        if (isLoggedIn) {
-                            pushTokenRegistrar.register()
-                        }
+                    LaunchedEffect(Unit) {
+                        authRepository.bootstrapSession()
+                        sessionReady = true
                     }
-                    
-                    NavGraph(
-                        navController = navController,
-                        isLoggedIn = isLoggedIn
-                    )
-                    ForceUpdateGate(clubRepository = clubRepository)
+
+                    if (!sessionReady) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        RequestNotificationPermission(enabled = isLoggedIn)
+
+                        LaunchedEffect(isLoggedIn) {
+                            if (isLoggedIn) {
+                                pushTokenRegistrar.register()
+                            }
+                        }
+
+                        NavGraph(
+                            navController = navController,
+                            isLoggedIn = isLoggedIn
+                        )
+                        ForceUpdateGate(clubRepository = clubRepository)
+                    }
                 }
             }
         }

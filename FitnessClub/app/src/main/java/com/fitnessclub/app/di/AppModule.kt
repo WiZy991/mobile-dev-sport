@@ -4,6 +4,7 @@ import android.util.Log
 import android.content.Context
 import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.auth.TokenRefreshAuthenticator
 import com.fitnessclub.app.data.local.TokenManager
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -38,11 +39,15 @@ object AppModule {
     
     @Provides
     @Singleton
-    fun provideOkHttpClient(tokenManager: TokenManager): OkHttpClient {
+    fun provideOkHttpClient(
+        tokenManager: TokenManager,
+        tokenRefreshAuthenticator: TokenRefreshAuthenticator,
+    ): OkHttpClient {
         val builder = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            .authenticator(tokenRefreshAuthenticator)
 
         if (BuildConfig.DEBUG) {
             val loggingInterceptor = HttpLoggingInterceptor { message -> Log.d("FC_HTTP", message) }.apply {
