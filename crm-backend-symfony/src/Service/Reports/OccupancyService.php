@@ -7,6 +7,7 @@ namespace App\Service\Reports;
 use App\Entity\AccessLog;
 use App\Entity\Club;
 use App\Entity\User;
+use App\Service\ClubTimezone;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -19,16 +20,16 @@ use Symfony\Contracts\Cache\ItemInterface;
  * Логика: за окно присутствия для каждого клиента берём ПОСЛЕДНЕЕ granted-событие.
  * Если оно entry — клиент в зале; если exit — вышел.
  *
- * Окно суток: с 23:15 UTC до следующих 23:15 UTC (не полночь).
+ * Окно суток: с 23:15 до 23:15 по Владивостоку (не полночь UTC и не 23:15 UTC).
  * Максимум в зале: 3 часа с последнего входа (потом авто-exit в лог; QR-выход не трогаем).
  *
- * access_logs.created_at — UTC.
+ * access_logs.created_at — UTC; границы окна переводятся в UTC для SQL.
  */
 final class OccupancyService
 {
     private const COUNT_CACHE_TTL_SECONDS = 5;
 
-    /** Сброс «суток зала» по UTC. */
+    /** Сброс «суток зала» по местному времени клуба (Владивосток). */
     public const DAY_RESET_HOUR = 23;
     public const DAY_RESET_MINUTE = 15;
 
@@ -43,27 +44,28 @@ final class OccupancyService
     }
 
     /**
-     * Окно присутствия: [прошлые 23:15 UTC; следующие 23:15 UTC).
+     * Окно присутствия: [прошлые 23:15; следующие 23:15) Владивосток → UTC для БД.
      *
      * @return array{from: string, to: string}
      */
     private function presenceWindow(): array
     {
+        $clubTz = ClubTimezone::zone();
         $utc = new \DateTimeZone('UTC');
-        $now = new \DateTimeImmutable('now', $utc);
+        $now = new \DateTimeImmutable('now', $clubTz);
         $resetToday = $now->setTime(self::DAY_RESET_HOUR, self::DAY_RESET_MINUTE, 0);
 
         if ($now < $resetToday) {
-            $from = $resetToday->modify('-1 day');
-            $to = $resetToday;
+            $fromLocal = $resetToday->modify('-1 day');
+            $toLocal = $resetToday;
         } else {
-            $from = $resetToday;
-            $to = $resetToday->modify('+1 day');
+            $fromLocal = $resetToday;
+            $toLocal = $resetToday->modify('+1 day');
         }
 
         return [
-            'from' => $from->format('Y-m-d H:i:s'),
-            'to' => $to->format('Y-m-d H:i:s'),
+            'from' => $fromLocal->setTimezone($utc)->format('Y-m-d H:i:s'),
+            'to' => $toLocal->setTimezone($utc)->format('Y-m-d H:i:s'),
         ];
     }
 
@@ -149,7 +151,7 @@ final class OccupancyService
             $clubRaw = $r['club_id'] ?? null;
             $result[] = [
                 'user' => $user,
-                'entered_at' => new \DateTimeImmutable((string) $r['entered_at']),
+                'entered_at' => new \DateTimeImmutable((string) $r['entered_at'], new \DateTimeZone('UTC')),
                 'club_id' => $clubRaw !== null && $clubRaw !== '' ? (int) $clubRaw : null,
             ];
         }

@@ -9,7 +9,7 @@
             {% if online %}
                 <span class="badge bg-success align-self-center">шлюз онлайн</span>
             {% elseif club.gatewayLastSeenAt %}
-                <span class="badge bg-danger align-self-center">шлюз офлайн ({{ club.gatewayLastSeenAt|date('Y-m-d H:i') }})</span>
+                <span class="badge bg-danger align-self-center">шлюз офлайн ({{ club.gatewayLastSeenAt|date('Y-m-d H:i', 'Asia/Vladivostok') }})</span>
             {% else %}
                 <span class="badge bg-secondary align-self-center">не подключался</span>
             {% endif %}
@@ -27,8 +27,8 @@
                 </div>
             </div>
             <div class="small text-secondary" style="max-width: 480px;">
-                Учитываются клиенты, у которых сегодня ПОСЛЕДНЕЕ <em>granted</em>-событие — <code>entry</code>
-                (и относится к этому клубу). При парном сценарии вход/выход — пара entry → exit убирает клиента из зала.
+                Учитываются клиенты этого клуба с 23:15 до 23:15 по Владивостоку; не дольше 3 часов с входа.
+                Выход по QR работает как раньше. Время «Зашёл» — местное (Владивосток).
             </div>
         </div>
         {% if inside_list is defined and inside_list|length > 0 %}
@@ -47,7 +47,7 @@
                             <tr>
                                 <td><a href="{{ path('admin_client_show', {id: row.user.id}) }}" class="link-light text-decoration-none">{{ row.user.name }}</a></td>
                                 <td>{{ row.user.phone }}</td>
-                                <td class="text-end">{{ row.entered_at|date('H:i') }}</td>
+                                <td class="text-end">{{ row.entered_at|date('H:i', 'Asia/Vladivostok') }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -211,7 +211,7 @@
                                         {% set badge = {'pending': 'secondary', 'delivered': 'info', 'done': 'success', 'failed': 'danger', 'expired': 'dark'}[c.status]|default('secondary') %}
                                         <span class="badge bg-{{ badge }}">{{ c.status }}</span>
                                     </td>
-                                    <td class="small">{{ c.createdAt|date('H:i:s') }}</td>
+                                    <td class="small">{{ c.createdAt|date('H:i:s', 'Asia/Vladivostok') }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -241,7 +241,7 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-center"><span class="badge bg-danger">{{ a.peopleCount }}</span></td>
-                                    <td class="small">{{ a.createdAt|date('Y-m-d H:i:s') }}</td>
+                                    <td class="small">{{ a.createdAt|date('Y-m-d H:i:s', 'Asia/Vladivostok') }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
