@@ -163,6 +163,12 @@ class UserController extends AbstractController
                     'code' => 'passport_locked',
                 ], 403);
             }
+            if ($e->getMessage() === 'club_not_found') {
+                return $this->json([
+                    'error' => 'Выбранный зал не найден в CRM. Обновите приложение или выберите зал заново.',
+                    'code' => 'club_not_found',
+                ], 400);
+            }
             throw $e;
         }
 

@@ -56,6 +56,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.annotation.DrawableRes
+import coil.compose.AsyncImage
 import com.fitnessclub.app.data.api.ClubItem
 import com.fitnessclub.app.data.catalog.LocalSubscriptionCatalog
 import com.fitnessclub.app.data.config.Brand
@@ -65,6 +67,13 @@ import com.fitnessclub.app.ui.theme.Primary
 import com.fitnessclub.app.ui.theme.PrimaryVariant
 import java.text.NumberFormat
 import java.util.Locale
+
+/** Карточка зала на экране выбора: клуб из CRM + фото (из CRM или локальное). */
+private data class VenueOption(
+    val club: ClubItem,
+    @DrawableRes val imageRes: Int,
+    val imageUrl: String? = null,
+)
 
 @Composable
 fun RegisterClubPickScreen(
@@ -80,7 +89,38 @@ fun RegisterClubPickScreen(
     val scroll = rememberScrollState()
     var expandedIds by remember { mutableStateOf(setOf<String>()) }
     var showSberDialog by remember { mutableStateOf(false) }
-    val useApiClubs = Brand.isWhiteLabel
+    // Прайс-лист в карточке — только у Доброзала.
+    val showPriceList = !Brand.isWhiteLabel
+
+    // Список залов берём из CRM: только там id совпадают с clubs.id, и клиент
+    // привязывается к тому залу, который выбрал.
+    val fromCrm: List<VenueOption> = remember(apiClubs) {
+        apiClubs.map { club ->
+            VenueOption(
+                club = club,
+                imageRes = RegistrationVenues.imageResFor(club.name, club.address),
+                imageUrl = club.imageUrl?.trim()?.takeIf { it.isNotEmpty() },
+            )
+        }
+    }
+    // Резерв, если список не пришёл: залы Доброзала зашиты в приложении.
+    val fallback: List<VenueOption> = remember {
+        if (Brand.isWhiteLabel) {
+            emptyList()
+        } else {
+            RegistrationVenues.orderedCards.map { card ->
+                VenueOption(
+                    club = RegistrationVenues.toClubItem(card),
+                    imageRes = card.imageRes,
+                )
+            }
+        }
+    }
+    val venues: List<VenueOption> = when {
+        fromCrm.isNotEmpty() -> fromCrm
+        clubsLoading -> emptyList()
+        else -> fallback
+    }
 
     fun toggleExpand(clubId: String) {
         expandedIds = if (expandedIds.contains(clubId)) {
@@ -129,54 +169,106 @@ fun RegisterClubPickScreen(
                 textAlign = TextAlign.Center,
             )
 
-            if (useApiClubs) {
-                when {
-                    clubsLoading -> CircularProgressIndicator(
-                        color = Color.White,
+            when {
+                venues.isEmpty() && clubsLoading -> CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(24.dp),
+                )
+                venues.isEmpty() && !clubsLoadError.isNullOrBlank() -> Text(
+                    text = clubsLoadError,
+                    color = Color.White,
+                    modifier = Modifier.padding(16.dp),
+                )
+                venues.isEmpty() -> Text(
+                    text = "Нет залов. Отметьте «Показывать в приложении» у залов в CRM.",
+                    color = Color.White.copy(0.9f),
+                    modifier = Modifier.padding(16.dp),
+                )
+                else -> venues.forEach { venue ->
+                    val clubId = venue.club.id
+                    val selected = clubId == selectedClubId
+                    val expanded = expandedIds.contains(clubId)
+                    val pickImageInteraction = remember(clubId) { MutableInteractionSource() }
+                    val pickTitleInteraction = remember("${clubId}_title") { MutableInteractionSource() }
+                    Card(
                         modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(24.dp),
-                    )
-                    !clubsLoadError.isNullOrBlank() -> Text(
-                        text = clubsLoadError,
-                        color = Color.White,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                    apiClubs.isEmpty() -> Text(
-                        text = "Нет залов. Проверьте организацию в CRM и ORGANIZATION_SLUG в приложении.",
-                        color = Color.White.copy(0.9f),
-                        modifier = Modifier.padding(16.dp),
-                    )
-                    else -> apiClubs.forEach { club ->
-                        val selected = club.id == selectedClubId
-                        Card(
-                            modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .then(
+                                if (selected) {
+                                    Modifier.border(2.dp, Color.White, RoundedCornerShape(16.dp))
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(0.12f)),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            val imageModifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                                .then(
-                                    if (selected) Modifier.border(2.dp, Color.White, RoundedCornerShape(16.dp))
-                                    else Modifier,
+                                .height(140.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(
+                                    interactionSource = pickImageInteraction,
+                                    indication = null,
+                                ) { onPicked(venue.club) }
+                            if (venue.imageUrl != null) {
+                                AsyncImage(
+                                    model = venue.imageUrl,
+                                    contentDescription = null,
+                                    placeholder = painterResource(venue.imageRes),
+                                    error = painterResource(venue.imageRes),
+                                    modifier = imageModifier,
+                                    contentScale = ContentScale.Crop,
                                 )
-                                .clickable { onPicked(club) },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(0.12f)),
-                        ) {
+                            } else {
+                                Image(
+                                    painter = painterResource(venue.imageRes),
+                                    contentDescription = null,
+                                    modifier = imageModifier,
+                                    contentScale = ContentScale.Crop,
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
                             Row(
-                                Modifier.padding(16.dp),
+                                Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Column(Modifier.weight(1f)) {
+                                Column(
+                                    Modifier
+                                        .weight(1f)
+                                        .clickable(
+                                            interactionSource = pickTitleInteraction,
+                                            indication = null,
+                                        ) { onPicked(venue.club) },
+                                ) {
                                     Text(
-                                        text = club.name,
+                                        text = venue.club.name,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = Color.White,
                                         fontWeight = FontWeight.SemiBold,
                                     )
-                                    if (club.address.isNotBlank()) {
+                                    if (venue.club.address.isNotBlank()) {
                                         Text(
-                                            text = club.address,
+                                            text = venue.club.address,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color.White.copy(0.88f),
+                                        )
+                                    }
+                                }
+                                if (showPriceList) {
+                                    IconButton(
+                                        onClick = { toggleExpand(clubId) },
+                                        modifier = Modifier.size(44.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (expanded) "Свернуть цены" else "Показать цены",
+                                            tint = Color.White,
+                                            modifier = Modifier.rotate(if (expanded) 180f else 0f),
                                         )
                                     }
                                 }
@@ -189,122 +281,40 @@ fun RegisterClubPickScreen(
                                     )
                                 }
                             }
-                        }
-                    }
-                }
-            } else {
-            RegistrationVenues.orderedCards.forEach { card ->
-                val selected = card.clubId == selectedClubId
-                val expanded = expandedIds.contains(card.clubId)
-                val pickImageInteraction = remember(card.clubId) { MutableInteractionSource() }
-                val pickTitleInteraction = remember("${card.clubId}_title") { MutableInteractionSource() }
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp)
-                        .then(
-                            if (selected) {
-                                Modifier.border(2.dp, Color.White, RoundedCornerShape(16.dp))
-                            } else {
-                                Modifier
-                            },
-                        ),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(0.12f)),
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Image(
-                            painter = painterResource(card.imageRes),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(140.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(
-                                    interactionSource = pickImageInteraction,
-                                    indication = null,
-                                ) { onPicked(RegistrationVenues.toClubItem(card)) },
-                            contentScale = ContentScale.Crop,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(
-                                Modifier
-                                    .weight(1f)
-                                    .clickable(
-                                        interactionSource = pickTitleInteraction,
-                                        indication = null,
-                                    ) { onPicked(RegistrationVenues.toClubItem(card)) },
-                            ) {
-                                Text(
-                                    text = card.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    text = card.addressLines,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(0.88f),
-                                )
-                            }
-                            IconButton(
-                                onClick = { toggleExpand(card.clubId) },
-                                modifier = Modifier.size(44.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = if (expanded) "Свернуть цены" else "Показать цены",
-                                    tint = Color.White,
-                                    modifier = Modifier.rotate(if (expanded) 180f else 0f),
-                                )
-                            }
-                            if (selected) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp),
-                                )
-                            }
-                        }
 
-                        AnimatedVisibility(
-                            visible = expanded,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut(),
-                        ) {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp),
+                            AnimatedVisibility(
+                                visible = showPriceList && expanded,
+                                enter = expandVertically() + fadeIn(),
+                                exit = shrinkVertically() + fadeOut(),
                             ) {
-                                HorizontalDivider(
-                                    color = Color.White.copy(0.25f),
-                                    modifier = Modifier.padding(bottom = 10.dp),
-                                )
-                                Text(
-                                    text = "Абонементы",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(bottom = 8.dp),
-                                )
-                                LocalSubscriptionCatalog.PLANS_PRICELIST_ORDER.forEachIndexed { index, plan ->
-                                    if (index > 0) {
-                                        Spacer(Modifier.height(8.dp))
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp),
+                                ) {
+                                    HorizontalDivider(
+                                        color = Color.White.copy(0.25f),
+                                        modifier = Modifier.padding(bottom = 10.dp),
+                                    )
+                                    Text(
+                                        text = "Абонементы",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(bottom = 8.dp),
+                                    )
+                                    LocalSubscriptionCatalog.PLANS_PRICELIST_ORDER.forEachIndexed { index, plan ->
+                                        if (index > 0) {
+                                            Spacer(Modifier.height(8.dp))
+                                        }
+                                        PriceListRow(plan = plan)
                                     }
-                                    PriceListRow(plan = plan)
                                 }
                             }
                         }
                     }
                 }
             }
-            } // else: RegistrationVenues (Доброзал)
 
             Spacer(Modifier.height(6.dp))
             Button(

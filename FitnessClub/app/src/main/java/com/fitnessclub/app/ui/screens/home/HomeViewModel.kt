@@ -123,6 +123,8 @@ class HomeViewModel @Inject constructor(
                             occupancyMax = occ.maxCapacity,
                             occupancyPercentage = occ.percentage,
                             occupancyStatus = occ.status,
+                            // Подписываем плашку залом, по которому реально посчитано.
+                            clubHallName = occ.clubName?.trim().orEmpty(),
                         )
                     }
                 }
@@ -213,11 +215,13 @@ class HomeViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val info = result.data
                     val brand = Brand.orFallback(info.brandName)
-                    val hall = info.name.trim().ifBlank { brand }
+                    // Название зала — только если сервер определил зал клиента.
+                    // Иначе в info приходят контакты сети, и это не «мой зал».
+                    val hall = info.id?.let { info.name.trim().ifBlank { brand } }
                     _uiState.update {
                         it.copy(
                             brandName = brand,
-                            clubHallName = hall,
+                            clubHallName = hall ?: it.clubHallName,
                         )
                     }
                 }

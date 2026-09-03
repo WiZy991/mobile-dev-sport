@@ -500,7 +500,12 @@ data class GymOccupancy(
     @com.google.gson.annotations.SerializedName("percentage")
     val percentage: Int,
     @com.google.gson.annotations.SerializedName("status")
-    val status: String
+    val status: String,
+    /** Зал, по которому посчитано. null — сервер не смог определить зал клиента. */
+    @com.google.gson.annotations.SerializedName("club_id")
+    val clubId: Int? = null,
+    @com.google.gson.annotations.SerializedName("club_name")
+    val clubName: String? = null
 )
 
 data class ApiDocument(
@@ -536,7 +541,10 @@ data class ClubItem(
     @com.google.gson.annotations.SerializedName("amenities")
     val amenities: List<String> = emptyList(),
     @com.google.gson.annotations.SerializedName("max_capacity")
-    val maxCapacity: Int? = null
+    val maxCapacity: Int? = null,
+    /** Фото зала из CRM (карточка зала при регистрации). */
+    @com.google.gson.annotations.SerializedName("image_url")
+    val imageUrl: String? = null
 )
 
 data class AppUpdateInfo(

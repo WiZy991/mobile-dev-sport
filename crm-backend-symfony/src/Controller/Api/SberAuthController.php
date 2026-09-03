@@ -262,7 +262,11 @@ class SberAuthController extends AbstractController
         // Зал, выбранный в приложении перед «Регистрация через Сбер ID».
         $clubRaw = $data['club_id'] ?? $data['clubId'] ?? null;
         if ($clubRaw !== null && $clubRaw !== '') {
-            $this->mobileClientPayloadApplier->applyRegistrationPayload($user, ['club_id' => $clubRaw]);
+            $this->mobileClientPayloadApplier->applyRegistrationPayload($user, [
+                'club_id' => $clubRaw,
+                'club_name' => $data['club_name'] ?? null,
+                'club_address' => $data['club_address'] ?? null,
+            ]);
         }
 
         $this->em->persist($user);

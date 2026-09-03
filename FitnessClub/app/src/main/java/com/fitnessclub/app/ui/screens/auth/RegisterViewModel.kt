@@ -510,6 +510,8 @@ class RegisterViewModel @Inject constructor(
             promoCode = state.promoCode.takeIf { it.isNotBlank() },
             newsletter = false,
             clubId = state.selectedClub?.id,
+            clubName = state.selectedClub?.name,
+            clubAddress = state.selectedClub?.address,
             referralSource = state.referralSource,
             referralSourceOther = state.referralSourceOther.takeIf { it.isNotBlank() }
         )

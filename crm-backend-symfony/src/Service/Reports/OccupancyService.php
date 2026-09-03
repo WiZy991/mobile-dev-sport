@@ -36,6 +36,9 @@ final class OccupancyService
     /** Автоматический выход, если не было QR-выхода. */
     public const MAX_STAY_SECONDS = 3 * 3600;
 
+    /** Кэш на запрос: сеть из одного зала или из нескольких. */
+    private ?bool $singleClubNetwork = null;
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         #[Autowire(service: 'cache.app')]
@@ -86,7 +89,11 @@ final class OccupancyService
     }
 
     /**
-     * Фильтр клуба: конкретный клуб ИЛИ legacy NULL (тот же человек / тот же зал).
+     * Фильтр клуба.
+     *
+     * События без клуба (старые логи, шлюз без привязки) относим к залу только в сети
+     * из одного зала. В сети из нескольких залов такие события нельзя считать «своими»:
+     * иначе счётчик каждого зала показывал бы посетителей всех залов сразу.
      *
      * @return array{sql: string, params: array<string, mixed>}
      */
@@ -96,13 +103,27 @@ final class OccupancyService
             return ['sql' => '', 'params' => []];
         }
 
+        $sql = $this->networkHasSingleClub()
+            ? " AND ({$column} IS NULL OR {$column} = :club_id)"
+            : " AND {$column} = :club_id";
+
         return [
-            'sql' => " AND ({$column} IS NULL OR {$column} = :club_id)",
+            'sql' => $sql,
             'params' => ['club_id' => $club->getId()],
         ];
     }
 
-    /** Сколько клиентов сейчас в зале (опционально по клубу; NULL-club считается этим залом). */
+    /** В сети один зал — событиям без клуба больше некуда относиться. */
+    private function networkHasSingleClub(): bool
+    {
+        if ($this->singleClubNetwork === null) {
+            $this->singleClubNetwork = (int) $this->em->getRepository(Club::class)->count([]) <= 1;
+        }
+
+        return $this->singleClubNetwork;
+    }
+
+    /** Сколько клиентов сейчас в зале (без клуба — по всей сети). */
     public function countCurrentlyInside(?Club $club = null): int
     {
         $cacheKey = 'occupancy.count.' . ($club?->getId() ?? 'all');

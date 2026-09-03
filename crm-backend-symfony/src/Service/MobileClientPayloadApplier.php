@@ -42,16 +42,82 @@ final class MobileClientPayloadApplier
             $user->setReferralSourceOther($referralOther === '' ? null : substr($referralOther, 0, 255));
         }
 
-        $clubRaw = $data['club_id'] ?? null;
-        if ($clubRaw !== null && $clubRaw !== '') {
-            $cid = (int) $clubRaw;
-            if ($cid > 0) {
-                $club = $this->em->getRepository(Club::class)->find($cid);
-                if ($club instanceof Club) {
-                    $user->setClub($club);
-                }
+        $club = $this->resolveRegistrationClub($data);
+        if ($club instanceof Club) {
+            $user->setClub($club);
+        }
+    }
+
+    /**
+     * Зал, выбранный при регистрации.
+     *
+     * `club_id` из приложения может разойтись с `clubs.id` в CRM (в сборках с
+     * захардкоженным списком залов id угадывался), и тогда клиент молча уезжал в чужой зал.
+     * Поэтому id принимаем только если он ведёт на зал с тем же названием/адресом,
+     * которые человек видел на экране; иначе ищем зал по ним.
+     */
+    private function resolveRegistrationClub(array $data): ?Club
+    {
+        $repo = $this->em->getRepository(Club::class);
+
+        $cid = (int) ($data['club_id'] ?? 0);
+        $byId = $cid > 0 ? $repo->find($cid) : null;
+        $byId = $byId instanceof Club ? $byId : null;
+
+        $shownTokens = $this->clubLabelTokens(
+            (string) ($data['club_name'] ?? '') . ' ' . (string) ($data['club_address'] ?? '')
+        );
+        if ($shownTokens === []) {
+            return $byId;
+        }
+
+        if ($byId !== null && $this->clubMatchesTokens($byId, $shownTokens)) {
+            return $byId;
+        }
+
+        /** @var list<Club> $all */
+        $all = $repo->findAll();
+        foreach ($all as $candidate) {
+            if ($this->clubMatchesTokens($candidate, $shownTokens)) {
+                return $candidate;
             }
         }
+
+        return $byId;
+    }
+
+    /** @param list<string> $tokens */
+    private function clubMatchesTokens(Club $club, array $tokens): bool
+    {
+        $clubTokens = $this->clubLabelTokens($club->getName() . ' ' . $club->getAddress());
+
+        return array_intersect($clubTokens, $tokens) !== [];
+    }
+
+    /**
+     * Значимые слова названия/адреса зала: «ТЦ Формат, ул. Центральная, 18» → ['формат', 'центральная'].
+     *
+     * @return list<string>
+     */
+    private function clubLabelTokens(string $label): array
+    {
+        $normalized = str_replace('ё', 'е', mb_strtolower(trim($label)));
+        $normalized = (string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', $normalized);
+
+        $stop = [
+            'этаж', 'этажа', 'город', 'улица', 'дом', 'корпус', 'здание',
+            'клуб', 'зал', 'основной', 'фитнес', 'доброзал', 'владивосток',
+        ];
+
+        $tokens = [];
+        foreach (explode(' ', $normalized) as $word) {
+            if (mb_strlen($word) < 4 || \in_array($word, $stop, true)) {
+                continue;
+            }
+            $tokens[$word] = true;
+        }
+
+        return array_keys($tokens);
     }
 
     /**
@@ -117,12 +183,13 @@ final class MobileClientPayloadApplier
                 $user->setClub(null);
             } else {
                 $cid = (int) $clubRaw;
-                if ($cid > 0) {
-                    $club = $this->em->getRepository(Club::class)->find($cid);
-                    if ($club instanceof Club) {
-                        $user->setClub($club);
-                    }
+                $club = $cid > 0 ? $this->em->getRepository(Club::class)->find($cid) : null;
+                if (!$club instanceof Club) {
+                    // Молча оставить старый зал нельзя: в приложении смена зала выглядела бы
+                    // успешной, а клиент оставался бы в прежнем.
+                    throw new \DomainException('club_not_found');
                 }
+                $user->setClub($club);
             }
         }
     }

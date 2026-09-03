@@ -167,6 +167,16 @@ data class RegisterRequest(
     @SerializedName("club_id")
     val clubId: String? = null,
 
+    /**
+     * Зал так, как он был показан на экране выбора. CRM привязывает клиента по [clubId]
+     * только если id ведёт на этот же зал — иначе находит зал по названию и адресу.
+     */
+    @SerializedName("club_name")
+    val clubName: String? = null,
+
+    @SerializedName("club_address")
+    val clubAddress: String? = null,
+
     /** Опросник «Откуда вы о нас узнали»: ключ варианта (см. RegisterSurveyScreen). */
     @SerializedName("referral_source")
     val referralSource: String? = null,

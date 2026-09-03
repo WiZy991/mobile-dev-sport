@@ -5,9 +5,11 @@ import com.fitnessclub.app.R
 import com.fitnessclub.app.data.api.ClubItem
 
 /**
- * Залы при регистрации. [clubId] совпадает с `clubs.id` на сервере.
- * Синхронизация строк в БД CRM: `php bin/console app:clubs:sync-registration-venues`
- * (см. crm-backend-symfony `SyncRegistrationVenuesCommand`).
+ * Залы при регистрации.
+ *
+ * Основной источник списка — `GET /clubs` (залы с галочкой «Показывать в приложении»):
+ * только там id совпадают с `clubs.id` в CRM. Карточки ниже — резерв на случай, когда
+ * список не пришёл (нет сети / в CRM не отмечен ни один зал), плюс фото для карточек.
  */
 data class RegistrationVenueCard(
     val clubId: String,
@@ -52,4 +54,19 @@ object RegistrationVenues {
         name = card.title,
         address = card.addressLines,
     )
+
+    /**
+     * Фото зала для карточки регистрации: по названию и адресу, а не по id
+     * (id залов в CRM у каждой сети свои, привязываться к ним нельзя).
+     */
+    @DrawableRes
+    fun imageResFor(name: String, address: String): Int {
+        val hay = "$name $address".lowercase()
+        val kupera = listOf("купера", "де фриз", "де-фриз", "дефриз")
+        return if (kupera.any { hay.contains(it) }) {
+            R.drawable.registration_club_kupera
+        } else {
+            R.drawable.registration_club_mall
+        }
+    }
 }

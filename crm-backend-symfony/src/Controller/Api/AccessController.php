@@ -124,6 +124,7 @@ class AccessController extends AbstractController
         }
 
         $log->setUser($user);
+        $this->bindLogToUserClub($log, $user);
 
         if ($user->isBlocked()) {
             $log->setReason('user_blocked');
@@ -303,6 +304,7 @@ class AccessController extends AbstractController
             $user = $this->em->getRepository(User::class)->find($userId);
             if ($user) {
                 $log->setUser($user);
+                $this->bindLogToUserClub($log, $user);
             }
         }
 
@@ -311,6 +313,22 @@ class AccessController extends AbstractController
         $this->occupancyService->notifyPresenceChanged(null);
 
         return $this->json(['success' => true]);
+    }
+
+    /**
+     * У этого эндпоинта нет токена шлюза, поэтому зал берём из профиля клиента.
+     * Без этого событие ложится в журнал без клуба и попадает в заполненность всех залов.
+     */
+    private function bindLogToUserClub(AccessLog $log, User $user): void
+    {
+        if ($log->getClub() instanceof Club) {
+            return;
+        }
+
+        $club = $user->getClub();
+        if ($club instanceof Club) {
+            $log->setClub($club);
+        }
     }
 
     /**
