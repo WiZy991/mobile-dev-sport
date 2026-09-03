@@ -23,7 +23,7 @@ data class RegistrationVenueCard(
 object RegistrationVenues {
     private val allCards: List<RegistrationVenueCard> = listOf(
         RegistrationVenueCard(
-            clubId = "1",
+            clubId = "12",
             title = "ТЦ Формат",
             addressLines = "ул. Центральная, 18, 2 этаж",
             imageRes = R.drawable.registration_club_mall,

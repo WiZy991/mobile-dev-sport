@@ -62,7 +62,7 @@ final class DiagnoseClubBindingCommand extends Command
                 $this->fetchClubs(),
             ),
         );
-        $io->comment('В приложении карточки регистрации жёстко привязаны к id: 1 = ТЦ Формат, 2 = ТЦ Новый де Фриз, 11 = ТЦ Седанка Сити.');
+        $io->comment('Клиент без зала в списке ниже — приложение прислало club_id, которого тут нет: сверьте id с резервным списком карточек в приложении (RegistrationVenues).');
 
         $io->section('Настройки сети (club_settings)');
         $io->table(
