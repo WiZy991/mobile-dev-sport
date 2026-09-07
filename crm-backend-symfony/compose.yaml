@@ -19,6 +19,7 @@ services:
     # ENTRYPOINT сам делает migrate + supervisord; CMD пустой.
     # Секреты / uploads с хоста (иначе фото тренеров пропадают при recreate контейнера).
     volumes:
+      - ./.env:/app/.env:ro
       - ./var/secrets:/app/var/secrets:ro
       - ./etc/Apns:/app/etc/Apns:ro
       - ./public/uploads/promotions:/app/public/uploads/promotions
@@ -46,6 +47,7 @@ services:
     # ENTRYPOINT выполнит migrate, затем этот CMD вместо supervisord.
     command: ["sh", "-c", "while true; do php bin/console app:process-scheduled-notifications --no-interaction || true; php bin/console app:occupancy-auto-exit --no-interaction || true; sleep 20; done"]
     volumes:
+      - ./.env:/app/.env:ro
       - ./var/secrets:/app/var/secrets:ro
       - ./etc/Apns:/app/etc/Apns:ro
     networks:
