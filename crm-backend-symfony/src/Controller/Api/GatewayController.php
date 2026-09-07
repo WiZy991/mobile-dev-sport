@@ -200,10 +200,10 @@ class GatewayController extends AbstractController
             ]));
         }
 
-        // Окно валидности QR — 15 секунд (только для входа; синхронно с мобильным приложением).
+        // Окно валидности QR — только для входа; выход время не проверяет.
         $nowMs = (int) (microtime(true) * 1000);
         $deltaMs = abs($nowMs - $timestamp);
-        if ($deltaMs > 15_000) {
+        if (!FitnessClubEntryQrTimestamp::isFresh($timestamp, $nowMs)) {
             return $this->denied($log, 'qr_expired', 400, [
                 'delta_ms' => $deltaMs,
                 'server_now_ms' => $nowMs,
@@ -580,7 +580,7 @@ class GatewayController extends AbstractController
 
         $nowMs = (int) (microtime(true) * 1000);
         $deltaMs = abs($nowMs - $timestamp);
-        if ($deltaMs > 15_000) {
+        if (!FitnessClubEntryQrTimestamp::isFresh($timestamp, $nowMs)) {
             return $this->denied($log, 'qr_expired', 400, [
                 'delta_ms' => $deltaMs,
                 'server_now_ms' => $nowMs,

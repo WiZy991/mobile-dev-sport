@@ -14,6 +14,8 @@ namespace App\Service\Integration;
 final class FitnessClubEntryQrTimestamp
 {
     private const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    /** 15 с на экране + лаг считывателя + расхождение часов iOS (часто 10–30 с). */
+    public const VALIDITY_MS = 60_000;
 
     /**
      * @return int|null Unix time в миллисекундах или null, если сегмент не распознан
@@ -34,6 +36,13 @@ final class FitnessClubEntryQrTimestamp
         }
 
         return self::fromBase62($seg);
+    }
+
+    public static function isFresh(int $qrTimestampMs, ?int $nowMs = null): bool
+    {
+        $nowMs ??= (int) round(microtime(true) * 1000);
+
+        return abs($nowMs - $qrTimestampMs) <= self::VALIDITY_MS;
     }
 
     private static function fromBase62(string $s): int

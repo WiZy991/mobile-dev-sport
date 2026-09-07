@@ -206,9 +206,9 @@ class AccessController extends AbstractController
             ));
         }
 
-        // Проверка времени (15 секунд — только для входа)
+        // Проверка времени (только для входа; выход окно не проверяет)
         $nowMs = (int) (microtime(true) * 1000);
-        if (abs($nowMs - $timestamp) > 15 * 1000) {
+        if (!FitnessClubEntryQrTimestamp::isFresh($timestamp, $nowMs)) {
             $log->setReason('qr_expired');
             $response['reason'] = 'qr_expired';
             $this->em->persist($log);
@@ -369,7 +369,7 @@ class AccessController extends AbstractController
         }
 
         $nowMs = (int) (microtime(true) * 1000);
-        if (abs($nowMs - $timestamp) > 15_000) {
+        if (!FitnessClubEntryQrTimestamp::isFresh($timestamp, $nowMs)) {
             $log->setReason('qr_expired');
             $response['reason'] = 'qr_expired';
             $this->em->persist($log);
