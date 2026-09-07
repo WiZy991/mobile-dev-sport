@@ -36,4 +36,22 @@ final class ProfileLegalLock
 
         return $count > 0;
     }
+
+    /**
+     * Блокируем только смену уже заполненного поля.
+     * Первое заполнение пустого ФИО/телефона/паспорта при покупке должно проходить.
+     */
+    public function blocksFilledIdentityChange(string $current, string $incoming): bool
+    {
+        $current = trim($current);
+        $incoming = trim($incoming);
+        if ($incoming === '' || $incoming === $current) {
+            return false;
+        }
+        if ($current === '') {
+            return false;
+        }
+
+        return true;
+    }
 }

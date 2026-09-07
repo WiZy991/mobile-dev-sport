@@ -148,16 +148,6 @@ class UserController extends AbstractController
             return $this->json(['error' => 'Unauthorized'], 401);
         }
 
-        if ($this->profileLegalLock->isLocked($user)) {
-            $identityTouched = isset($data['name']) || isset($data['phone']);
-            if ($identityTouched) {
-                return $this->json([
-                    'error' => 'На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки.',
-                    'code' => 'profile_locked',
-                ], 403);
-            }
-        }
-
         if (isset($data['email'])) {
             $incoming = mb_strtolower(trim((string) $data['email']));
             if ($incoming !== '' && $incoming !== mb_strtolower($user->getEmail())) {
@@ -165,11 +155,31 @@ class UserController extends AbstractController
                 $user->setEmailVerifiedAt(null);
             }
         }
-        if (isset($data['name']) && !$this->profileLegalLock->isLocked($user)) {
-            $user->setName($data['name']);
+        if (isset($data['name'])) {
+            $incoming = trim((string) $data['name']);
+            $current = trim($user->getName());
+            if ($incoming !== '' && $incoming !== $current) {
+                if ($this->profileLegalLock->isLocked($user) && $this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
+                    return $this->json([
+                        'error' => 'На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки.',
+                        'code' => 'profile_locked',
+                    ], 403);
+                }
+                $user->setName($incoming);
+            }
         }
-        if (isset($data['phone']) && !$this->profileLegalLock->isLocked($user)) {
-            $user->setPhone($data['phone']);
+        if (isset($data['phone'])) {
+            $incoming = trim((string) $data['phone']);
+            $current = trim((string) ($user->getPhone() ?? ''));
+            if ($incoming !== '' && $incoming !== $current) {
+                if ($this->profileLegalLock->isLocked($user) && $this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
+                    return $this->json([
+                        'error' => 'На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки.',
+                        'code' => 'profile_locked',
+                    ], 403);
+                }
+                $user->setPhone($incoming);
+            }
         }
 
         try {

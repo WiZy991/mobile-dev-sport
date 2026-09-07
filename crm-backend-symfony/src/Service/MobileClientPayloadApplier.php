@@ -243,28 +243,30 @@ final class MobileClientPayloadApplier
     {
         if (\array_key_exists('name', $data)) {
             $incoming = trim((string) ($data['name'] ?? ''));
-            if ($incoming !== '' && $incoming !== trim($user->getName())) {
+            $current = trim($user->getName());
+            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
                 return true;
             }
         }
         if (\array_key_exists('date_of_birth', $data)) {
             $pid = $data['date_of_birth'];
-            $incoming = null;
+            $incoming = '';
             if ($pid !== null && $pid !== '') {
                 try {
                     $incoming = (new \DateTimeImmutable(trim((string) $pid)))->format('Y-m-d');
                 } catch (\Throwable) {
-                    return true;
+                    return trim((string) ($user->getDateOfBirth()?->format('Y-m-d') ?? '')) !== '';
                 }
             }
-            if ($incoming !== $user->getDateOfBirth()?->format('Y-m-d')) {
+            $current = (string) ($user->getDateOfBirth()?->format('Y-m-d') ?? '');
+            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
                 return true;
             }
         }
         if (\array_key_exists('registration_address', $data)) {
             $v = trim((string) ($data['registration_address'] ?? ''));
             $current = trim((string) ($user->getRegistrationAddress() ?? ''));
-            if ($v !== $current) {
+            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $v)) {
                 return true;
             }
         }
@@ -285,38 +287,38 @@ final class MobileClientPayloadApplier
         }
 
         if (\array_key_exists('passport_series', $data)) {
-            $v = trim((string) ($data['passport_series'] ?? ''));
-            $current = trim((string) ($user->getPassportSeries() ?? ''));
-            if ($v !== $current) {
+            $v = preg_replace('/\D+/', '', (string) ($data['passport_series'] ?? '')) ?? '';
+            $current = preg_replace('/\D+/', '', (string) ($user->getPassportSeries() ?? '')) ?? '';
+            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $v)) {
                 return true;
             }
         }
         if (\array_key_exists('passport_number', $data)) {
-            $v = trim((string) ($data['passport_number'] ?? ''));
-            $current = trim((string) ($user->getPassportNumber() ?? ''));
-            if ($v !== $current) {
+            $v = preg_replace('/\D+/', '', (string) ($data['passport_number'] ?? '')) ?? '';
+            $current = preg_replace('/\D+/', '', (string) ($user->getPassportNumber() ?? '')) ?? '';
+            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $v)) {
                 return true;
             }
         }
         if (\array_key_exists('passport_issued_by', $data)) {
             $v = trim((string) ($data['passport_issued_by'] ?? ''));
             $current = trim((string) ($user->getPassportIssuedBy() ?? ''));
-            if ($v !== $current) {
+            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $v)) {
                 return true;
             }
         }
         if (\array_key_exists('passport_issue_date', $data)) {
             $pid = $data['passport_issue_date'];
-            $incoming = null;
+            $incoming = '';
             if ($pid !== null && $pid !== '') {
                 try {
                     $incoming = (new \DateTimeImmutable(trim((string) $pid)))->format('Y-m-d');
                 } catch (\Throwable) {
-                    return true;
+                    return trim((string) ($user->getPassportIssueDate()?->format('Y-m-d') ?? '')) !== '';
                 }
             }
-            $current = $user->getPassportIssueDate()?->format('Y-m-d');
-            if ($incoming !== $current) {
+            $current = (string) ($user->getPassportIssueDate()?->format('Y-m-d') ?? '');
+            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
                 return true;
             }
         }
