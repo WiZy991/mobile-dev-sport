@@ -8,40 +8,41 @@
     </div>
 
     <div class="content-card mb-3">
-        <div class="mb-2 text-primary small fw-semibold text-uppercase">Версия и обновление Android</div>
-        <p class="small text-secondary mb-2">
-            При запуске приложение само сообщает номер сборки. Сервер запоминает максимум —
-            у всех, кто ниже, открывается полноэкранный баннер. Ручные поля нужны только чтобы поднять минимум раньше
-            или включить режим без крестика.
-        </p>
-        <p class="small mb-3">
-            С телефонов сейчас: Доброзал <strong>{{ android_seen_dobrozal|default('0') }}</strong>,
-            Академия борьбы <strong>{{ android_seen_academy|default('0') }}</strong>.
-            {% if (android_seen_dobrozal|default('0') == '0') and (android_seen_academy|default('0') == '0') %}
-                <span class="text-secondary">Пока 0: после выкладки бэка откройте новую сборку на телефоне — цифра появится.</span>
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Версия Android</div>
+        <p class="small mb-2">
+            Доброзал, последняя открытая сборка: <strong>{{ android_seen_dobrozal|default('0') }}</strong>
+            {% if android_seen_dobrozal|default('0') == '0' %}
+                <span class="text-secondary">— ещё никто не заходил с приложением после обновления сервера</span>
             {% endif %}
         </p>
-        <form method="post" action="{{ path('admin_section', {section: 'mobileapps'}) }}" class="row g-2">
-            <input type="hidden" name="form" value="app_update">
-            <div class="col-md-3">
-                <label class="form-label small">Ручной минимум (versionCode)</label>
-                <input type="number" min="0" step="1" name="android_min_version_code" class="form-control form-control-sm" value="{{ android_min_version_code|default('0') }}">
-                <div class="form-text">0 — только автомат с телефонов.</div>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label small">Текст на баннере</label>
-                <input type="text" name="android_update_message" class="form-control form-control-sm" value="{{ android_update_message|default('') }}" placeholder="Вышла новая версия. Обновите приложение.">
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" name="android_force_update" value="1" id="android_force_update" {% if android_force_update|default('0') in ['1', 'true', 'yes'] %}checked{% endif %}>
-                    <label class="form-check-label small" for="android_force_update">Без крестика</label>
+        <p class="small text-secondary mb-2">
+            Ничего вписывать не нужно. Выложили 39 в Google Play → выкатили этот бэк → один раз откройте приложение 39 на телефоне.
+            Здесь появится «39», и у всех на старой сборке сам вылезет баннер «обновитесь» с крестиком.
+        </p>
+        <details class="small">
+            <summary class="text-secondary mb-2">Редко нужно: свой текст или запретить закрыть баннер</summary>
+            <form method="post" action="{{ path('admin_section', {section: 'mobileapps'}) }}" class="row g-2 mt-1">
+                <input type="hidden" name="form" value="app_update">
+                <div class="col-md-3">
+                    <label class="form-label small">Поднять минимум вручную</label>
+                    <input type="number" min="0" step="1" name="android_min_version_code" class="form-control form-control-sm" value="{{ android_min_version_code|default('0') }}">
+                    <div class="form-text">0 — не трогать, пусть считает сам.</div>
                 </div>
-            </div>
-            <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary">Сохранить</button>
-            </div>
-        </form>
+                <div class="col-md-6">
+                    <label class="form-label small">Текст на баннере</label>
+                    <input type="text" name="android_update_message" class="form-control form-control-sm" value="{{ android_update_message|default('') }}" placeholder="Вышла новая версия. Обновите приложение.">
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" name="android_force_update" value="1" id="android_force_update" {% if android_force_update|default('0') in ['1', 'true', 'yes'] %}checked{% endif %}>
+                        <label class="form-check-label" for="android_force_update">Нельзя закрыть баннер, пока не обновят</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Сохранить</button>
+                </div>
+            </form>
+        </details>
     </div>
 
     <div class="content-card mb-3">
