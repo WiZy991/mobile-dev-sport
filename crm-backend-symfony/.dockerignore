@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+var
+vendor
+tests
+*.md
+docker-compose*.override.yml
+compose.override.yaml

@@ -33,6 +33,51 @@ api_auth_logout:
   controller: App\Controller\Api\AuthController::logout
   methods: [POST]
 
+api_auth_otp_channels:
+  path: /api/v1/auth/otp/channels
+  controller: App\Controller\Api\PhoneAuthController::channels
+  methods: [GET]
+
+api_auth_otp_channels_slash:
+  path: /api/v1/auth/otp/channels/
+  controller: App\Controller\Api\PhoneAuthController::channels
+  methods: [GET]
+
+api_auth_otp_request:
+  path: /api/v1/auth/otp/request
+  controller: App\Controller\Api\PhoneAuthController::requestOtp
+  methods: [POST]
+
+api_auth_otp_request_slash:
+  path: /api/v1/auth/otp/request/
+  controller: App\Controller\Api\PhoneAuthController::requestOtp
+  methods: [POST]
+
+api_auth_otp_verify:
+  path: /api/v1/auth/otp/verify
+  controller: App\Controller\Api\PhoneAuthController::verifyOtp
+  methods: [POST]
+
+api_auth_otp_verify_slash:
+  path: /api/v1/auth/otp/verify/
+  controller: App\Controller\Api\PhoneAuthController::verifyOtp
+  methods: [POST]
+
+api_auth_otp_max_webhook:
+  path: /api/v1/auth/otp/max-webhook
+  controller: App\Controller\Api\PhoneAuthController::maxWebhook
+  methods: [POST]
+
+api_auth_register_check_email:
+  path: /api/v1/auth/register/check-email
+  controller: App\Controller\Api\PhoneAuthController::checkEmail
+  methods: [POST]
+
+api_auth_register_phone:
+  path: /api/v1/auth/register/phone
+  controller: App\Controller\Api\PhoneAuthController::registerPhone
+  methods: [POST]
+
 api_auth_apple_sign_in:
   path: /api/v1/auth/apple
   controller: App\Controller\Api\AppleAuthController::signIn

@@ -7,7 +7,9 @@ cd /app
 mkdir -p /app/public/uploads/clubs /app/public/uploads/promotions /app/public/uploads/trainers /app/var/cache /app/var/log
 chown -R www-data:www-data /app/public/uploads /app/var || true
 
-php bin/console cache:clear --no-interaction || true
+rm -rf /app/var/cache/* || true
+php bin/console cache:clear --no-interaction --no-warmup || true
+php bin/console cache:warmup --no-interaction || true
 php bin/console doctrine:database:create --if-not-exists --no-interaction || true
 php bin/console doctrine:migrations:migrate --no-interaction || true
 chown -R www-data:www-data /app/var || true
