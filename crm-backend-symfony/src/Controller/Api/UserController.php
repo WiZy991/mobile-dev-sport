@@ -11,6 +11,7 @@ use App\Service\Notification\ClientNotificationService;
 use App\Service\CurrentUserResolver;
 use App\Service\Auth\EmailVerificationService;
 use App\Service\Auth\ProfileLegalLock;
+use App\Service\MobileClientPayloadApplier;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
