@@ -458,12 +458,11 @@ private fun RegisterPersonalStep(
     if (uiState.phoneRegistration != true) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextField(
-                value = uiState.phoneNationalDigits,
-                onValueChange = viewModel::onPhoneChange,
+                value = russianPhoneFieldValue(uiState.phoneNationalDigits),
+                onValueChange = { viewModel.onPhoneChange(it.text) },
                 textStyle = orangeRegisterInputTextStyle(),
                 label = { Text("Номер телефона *", color = Color.White.copy(0.78f)) },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                visualTransformation = remember { RussianPhoneVisualTransformation() },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 singleLine = true,

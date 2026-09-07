@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.fitnessclub.app.ui.screens.auth.RussianPhoneVisualTransformation
+import com.fitnessclub.app.ui.screens.auth.russianPhoneFieldValue
 import com.fitnessclub.app.ui.theme.Primary
 import kotlinx.coroutines.launch
 
@@ -225,9 +225,9 @@ fun EditProfileScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             OutlinedTextField(
-                value = uiState.phoneNationalDigits,
+                value = russianPhoneFieldValue(uiState.phoneNationalDigits),
                 onValueChange = {
-                    if (uiState.profileLocked) showLockedDialog = true else viewModel.updatePhone(it)
+                    if (uiState.profileLocked) showLockedDialog = true else viewModel.updatePhone(it.text)
                 },
                 label = { Text("Телефон") },
                 leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
@@ -236,7 +236,6 @@ fun EditProfileScreen(
                 singleLine = true,
                 readOnly = uiState.profileLocked,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                visualTransformation = remember { RussianPhoneVisualTransformation() },
                 shape = RoundedCornerShape(12.dp)
             )
             

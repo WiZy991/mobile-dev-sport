@@ -173,7 +173,7 @@ class LoginViewModel @Inject constructor(
     val events: SharedFlow<LoginEvent> = _events.asSharedFlow()
 
     fun onPhoneChange(raw: String) {
-        val national = normalizeRussianNationalDigits(raw)
+        val national = nationalDigitsFromPhoneField(raw, _uiState.value.phoneNationalDigits)
         _uiState.value = _uiState.value.copy(
             phoneNationalDigits = national,
             phoneError = null

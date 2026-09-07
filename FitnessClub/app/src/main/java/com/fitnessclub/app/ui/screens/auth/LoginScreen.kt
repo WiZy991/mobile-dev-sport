@@ -76,6 +76,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
@@ -208,8 +209,8 @@ fun LoginScreen(
 
             if (uiState.otpStep == LoginOtpStep.PHONE) {
                 LoginCredentialField(
-                    value = formatRussianPhoneMask(uiState.phoneNationalDigits),
-                    onValueChange = viewModel::onPhoneChange,
+                    value = russianPhoneFieldValue(uiState.phoneNationalDigits),
+                    onValueChange = { viewModel.onPhoneChange(it.text) },
                     label = "Телефон",
                     error = uiState.phoneError,
                     keyboardType = KeyboardType.Phone,
@@ -641,6 +642,56 @@ private fun LoginCredentialField(
             isError = error != null,
             singleLine = true,
             visualTransformation = visualTransformation,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+            keyboardActions = KeyboardActions(onDone = { onImeAction() }, onNext = { onImeAction() }),
+            shape = RoundedCornerShape(14.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = LoginSurfaceWhite,
+                unfocusedContainerColor = LoginSurfaceWhite,
+                disabledContainerColor = LoginSurfaceWhite.copy(0.7f),
+                focusedTextColor = LoginBackground,
+                unfocusedTextColor = LoginBackground,
+                focusedLabelColor = LoginBackground.copy(0.75f),
+                unfocusedLabelColor = LoginBackground.copy(0.6f),
+                cursorColor = LoginBackground,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                errorIndicatorColor = Color.Transparent,
+            ),
+        )
+        error?.let {
+            Text(
+                text = it,
+                color = LoginSurfaceWhite,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LoginCredentialField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    label: String,
+    error: String?,
+    keyboardType: KeyboardType,
+    imeAction: ImeAction,
+    onImeAction: () -> Unit,
+    leading: @Composable (() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        TextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(label) },
+            leadingIcon = leading,
+            trailingIcon = trailing,
+            isError = error != null,
+            singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
             keyboardActions = KeyboardActions(onDone = { onImeAction() }, onNext = { onImeAction() }),
             shape = RoundedCornerShape(14.dp),

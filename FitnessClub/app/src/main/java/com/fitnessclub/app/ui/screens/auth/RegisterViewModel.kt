@@ -291,8 +291,12 @@ class RegisterViewModel @Inject constructor(
     }
 
     fun onPhoneChange(raw: String) {
-        val national = normalizeRussianNationalDigits(raw)
-        updateForm { it.copy(phoneNationalDigits = national, phoneError = null) }
+        updateForm {
+            it.copy(
+                phoneNationalDigits = nationalDigitsFromPhoneField(raw, it.phoneNationalDigits),
+                phoneError = null,
+            )
+        }
     }
 
     fun onEmailChange(v: String) {

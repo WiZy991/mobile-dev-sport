@@ -229,19 +229,6 @@ fun PurchasePassportDialog(
                         showPencil = review,
                         keyboardType = KeyboardType.Email,
                     )
-                    if (!gate.emailVerified) {
-                        Text(
-                            "Email ещё не подтверждён. Нажмите «Подтвердить» — покупку можно продолжить после перехода по ссылке из письма.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TextButton(
-                            onClick = onResendEmail,
-                            enabled = !isResendingEmail && !isLoading,
-                        ) {
-                            Text(if (isResendingEmail) "Отправляем…" else "Подтвердить")
-                        }
-                    }
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         TextField(
                             value = birthDisplay,

@@ -1,5 +1,8 @@
 package com.fitnessclub.app.ui.screens.auth
 
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+
 /** До 10 цифр после кода страны (без ведущей 7/8). */
 fun normalizeRussianNationalDigits(input: String): String {
     var d = input.filter { it.isDigit() }
@@ -9,6 +12,28 @@ fun normalizeRussianNationalDigits(input: String): String {
         d = d.drop(1)
     }
     return d.take(10)
+}
+
+/**
+ * Разбор текста из поля с маской `+7 (XXX) XXX-XX-XX`.
+ * Backspace по скобке/пробелу снимает последнюю цифру, а не «застревает» в префиксе.
+ */
+fun nationalDigitsFromPhoneField(raw: String, previousNational: String): String {
+    val prevFormatted = formatRussianPhoneMask(previousNational)
+    val normalized = normalizeRussianNationalDigits(raw)
+    if (raw.length < prevFormatted.length &&
+        normalized.length >= previousNational.length &&
+        previousNational.isNotEmpty()
+    ) {
+        return previousNational.dropLast(1)
+    }
+    return normalized
+}
+
+/** Значение поля: маска на экране, курсор всегда после последней цифры. */
+fun russianPhoneFieldValue(nationalDigits: String): TextFieldValue {
+    val formatted = formatRussianPhoneMask(nationalDigits)
+    return TextFieldValue(text = formatted, selection = TextRange(formatted.length))
 }
 
 /** Полный вид номера для поля ввода: `+7 (XXX) XXX-XX-XX` (в стейте — только 10 национальных цифр). */

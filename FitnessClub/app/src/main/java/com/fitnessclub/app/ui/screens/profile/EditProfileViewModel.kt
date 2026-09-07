@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.repository.AuthRepository
+import com.fitnessclub.app.ui.screens.auth.nationalDigitsFromPhoneField
 import com.fitnessclub.app.ui.screens.auth.normalizeRussianNationalDigits
 import com.fitnessclub.app.ui.screens.auth.phoneForApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -86,7 +87,7 @@ class EditProfileViewModel @Inject constructor(
     fun updatePhone(raw: String) {
         _uiState.update {
             it.copy(
-                phoneNationalDigits = normalizeRussianNationalDigits(raw),
+                phoneNationalDigits = nationalDigitsFromPhoneField(raw, it.phoneNationalDigits),
                 error = null,
             )
         }
