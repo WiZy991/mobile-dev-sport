@@ -171,8 +171,10 @@ class UserController extends AbstractController
         if (isset($data['phone'])) {
             $incoming = trim((string) $data['phone']);
             $current = trim((string) ($user->getPhone() ?? ''));
-            if ($incoming !== '' && $incoming !== $current) {
-                if ($this->profileLegalLock->isLocked($user) && $this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
+            $incomingDigits = preg_replace('/\D+/', '', $incoming) ?? '';
+            $currentDigits = preg_replace('/\D+/', '', $current) ?? '';
+            if ($incoming !== '' && $incoming !== $current && $incomingDigits !== $currentDigits) {
+                if ($this->profileLegalLock->isLocked($user) && $this->profileLegalLock->blocksFilledIdentityChange($currentDigits, $incomingDigits)) {
                     return $this->json([
                         'error' => 'На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки.',
                         'code' => 'profile_locked',

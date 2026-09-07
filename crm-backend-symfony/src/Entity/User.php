@@ -567,13 +567,19 @@ class User implements TenantAware
     }
 
     /**
-     * Паспорт, подтверждённый через Сбер ID, клиент менять не может.
-     * Активный/замороженный абонемент блокирует ФИО и телефон отдельно — см. ProfileLegalLock.
+     * Паспорт из Сбера нельзя менять, только если он реально записан.
+     * Сбер без maindoc ставит verified на пустые поля — иначе клиент не может купить абонемент.
      */
     public function isPassportLockedFromClientEdit(): bool
     {
-        return $this->passportVerificationProvider === 'sber_id'
-            && $this->passportVerificationStatus === 'verified';
+        if ($this->passportVerificationProvider !== 'sber_id'
+            || $this->passportVerificationStatus !== 'verified') {
+            return false;
+        }
+        $series = preg_replace('/\D+/', '', (string) ($this->passportSeries ?? '')) ?? '';
+        $number = preg_replace('/\D+/', '', (string) ($this->passportNumber ?? '')) ?? '';
+
+        return strlen($series) === 4 && strlen($number) === 6;
     }
 
     public function isNotifyPushEnabled(): bool
