@@ -275,7 +275,7 @@ class SberAuthController extends AbstractController
         $this->sberUserinfoLogger->log($userinfo);
 
         // Не ротируем refresh: иначе ломается вход по отпечатку (приложение хранит прежний refresh).
-        $authPayload = $this->mobileTokens->issue($user, false);
+        $authPayload = $this->mobileTokens->issue($user, true);
         if (!$user->getPassportSeries() || !$user->getPassportNumber()) {
             $authPayload['sber_profile_hint'] = $this->buildPassportMissingHint($tokens, $merged, $userinfoError);
         }

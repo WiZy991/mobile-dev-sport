@@ -6,12 +6,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -55,14 +59,15 @@ fun PaymentPendingScreen(
 ) {
     var statusMessage by remember { mutableStateOf("Ожидаем подтверждение оплаты…") }
     var isFailed by remember { mutableStateOf(false) }
+    var isPaid by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val leaveScreen: () -> Unit = {
-        if (isFailed) {
-            onNavigateBack()
+        if (isFailed || isPaid) {
+            if (isPaid) onPaymentSuccess() else onNavigateBack()
         } else if (!leaving) {
             leaving = true
             scope.launch {
@@ -110,8 +115,12 @@ fun PaymentPendingScreen(
         viewModel.events.collectLatest { event ->
             when (event) {
                 is PaymentPendingEvent.Success -> {
-                    statusMessage = "Оплата прошла успешно"
-                    onPaymentSuccess()
+                    isPaid = true
+                    leaving = false
+                    statusMessage = event.planName
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { "Все прошло отлично! Вы приобрели $it" }
+                        ?: "Все прошло отлично! Вы приобрели абонемент"
                 }
                 is PaymentPendingEvent.Failed -> {
                     isFailed = true
@@ -150,7 +159,14 @@ fun PaymentPendingScreen(
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.padding(24.dp),
             ) {
-                if (isFailed) {
+                if (isPaid) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = Primary,
+                    )
+                } else if (isFailed) {
                     Icon(
                         Icons.Default.Error,
                         contentDescription = null,
@@ -168,7 +184,15 @@ fun PaymentPendingScreen(
                     textAlign = TextAlign.Center,
                 )
                 Spacer(modifier = Modifier.height(20.dp))
-                if (!isFailed) {
+                if (isPaid) {
+                    Button(
+                        onClick = onPaymentSuccess,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                    ) {
+                        Text("Отлично")
+                    }
+                } else if (!isFailed) {
                     Text(
                         text = "Если вы закрыли страницу банка без оплаты — нажмите «Вернуться».",
                         style = MaterialTheme.typography.bodySmall,
@@ -177,8 +201,14 @@ fun PaymentPendingScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
-                OutlinedButton(onClick = leaveScreen, enabled = !leaving || isFailed) {
-                    Text(if (isFailed) "Закрыть" else "Вернуться")
+                OutlinedButton(onClick = leaveScreen, enabled = !leaving || isFailed || isPaid) {
+                    Text(
+                        when {
+                            isPaid -> "В профиль"
+                            isFailed -> "Закрыть"
+                            else -> "Вернуться"
+                        },
+                    )
                 }
             }
         }

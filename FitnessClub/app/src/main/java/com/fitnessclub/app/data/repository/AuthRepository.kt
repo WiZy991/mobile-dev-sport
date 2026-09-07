@@ -6,10 +6,18 @@ import com.fitnessclub.app.data.local.AuthFlowStore
 import com.fitnessclub.app.data.local.BiometricLoginStore
 import com.fitnessclub.app.data.local.TokenManager
 import com.fitnessclub.app.data.model.ChangePasswordRequest
+import com.fitnessclub.app.data.model.CheckEmailRequest
+import com.fitnessclub.app.data.model.CheckEmailResponse
+import com.fitnessclub.app.data.model.EmailResendResponse
 import com.fitnessclub.app.data.model.LoginHintRequest
 import com.fitnessclub.app.data.model.LoginHintResponse
 import com.fitnessclub.app.data.model.LoginHintResult
 import com.fitnessclub.app.data.model.LoginRequest
+import com.fitnessclub.app.data.model.OtpChannelStatus
+import com.fitnessclub.app.data.model.OtpRequestBody
+import com.fitnessclub.app.data.model.OtpRequestResponse
+import com.fitnessclub.app.data.model.OtpVerifyBody
+import com.fitnessclub.app.data.model.OtpVerifyResponse
 import com.fitnessclub.app.data.model.ProfilePatchRequest
 import com.fitnessclub.app.data.model.RegisterRequest
 import com.fitnessclub.app.data.model.SberCallbackRequest
@@ -162,18 +170,103 @@ class AuthRepository @Inject constructor(
     fun register(request: RegisterRequest): Flow<ApiResult<User>> = flow {
         emit(ApiResult.Loading)
         try {
-            val response = api.register(request)
+            val response = if (!request.otpTicket.isNullOrBlank()) {
+                api.registerPhone(request)
+            } else {
+                api.register(request)
+            }
             if (response.isSuccessful && response.body() != null) {
                 val authResponse = response.body()!!
                 tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
                 tokenManager.saveUser(authResponse.user)
                 onAuthenticated()
+                authFlowStore.clearOtpRegistration()
                 emit(ApiResult.Success(authResponse.user))
             } else {
                 emit(ApiResult.Error(authErrorMessage(response, "Ошибка регистрации"), response.code()))
             }
         } catch (e: Exception) {
             emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+        }
+    }
+
+    suspend fun otpChannels(): ApiResult<List<OtpChannelStatus>> {
+        return try {
+            val response = api.otpChannels()
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
+                ApiResult.Success(body.channels)
+            } else {
+                ApiResult.Error("Не удалось получить список каналов", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+        }
+    }
+
+    suspend fun requestOtp(phone: String, channel: String): ApiResult<OtpRequestResponse> {
+        return try {
+            val response = api.requestOtp(OtpRequestBody(phone, channel))
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
+                ApiResult.Success(body)
+            } else {
+                val parsed = parseAuthError(response, "")
+                ApiResult.Error(
+                    otpSendFailureMessage(response.code(), parsed),
+                    response.code(),
+                    parsed.authCode,
+                )
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Нет связи с сервером. Проверьте интернет.")
+        }
+    }
+
+    suspend fun verifyOtp(phone: String, code: String): ApiResult<OtpVerifyResponse> {
+        return try {
+            val response = api.verifyOtp(OtpVerifyBody(phone, code))
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
+                if (!body.token.isNullOrBlank() && !body.refreshToken.isNullOrBlank() && body.user != null) {
+                    tokenManager.saveTokens(body.token, body.refreshToken)
+                    tokenManager.saveUser(body.user)
+                    onAuthenticated()
+                }
+                ApiResult.Success(body)
+            } else {
+                ApiResult.Error(authErrorMessage(response, "Неверный код"), response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+        }
+    }
+
+    suspend fun checkRegisterEmail(email: String): ApiResult<CheckEmailResponse> {
+        return try {
+            val response = api.checkRegisterEmail(CheckEmailRequest(email))
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
+                ApiResult.Success(body)
+            } else {
+                ApiResult.Error(authErrorMessage(response, "Не удалось проверить email"), response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+        }
+    }
+
+    suspend fun resendEmailVerification(): ApiResult<EmailResendResponse> {
+        return try {
+            val response = api.resendEmailVerification()
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
+                ApiResult.Success(body)
+            } else {
+                ApiResult.Error(authErrorMessage(response, "Не удалось отправить письмо"), response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Неизвестная ошибка")
         }
     }
     
@@ -348,7 +441,8 @@ class AuthRepository @Inject constructor(
                 tokenManager.saveUser(updated)
                 ApiResult.Success(updated)
             } else {
-                ApiResult.Error(authErrorMessage(response, "Не удалось сохранить профиль"), response.code())
+                val parsed = parseAuthError(response, "Не удалось сохранить профиль")
+                ApiResult.Error(parsed.message, response.code(), parsed.authCode)
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Неизвестная ошибка")
@@ -363,12 +457,14 @@ class AuthRepository @Inject constructor(
         issueDateIso: String,
         registrationAddress: String,
         dateOfBirthIso: String? = null,
+        name: String? = null,
+        email: String? = null,
     ): ApiResult<User> {
         val current = tokenManager.getUser().first()
             ?: return ApiResult.Error("Профиль не загружен")
         return updateProfile(
-            name = current.name,
-            email = current.email,
+            name = name?.trim()?.takeIf { it.isNotEmpty() } ?: current.name,
+            email = email?.trim()?.takeIf { it.isNotEmpty() } ?: current.email,
             phone = current.phone,
             dateOfBirth = dateOfBirthIso ?: current.dateOfBirth,
             passportSeries = series,
@@ -453,10 +549,38 @@ class AuthRepository @Inject constructor(
     private fun authErrorMessage(response: Response<*>, fallback: String): String =
         parseAuthError(response, fallback).message
 
+    private fun otpSendFailureMessage(http: Int, parsed: ParsedAuthError): String {
+        val fromCode = when (parsed.authCode?.trim()) {
+            "channel_unavailable" ->
+                parsed.message.ifBlank { "Этот канал сейчас недоступен. Выберите другой или войдите по почте." }
+            "channel_undeliverable" ->
+                parsed.message.ifBlank { "Этот номер не принимает код в выбранном мессенджере. Выберите другой канал." }
+            "channel_failed" ->
+                parsed.message.ifBlank { "Не удалось отправить код. Попробуйте другой канал или войдите по почте." }
+            "otp_rate_limited" -> "Слишком много запросов кода. Подождите час."
+            "otp_too_soon" -> "Повторная отправка будет доступна через несколько секунд"
+            "invalid_phone" -> "Укажите номер телефона полностью"
+            "invalid_channel" -> "Выберите Telegram, Max или WhatsApp"
+            else -> null
+        }
+        if (fromCode != null) return fromCode
+        if (http == 404 || http == 405 || parsed.message.isBlank() || parsed.message.contains("<html", ignoreCase = true)) {
+            return "Сервер ещё не отправляет коды в мессенджеры. Войдите по почте или Сбер ID."
+        }
+        return parsed.message.ifBlank { "Не удалось отправить код. Войдите по почте или Сбер ID." }
+    }
+
     private fun humanizeKnownAuthMessages(text: String, code: String?): String {
         when (code?.trim()) {
             "password_not_set" -> return passwordNotSetHintMessage()
-            "passport_locked" -> return "Паспорт подтверждён через Сбер ID и не может быть изменён из приложения"
+            "passport_locked", "profile_locked" ->
+                return "На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки."
+            "channel_unavailable" ->
+                return text.ifBlank { "Этот канал сейчас недоступен. Выберите другой или войдите по почте." }
+            "channel_undeliverable" ->
+                return text.ifBlank { "Этот номер не принимает код в выбранном мессенджере. Выберите другой канал." }
+            "channel_failed" ->
+                return text.ifBlank { "Не удалось отправить код. Попробуйте другой канал или войдите по почте." }
         }
         return when (text.trim()) {
         "Укажите email и password", "Введите пароль" -> loginPasswordRequiredMessage()

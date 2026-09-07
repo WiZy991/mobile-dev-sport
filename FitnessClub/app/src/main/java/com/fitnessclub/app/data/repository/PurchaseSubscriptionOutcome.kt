@@ -17,5 +17,8 @@ sealed class PurchaseSubscriptionOutcome {
     /** Нет паспортных данных — показать форму перед оплатой и повторить. */
     data class PassportRequired(val message: String) : PurchaseSubscriptionOutcome()
 
+    /** Email не подтверждён — повтор письма, прогресс покупки сохраняется. */
+    data class EmailUnverified(val message: String) : PurchaseSubscriptionOutcome()
+
     data class Error(val message: String, val httpCode: Int? = null) : PurchaseSubscriptionOutcome()
 }

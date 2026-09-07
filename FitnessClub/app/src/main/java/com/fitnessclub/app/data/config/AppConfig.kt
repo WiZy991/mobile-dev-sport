@@ -23,6 +23,6 @@ object AppConfig {
     val LEGAL_INDEX_URL get() = DOBROZAL_DOC_URL
     val REQUISITES_URL get() = "$SITE_URL/requisites"
 
-    val PLAY_STORE_URL: String get() = BuildConfig.PLAY_STORE_URL
+    val PLAY_STORE_URL: String get() = StoreListing.playStoreUrl(BuildConfig.APPLICATION_ID)
     val RUSTORE_CATALOG_URL: String get() = BuildConfig.RUSTORE_CATALOG_URL
 }

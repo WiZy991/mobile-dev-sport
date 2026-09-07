@@ -69,6 +69,7 @@ final class MobileAuthTokenIssuer
             'club_id' => $user->getClub()?->getId(),
             'club_name' => $user->getClub()?->getName(),
             'entry_qr_format' => $user->getClub()?->getEntryQrFormat(),
+            'email_verified' => $user->isEmailVerified(),
         ];
     }
 }

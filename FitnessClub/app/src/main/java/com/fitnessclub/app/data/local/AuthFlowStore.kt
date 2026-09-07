@@ -25,6 +25,9 @@ class AuthFlowStore @Inject constructor(
     private val completedKey = booleanPreferencesKey("has_completed_registration")
     private val sberVerifierKey = stringPreferencesKey("pending_sber_code_verifier")
     private val pendingClubKey = stringPreferencesKey("pending_registration_club_id")
+    private val otpTicketKey = stringPreferencesKey("otp_registration_ticket")
+    private val otpPhoneKey = stringPreferencesKey("otp_registration_phone")
+    private val draftJsonKey = stringPreferencesKey("registration_draft_json")
 
     val hasCompletedRegistration: Flow<Boolean> =
         context.authFlowPrefs.data.map { prefs -> prefs[completedKey] == true }
@@ -85,4 +88,34 @@ class AuthFlowStore @Inject constructor(
             prefs.remove(pendingClubKey)
         }
     }
+
+    suspend fun saveOtpRegistration(ticket: String, phone: String) {
+        context.authFlowPrefs.edit { prefs ->
+            prefs[otpTicketKey] = ticket
+            prefs[otpPhoneKey] = phone
+        }
+    }
+
+    suspend fun peekOtpTicket(): String? =
+        context.authFlowPrefs.data.map { prefs -> prefs[otpTicketKey] }.first()?.trim()?.takeIf { it.isNotEmpty() }
+
+    suspend fun peekOtpPhone(): String? =
+        context.authFlowPrefs.data.map { prefs -> prefs[otpPhoneKey] }.first()?.trim()?.takeIf { it.isNotEmpty() }
+
+    suspend fun clearOtpRegistration() {
+        context.authFlowPrefs.edit { prefs ->
+            prefs.remove(otpTicketKey)
+            prefs.remove(otpPhoneKey)
+            prefs.remove(draftJsonKey)
+        }
+    }
+
+    suspend fun saveRegistrationDraft(json: String) {
+        context.authFlowPrefs.edit { prefs ->
+            prefs[draftJsonKey] = json
+        }
+    }
+
+    suspend fun peekRegistrationDraft(): String? =
+        context.authFlowPrefs.data.map { prefs -> prefs[draftJsonKey] }.first()?.trim()?.takeIf { it.isNotEmpty() }
 }

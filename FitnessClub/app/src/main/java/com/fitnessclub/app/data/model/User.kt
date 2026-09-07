@@ -54,6 +54,12 @@ data class User(
     @SerializedName("registration_address")
     val registrationAddress: String? = null,
     
+    @SerializedName("email_verified")
+    val emailVerified: Boolean = false,
+
+    @SerializedName("profile_locked")
+    val profileLocked: Boolean = false,
+    
     @SerializedName("created_at")
     val createdAt: String? = null
 ) {
@@ -183,5 +189,64 @@ data class RegisterRequest(
 
     /** Свой вариант ответа, если выбрано «Другое». */
     @SerializedName("referral_source_other")
-    val referralSourceOther: String? = null
+    val referralSourceOther: String? = null,
+
+    @SerializedName("otp_ticket")
+    val otpTicket: String? = null,
+)
+
+data class OtpRequestBody(
+    @SerializedName("phone") val phone: String,
+    @SerializedName("channel") val channel: String,
+)
+
+data class OtpRequestResponse(
+    @SerializedName("ok") val ok: Boolean = false,
+    @SerializedName("channel") val channel: String? = null,
+    @SerializedName("resend_after_sec") val resendAfterSec: Int = 20,
+    @SerializedName("ttl_sec") val ttlSec: Int = 300,
+    @SerializedName("deeplink") val deeplink: String? = null,
+    @SerializedName("instruction") val instruction: String? = null,
+    @SerializedName("dev_code") val devCode: String? = null,
+    @SerializedName("error") val error: String? = null,
+    @SerializedName("code") val code: String? = null,
+)
+
+data class OtpVerifyBody(
+    @SerializedName("phone") val phone: String,
+    @SerializedName("code") val code: String,
+)
+
+data class OtpVerifyResponse(
+    @SerializedName("token") val token: String? = null,
+    @SerializedName("refresh_token") val refreshToken: String? = null,
+    @SerializedName("user") val user: User? = null,
+    @SerializedName("registration_required") val registrationRequired: Boolean = false,
+    @SerializedName("otp_ticket") val otpTicket: String? = null,
+    @SerializedName("phone") val phone: String? = null,
+)
+
+data class OtpChannelsResponse(
+    @SerializedName("channels") val channels: List<OtpChannelStatus> = emptyList(),
+)
+
+data class OtpChannelStatus(
+    @SerializedName("id") val id: String,
+    @SerializedName("available") val available: Boolean = false,
+)
+
+data class CheckEmailRequest(
+    @SerializedName("email") val email: String,
+)
+
+data class CheckEmailResponse(
+    @SerializedName("exists") val exists: Boolean = false,
+    @SerializedName("masked_phone") val maskedPhone: String? = null,
+    @SerializedName("message") val message: String? = null,
+)
+
+data class EmailResendResponse(
+    @SerializedName("ok") val ok: Boolean = false,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("already_verified") val alreadyVerified: Boolean = false,
 )

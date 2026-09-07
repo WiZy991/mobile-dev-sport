@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -52,6 +53,7 @@ fun ClubPurchaseConsentDialog(
     isLoading: Boolean = false,
 ) {
     var safetyBriefed by remember { mutableStateOf(false) }
+    var dataAccurate by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
@@ -130,6 +132,24 @@ fun ClubPurchaseConsentDialog(
                             modifier = Modifier.weight(1f),
                         )
                     }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Checkbox(
+                            checked = dataAccurate,
+                            onCheckedChange = { dataAccurate = it },
+                            enabled = !isLoading,
+                        )
+                        Text(
+                            text = "Подтверждаю достоверность предоставленных данных",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
                 Column(
                     modifier = Modifier
@@ -139,7 +159,7 @@ fun ClubPurchaseConsentDialog(
                 ) {
                     Button(
                         onClick = onConfirm,
-                        enabled = safetyBriefed && !isLoading,
+                        enabled = safetyBriefed && dataAccurate && !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp),
@@ -157,7 +177,7 @@ fun ClubPurchaseConsentDialog(
                             .fillMaxWidth()
                             .heightIn(min = 48.dp),
                     ) {
-                        Text("Отмена")
+                        Text("Назад")
                     }
                 }
             }

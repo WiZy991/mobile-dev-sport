@@ -24,6 +24,7 @@ class AuthController extends AbstractController
         private readonly MobileAuthTokenIssuer $mobileTokens,
         private readonly LeadIngestionService $leadIngestion,
         private readonly StaffEventNotifier $staffEventNotifier,
+        private readonly \App\Service\Auth\EmailVerificationService $emailVerification,
     ) {}
 
     #[Route('/login', name: 'api_auth_login', methods: ['POST'])]
@@ -70,7 +71,7 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Access denied', 'code' => 'user_blocked'], 403);
         }
 
-        return $this->json($this->mobileTokens->issue($user, false));
+        return $this->json($this->mobileTokens->issue($user, true));
     }
 
     /**
@@ -165,7 +166,7 @@ class AuthController extends AbstractController
 
             // Не ротируем refresh: он же лежит в биометрическом хранилище приложения,
             // иначе после этого шага вход по отпечатку перестаёт работать.
-            return $this->json($this->mobileTokens->issue($existing, false));
+            return $this->json($this->mobileTokens->issue($existing, true));
         }
 
         $user = (new User())
@@ -211,6 +212,11 @@ class AuthController extends AbstractController
             sprintf('%s (%s) зарегистрировался', $user->getName(), $user->getEmail()),
             $user->getId() !== null ? (string) $user->getId() : null,
         );
+
+        try {
+            $this->emailVerification->sendConfirmation($user);
+        } catch (\Throwable) {
+        }
 
         return $this->json($this->mobileTokens->issue($user, true));
     }

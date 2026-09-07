@@ -9,7 +9,8 @@ use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\Api\UserAccountDeletionService;
 use App\Service\Notification\ClientNotificationService;
 use App\Service\CurrentUserResolver;
-use App\Service\MobileClientPayloadApplier;
+use App\Service\Auth\EmailVerificationService;
+use App\Service\Auth\ProfileLegalLock;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,6 +29,8 @@ class UserController extends AbstractController
         private readonly UserAccountDeletionService $accountDeletion,
         private readonly OccupancyService $occupancyService,
         private readonly ClientNotificationService $clientNotifications,
+        private readonly EmailVerificationService $emailVerification,
+        private readonly ProfileLegalLock $profileLegalLock,
     ) {}
 
     #[Route('/access-status', name: 'api_user_access_status', methods: ['GET'])]
@@ -144,23 +147,37 @@ class UserController extends AbstractController
             return $this->json(['error' => 'Unauthorized'], 401);
         }
 
-        if (isset($data['email'])) {
-            $user->setEmail($data['email']);
+        if ($this->profileLegalLock->isLocked($user)) {
+            $identityTouched = isset($data['name']) || isset($data['phone']);
+            if ($identityTouched) {
+                return $this->json([
+                    'error' => 'На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки.',
+                    'code' => 'profile_locked',
+                ], 403);
+            }
         }
-        if (isset($data['name'])) {
+
+        if (isset($data['email'])) {
+            $incoming = mb_strtolower(trim((string) $data['email']));
+            if ($incoming !== '' && $incoming !== mb_strtolower($user->getEmail())) {
+                $user->setEmail($incoming);
+                $user->setEmailVerifiedAt(null);
+            }
+        }
+        if (isset($data['name']) && !$this->profileLegalLock->isLocked($user)) {
             $user->setName($data['name']);
         }
-        if (isset($data['phone'])) {
+        if (isset($data['phone']) && !$this->profileLegalLock->isLocked($user)) {
             $user->setPhone($data['phone']);
         }
 
         try {
             $this->mobileClientPayloadApplier->applyProfilePatch($user, $data);
         } catch (\DomainException $e) {
-            if ($e->getMessage() === 'passport_locked') {
+            if ($e->getMessage() === 'passport_locked' || $e->getMessage() === 'profile_locked') {
                 return $this->json([
-                    'error' => 'Паспорт подтверждён через Сбер ID и не может быть изменён из приложения',
-                    'code' => 'passport_locked',
+                    'error' => 'На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки.',
+                    'code' => 'profile_locked',
                 ], 403);
             }
             if ($e->getMessage() === 'club_not_found') {
@@ -175,7 +192,24 @@ class UserController extends AbstractController
         $this->em->persist($user);
         $this->em->flush();
 
-        return $this->json($this->serializeUserProfile($user));
+        return $this->json(array_merge($this->serializeUserProfile($user), [
+            'profile_locked' => $this->profileLegalLock->isLocked($user),
+        ]));
+    }
+
+    #[Route('/email/resend', name: 'api_user_email_resend', methods: ['POST'])]
+    public function resendEmailVerification(Request $request): JsonResponse
+    {
+        $user = $this->userResolver->resolve($request);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+        if ($user->isEmailVerified()) {
+            return $this->json(['ok' => true, 'already_verified' => true, 'email' => $user->getEmail()]);
+        }
+        $this->emailVerification->sendConfirmation($user);
+
+        return $this->json(['ok' => true, 'email' => $user->getEmail()]);
     }
 
     #[Route('/change-password', name: 'api_user_change_password', methods: ['POST'])]
@@ -272,6 +306,7 @@ class UserController extends AbstractController
             'passport_issued_by' => $user->getPassportIssuedBy(),
             'passport_issue_date' => $user->getPassportIssueDate()?->format('Y-m-d'),
             'registration_address' => $user->getRegistrationAddress(),
+            'profile_locked' => $this->profileLegalLock->isLocked($user),
         ]);
     }
 

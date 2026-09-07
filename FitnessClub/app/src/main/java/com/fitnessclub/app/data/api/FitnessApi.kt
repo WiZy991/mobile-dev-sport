@@ -16,6 +16,24 @@ interface FitnessApi {
     
     @POST("auth/register")
     suspend fun register(@Body request: RegisterRequest): Response<AuthResponse>
+
+    @POST("auth/register/phone")
+    suspend fun registerPhone(@Body request: RegisterRequest): Response<AuthResponse>
+
+    @POST("auth/register/check-email")
+    suspend fun checkRegisterEmail(@Body request: CheckEmailRequest): Response<CheckEmailResponse>
+
+    @GET("auth/otp/channels")
+    suspend fun otpChannels(): Response<OtpChannelsResponse>
+
+    @POST("auth/otp/request")
+    suspend fun requestOtp(@Body request: OtpRequestBody): Response<OtpRequestResponse>
+
+    @POST("auth/otp/verify")
+    suspend fun verifyOtp(@Body request: OtpVerifyBody): Response<OtpVerifyResponse>
+
+    @POST("user/email/resend")
+    suspend fun resendEmailVerification(): Response<EmailResendResponse>
     
     @POST("auth/refresh")
     suspend fun refreshToken(@Header("Authorization") refreshToken: String): Response<AuthResponse>
@@ -145,6 +163,8 @@ interface FitnessApi {
     @GET("club/info")
     suspend fun getClubInfo(
         @Query("club_id") clubId: String? = null,
+        @Query("app_version_code") appVersionCode: Int? = null,
+        @Query("application_id") applicationId: String? = null,
     ): Response<ClubInfo>
 
     @GET("club/promotions")
@@ -597,6 +617,10 @@ data class ClubInfo(
     val appUpdate: AppUpdateInfo? = null,
     @com.google.gson.annotations.SerializedName("network")
     val network: com.fitnessclub.app.data.model.ClubNetworkInfo? = null,
+    @com.google.gson.annotations.SerializedName("welcome_banner_url")
+    val welcomeBannerUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("welcome_legal_text")
+    val welcomeLegalText: String? = null,
 )
 
 data class ClubPromotion(

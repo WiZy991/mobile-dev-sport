@@ -167,6 +167,13 @@ class SubscriptionRepository @Inject constructor(
                                 ?: "Для покупки заполните паспортные данные",
                         )
                     }
+                    parsed?.code == "email_unverified" -> {
+                        PurchaseSubscriptionOutcome.EmailUnverified(
+                            message = parsed.message
+                                ?: parsed.error
+                                ?: "Подтвердите email, чтобы оформить абонемент",
+                        )
+                    }
                     else -> {
                         val msg = humanizeApiError(
                             httpCode = response.code(),
@@ -263,6 +270,7 @@ private fun humanizeApiError(
         "token_expired", "invalid_token" -> return "Сессия истекла. Выйдите и войдите в приложение снова."
         "missing_token" -> return "Войдите в приложение, чтобы оплатить абонемент."
         "passport_required" -> return "Для покупки абонемента заполните паспортные данные"
+        "email_unverified" -> return "Подтвердите email, чтобы оформить абонемент"
     }
 
     when (parsedError?.trim()) {

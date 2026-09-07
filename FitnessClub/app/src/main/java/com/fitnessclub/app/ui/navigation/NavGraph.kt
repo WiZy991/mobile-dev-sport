@@ -21,9 +21,11 @@ import com.fitnessclub.app.ui.screens.auth.LoginScreen
 import com.fitnessclub.app.ui.screens.auth.LoginViewModel
 import com.fitnessclub.app.ui.screens.auth.PostRegisterSetupScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterClubPickScreen
+import com.fitnessclub.app.ui.screens.auth.RegisterEmailScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterSurveyScreen
 import com.fitnessclub.app.ui.screens.auth.RegisterViewModel
+import com.fitnessclub.app.ui.screens.auth.WelcomeScreen
 import com.fitnessclub.app.ui.screens.club.ClubInfoScreen
 import com.fitnessclub.app.ui.screens.club.SelectPreferredClubScreen
 import com.fitnessclub.app.ui.screens.clubs.ClubsScreen
@@ -59,7 +61,7 @@ fun NavGraph(
     navController: NavHostController,
     isLoggedIn: Boolean
 ) {
-    val startDestination = if (isLoggedIn) Screen.Home.route else Screen.Login.route
+    val startDestination = if (isLoggedIn) Screen.Home.route else Screen.Welcome.route
 
     // После логина уводим с экрана входа на главную.
     // На холодном старте уже в Home — повторный navigate с popUpTo даёт «вторую анимацию запуска».
@@ -67,7 +69,8 @@ fun NavGraph(
         if (!isLoggedIn) return@LaunchedEffect
         val route = navController.currentBackStackEntry?.destination?.route
             ?: navController.currentDestination?.route
-        val onAuthScreen = route == Screen.Login.route ||
+        val onAuthScreen = route == Screen.Welcome.route ||
+            route == Screen.Login.route ||
             route?.startsWith("login") == true ||
             route?.startsWith("register") == true
         if (onAuthScreen) {
@@ -101,6 +104,17 @@ fun NavGraph(
         navController = navController,
         startDestination = startDestination
     ) {
+        composable(Screen.Welcome.route) {
+            WelcomeScreen(
+                onContinue = {
+                    navController.navigate(Screen.Login.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenLegalPdf = openLegalPdf,
+            )
+        }
+
         // Auth screens
         composable(
             route = Screen.Login.ROUTE_WITH_ARG,
@@ -120,6 +134,9 @@ fun NavGraph(
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
                 },
+                onNavigateToPhoneRegister = {
+                    navController.navigate(Screen.Register.route)
+                },
                 onOpenLegalPdf = openLegalPdf,
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
@@ -132,8 +149,42 @@ fun NavGraph(
         
         navigation(
             route = Screen.Register.route,
-            startDestination = RegisterRoutes.SURVEY
+            startDestination = RegisterRoutes.START
         ) {
+            composable(RegisterRoutes.START) {
+                val parentEntry = remember {
+                    navController.getBackStackEntry(Screen.Register.route)
+                }
+                val viewModel: RegisterViewModel = hiltViewModel(parentEntry)
+                val registerState by viewModel.uiState.collectAsState()
+                androidx.compose.runtime.LaunchedEffect(registerState.phoneRegistration) {
+                    val phone = registerState.phoneRegistration
+                    if (phone == true) {
+                        navController.navigate(RegisterRoutes.EMAIL) {
+                            popUpTo(RegisterRoutes.START) { inclusive = true }
+                        }
+                    } else if (phone == false) {
+                        navController.navigate(RegisterRoutes.SURVEY) {
+                            popUpTo(RegisterRoutes.START) { inclusive = true }
+                        }
+                    }
+                }
+            }
+            composable(RegisterRoutes.EMAIL) {
+                val parentEntry = remember {
+                    navController.getBackStackEntry(Screen.Register.route)
+                }
+                val viewModel: RegisterViewModel = hiltViewModel(parentEntry)
+                RegisterEmailScreen(
+                    viewModel = viewModel,
+                    onBack = {
+                        navController.popBackStack(Screen.Login.route, inclusive = false)
+                    },
+                    onContinue = {
+                        navController.navigate(RegisterRoutes.FORM)
+                    },
+                )
+            }
             composable(RegisterRoutes.SURVEY) {
                 val parentEntry = remember {
                     navController.getBackStackEntry(Screen.Register.route)
@@ -155,19 +206,40 @@ fun NavGraph(
                 }
                 val viewModel: RegisterViewModel = hiltViewModel(parentEntry)
                 val registerState by viewModel.uiState.collectAsState()
+                LaunchedEffect(Unit) {
+                    viewModel.events.collect { event ->
+                        if (event is com.fitnessclub.app.ui.screens.auth.RegisterEvent.Success) {
+                            navController.navigate(RegisterRoutes.SETUP) {
+                                popUpTo(Screen.Register.route) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                }
                 RegisterClubPickScreen(
                     selectedClubId = registerState.selectedClub?.id,
                     apiClubs = registerState.clubs,
                     clubsLoading = registerState.clubsLoading,
                     clubsLoadError = registerState.clubsLoadError,
+                    isSubmitting = registerState.isLoading,
+                    submitError = registerState.error,
+                    phoneRegistration = registerState.phoneRegistration == true,
                     onBack = {
-                        navController.popBackStack(Screen.Login.route, inclusive = false)
+                        if (registerState.phoneRegistration == true) {
+                            navController.popBackStack(RegisterRoutes.FORM, inclusive = false)
+                        } else {
+                            navController.popBackStack(Screen.Login.route, inclusive = false)
+                        }
                     },
                     onPicked = { club ->
                         viewModel.onClubSelected(club)
                     },
                     onContinueToRegister = {
-                        navController.navigate(RegisterRoutes.FORM)
+                        if (registerState.phoneRegistration == true) {
+                            viewModel.register()
+                        } else {
+                            navController.navigate(RegisterRoutes.FORM)
+                        }
                     },
                     onRequestSberRegistration = { clubId ->
                         viewModel.prepareSberRegistration(clubId) {
@@ -198,6 +270,9 @@ fun NavGraph(
                     },
                     onChangeClub = {
                         navController.popBackStack(RegisterRoutes.CLUB_PICK, inclusive = false)
+                    },
+                    onNeedClubPick = {
+                        navController.navigate(RegisterRoutes.CLUB_PICK)
                     },
                 )
             }

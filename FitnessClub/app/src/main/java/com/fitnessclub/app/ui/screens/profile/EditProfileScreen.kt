@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.input.KeyboardType
@@ -32,8 +33,10 @@ fun EditProfileScreen(
     viewModel: EditProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var showLockedDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
@@ -41,10 +44,18 @@ fun EditProfileScreen(
         }
     }
 
-    LaunchedEffect(uiState.error) {
+    LaunchedEffect(uiState.error, uiState.profileLocked) {
         val error = uiState.error
         if (!error.isNullOrBlank()) {
-            snackbarHostState.showSnackbar(error)
+            if (uiState.profileLocked && (
+                    error.contains("абонемент") ||
+                        error.contains("поддержк")
+                    )
+            ) {
+                showLockedDialog = true
+            } else {
+                snackbarHostState.showSnackbar(error)
+            }
         }
     }
     
@@ -164,15 +175,37 @@ fun EditProfileScreen(
             }
             
             Spacer(modifier = Modifier.height(32.dp))
+
+            if (uiState.profileLocked) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showLockedDialog = true },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(
+                        text = "На ваши данные приобретён абонемент. ФИО, телефон и дату рождения можно изменить только через поддержку.",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
             
             // Form fields
             OutlinedTextField(
                 value = uiState.name,
-                onValueChange = { viewModel.updateName(it) },
+                onValueChange = {
+                    if (uiState.profileLocked) showLockedDialog = true else viewModel.updateName(it)
+                },
                 label = { Text("Имя") },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                readOnly = uiState.profileLocked,
                 shape = RoundedCornerShape(12.dp)
             )
             
@@ -193,12 +226,15 @@ fun EditProfileScreen(
             
             OutlinedTextField(
                 value = uiState.phoneNationalDigits,
-                onValueChange = { viewModel.updatePhone(it) },
+                onValueChange = {
+                    if (uiState.profileLocked) showLockedDialog = true else viewModel.updatePhone(it)
+                },
                 label = { Text("Телефон") },
                 leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                 placeholder = { Text("+7 (___) ___-__-__") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                readOnly = uiState.profileLocked,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 visualTransformation = remember { RussianPhoneVisualTransformation() },
                 shape = RoundedCornerShape(12.dp)
@@ -209,12 +245,15 @@ fun EditProfileScreen(
             // Birthday (optional)
             OutlinedTextField(
                 value = uiState.birthdayDigits,
-                onValueChange = { viewModel.updateBirthday(it) },
+                onValueChange = {
+                    if (uiState.profileLocked) showLockedDialog = true else viewModel.updateBirthday(it)
+                },
                 label = { Text("Дата рождения") },
                 leadingIcon = { Icon(Icons.Default.Cake, contentDescription = null) },
                 placeholder = { Text("ДД.ММ.ГГГГ") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                readOnly = uiState.profileLocked,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 visualTransformation = remember { DateDotsVisualTransformation() },
                 shape = RoundedCornerShape(12.dp)
@@ -288,5 +327,30 @@ fun EditProfileScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
         }
+    }
+
+    if (showLockedDialog) {
+        AlertDialog(
+            onDismissRequest = { showLockedDialog = false },
+            title = { Text("Данные нельзя изменить") },
+            text = {
+                Text("На ваши данные приобретён абонемент. Если ФИО, телефон или дата рождения изменились, свяжитесь со службой поддержки.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLockedDialog = false
+                        val intent = android.content.Intent(
+                            android.content.Intent.ACTION_SENDTO,
+                            android.net.Uri.parse("mailto:"),
+                        )
+                        runCatching { context.startActivity(intent) }
+                    },
+                ) { Text("Связаться с поддержкой") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLockedDialog = false }) { Text("Закрыть") }
+            },
+        )
     }
 }

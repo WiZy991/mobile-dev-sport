@@ -110,11 +110,13 @@ class MainActivity : FragmentActivity() {
                             }
                         }
 
-                        NavGraph(
-                            navController = navController,
-                            isLoggedIn = isLoggedIn
-                        )
-                        ForceUpdateGate(clubRepository = clubRepository)
+                        Box(Modifier.fillMaxSize()) {
+                            NavGraph(
+                                navController = navController,
+                                isLoggedIn = isLoggedIn
+                            )
+                            ForceUpdateGate(clubRepository = clubRepository)
+                        }
                     }
                 }
             }

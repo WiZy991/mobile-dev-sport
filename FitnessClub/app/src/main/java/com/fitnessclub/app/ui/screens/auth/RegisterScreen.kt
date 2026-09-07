@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -102,6 +103,7 @@ fun RegisterScreen(
     onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
     onRegisterSuccess: () -> Unit,
     onChangeClub: () -> Unit,
+    onNeedClubPick: () -> Unit = onChangeClub,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -121,8 +123,22 @@ fun RegisterScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is RegisterEvent.Success -> onRegisterSuccess()
+                is RegisterEvent.NeedClubPick -> onNeedClubPick()
             }
         }
+    }
+
+    if (uiState.showUnder18Dialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissUnder18,
+            title = { Text("Внимание!") },
+            text = {
+                Text("Лица младше 18 лет могут посещать наши спортзалы только в сопровождении родителя, опекуна или профессионального тренера.")
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissUnder18AndContinue) { Text("Хорошо") }
+            },
+        )
     }
 
     if (birthPickerOpen) {
@@ -202,14 +218,24 @@ fun RegisterScreen(
                 textAlign = TextAlign.Center
             )
 
-            SelectedClubSummary(
-                club = uiState.selectedClub,
-                clubsLoadError = uiState.clubsLoadError,
-                clubError = uiState.fieldError(uiState.clubError),
-                onChangeClub = onChangeClub,
-            )
+            if (uiState.phoneRegistration != true) {
+                SelectedClubSummary(
+                    club = uiState.selectedClub,
+                    clubsLoadError = uiState.clubsLoadError,
+                    clubError = uiState.fieldError(uiState.clubError),
+                    onChangeClub = onChangeClub,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (uiState.formStep == RegisterFormStep.PERSONAL) {
+                Text(
+                    "Пожалуйста, вводите данные точно также, как они указаны в вашем паспорте. Иначе вы не сможете приобрести абонемент.",
+                    color = Color.White.copy(0.9f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
 
             when (uiState.formStep) {
                 RegisterFormStep.PERSONAL -> RegisterPersonalStep(
@@ -429,35 +455,37 @@ private fun RegisterPersonalStep(
         }
     }
 
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        TextField(
-            value = uiState.phoneNationalDigits,
-            onValueChange = viewModel::onPhoneChange,
-            textStyle = orangeRegisterInputTextStyle(),
-            label = { Text("Номер телефона *", color = Color.White.copy(0.78f)) },
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            visualTransformation = remember { RussianPhoneVisualTransformation() },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-            singleLine = true,
-            colors = orangeFieldColors(),
-            isError = uiState.fieldError(uiState.phoneError) != null,
-            supportingText = uiState.fieldError(uiState.phoneError)
-                ?.let { { Text(it, color = Color(0xFFFFE0B2)) } },
-            placeholder = { Text("+7 (999) 123-45-67", color = Color.White.copy(0.45f)) },
-        )
-        Icon(Icons.Default.Keyboard, contentDescription = null, tint = Color.White.copy(0.7f))
-    }
+    if (uiState.phoneRegistration != true) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TextField(
+                value = uiState.phoneNationalDigits,
+                onValueChange = viewModel::onPhoneChange,
+                textStyle = orangeRegisterInputTextStyle(),
+                label = { Text("Номер телефона *", color = Color.White.copy(0.78f)) },
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                visualTransformation = remember { RussianPhoneVisualTransformation() },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                singleLine = true,
+                colors = orangeFieldColors(),
+                isError = uiState.fieldError(uiState.phoneError) != null,
+                supportingText = uiState.fieldError(uiState.phoneError)
+                    ?.let { { Text(it, color = Color(0xFFFFE0B2)) } },
+                placeholder = { Text("+7 (999) 123-45-67", color = Color.White.copy(0.45f)) },
+            )
+            Icon(Icons.Default.Keyboard, contentDescription = null, tint = Color.White.copy(0.7f))
+        }
 
-    OrangeOutlineField(
-        value = uiState.email,
-        onValueChange = viewModel::onEmailChange,
-        label = "E-mail *",
-        error = uiState.fieldError(uiState.emailError),
-        keyboardType = KeyboardType.Email,
-        imeAction = ImeAction.Done,
-        onDone = { focusManager.clearFocus() },
-    )
+        OrangeOutlineField(
+            value = uiState.email,
+            onValueChange = viewModel::onEmailChange,
+            label = "E-mail *",
+            error = uiState.fieldError(uiState.emailError),
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Done,
+            onDone = { focusManager.clearFocus() },
+        )
+    }
 
     Text("Пол *", color = Color.White.copy(0.85f), modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
     Row(

@@ -230,8 +230,7 @@ fun ShopScreen(
     if (pdfOverlay == null && showLegalConsentForPlan == null) {
         showPassportGate?.let { gate ->
             PurchasePassportDialog(
-                initialDateOfBirthDisplay = gate.initialDobDisplay,
-                needDateOfBirth = gate.needDateOfBirth,
+                gate = gate,
                 isLoading = uiState.isSavingPassport,
                 error = passportFormError,
                 onDismiss = {
@@ -245,12 +244,15 @@ fun ShopScreen(
                     viewModel.savePassportThenContinue(
                         result = result,
                         onSaved = {
-                            showPassportGate = null
                             showLegalConsentForPlan = gate.plan
                         },
                         onError = { msg -> passportFormError = msg },
                     )
                 },
+                onResendEmail = { viewModel.resendPurchaseEmail() },
+                isResendingEmail = uiState.isResendingEmail,
+                emailResendMessage = uiState.emailResendMessage,
+                onConsumeEmailResendMessage = { viewModel.consumeEmailResendMessage() },
             )
         }
     }
@@ -268,6 +270,7 @@ fun ShopScreen(
                         plan = plan,
                         onPaymentRequired = { paymentId, paymentUrl ->
                             showLegalConsentForPlan = null
+                            showPassportGate = null
                             showPurchasePlan = null
                             onNavigateToPayment(paymentId)
                             openPaymentUrl(context, paymentUrl)
@@ -281,14 +284,11 @@ fun ShopScreen(
                         onPassportRequired = { msg ->
                             showLegalConsentForPlan = null
                             passportFormError = msg
-                            viewModel.beginPurchaseAfterPriceConfirm(
-                                plan = plan,
-                                onReadyForConsent = { showLegalConsentForPlan = it },
-                                onNeedPassport = { showPassportGate = it },
-                                onError = { err ->
-                                    scope.launch { snackbarHostState.showSnackbar(err) }
-                                },
-                            )
+                        },
+                        onEmailUnverified = { msg ->
+                            scope.launch { snackbarHostState.showSnackbar(msg) }
+                            showLegalConsentForPlan = null
+                            viewModel.resendPurchaseEmail()
                         },
                         onError = { msg ->
                             purchaseError = msg

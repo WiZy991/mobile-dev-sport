@@ -51,6 +51,17 @@ class SubscriptionPaymentInitService
             ];
         }
 
+        if (!$user->isEmailVerified()) {
+            return [
+                'error' => [
+                    'error' => 'Подтвердите email, чтобы оформить абонемент',
+                    'code' => 'email_unverified',
+                    'message' => 'На почту отправлено письмо для подтверждения. После перехода по ссылке вернитесь и продолжите покупку.',
+                ],
+                'status' => 400,
+            ];
+        }
+
         $issueClub = $this->resolveIssueClub($user, $clubIdRaw);
         if ($issueClub === null) {
             return [

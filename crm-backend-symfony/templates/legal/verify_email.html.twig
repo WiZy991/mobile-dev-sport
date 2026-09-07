@@ -1,0 +1,14 @@
+{% extends 'legal/base.html.twig' %}
+
+{% block title %}Подтверждение email{% endblock %}
+
+{% block body %}
+    <h1>{% if ok %}Email подтверждён{% else %}Ссылка недействительна{% endif %}</h1>
+    <article class="content legal-doc">
+        {% if ok %}
+            <p>Адрес электронной почты подтверждён. Можно вернуться в приложение и продолжить покупку.</p>
+        {% else %}
+            <p>Ссылка устарела или уже использована. Запросите новое письмо в приложении.</p>
+        {% endif %}
+    </article>
+{% endblock %}

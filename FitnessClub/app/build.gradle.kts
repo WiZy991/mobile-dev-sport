@@ -24,8 +24,8 @@ android {
         applicationId = "ru.worldcashfit.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 37
-        versionName = "1.2.9"
+        versionCode = 39
+        versionName = "1.3.1"
 
         multiDexEnabled = true
         multiDexKeepProguard = file("multidex-config.pro")
@@ -46,7 +46,7 @@ android {
         manifestPlaceholders["deepLinkScheme"] = "dobrozal"
     }
 
-    flavorDimensions += "brand"
+    flavorDimensions += listOf("brand", "distribution")
     productFlavors {
         create("dobrozal") {
             dimension = "brand"
@@ -61,11 +61,6 @@ android {
             // Пусто = DEFAULT_ORGANIZATION_SLUG на сервере (организация Доброзал).
             buildConfigField("String", "ORGANIZATION_SLUG", "\"\"")
             buildConfigField("String", "CLUB_SITE_URL", "\"https://dobrozal.ru\"")
-            buildConfigField(
-                "String",
-                "PLAY_STORE_URL",
-                "\"https://play.google.com/store/apps/details?id=ru.worldcashfit.app\"",
-            )
             buildConfigField(
                 "String",
                 "RUSTORE_CATALOG_URL",
@@ -85,14 +80,18 @@ android {
             buildConfigField("String", "CLUB_SITE_URL", "\"https://worldcashfit.ru\"")
             buildConfigField(
                 "String",
-                "PLAY_STORE_URL",
-                "\"https://play.google.com/store/apps/details?id=ru.academywrestling.app\"",
-            )
-            buildConfigField(
-                "String",
                 "RUSTORE_CATALOG_URL",
                 "\"https://www.rustore.ru/catalog/app/ru.academywrestling.app\"",
             )
+        }
+        // Обычная сборка для Google Play: кнопки Play остаются.
+        create("playDist") {
+            dimension = "distribution"
+            isDefault = true
+        }
+        // Сборка для модерации RuStore: в APK нет перехода в Google Play.
+        create("ruStore") {
+            dimension = "distribution"
         }
     }
 

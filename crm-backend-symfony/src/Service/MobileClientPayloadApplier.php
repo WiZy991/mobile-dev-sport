@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\Entity\Club;
 use App\Entity\User;
+use App\Service\Auth\ProfileLegalLock;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -15,6 +16,7 @@ final class MobileClientPayloadApplier
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly ProfileLegalLock $profileLegalLock,
     ) {
     }
 
@@ -125,8 +127,8 @@ final class MobileClientPayloadApplier
      */
     public function applyProfilePatch(User $user, array $data): void
     {
-        if ($user->isPassportLockedFromClientEdit() && $this->hasPassportChangingPatch($user, $data)) {
-            throw new \DomainException('passport_locked');
+        if ($this->profileLegalLock->isLocked($user) && $this->hasIdentityChangingPatch($user, $data)) {
+            throw new \DomainException('profile_locked');
         }
         if (\array_key_exists('date_of_birth', $data)) {
             $dob = $data['date_of_birth'];
@@ -230,6 +232,44 @@ final class MobileClientPayloadApplier
         }
 
         return false;
+    }
+
+    /**
+     * Блокируем смену ФИО, даты рождения, паспорта и адреса прописки после договора.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function hasIdentityChangingPatch(User $user, array $data): bool
+    {
+        if (\array_key_exists('name', $data)) {
+            $incoming = trim((string) ($data['name'] ?? ''));
+            if ($incoming !== '' && $incoming !== trim($user->getName())) {
+                return true;
+            }
+        }
+        if (\array_key_exists('date_of_birth', $data)) {
+            $pid = $data['date_of_birth'];
+            $incoming = null;
+            if ($pid !== null && $pid !== '') {
+                try {
+                    $incoming = (new \DateTimeImmutable(trim((string) $pid)))->format('Y-m-d');
+                } catch (\Throwable) {
+                    return true;
+                }
+            }
+            if ($incoming !== $user->getDateOfBirth()?->format('Y-m-d')) {
+                return true;
+            }
+        }
+        if (\array_key_exists('registration_address', $data)) {
+            $v = trim((string) ($data['registration_address'] ?? ''));
+            $current = trim((string) ($user->getRegistrationAddress() ?? ''));
+            if ($v !== $current) {
+                return true;
+            }
+        }
+
+        return $this->hasPassportChangingPatch($user, $data);
     }
 
     /**

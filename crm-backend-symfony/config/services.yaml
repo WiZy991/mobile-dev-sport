@@ -50,6 +50,12 @@ parameters:
     yandex_metrika_id_default: 0
     sber_id_redirect_uri_default: ''
     access_gate_token_default: ''
+    telegram_gateway_token_default: ''
+    max_bot_token_default: ''
+    max_bot_username_default: ''
+    green_api_id_default: ''
+    green_api_token_default: ''
+    green_api_url_default: 'https://api.green-api.com'
 
 services:
     # default configuration for services in *this* file

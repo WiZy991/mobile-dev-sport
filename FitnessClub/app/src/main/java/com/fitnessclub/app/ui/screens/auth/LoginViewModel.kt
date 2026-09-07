@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -45,6 +46,7 @@ class LoginViewModel @Inject constructor(
     init {
         refreshBiometricOffer()
         loadClubBrandName()
+        loadOtpChannels()
         viewModelScope.launch {
             authFlowStore.hasCompletedRegistration.collect { completed ->
                 _uiState.value = _uiState.value.copy(hasCompletedRegistration = completed)
@@ -61,9 +63,35 @@ class LoginViewModel @Inject constructor(
             when (val result = clubRepository.getClubInfo()) {
                 is ApiResult.Success -> {
                     val brand = Brand.orFallback(result.data.brandName)
-                    _uiState.value = _uiState.value.copy(clubBrandName = brand)
+                    _uiState.value = _uiState.value.copy(
+                        clubBrandName = brand,
+                        supportEmail = result.data.email.trim().takeIf { it.isNotEmpty() },
+                        supportPhone = result.data.phone.trim().takeIf { it.isNotEmpty() },
+                    )
                 }
                 else -> Unit
+            }
+        }
+    }
+
+    private fun loadOtpChannels() {
+        viewModelScope.launch {
+            when (val result = authRepository.otpChannels()) {
+                is ApiResult.Success -> {
+                    val available = result.data.associate { it.id to it.available }
+                    val current = _uiState.value.otpChannel
+                    val selected = if (available[current] == true) {
+                        current
+                    } else {
+                        listOf("telegram", "max", "whatsapp").firstOrNull { available[it] == true } ?: current
+                    }
+                    _uiState.value = _uiState.value.copy(
+                        otpChannelAvailable = available,
+                        otpChannelsLoaded = true,
+                        otpChannel = selected,
+                    )
+                }
+                else -> _uiState.value = _uiState.value.copy(otpChannelsLoaded = true)
             }
         }
     }
@@ -141,7 +169,7 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    private val _events = MutableSharedFlow<LoginEvent>()
+    private val _events = MutableSharedFlow<LoginEvent>(extraBufferCapacity = 8)
     val events: SharedFlow<LoginEvent> = _events.asSharedFlow()
 
     fun onPhoneChange(raw: String) {
@@ -438,6 +466,104 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun onOtpChannelChange(channel: String) {
+        val available = _uiState.value.otpChannelAvailable
+        if (available.isNotEmpty() && available[channel] == false) {
+            _uiState.value = _uiState.value.copy(
+                error = "Этот канал ещё не подключён. Выберите другой или войдите по почте / Сбер ID.",
+            )
+            return
+        }
+        _uiState.value = _uiState.value.copy(otpChannel = channel, error = null)
+    }
+
+    fun onOtpCodeChange(code: String) {
+        val digits = code.filter { it.isDigit() }.take(6)
+        _uiState.value = _uiState.value.copy(otpCode = digits, otpError = null)
+        if (digits.length == 6) {
+            verifyOtp()
+        }
+    }
+
+    fun requestOtp() {
+        val phone = phoneForApi(_uiState.value.phoneNationalDigits)
+        if (phone.isEmpty()) {
+            _uiState.value = _uiState.value.copy(phoneError = "Введите полный номер телефона")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, phoneError = null)
+            when (val r = authRepository.requestOtp(phone, _uiState.value.otpChannel)) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        otpStep = LoginOtpStep.CODE,
+                        otpInstruction = r.data.instruction,
+                        otpDeeplink = r.data.deeplink,
+                        otpDevCode = r.data.devCode,
+                        resendSecondsLeft = r.data.resendAfterSec.coerceAtLeast(20),
+                        otpCode = "",
+                    )
+                    tickResend()
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = r.message)
+                }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
+    fun verifyOtp() {
+        val state = _uiState.value
+        val phone = phoneForApi(state.phoneNationalDigits)
+        if (state.otpCode.length != 6) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, otpError = null)
+            when (val r = authRepository.verifyOtp(phone, state.otpCode)) {
+                is ApiResult.Success -> {
+                    val body = r.data
+                    if (body.registrationRequired && !body.otpTicket.isNullOrBlank()) {
+                        authFlowStore.saveOtpRegistration(body.otpTicket, body.phone ?: phone)
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        _events.emit(LoginEvent.NeedPhoneRegistration)
+                    } else if (body.user != null) {
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        _events.emit(LoginEvent.Success(body.user))
+                    } else {
+                        _uiState.value = _uiState.value.copy(isLoading = false, otpError = "Не удалось войти")
+                    }
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        otpError = r.message,
+                        otpCode = "",
+                        otpShakeNonce = state.otpShakeNonce + 1,
+                    )
+                }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
+    fun toggleEmailLogin() {
+        _uiState.update { it.copy(showEmailLogin = !it.showEmailLogin) }
+    }
+
+    fun backToPhoneStep() {
+        _uiState.value = _uiState.value.copy(otpStep = LoginOtpStep.PHONE, otpCode = "", otpError = null)
+    }
+
+    private fun tickResend() {
+        viewModelScope.launch {
+            while (_uiState.value.resendSecondsLeft > 0) {
+                kotlinx.coroutines.delay(1000)
+                _uiState.update { it.copy(resendSecondsLeft = (it.resendSecondsLeft - 1).coerceAtLeast(0)) }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
@@ -447,6 +573,20 @@ data class LoginUiState(
     val phoneNationalDigits: String = "",
     val phoneError: String? = null,
     val credentialsStep: Boolean = false,
+    val otpStep: LoginOtpStep = LoginOtpStep.PHONE,
+    val otpChannel: String = "telegram",
+    val otpChannelAvailable: Map<String, Boolean> = emptyMap(),
+    val otpChannelsLoaded: Boolean = false,
+    val otpCode: String = "",
+    val otpError: String? = null,
+    val otpShakeNonce: Int = 0,
+    val supportEmail: String? = null,
+    val supportPhone: String? = null,
+    val otpInstruction: String? = null,
+    val otpDeeplink: String? = null,
+    val otpDevCode: String? = null,
+    val resendSecondsLeft: Int = 0,
+    val showEmailLogin: Boolean = false,
     val email: String = "",
     val password: String = "",
     val emailError: String? = null,
@@ -468,4 +608,7 @@ sealed class LoginEvent {
         val welcomeMessage: String? = null,
     ) : LoginEvent()
     data class OpenExternalUrl(val url: String) : LoginEvent()
+    data object NeedPhoneRegistration : LoginEvent()
 }
+
+enum class LoginOtpStep { PHONE, CODE }

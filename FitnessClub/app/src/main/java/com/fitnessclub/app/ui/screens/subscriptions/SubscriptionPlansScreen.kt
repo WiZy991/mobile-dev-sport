@@ -294,8 +294,7 @@ fun SubscriptionPlansScreen(
     if (pdfOverlay == null && showLegalConsentDialog == null) {
         showPassportGate?.let { gate ->
             PurchasePassportDialog(
-                initialDateOfBirthDisplay = gate.initialDobDisplay,
-                needDateOfBirth = gate.needDateOfBirth,
+                gate = gate,
                 isLoading = uiState.isSavingPassport,
                 error = passportFormError,
                 onDismiss = {
@@ -309,12 +308,15 @@ fun SubscriptionPlansScreen(
                     viewModel.savePassportThenContinue(
                         result = result,
                         onSaved = {
-                            showPassportGate = null
                             showLegalConsentDialog = gate.plan
                         },
                         onError = { msg -> passportFormError = msg },
                     )
                 },
+                onResendEmail = { viewModel.resendPurchaseEmail() },
+                isResendingEmail = uiState.isResendingEmail,
+                emailResendMessage = uiState.emailResendMessage,
+                onConsumeEmailResendMessage = { viewModel.consumeEmailResendMessage() },
             )
         }
     }
@@ -333,6 +335,7 @@ fun SubscriptionPlansScreen(
                         plan = plan,
                         onPaymentRequired = { paymentId, paymentUrl ->
                             showLegalConsentDialog = null
+                            showPassportGate = null
                             showPurchaseDialog = null
                             onNavigateToPayment(paymentId)
                             openPaymentUrl(context, paymentUrl)
@@ -348,14 +351,11 @@ fun SubscriptionPlansScreen(
                         onPassportRequired = { msg ->
                             showLegalConsentDialog = null
                             passportFormError = msg
-                            viewModel.beginPurchaseAfterPriceConfirm(
-                                plan = plan,
-                                onReadyForConsent = { showLegalConsentDialog = it },
-                                onNeedPassport = { showPassportGate = it },
-                                onError = { err ->
-                                    scope.launch { snackbarHostState.showSnackbar(err) }
-                                },
-                            )
+                        },
+                        onEmailUnverified = { msg ->
+                            scope.launch { snackbarHostState.showSnackbar(msg) }
+                            showLegalConsentDialog = null
+                            viewModel.resendPurchaseEmail()
                         },
                         onError = { msg ->
                             purchaseError = msg

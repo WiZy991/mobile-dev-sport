@@ -1,5 +1,6 @@
 package com.fitnessclub.app.data.repository
 
+import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.ClubInfo
 import com.fitnessclub.app.data.api.FitnessApi
@@ -16,7 +17,11 @@ class ClubRepository @Inject constructor(
     suspend fun getClubInfo(): ApiResult<ClubInfo> {
         return try {
             val clubId = preferredClubIdQuery()
-            val response = api.getClubInfo(clubId)
+            val response = api.getClubInfo(
+                clubId = clubId,
+                appVersionCode = BuildConfig.VERSION_CODE,
+                applicationId = BuildConfig.APPLICATION_ID,
+            )
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {

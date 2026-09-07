@@ -14,6 +14,7 @@ import com.fitnessclub.app.data.repository.SubscriptionRepository
 import com.fitnessclub.app.ui.screens.subscriptions.ClubPurchaseContext
 import com.fitnessclub.app.ui.screens.subscriptions.PurchasePassportGate
 import com.fitnessclub.app.ui.screens.subscriptions.PurchasePassportResult
+import com.fitnessclub.app.ui.screens.subscriptions.toPurchaseProfileGate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +32,8 @@ data class ShopUiState(
     val selectedCategory: ShopCategory = ShopCategory.SUBSCRIPTIONS,
     val isPurchasing: Boolean = false,
     val isSavingPassport: Boolean = false,
+    val isResendingEmail: Boolean = false,
+    val emailResendMessage: String? = null,
     val error: String? = null,
     val purchaseMessage: String? = null,
     val clubPurchaseContext: ClubPurchaseContext = ClubPurchaseContext(clubName = "Ваш клуб"),
@@ -200,16 +203,32 @@ class ShopViewModel @Inject constructor(
                 onError("Профиль не загружен. Войдите снова.")
                 return@launch
             }
-            if (user.isPassportCompleteForPurchase()) {
-                onReadyForConsent(plan)
-            } else {
-                onNeedPassport(
-                    PurchasePassportGate(
-                        plan = plan,
-                        needDateOfBirth = user.dateOfBirth.isNullOrBlank(),
-                        initialDobDisplay = isoDateToDisplay(user.dateOfBirth),
-                    ),
-                )
+            onNeedPassport(user.toPurchaseProfileGate(plan))
+        }
+    }
+
+    fun consumeEmailResendMessage() {
+        _uiState.update { it.copy(emailResendMessage = null) }
+    }
+
+    fun resendPurchaseEmail() {
+        if (_uiState.value.isResendingEmail) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isResendingEmail = true, emailResendMessage = null) }
+            when (val r = authRepository.resendEmailVerification()) {
+                is ApiResult.Success -> {
+                    val sentTo = r.data.email?.takeIf { it.isNotBlank() }
+                    val msg = if (r.data.alreadyVerified) {
+                        "Email уже подтверждён"
+                    } else {
+                        "Письмо отправлено на ${sentTo ?: "указанный адрес"}"
+                    }
+                    _uiState.update { it.copy(isResendingEmail = false, emailResendMessage = msg) }
+                }
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(isResendingEmail = false, emailResendMessage = r.message) }
+                }
+                is ApiResult.Loading -> Unit
             }
         }
     }
@@ -230,6 +249,8 @@ class ShopViewModel @Inject constructor(
                     issueDateIso = result.issueDateIso,
                     registrationAddress = result.registrationAddress,
                     dateOfBirthIso = result.dateOfBirthIso,
+                    name = result.name,
+                    email = result.email,
                 )
             ) {
                 is ApiResult.Success -> {
@@ -250,6 +271,7 @@ class ShopViewModel @Inject constructor(
         onPaymentRequired: (paymentId: Int, paymentUrl: String) -> Unit,
         onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
         onPassportRequired: (String) -> Unit = {},
+        onEmailUnverified: (String) -> Unit = {},
         onError: (String) -> Unit,
     ) {
         viewModelScope.launch {
@@ -280,21 +302,15 @@ class ShopViewModel @Inject constructor(
                     _uiState.update { it.copy(isPurchasing = false) }
                     onPassportRequired(result.message)
                 }
+                is PurchaseSubscriptionOutcome.EmailUnverified -> {
+                    _uiState.update { it.copy(isPurchasing = false) }
+                    onEmailUnverified(result.message)
+                }
                 is PurchaseSubscriptionOutcome.Error -> {
                     _uiState.update { it.copy(isPurchasing = false) }
                     onError(result.message)
                 }
             }
-        }
-    }
-
-    private fun isoDateToDisplay(iso: String?): String {
-        if (iso.isNullOrBlank()) return ""
-        return try {
-            val d = java.time.LocalDate.parse(iso.take(10))
-            d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-        } catch (_: Exception) {
-            iso
         }
     }
 

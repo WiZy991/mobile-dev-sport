@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 sealed class PaymentPendingEvent {
-    data object Success : PaymentPendingEvent()
+    data class Success(val planName: String?) : PaymentPendingEvent()
     data class Failed(val message: String) : PaymentPendingEvent()
 }
 
@@ -149,7 +149,7 @@ class PaymentPendingViewModel @Inject constructor(
         return when (data.status) {
             "paid" -> {
                 delay(300)
-                _events.emit(PaymentPendingEvent.Success)
+                _events.emit(PaymentPendingEvent.Success(data.subscription?.name?.takeIf { it.isNotBlank() }))
                 true
             }
             "failed", "expired", "cancelled" -> {

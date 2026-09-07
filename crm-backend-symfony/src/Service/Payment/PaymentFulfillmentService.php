@@ -136,11 +136,13 @@ class PaymentFulfillmentService
             return;
         }
 
-        $lines = ['Оплата прошла успешно, абонемент «' . $plan->getName() . '» активирован.'];
+        $lines = [
+            'Вы успешно оплатили тариф «' . $plan->getName() . '». Спасибо, что вы с нами!',
+        ];
         $start = $sub->getStartDate();
         $end = $sub->getEndDate();
         if ($start !== null && $end !== null) {
-            $lines[] = 'Срок действия: с ' . $start->format('d.m.Y') . ' по ' . $end->format('d.m.Y') . '.';
+            $lines[] = 'Тариф действует с ' . $start->format('d.m.Y') . ' по ' . $end->format('d.m.Y') . '.';
         } elseif ($end !== null) {
             $lines[] = 'Действует до ' . $end->format('d.m.Y') . '.';
         }
@@ -149,7 +151,8 @@ class PaymentFulfillmentService
         }
         $lines[] = 'Сумма: ' . number_format($payment->getAmountKopecks() / 100, 2, ',', ' ') . ' ₽.';
         $lines[] = '';
-        $lines[] = 'Абонемент уже доступен в приложении. Если возникнут вопросы — просто ответьте на это письмо или создайте обращение в приложении.';
+        $lines[] = 'Условия тарифа смотрите в приложении в разделе абонементов. Чек об оплате придёт отдельным письмом от банка.';
+        $lines[] = 'Если возникнут вопросы — ответьте на это письмо или создайте обращение в приложении.';
 
         try {
             $this->clientNotifications->notify(

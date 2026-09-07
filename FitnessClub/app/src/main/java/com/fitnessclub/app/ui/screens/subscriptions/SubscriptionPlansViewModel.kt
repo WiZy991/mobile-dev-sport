@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.PurchaseSubscriptionOutcome
@@ -30,13 +31,25 @@ data class SubscriptionPlansUiState(
     val purchaseSuccess: Boolean = false,
     val clubPurchaseContext: ClubPurchaseContext = ClubPurchaseContext(clubName = "Ваш клуб"),
     val isSavingPassport: Boolean = false,
+    val isResendingEmail: Boolean = false,
+    val emailResendMessage: String? = null,
 )
 
-/** Состояние шага паспорта перед согласием/оплатой. */
+/** Состояние шага сверки профиля перед согласием/оплатой. */
 data class PurchasePassportGate(
     val plan: SubscriptionPlan,
+    val isReview: Boolean,
+    val name: String,
+    val email: String,
+    val emailVerified: Boolean,
+    val phone: String,
     val needDateOfBirth: Boolean,
     val initialDobDisplay: String,
+    val series: String = "",
+    val number: String = "",
+    val issuedBy: String = "",
+    val issueDateDisplay: String = "",
+    val registrationAddress: String = "",
 )
 
 @HiltViewModel
@@ -175,7 +188,7 @@ class SubscriptionPlansViewModel @Inject constructor(
         return if (final < catalog) catalog else null
     }
 
-    /** После подтверждения цены: паспорт (если нет) → согласие с документами → Альфа. */
+    /** После подтверждения цены: сверка профиля → согласие с документами → Альфа. */
     fun beginPurchaseAfterPriceConfirm(
         plan: SubscriptionPlan,
         onReadyForConsent: (SubscriptionPlan) -> Unit,
@@ -189,16 +202,32 @@ class SubscriptionPlansViewModel @Inject constructor(
                 onError("Профиль не загружен. Войдите снова.")
                 return@launch
             }
-            if (user.isPassportCompleteForPurchase()) {
-                onReadyForConsent(plan)
-            } else {
-                onNeedPassport(
-                    PurchasePassportGate(
-                        plan = plan,
-                        needDateOfBirth = user.dateOfBirth.isNullOrBlank(),
-                        initialDobDisplay = isoDateToDisplay(user.dateOfBirth),
-                    ),
-                )
+            onNeedPassport(user.toPurchaseProfileGate(plan))
+        }
+    }
+
+    fun consumeEmailResendMessage() {
+        _uiState.update { it.copy(emailResendMessage = null) }
+    }
+
+    fun resendPurchaseEmail() {
+        if (_uiState.value.isResendingEmail) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isResendingEmail = true, emailResendMessage = null) }
+            when (val r = authRepository.resendEmailVerification()) {
+                is ApiResult.Success -> {
+                    val sentTo = r.data.email?.takeIf { it.isNotBlank() }
+                    val msg = if (r.data.alreadyVerified) {
+                        "Email уже подтверждён"
+                    } else {
+                        "Письмо отправлено на ${sentTo ?: "указанный адрес"}"
+                    }
+                    _uiState.update { it.copy(isResendingEmail = false, emailResendMessage = msg) }
+                }
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(isResendingEmail = false, emailResendMessage = r.message) }
+                }
+                is ApiResult.Loading -> Unit
             }
         }
     }
@@ -219,6 +248,8 @@ class SubscriptionPlansViewModel @Inject constructor(
                     issueDateIso = result.issueDateIso,
                     registrationAddress = result.registrationAddress,
                     dateOfBirthIso = result.dateOfBirthIso,
+                    name = result.name,
+                    email = result.email,
                 )
             ) {
                 is ApiResult.Success -> {
@@ -239,6 +270,7 @@ class SubscriptionPlansViewModel @Inject constructor(
         onPaymentRequired: (paymentId: Int, paymentUrl: String) -> Unit,
         onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
         onPassportRequired: (String) -> Unit = {},
+        onEmailUnverified: (String) -> Unit = {},
         onError: (String) -> Unit,
     ) {
         if (_uiState.value.isLoading) {
@@ -276,6 +308,10 @@ class SubscriptionPlansViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false) }
                     onPassportRequired(result.message)
                 }
+                is PurchaseSubscriptionOutcome.EmailUnverified -> {
+                    _uiState.update { it.copy(isLoading = false) }
+                    onEmailUnverified(result.message)
+                }
                 is PurchaseSubscriptionOutcome.Error -> {
                     _uiState.update { it.copy(isLoading = false) }
                     onError(result.message)
@@ -293,4 +329,26 @@ private fun isoDateToDisplay(iso: String?): String {
     } catch (_: Exception) {
         iso
     }
+}
+
+internal fun User.toPurchaseProfileGate(
+    plan: SubscriptionPlan,
+): PurchasePassportGate {
+    val passportComplete = isPassportCompleteForPurchase()
+    val review = passportComplete && name.isNotBlank() && email.isNotBlank()
+    return PurchasePassportGate(
+        plan = plan,
+        isReview = review,
+        name = name,
+        email = email,
+        emailVerified = emailVerified,
+        phone = phone,
+        needDateOfBirth = dateOfBirth.isNullOrBlank(),
+        initialDobDisplay = isoDateToDisplay(dateOfBirth),
+        series = passportSeries.orEmpty(),
+        number = passportNumber.orEmpty(),
+        issuedBy = passportIssuedBy.orEmpty(),
+        issueDateDisplay = isoDateToDisplay(passportIssueDate),
+        registrationAddress = registrationAddress.orEmpty(),
+    )
 }

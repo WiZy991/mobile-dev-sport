@@ -2738,11 +2738,15 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
-            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'trainer_rental_amount_rub'];
+            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'trainer_rental_amount_rub', 'welcome_banner_url', 'welcome_legal_text', 'android_min_version_code', 'android_update_message'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
                 $this->clubSettings->set($key, $value !== '' ? $value : null);
             }
+            $this->clubSettings->set(
+                'android_force_update',
+                $request->request->getBoolean('android_force_update') ? '1' : '0',
+            );
 
             $socialLinks = ClubSocialLinks::normalizeFromRequest(
                 $request->request->all('social_type'),
@@ -2867,6 +2871,11 @@ class AdminController extends AbstractController
                 'network_about' => $getSetting('network_about', ''),
                 'contact_phone' => $getSetting('contact_phone', ''),
                 'contact_email' => $getSetting('contact_email', ''),
+                'welcome_banner_url' => $getSetting('welcome_banner_url', ''),
+                'welcome_legal_text' => $getSetting('welcome_legal_text', ''),
+                'android_min_version_code' => $getSetting('android_min_version_code', '0'),
+                'android_force_update' => $getSetting('android_force_update', '0'),
+                'android_update_message' => $getSetting('android_update_message', ''),
                 'perco_enabled' => $getSetting('perco_enabled', '0'),
                 'perco_base_url' => $getSetting('perco_base_url', ''),
                 'perco_login' => $getSetting('perco_login', ''),

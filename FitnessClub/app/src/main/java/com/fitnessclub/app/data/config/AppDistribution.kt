@@ -4,8 +4,8 @@ import android.content.Context
 import android.os.Build
 
 /**
- * Определяет, из какого магазина установлено приложение, чтобы открывать
- * страницу оценки в том же магазине (RuStore vs Google Play).
+ * Кнопки оценки и обновления зависят от flavor:
+ * playDist — Google Play и RuStore, ruStore — только RuStore.
  */
 object AppDistribution {
     data class StoreRatingOption(
@@ -28,47 +28,26 @@ object AppDistribution {
     fun isInstalledFromGooglePlay(context: Context): Boolean =
         detectStore(context) == Store.GOOGLE_PLAY
 
-    /** @deprecated Используйте [storeRatingOptions]. */
     fun canOpenStoreRating(context: Context): Boolean =
         storeRatingOptions(context).isNotEmpty()
 
-    /** @deprecated Используйте [storeRatingOptions]. */
     fun storeListingUrl(context: Context): String? =
         storeRatingOptions(context).firstOrNull()?.url
 
-    /** @deprecated Используйте [storeRatingOptions]. */
     fun rateAppButtonLabel(context: Context): String =
         storeRatingOptions(context).firstOrNull()?.label ?: "Оценить приложение"
 
-    fun storeRatingHint(context: Context): String? = when (detectStore(context)) {
-        Store.GOOGLE_PLAY -> "Оставьте отзыв в Google Play — это помогает развивать приложение."
-        Store.RUSTORE -> "Оставьте отзыв в RuStore — это помогает развивать приложение."
-        Store.OTHER -> "Выберите магазин, из которого вы установили приложение:"
-    }
+    fun storeRatingHint(context: Context): String = StoreListing.ratingHint()
 
-    fun storeRatingOptions(context: Context): List<StoreRatingOption> = when (detectStore(context)) {
-        Store.GOOGLE_PLAY -> listOf(
-            StoreRatingOption(
-                label = "Оценить в Google Play",
-                url = AppConfig.PLAY_STORE_URL,
-            ),
-        )
-        Store.RUSTORE -> listOf(
-            StoreRatingOption(
-                label = "Оценить в RuStore",
-                url = AppConfig.RUSTORE_CATALOG_URL,
-            ),
-        )
-        Store.OTHER -> listOf(
-            StoreRatingOption(
-                label = "Оценить в Google Play",
-                url = AppConfig.PLAY_STORE_URL,
-            ),
-            StoreRatingOption(
-                label = "Оценить в RuStore",
-                url = AppConfig.RUSTORE_CATALOG_URL,
-            ),
-        )
+    fun storeRatingOptions(context: Context): List<StoreRatingOption> =
+        StoreListing.ratingOptions(context.packageName, AppConfig.RUSTORE_CATALOG_URL)
+
+    fun updateStoreOptions(context: Context): List<StoreRatingOption> {
+        val options = StoreListing.updateOptions(context.packageName, AppConfig.RUSTORE_CATALOG_URL)
+        if (options.size <= 1) return options
+        val rustore = options.filter { it.url.contains("rustore.ru", ignoreCase = true) }
+        val other = options.filterNot { it.url.contains("rustore.ru", ignoreCase = true) }
+        return if (detectStore(context) == Store.RUSTORE) rustore + other else other + rustore
     }
 
     private fun resolveStoreFromInstaller(installer: String?): Store {

@@ -91,6 +91,15 @@ data class RegisterUiState(
     val confirmPasswordError: String? = null,
     val clubError: String? = null,
     val legalTermsError: String? = null,
+    /** null — ещё не известно; true — регистрация после OTP. */
+    val phoneRegistration: Boolean? = null,
+    val otpTicket: String = "",
+    val otpPhone: String = "",
+    val emailTakenMaskedPhone: String? = null,
+    val showUnder18Dialog: Boolean = false,
+    val emailCheckLoading: Boolean = false,
+    val supportEmail: String? = null,
+    val supportPhone: String? = null,
     /** Показывать ошибки полей после попытки «Далее» / «Зарегистрироваться». */
     val showValidationErrors: Boolean = false,
     val formStep: RegisterFormStep = RegisterFormStep.PERSONAL,
@@ -129,6 +138,7 @@ data class RegisterUiState(
 
 sealed class RegisterEvent {
     data class Success(val user: User) : RegisterEvent()
+    data object NeedClubPick : RegisterEvent()
 }
 
 /** Варианты опросника «Откуда вы о нас узнали»: стабильный ключ + подпись. */
@@ -158,7 +168,7 @@ class RegisterViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
     
-    private val _events = MutableSharedFlow<RegisterEvent>()
+    private val _events = MutableSharedFlow<RegisterEvent>(extraBufferCapacity = 8)
     val events: SharedFlow<RegisterEvent> = _events.asSharedFlow()
     
     private val displayDateFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy")
@@ -166,10 +176,35 @@ class RegisterViewModel @Inject constructor(
     /** Обновление полей формы: сбрасывает краткое сообщение над кнопкой при исправлении. */
     private inline fun updateForm(crossinline block: (RegisterUiState) -> RegisterUiState) {
         _uiState.update { block(it).copy(validationSummary = null) }
+        viewModelScope.launch { persistDraft() }
     }
 
     init {
         loadClubs()
+        viewModelScope.launch {
+            val ticket = authFlowStore.peekOtpTicket()
+            val phone = authFlowStore.peekOtpPhone().orEmpty()
+            restoreDraft()
+            _uiState.update {
+                it.copy(
+                    phoneRegistration = !ticket.isNullOrBlank(),
+                    otpTicket = ticket.orEmpty(),
+                    otpPhone = phone,
+                    phoneNationalDigits = normalizeRussianNationalDigits(phone).ifBlank { it.phoneNationalDigits },
+                )
+            }
+        }
+        viewModelScope.launch {
+            when (val r = clubRepository.getClubInfo()) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(
+                        supportEmail = r.data.email.trim().takeIf { v -> v.isNotEmpty() },
+                        supportPhone = r.data.phone.trim().takeIf { v -> v.isNotEmpty() },
+                    )
+                }
+                else -> Unit
+            }
+        }
     }
 
     private fun loadClubs() {
@@ -401,6 +436,9 @@ class RegisterViewModel @Inject constructor(
             applyValidationErrors(errors, summaryForStep(step, errors), step)
             return false
         }
+        if (step == RegisterFormStep.PERSONAL && _uiState.value.phoneRegistration == true) {
+            return true
+        }
         if (step == RegisterFormStep.LAST) return true
         val next = when (step) {
             RegisterFormStep.PERSONAL -> RegisterFormStep.ACCOUNT
@@ -418,11 +456,107 @@ class RegisterViewModel @Inject constructor(
 
     fun onPrimaryFormAction() {
         val step = _uiState.value.formStep
+        val phoneFlow = _uiState.value.phoneRegistration == true && step == RegisterFormStep.PERSONAL
+        if (phoneFlow) {
+            if (!advanceFormStep()) return
+            if (shouldShowUnder18Prompt()) {
+                _uiState.update { it.copy(showUnder18Dialog = true) }
+                return
+            }
+            viewModelScope.launch { persistDraft(); _events.emit(RegisterEvent.NeedClubPick) }
+            return
+        }
         if (step == RegisterFormStep.ACCOUNT) {
+            if (shouldShowUnder18Prompt()) {
+                _uiState.update { it.copy(showUnder18Dialog = true) }
+                return
+            }
             register()
         } else {
             advanceFormStep()
         }
+    }
+
+    fun dismissUnder18AndContinue() {
+        _uiState.update { it.copy(showUnder18Dialog = false) }
+        if (_uiState.value.phoneRegistration == true) {
+            viewModelScope.launch { persistDraft(); _events.emit(RegisterEvent.NeedClubPick) }
+        } else {
+            register()
+        }
+    }
+
+    fun dismissUnder18() {
+        _uiState.update { it.copy(showUnder18Dialog = false) }
+    }
+
+    private fun shouldShowUnder18Prompt(): Boolean {
+        val iso = parseToIsoDate(_uiState.value.birthDateDisplay) ?: return false
+        return try {
+            val born = LocalDate.parse(iso)
+            born.plusYears(18).isAfter(LocalDate.now())
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun submitRegisterEmail(onOk: () -> Unit) {
+        val email = _uiState.value.email.trim()
+        if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            _uiState.update { it.copy(emailError = "Введите корректный email") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(emailCheckLoading = true, emailTakenMaskedPhone = null, emailError = null) }
+            when (val r = authRepository.checkRegisterEmail(email)) {
+                is ApiResult.Success -> {
+                    persistDraft()
+                    if (r.data.exists) {
+                        _uiState.update {
+                            it.copy(
+                                emailCheckLoading = false,
+                                emailTakenMaskedPhone = r.data.maskedPhone,
+                            )
+                        }
+                    } else {
+                        _uiState.update { it.copy(emailCheckLoading = false) }
+                        onOk()
+                    }
+                }
+                is ApiResult.Error -> {
+                    _uiState.update {
+                        it.copy(emailCheckLoading = false, emailError = r.message)
+                    }
+                }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
+    fun dismissEmailTaken() {
+        _uiState.update { it.copy(emailTakenMaskedPhone = null) }
+    }
+
+    private suspend fun restoreDraft() {
+        val json = authFlowStore.peekRegistrationDraft() ?: return
+        val parts = json.split('\u0001')
+        if (parts.size < 5) return
+        _uiState.update {
+            it.copy(
+                email = parts.getOrNull(0).orEmpty().ifBlank { it.email },
+                lastName = parts.getOrNull(1).orEmpty().ifBlank { it.lastName },
+                firstName = parts.getOrNull(2).orEmpty().ifBlank { it.firstName },
+                middleName = parts.getOrNull(3).orEmpty().ifBlank { it.middleName },
+                birthDateDisplay = parts.getOrNull(4).orEmpty().ifBlank { it.birthDateDisplay },
+            )
+        }
+    }
+
+    private suspend fun persistDraft() {
+        val s = _uiState.value
+        authFlowStore.saveRegistrationDraft(
+            listOf(s.email, s.lastName, s.firstName, s.middleName, s.birthDateDisplay).joinToString("\u0001"),
+        )
     }
     
     /**
@@ -487,7 +621,7 @@ class RegisterViewModel @Inject constructor(
 
         val state = _uiState.value
         val birthIso = parseToIsoDate(state.birthDateDisplay)!!
-        val phoneApi = phoneForApi(state.phoneNationalDigits)
+        val phoneApi = phoneForApi(state.phoneNationalDigits).ifBlank { state.otpPhone }
 
         val fullName = listOf(state.lastName, state.firstName, state.middleName)
             .filter { it.isNotBlank() }
@@ -496,7 +630,7 @@ class RegisterViewModel @Inject constructor(
         // Паспорт — не на регистрации: обязателен перед покупкой абонемента.
         return RegisterRequest(
             email = state.email,
-            password = state.password,
+            password = if (state.phoneRegistration == true) "" else state.password,
             phone = phoneApi,
             name = fullName,
             registrationType = "client",
@@ -513,7 +647,8 @@ class RegisterViewModel @Inject constructor(
             clubName = state.selectedClub?.name,
             clubAddress = state.selectedClub?.address,
             referralSource = state.referralSource,
-            referralSourceOther = state.referralSourceOther.takeIf { it.isNotBlank() }
+            referralSourceOther = state.referralSourceOther.takeIf { it.isNotBlank() },
+            otpTicket = state.otpTicket.takeIf { it.isNotBlank() },
         )
     }
     
@@ -585,8 +720,11 @@ class RegisterViewModel @Inject constructor(
         var errors = FieldErrors()
         when (step) {
             RegisterFormStep.PERSONAL -> {
-                if (state.selectedClub == null) {
+                if (state.phoneRegistration != true && state.selectedClub == null) {
                     errors = errors.copy(clubError = "Выберите клуб на предыдущем шаге")
+                }
+                if (state.phoneRegistration != true && phoneForApi(state.phoneNationalDigits).isEmpty()) {
+                    errors = errors.copy(phoneError = "Введите полный номер телефона")
                 }
                 if (state.lastName.isBlank()) {
                     errors = errors.copy(lastNameError = "Введите фамилию")
@@ -597,19 +735,21 @@ class RegisterViewModel @Inject constructor(
                 if (parseToIsoDate(state.birthDateDisplay) == null) {
                     errors = errors.copy(birthDateError = "Укажите дату рождения (дд.мм.гггг)")
                 }
-                if (phoneForApi(state.phoneNationalDigits).isEmpty()) {
-                    errors = errors.copy(phoneError = "Введите полный номер телефона")
-                }
-                if (state.email.isBlank()) {
-                    errors = errors.copy(emailError = "Введите email")
-                } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(state.email).matches()) {
-                    errors = errors.copy(emailError = "Неверный формат email")
+                if (state.phoneRegistration != true) {
+                    if (state.email.isBlank()) {
+                        errors = errors.copy(emailError = "Введите email")
+                    } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(state.email).matches()) {
+                        errors = errors.copy(emailError = "Неверный формат email")
+                    }
                 }
                 if (state.gender == null) {
                     errors = errors.copy(genderError = "Выберите пол")
                 }
             }
             RegisterFormStep.ACCOUNT -> {
+                if (state.phoneRegistration == true) {
+                    return errors
+                }
                 if (state.password.isBlank()) {
                     errors = errors.copy(passwordError = "Введите пароль")
                 } else if (state.password.length < 6) {

@@ -9,6 +9,7 @@ use App\Entity\SubscriptionPlan;
 use App\Entity\User;
 use App\Service\Admin\ClubSettingsStore;
 use App\Service\Admin\ClubSocialLinks;
+use App\Service\App\AndroidVersionBeacon;
 use App\Service\CurrentUserResolver;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,6 +26,7 @@ class ClubController extends AbstractController
         private readonly ClubSettingsStore $clubSettings,
         private readonly OccupancyService $occupancy,
         private readonly CurrentUserResolver $userResolver,
+        private readonly AndroidVersionBeacon $androidVersionBeacon,
     ) {}
 
     #[Route('/occupancy', name: 'api_club_occupancy', methods: ['GET'])]
@@ -88,11 +90,16 @@ class ClubController extends AbstractController
         $visiting = trim((string) ($this->clubSettings->get('visiting_rules_url') ?? ''));
         $safety = trim((string) ($this->clubSettings->get('safety_rules_url') ?? ''));
 
+        $banner = trim((string) ($this->clubSettings->get('welcome_banner_url') ?? ''));
+        $legalText = trim((string) ($this->clubSettings->get('welcome_legal_text') ?? ''));
+
         return [
             'offer_url' => $offer !== '' ? $offer : 'https://dobrozal.ru/doc/offer',
             'privacy_url' => $privacy !== '' ? $privacy : 'https://dobrozal.ru/doc/privacy',
             'visiting_rules_url' => $visiting !== '' ? $visiting : null,
             'safety_rules_url' => $safety !== '' ? $safety : null,
+            'welcome_banner_url' => $banner !== '' ? $banner : null,
+            'welcome_legal_text' => $legalText !== '' ? $legalText : null,
         ];
     }
 
@@ -280,7 +287,12 @@ class ClubController extends AbstractController
             $brandName = 'Доброзал';
         }
 
-        $minVersionCode = max(0, (int) ($this->clubSettings->get('android_min_version_code') ?? 0));
+        $reportedAppId = trim((string) $request->query->get('application_id', ''));
+        $reportedCode = (int) $request->query->get('app_version_code', 0);
+        if ($reportedAppId !== '' && $reportedCode > 0) {
+            $this->androidVersionBeacon->remember($reportedAppId, $reportedCode);
+        }
+        $minVersionCode = $this->androidVersionBeacon->effectiveMinVersionCode($reportedAppId);
         $iosMinVersionCode = max(0, (int) ($this->clubSettings->get('ios_min_version_code') ?? 0));
         $forceUpdate = \in_array(
             strtolower(trim((string) ($this->clubSettings->get('android_force_update') ?? '0'))),

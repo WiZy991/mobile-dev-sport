@@ -28,6 +28,7 @@ data class EditProfileUiState(
     /** Только цифры даты рождения, до 8 (ддммгггг). */
     val birthdayDigits: String = "",
     val avatarUrl: String? = null,
+    val profileLocked: Boolean = false,
     val error: String? = null
 )
 
@@ -49,7 +50,8 @@ class EditProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
-            val user = authRepository.getCurrentUser().first()
+            val user = authRepository.refreshCurrentUser()
+                ?: authRepository.getCurrentUser().first()
             if (user != null) {
                 _uiState.update {
                     it.copy(
@@ -58,7 +60,8 @@ class EditProfileViewModel @Inject constructor(
                         email = user.email,
                         phoneNationalDigits = normalizeRussianNationalDigits(user.phone),
                         birthdayDigits = isoToBirthdayDigits(user.dateOfBirth),
-                        avatarUrl = user.avatarUrl
+                        avatarUrl = user.avatarUrl,
+                        profileLocked = user.profileLocked,
                     )
                 }
             } else {
@@ -153,6 +156,9 @@ class EditProfileViewModel @Inject constructor(
                         it.copy(
                             isSaving = false,
                             error = result.message,
+                            profileLocked = result.authCode == "profile_locked" ||
+                                result.authCode == "passport_locked" ||
+                                it.profileLocked,
                         )
                     }
                 }

@@ -1,6 +1,8 @@
 package com.fitnessclub.app.ui.navigation
 
 object RegisterRoutes {
+    const val START = "register_start"
+    const val EMAIL = "register_email"
     const val CLUB_PICK = "register_club_pick"
     const val FORM = "register_form"
     const val SURVEY = "register_survey"

@@ -5,6 +5,7 @@ import com.fitnessclub.app.data.config.LegalPdfAsset
 
 sealed class Screen(val route: String) {
     // Auth
+    data object Welcome : Screen("welcome")
     data object Login : Screen("login") {
         const val ARG_START_SBER = "startSber"
         const val ROUTE_WITH_ARG = "login?startSber={startSber}"

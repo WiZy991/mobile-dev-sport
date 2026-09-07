@@ -133,6 +133,15 @@ class User implements TenantAware
     #[ORM\Column(name: 'notify_promo', type: 'boolean')]
     private bool $notifyPromo = false;
 
+    #[ORM\Column(name: 'email_verified_at', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $emailVerifiedAt = null;
+
+    #[ORM\Column(name: 'email_verify_token', type: 'string', length: 64, nullable: true)]
+    private ?string $emailVerifyToken = null;
+
+    #[ORM\Column(name: 'email_verify_token_expires_at', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $emailVerifyTokenExpiresAt = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -557,6 +566,10 @@ class User implements TenantAware
         return $this;
     }
 
+    /**
+     * Паспорт, подтверждённый через Сбер ID, клиент менять не может.
+     * Активный/замороженный абонемент блокирует ФИО и телефон отдельно — см. ProfileLegalLock.
+     */
     public function isPassportLockedFromClientEdit(): bool
     {
         return $this->passportVerificationProvider === 'sber_id'
@@ -619,6 +632,47 @@ class User implements TenantAware
     public function setNotifyPromo(bool $notifyPromo): self
     {
         $this->notifyPromo = $notifyPromo;
+
+        return $this;
+    }
+
+    public function getEmailVerifiedAt(): ?\DateTimeImmutable
+    {
+        return $this->emailVerifiedAt;
+    }
+
+    public function setEmailVerifiedAt(?\DateTimeImmutable $emailVerifiedAt): self
+    {
+        $this->emailVerifiedAt = $emailVerifiedAt;
+
+        return $this;
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->emailVerifiedAt !== null;
+    }
+
+    public function getEmailVerifyToken(): ?string
+    {
+        return $this->emailVerifyToken;
+    }
+
+    public function setEmailVerifyToken(?string $emailVerifyToken): self
+    {
+        $this->emailVerifyToken = $emailVerifyToken;
+
+        return $this;
+    }
+
+    public function getEmailVerifyTokenExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->emailVerifyTokenExpiresAt;
+    }
+
+    public function setEmailVerifyTokenExpiresAt(?\DateTimeImmutable $emailVerifyTokenExpiresAt): self
+    {
+        $this->emailVerifyTokenExpiresAt = $emailVerifyTokenExpiresAt;
 
         return $this;
     }

@@ -85,6 +85,9 @@ fun RegisterClubPickScreen(
     apiClubs: List<ClubItem> = emptyList(),
     clubsLoading: Boolean = false,
     clubsLoadError: String? = null,
+    isSubmitting: Boolean = false,
+    submitError: String? = null,
+    phoneRegistration: Boolean = false,
 ) {
     val scroll = rememberScrollState()
     var expandedIds by remember { mutableStateOf(setOf<String>()) }
@@ -317,16 +320,29 @@ fun RegisterClubPickScreen(
             }
 
             Spacer(Modifier.height(6.dp))
+            submitError?.let {
+                Text(
+                    it,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                )
+            }
             Button(
                 onClick = onContinueToRegister,
-                enabled = selectedClubId != null,
+                enabled = selectedClubId != null && !isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp),
                 shape = RoundedCornerShape(14.dp),
             ) {
-                Text("Продолжить регистрацию")
+                if (isSubmitting) {
+                    CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text(if (phoneRegistration) "Зарегистрироваться" else "Продолжить регистрацию")
+                }
             }
+            if (!phoneRegistration) {
             TextButton(
                 onClick = { showSberDialog = true },
                 enabled = selectedClubId != null,
@@ -335,6 +351,9 @@ fun RegisterClubPickScreen(
                     .padding(bottom = 28.dp),
             ) {
                 Text("Или зарегистрироваться через Сбер ID", color = Color.White)
+            }
+            } else {
+                Spacer(Modifier.height(28.dp))
             }
         }
 

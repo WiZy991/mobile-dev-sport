@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -32,7 +33,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,17 +55,18 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val STEP_NOTIFICATIONS = 0
-private const val STEP_BIOMETRIC = 1
+private const val STEP_LOCATION = 1
+private const val STEP_BIOMETRIC = 2
 
 /**
  * После успешной регистрации:
- * 1) системный запрос уведомлений (Android 13+),
- * 2) предложение включить биометрию (системный BiometricPrompt).
+ * 1) объяснение уведомлений, затем системный запрос (Android 13+),
+ * 2) объяснение геолокации (ближайший зал / маршрут),
+ * 3) предложение включить биометрию — можно пропустить.
  */
 @Composable
 fun PostRegisterSetupScreen(
@@ -82,19 +83,33 @@ fun PostRegisterSetupScreen(
     val biometricStore = entryPoint.biometricLoginStore()
     val tokenManager = entryPoint.tokenManager()
 
-    var step by remember { mutableIntStateOf(STEP_NOTIFICATIONS) }
+    var step by remember {
+        mutableIntStateOf(
+            when {
+                needsNotificationRationale(context) -> STEP_NOTIFICATIONS
+                needsLocationRationale(context) -> STEP_LOCATION
+                else -> STEP_BIOMETRIC
+            },
+        )
+    }
     var statusMessage by remember { mutableStateOf<String?>(null) }
-    var biometricPromptShown by remember { mutableStateOf(false) }
-    // Пересчитываем на шаге биометрии (после регистрации чужой отпечаток уже сброшен).
-    var alreadyEnabled by remember { mutableStateOf(false) }
+    var alreadyEnabled by remember { mutableStateOf(biometricStore.hasStoredCredential()) }
     val canBiometric = remember { biometricStore.canUseDeviceBiometric() }
 
-    fun goToBiometricOrFinish() {
+    fun finishOrBiometric() {
         if (canBiometric) {
             alreadyEnabled = biometricStore.hasStoredCredential()
             step = STEP_BIOMETRIC
         } else {
             onFinished()
+        }
+    }
+
+    fun goAfterNotifications() {
+        if (needsLocationRationale(context)) {
+            step = STEP_LOCATION
+        } else {
+            finishOrBiometric()
         }
     }
 
@@ -131,33 +146,13 @@ fun PostRegisterSetupScreen(
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) {
-        goToBiometricOrFinish()
+        goAfterNotifications()
     }
 
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            goToBiometricOrFinish()
-            return@LaunchedEffect
-        }
-        val granted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            goToBiometricOrFinish()
-        } else {
-            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
-
-    // Системный диалог биометрии сразу после уведомлений (с паузой — Android часто глотает второй prompt).
-    LaunchedEffect(step) {
-        if (step != STEP_BIOMETRIC || biometricPromptShown) return@LaunchedEffect
-        if (alreadyEnabled) return@LaunchedEffect
-        if (!canBiometric) return@LaunchedEffect
-        biometricPromptShown = true
-        delay(400)
-        launchBiometricSetup(fromButton = false)
+    val locationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        finishOrBiometric()
     }
 
     Column(
@@ -179,14 +174,14 @@ fun PostRegisterSetupScreen(
                 )
                 Spacer(Modifier.height(20.dp))
                 Text(
-                    "Разрешить уведомления?",
+                    "Зачем нужны уведомления",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "Мы пришлём напоминания о тренировках и важные сообщения клуба.",
+                    "Мы пришлём напоминания о тренировках, статусе абонемента и важные сообщения клуба. Без разрешения эти сообщения не дойдут.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -197,7 +192,7 @@ fun PostRegisterSetupScreen(
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         } else {
-                            goToBiometricOrFinish()
+                            goAfterNotifications()
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -206,7 +201,48 @@ fun PostRegisterSetupScreen(
                 ) {
                     Text("Разрешить")
                 }
-                TextButton(onClick = { goToBiometricOrFinish() }) {
+                TextButton(onClick = { goAfterNotifications() }) {
+                    Text("Не сейчас")
+                }
+            }
+            STEP_LOCATION -> {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = Primary,
+                    modifier = Modifier.size(64.dp),
+                )
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    "Доступ к геолокации",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Нужен, чтобы показать ближайший зал и построить маршрут. Местоположение не используется для слежения.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(28.dp))
+                Button(
+                    onClick = {
+                        locationLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Разрешить")
+                }
+                TextButton(onClick = { finishOrBiometric() }) {
                     Text("Не сейчас")
                 }
             }
@@ -241,7 +277,7 @@ fun PostRegisterSetupScreen(
                             if (alreadyEnabled) {
                                 "Можно продолжить — в следующий раз войдёте без пароля."
                             } else {
-                                "Подтвердите отпечаток в системном окне — в следующий раз войдёте без пароля."
+                                "Это необязательно. Можно включить позже в Настройках. Подтвердите отпечаток, чтобы входить без пароля."
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
@@ -292,6 +328,26 @@ fun PostRegisterSetupScreen(
             }
         }
     }
+}
+
+private fun needsNotificationRationale(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
+    return ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.POST_NOTIFICATIONS,
+    ) != PackageManager.PERMISSION_GRANTED
+}
+
+private fun needsLocationRationale(context: Context): Boolean {
+    val fine = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+    val coarse = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+    return !fine && !coarse
 }
 
 private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
