@@ -19,9 +19,24 @@ final class SubscriptionFreezeService
         return $this->policy->freezeDaysTotalForPlan($plan);
     }
 
+    /**
+     * Лимит заморозки: записанное в абонемент, но не больше текущего правила тарифа.
+     * Старые месячные могли получить 30 дней при импорте — на месячном заморозки нет.
+     */
+    public function effectiveFreezeDaysTotal(Subscription $subscription): int
+    {
+        $policyTotal = $this->policy->freezeDaysTotalForPlan($subscription->getPlan());
+        $stored = $subscription->getFreezeDaysTotal();
+        if ($stored === null) {
+            return $policyTotal;
+        }
+
+        return max(0, min($stored, $policyTotal));
+    }
+
     public function freezeDaysLeft(Subscription $subscription): int
     {
-        $total = $subscription->getFreezeDaysTotal() ?? 0;
+        $total = $this->effectiveFreezeDaysTotal($subscription);
         $used = $subscription->getFreezeDaysUsed() ?? 0;
 
         return max(0, $total - $used);
@@ -29,8 +44,11 @@ final class SubscriptionFreezeService
 
     public function canFreeze(Subscription $subscription): bool
     {
+        $today = new \DateTimeImmutable('today');
+
         return $subscription->getStatus() === 'active'
-            && ($subscription->getFreezeDaysTotal() ?? 0) > 0
+            && $subscription->isEffectiveActiveOn($today)
+            && $this->effectiveFreezeDaysTotal($subscription) > 0
             && $this->freezeDaysLeft($subscription) > 0;
     }
 
@@ -41,11 +59,11 @@ final class SubscriptionFreezeService
             return 'Укажите количество дней';
         }
 
-        $total = $subscription->getFreezeDaysTotal() ?? 0;
+        $total = $this->effectiveFreezeDaysTotal($subscription);
         if ($total <= 0) {
             return 'Заморозка недоступна для этого абонемента';
         }
-        if ($subscription->getStatus() !== 'active') {
+        if ($subscription->getStatus() !== 'active' || !$subscription->isEffectiveActiveOn(new \DateTimeImmutable('today'))) {
             return 'Абонемент уже заморожен или не активен';
         }
 

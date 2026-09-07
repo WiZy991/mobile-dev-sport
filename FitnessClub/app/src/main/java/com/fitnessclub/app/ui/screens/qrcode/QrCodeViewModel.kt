@@ -130,7 +130,8 @@ class QrCodeViewModel @Inject constructor(
         }
         val reason = when (val result = subscriptionRepository.getMySubscriptions().first { it !is ApiResult.Loading }) {
             is ApiResult.Success -> {
-                val active = result.data.filter { it.status == SubscriptionStatus.ACTIVE && !it.isFrozen }
+                val todayIso = java.time.LocalDate.now().toString()
+                val active = result.data.filter { it.isCurrentOn(todayIso) && !it.isFrozen && it.status == SubscriptionStatus.ACTIVE }
                 when {
                     active.isEmpty() -> "Нет активного абонемента. Оформите абонемент, чтобы войти в зал."
                     active.none { sub ->

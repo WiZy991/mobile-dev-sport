@@ -778,6 +778,15 @@ class AdminController extends AbstractController
             ['user' => $client],
             ['id' => 'DESC']
         );
+        $expired = false;
+        foreach ($subscriptions as $sub) {
+            if ($this->lifecycleService->cancelIfVisitsExhausted($sub) || $this->lifecycleService->expireIfPastEndDate($sub)) {
+                $expired = true;
+            }
+        }
+        if ($expired) {
+            $this->em->flush();
+        }
         $bookings = $this->em->getRepository(Booking::class)->findBy(
             ['user' => $client],
             ['id' => 'DESC']

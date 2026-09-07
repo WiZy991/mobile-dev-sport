@@ -23,6 +23,7 @@ final class SubscriptionFreezeExtension extends AbstractExtension
     {
         return [
             new TwigFunction('subscription_freeze_days_for_plan', $this->freezeDaysForPlan(...)),
+            new TwigFunction('subscription_freeze_days_total', $this->freezeDaysTotal(...)),
             new TwigFunction('subscription_freeze_days_left', $this->freezeDaysLeft(...)),
             new TwigFunction('subscription_can_freeze', $this->canFreeze(...)),
             new TwigFunction('subscription_can_extend', $this->canExtend(...)),
@@ -34,6 +35,11 @@ final class SubscriptionFreezeExtension extends AbstractExtension
     public function freezeDaysForPlan(SubscriptionPlan $plan): int
     {
         return $this->freezeService->freezeDaysTotalForPlan($plan);
+    }
+
+    public function freezeDaysTotal(Subscription $subscription): int
+    {
+        return $this->freezeService->effectiveFreezeDaysTotal($subscription);
     }
 
     public function freezeDaysLeft(Subscription $subscription): int

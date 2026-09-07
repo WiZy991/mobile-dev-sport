@@ -64,7 +64,13 @@ class SubscriptionController extends AbstractController
 
         $changed = false;
         foreach ($subs as $sub) {
-            if ($sub instanceof Subscription && $this->lifecycleService->cancelIfVisitsExhausted($sub)) {
+            if (!$sub instanceof Subscription) {
+                continue;
+            }
+            if ($this->lifecycleService->cancelIfVisitsExhausted($sub)) {
+                $changed = true;
+            }
+            if ($this->lifecycleService->expireIfPastEndDate($sub)) {
                 $changed = true;
             }
         }
@@ -140,36 +146,18 @@ class SubscriptionController extends AbstractController
             }
         }
 
-        $data = array_map(static function (Subscription $s) use ($saleBySubId) {
-            $plan = $s->getPlan();
-            $displayName = $plan->getName();
-            $displayPrice = $plan->getPrice();
+        $data = array_map(function (Subscription $s) use ($saleBySubId) {
+            $row = $this->serializeSubscription($s);
             $sale = $saleBySubId[$s->getId()] ?? null;
             if ($sale !== null) {
-                $displayPrice = (float) $sale['price'];
+                $row['price'] = (float) $sale['price'];
                 $productName = (string) $sale['product_name'];
                 if (str_starts_with($productName, 'Абонемент: ')) {
-                    $displayName = substr($productName, strlen('Абонемент: '));
+                    $row['name'] = substr($productName, strlen('Абонемент: '));
                 }
             }
 
-            return [
-                'id' => 'sub-' . $s->getId(),
-                'name' => $displayName,
-                'description' => $plan->getDescription(),
-                'type' => $plan->getType(),
-                'start_date' => $s->getStartDate()->format('Y-m-d'),
-                'end_date' => $s->getEndDate()?->format('Y-m-d'),
-                'status' => $s->getStatus(),
-                'visits_total' => $s->getVisitsTotal(),
-                'visits_used' => $s->getVisitsUsed() ?? 0,
-                'freeze_days_total' => $s->getFreezeDaysTotal() ?? 0,
-                'freeze_days_used' => $s->getFreezeDaysUsed() ?? 0,
-                'is_frozen' => $s->getStatus() === 'frozen',
-                'price' => $displayPrice,
-                'club_id' => $s->getClub()?->getId(),
-                'club_name' => $s->getClub()?->getName(),
-            ];
+            return $row;
         }, $subs);
 
         return $this->json($data);
@@ -470,7 +458,7 @@ class SubscriptionController extends AbstractController
             'status' => $s->getStatus(),
             'visits_total' => $s->getVisitsTotal(),
             'visits_used' => $s->getVisitsUsed() ?? 0,
-            'freeze_days_total' => $s->getFreezeDaysTotal() ?? 0,
+            'freeze_days_total' => $this->freezeService->effectiveFreezeDaysTotal($s),
             'freeze_days_used' => $s->getFreezeDaysUsed() ?? 0,
             'is_frozen' => $s->getStatus() === 'frozen',
             'price' => $plan->getPrice(),

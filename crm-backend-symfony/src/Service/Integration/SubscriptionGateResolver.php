@@ -35,7 +35,7 @@ final class SubscriptionGateResolver
         $calendarOk = [];
         foreach ($subs as $sub) {
             // Подчищаем «зомби» с used >= total, которые ещё active.
-            if ($this->lifecycle->cancelIfVisitsExhausted($sub)) {
+            if ($this->lifecycle->cancelIfVisitsExhausted($sub) || $this->lifecycle->expireIfPastEndDate($sub)) {
                 continue;
             }
             if ($sub->coversCalendarDay($today)) {

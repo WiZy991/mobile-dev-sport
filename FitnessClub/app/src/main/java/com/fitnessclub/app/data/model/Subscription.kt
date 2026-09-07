@@ -53,6 +53,24 @@ data class Subscription(
     
     val freezeDaysLeft: Int
         get() = freezeDaysTotal - freezeDaysUsed
+
+    /** Активен ли абонемент сегодня: статус + период. Просроченный active не держим в текущих. */
+    fun isCurrentOn(todayIsoDate: String): Boolean {
+        if (status == SubscriptionStatus.EXPIRED || status == SubscriptionStatus.CANCELLED) {
+            return false
+        }
+        val start = startDate.take(10)
+        if (start.isNotEmpty() && start > todayIsoDate) {
+            return status == SubscriptionStatus.PENDING
+        }
+        val end = endDate?.take(10)
+        if (!end.isNullOrBlank() && end < todayIsoDate) {
+            return false
+        }
+        return status == SubscriptionStatus.ACTIVE ||
+            status == SubscriptionStatus.FROZEN ||
+            status == SubscriptionStatus.PENDING
+    }
 }
 
 enum class SubscriptionType {

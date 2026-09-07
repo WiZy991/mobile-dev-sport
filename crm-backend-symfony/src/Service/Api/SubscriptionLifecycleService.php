@@ -17,7 +17,7 @@ final class SubscriptionLifecycleService
 
     public function canExtend(Subscription $subscription): bool
     {
-        return \in_array($subscription->getStatus(), ['active', 'frozen'], true);
+        return \in_array($subscription->getStatus(), ['active', 'frozen', 'expired'], true);
     }
 
     public function canCancel(Subscription $subscription): bool
@@ -50,6 +50,9 @@ final class SubscriptionLifecycleService
 
         $base = $subscription->getEndDate() ?? new \DateTimeImmutable('today');
         $subscription->setEndDate($base->modify('+' . $days . ' days'));
+        if ($subscription->getStatus() === 'expired' && $subscription->isEffectiveActiveOn(new \DateTimeImmutable('today'))) {
+            $subscription->setStatus('active');
+        }
 
         return null;
     }
@@ -94,6 +97,29 @@ final class SubscriptionLifecycleService
             $subscription->setVisitsUsed($total);
         }
         $subscription->setStatus('cancelled');
+
+        return true;
+    }
+
+    /**
+     * Статус в БД часто остаётся active после endDate — приложение тогда держит карточку «активной».
+     *
+     * @return bool true, если статус стал expired
+     */
+    public function expireIfPastEndDate(Subscription $subscription, ?\DateTimeImmutable $today = null): bool
+    {
+        if (!\in_array($subscription->getStatus(), ['active', 'frozen'], true)) {
+            return false;
+        }
+        $end = $subscription->getEndDate();
+        if ($end === null) {
+            return false;
+        }
+        $today ??= new \DateTimeImmutable('today');
+        if ($today->format('Y-m-d') <= $end->format('Y-m-d')) {
+            return false;
+        }
+        $subscription->setStatus('expired');
 
         return true;
     }

@@ -62,19 +62,12 @@ fun ProfileScreen(
             }
         }
     }
-    val activeSubscriptions = remember(clubSubscriptions) {
-        clubSubscriptions.filter {
-            it.status == SubscriptionStatus.ACTIVE ||
-                it.status == SubscriptionStatus.FROZEN ||
-                it.status == SubscriptionStatus.PENDING
-        }
+    val todayIso = remember { java.time.LocalDate.now().toString() }
+    val activeSubscriptions = remember(clubSubscriptions, todayIso) {
+        clubSubscriptions.filter { it.isCurrentOn(todayIso) }
     }
-    val archivedSubscriptions = remember(clubSubscriptions) {
-        clubSubscriptions.filterNot {
-            it.status == SubscriptionStatus.ACTIVE ||
-                it.status == SubscriptionStatus.FROZEN ||
-                it.status == SubscriptionStatus.PENDING
-        }
+    val archivedSubscriptions = remember(clubSubscriptions, todayIso) {
+        clubSubscriptions.filterNot { it.isCurrentOn(todayIso) }
     }
     
     LaunchedEffect(Unit) {
