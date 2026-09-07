@@ -564,8 +564,13 @@ class AuthRepository @Inject constructor(
             else -> null
         }
         if (fromCode != null) return fromCode
-        if (http == 404 || http == 405 || parsed.message.isBlank() || parsed.message.contains("<html", ignoreCase = true)) {
-            return "Сервер ещё не отправляет коды в мессенджеры. Войдите по почте или Сбер ID."
+        if (http == 404 || http == 405) {
+            return "На сервере нет ручки отправки кода (HTTP $http). Залейте CRM с OTP и перезапустите PHP. Пока войдите по почте или Сбер ID."
+        }
+        if (parsed.message.contains("<html", ignoreCase = true) || parsed.message.isBlank()) {
+            return "Сервер вернул ошибку ${if (http > 0) "HTTP $http" else ""} без JSON. Проверьте логи PHP и cache:clear. Пока войдите по почте или Сбер ID."
+                .replace("  ", " ")
+                .trim()
         }
         return parsed.message.ifBlank { "Не удалось отправить код. Войдите по почте или Сбер ID." }
     }
