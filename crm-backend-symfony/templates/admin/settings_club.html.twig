@@ -77,27 +77,10 @@
                     <input type="text" name="welcome_legal_text" class="form-control form-control-sm" value="{{ club.welcome_legal_text|default('') }}" placeholder="Нажимая «Продолжить», вы соглашаетесь с документами">
                 </div>
                 <div class="col-12 mt-3">
-                    <div class="text-primary small fw-semibold text-uppercase mb-2">Обновление приложения (Android)</div>
-                    <p class="small text-secondary mb-2">
-                        Обычно ничего ставить не нужно: при запуске приложение само сообщает свой номер сборки,
-                        сервер запоминает максимальный, и у всех, кто ниже, открывается баннер.
-                        Поля ниже — только если нужно вручную поднять минимум или включить жёсткий режим без крестика.
+                    <p class="small text-secondary mb-0">
+                        Версия приложения и баннер обновления — в разделе
+                        <a href="{{ path('admin_section', {section: 'mobileapps'}) }}">Мобильные приложения</a>.
                     </p>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small">Минимальный номер сборки (versionCode)</label>
-                    <input type="number" min="0" step="1" name="android_min_version_code" class="form-control form-control-sm" value="{{ club.android_min_version_code|default('0') }}">
-                    <div class="form-text">0 — баннер выключен.</div>
-                </div>
-                <div class="col-md-8">
-                    <label class="form-label small">Текст на баннере</label>
-                    <input type="text" name="android_update_message" class="form-control form-control-sm" value="{{ club.android_update_message|default('') }}" placeholder="Вышла новая версия. Обновите приложение.">
-                </div>
-                <div class="col-12">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="android_force_update" value="1" id="android_force_update" {% if club.android_force_update|default('0') in ['1', 'true', 'yes'] %}checked{% endif %}>
-                        <label class="form-check-label small" for="android_force_update">Жёсткое обновление — без крестика, закрыть нельзя</label>
-                    </div>
                 </div>
             </div>
 

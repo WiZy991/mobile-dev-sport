@@ -2738,15 +2738,11 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
-            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'trainer_rental_amount_rub', 'welcome_banner_url', 'welcome_legal_text', 'android_min_version_code', 'android_update_message'];
+            $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'trainer_rental_amount_rub', 'welcome_banner_url', 'welcome_legal_text'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
                 $this->clubSettings->set($key, $value !== '' ? $value : null);
             }
-            $this->clubSettings->set(
-                'android_force_update',
-                $request->request->getBoolean('android_force_update') ? '1' : '0',
-            );
 
             $socialLinks = ClubSocialLinks::normalizeFromRequest(
                 $request->request->all('social_type'),
@@ -2876,6 +2872,8 @@ class AdminController extends AbstractController
                 'android_min_version_code' => $getSetting('android_min_version_code', '0'),
                 'android_force_update' => $getSetting('android_force_update', '0'),
                 'android_update_message' => $getSetting('android_update_message', ''),
+                'android_seen_dobrozal' => $getSetting('android_seen_version_ru_worldcashfit_app', '0'),
+                'android_seen_academy' => $getSetting('android_seen_version_ru_academywrestling_app', '0'),
                 'perco_enabled' => $getSetting('perco_enabled', '0'),
                 'perco_base_url' => $getSetting('perco_base_url', ''),
                 'perco_login' => $getSetting('perco_login', ''),
@@ -4153,6 +4151,21 @@ class AdminController extends AbstractController
         }
 
         if ($section === 'mobileapps') {
+            if ($request->isMethod('POST') && $request->request->get('form') === 'app_update') {
+                $minCode = trim((string) $request->request->get('android_min_version_code', ''));
+                $message = trim((string) $request->request->get('android_update_message', ''));
+                $this->clubSettings->set('android_min_version_code', $minCode !== '' ? $minCode : null);
+                $this->clubSettings->set('android_update_message', $message !== '' ? $message : null);
+                $this->clubSettings->set(
+                    'android_force_update',
+                    $request->request->getBoolean('android_force_update') ? '1' : '0',
+                );
+                $this->em->flush();
+                $this->addFlash('success', 'Настройки обновления приложения сохранены.');
+
+                return $this->redirectToRoute('admin_section', ['section' => 'mobileapps']);
+            }
+
             $clubName = $this->clubSettings->get('name');
             $clubAddress = $this->clubSettings->get('address');
             $clubConfigured = ($clubName !== null && $clubName !== '') || ($clubAddress !== null && $clubAddress !== '');
@@ -4181,6 +4194,11 @@ class AdminController extends AbstractController
                 'productsActiveCount' => $productsActiveCount,
                 'pushTokensCount' => $pushTokensCount,
                 'recentAccessLogs' => $recentAccessLogs,
+                'android_min_version_code' => $this->clubSettings->get('android_min_version_code') ?? '0',
+                'android_force_update' => $this->clubSettings->get('android_force_update') ?? '0',
+                'android_update_message' => $this->clubSettings->get('android_update_message') ?? '',
+                'android_seen_dobrozal' => $this->clubSettings->get('android_seen_version_ru_worldcashfit_app') ?? '0',
+                'android_seen_academy' => $this->clubSettings->get('android_seen_version_ru_academywrestling_app') ?? '0',
             ]);
         }
 
