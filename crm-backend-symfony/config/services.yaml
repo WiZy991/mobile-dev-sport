@@ -56,6 +56,7 @@ parameters:
     green_api_id_default: ''
     green_api_token_default: ''
     green_api_url_default: 'https://api.green-api.com'
+    sms_ru_api_id_default: ''
 
 services:
     # default configuration for services in *this* file

@@ -6,14 +6,19 @@ namespace App\Service\Auth;
 
 final class OtpChannel
 {
+    public const SMS = 'sms';
+
+    /** @deprecated мессенджеры больше не используются для OTP */
     public const TELEGRAM = 'telegram';
+    /** @deprecated */
     public const MAX = 'max';
+    /** @deprecated */
     public const WHATSAPP = 'whatsapp';
 
     /** @return list<string> */
     public static function all(): array
     {
-        return [self::TELEGRAM, self::MAX, self::WHATSAPP];
+        return [self::SMS];
     }
 
     public static function isValid(string $channel): bool

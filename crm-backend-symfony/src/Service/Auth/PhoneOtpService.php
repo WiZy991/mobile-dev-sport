@@ -60,8 +60,10 @@ final class PhoneOtpService
         if ($phone === null) {
             throw new \DomainException('invalid_phone');
         }
-        if (!OtpChannel::isValid($channel)) {
-            throw new \DomainException('invalid_channel');
+        $channel = strtolower(trim($channel));
+        if ($channel === '' || !OtpChannel::isValid($channel)) {
+            // Старые клиенты могли слать telegram/max/whatsapp — переводим на SMS.
+            $channel = OtpChannel::SMS;
         }
 
         $sender = $this->senders[$channel] ?? null;
@@ -80,11 +82,11 @@ final class PhoneOtpService
             ->setCodeHash(password_hash($code, PASSWORD_BCRYPT))
             ->setExpiresAt(new \DateTimeImmutable('+' . self::TTL_SECONDS . ' seconds'))
             ->setDeeplinkToken(bin2hex(random_bytes(12)));
-        if ($channel === OtpChannel::MAX) {
-            $challenge->setDeliveryCode($code);
-        }
 
-        $delivery = OtpDeliveryResult::success();
+        $delivery = OtpDeliveryResult::success(
+            null,
+            'Код отправлен в SMS на ваш номер телефона',
+        );
         if ($configured && $sender instanceof OtpSenderInterface) {
             $delivery = $sender->send($phone, $code, new PhoneOtpChallengeContext(
                 (string) $challenge->getDeeplinkToken(),
@@ -103,12 +105,11 @@ final class PhoneOtpService
             'channel' => $channel,
             'resend_after_sec' => self::RESEND_SECONDS,
             'ttl_sec' => self::TTL_SECONDS,
+            'instruction' => $delivery->instruction
+                ?? 'Код отправлен в SMS на ваш номер телефона',
         ];
         if ($delivery->deeplink !== null) {
             $payload['deeplink'] = $delivery->deeplink;
-        }
-        if ($delivery->instruction !== null) {
-            $payload['instruction'] = $delivery->instruction;
         }
         if ($this->debug) {
             $payload['dev_code'] = $code;
