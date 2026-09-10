@@ -48,15 +48,15 @@
     <div class="content-card mb-3">
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Версия iOS</div>
         <p class="small text-secondary mb-2">
-            Сравнение идёт с <strong>build</strong> приложения (<code>CFBundleVersion</code> в Xcode), не с маркетинговой версией вроде 1.2.3.
-            Если build у пользователя меньше указанного минимума — при входе покажется попап «обновите приложение».
+            Сравнение с полем <strong>Version</strong> в Xcode (<code>1.0.8</code> — <code>CFBundleShortVersionString</code>), а не с Build.
+            Если версия у пользователя ниже указанной — при входе покажется попап.
         </p>
         <form method="post" action="{{ path('admin_section', {section: 'mobileapps'}) }}" class="row g-2">
             <input type="hidden" name="form" value="ios_app_update">
             <div class="col-md-3">
-                <label class="form-label small">Минимальный build (ios_min_version_code)</label>
-                <input type="number" min="0" step="1" name="ios_min_version_code" class="form-control form-control-sm" value="{{ ios_min_version_code|default('0') }}">
-                <div class="form-text">0 — попап не показывать. Например 42 — у кого build ≤ 41 увидят диалог.</div>
+                <label class="form-label small">Минимальная версия (например 1.0.9)</label>
+                <input type="text" name="ios_min_version" class="form-control form-control-sm" value="{{ ios_min_version|default('') }}" placeholder="1.0.9" pattern="[0-9]+(\.[0-9]+)*">
+                <div class="form-text">Пусто — попап не показывать. Сейчас в приложении Version = 1.0.8 → поставьте 1.0.9, чтобы все на 1.0.8 увидели диалог.</div>
             </div>
             <div class="col-md-6">
                 <label class="form-label small">Текст в попапе</label>

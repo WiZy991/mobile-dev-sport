@@ -294,6 +294,7 @@ class ClubController extends AbstractController
         }
         $minVersionCode = $this->androidVersionBeacon->effectiveMinVersionCode($reportedAppId);
         $iosMinVersionCode = max(0, (int) ($this->clubSettings->get('ios_min_version_code') ?? 0));
+        $iosMinVersion = trim((string) ($this->clubSettings->get('ios_min_version') ?? ''));
         $forceUpdate = \in_array(
             strtolower(trim((string) ($this->clubSettings->get('android_force_update') ?? '0'))),
             ['1', 'true', 'yes'],
@@ -379,6 +380,7 @@ class ClubController extends AbstractController
             'app_update' => [
                 'android_min_version_code' => $minVersionCode,
                 'ios_min_version_code' => $iosMinVersionCode,
+                'ios_min_version' => $iosMinVersion !== '' ? $iosMinVersion : null,
                 'force' => $forceUpdate,
                 'ios_force' => $iosForceUpdate,
                 'message' => $updateMessage,

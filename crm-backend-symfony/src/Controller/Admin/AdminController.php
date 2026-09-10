@@ -4176,9 +4176,9 @@ class AdminController extends AbstractController
             }
 
             if ($request->isMethod('POST') && $request->request->get('form') === 'ios_app_update') {
-                $iosMin = trim((string) $request->request->get('ios_min_version_code', ''));
+                $iosMinVersion = trim((string) $request->request->get('ios_min_version', ''));
                 $iosMessage = trim((string) $request->request->get('ios_update_message', ''));
-                $this->clubSettings->set('ios_min_version_code', $iosMin !== '' ? $iosMin : null);
+                $this->clubSettings->set('ios_min_version', $iosMinVersion !== '' ? $iosMinVersion : null);
                 $this->clubSettings->set('ios_update_message', $iosMessage !== '' ? $iosMessage : null);
                 $this->clubSettings->set(
                     'ios_force_update',
@@ -4223,7 +4223,7 @@ class AdminController extends AbstractController
                 'android_update_message' => $this->clubSettings->get('android_update_message') ?? '',
                 'android_seen_dobrozal' => $this->clubSettings->get('android_seen_version_ru_worldcashfit_app') ?? '0',
                 'android_seen_academy' => $this->clubSettings->get('android_seen_version_ru_academywrestling_app') ?? '0',
-                'ios_min_version_code' => $this->clubSettings->get('ios_min_version_code') ?? '0',
+                'ios_min_version' => $this->clubSettings->get('ios_min_version') ?? '',
                 'ios_force_update' => $this->clubSettings->get('ios_force_update') ?? '',
                 'ios_update_message' => $this->clubSettings->get('ios_update_message') ?? '',
             ]);
