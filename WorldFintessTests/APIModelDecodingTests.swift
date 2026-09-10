@@ -32,6 +32,39 @@ final class APIModelDecodingTests: XCTestCase {
         XCTAssertEqual(t.type, .group)
     }
 
+    func testDecodeProductionTrainingPayload() throws {
+        let json = Data(
+            """
+            [{"id":"training-2","name":"Тест","description":"Персональное занятие","type":"personal",
+            "trainer":{"id":"trainer-2","name":"Степан","photo_url":null,"specialization":"Тест","rating":5,"description":null},
+            "start_time":"2026-06-26T12:45:00","end_time":"2026-06-26T13:46:00",
+            "duration_minutes":61,"room":"","max_participants":1,"current_participants":0,
+            "is_booked":false,"intensity":"medium","image_url":null}]
+            """.utf8
+        )
+        let items = try AppJSON.decoder().decode([Training].self, from: json)
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items[0].type, .personal)
+        XCTAssertEqual(items[0].durationMinutes, 61)
+        XCTAssertEqual(items[0].trainer.name, "Степан")
+    }
+
+    func testDecodeProductionBookingPayload() throws {
+        let json = Data(
+            """
+            {"id":"booking-2","status":"confirmed","booked_at":"2026-06-26T03:02:00",
+            "training":{"id":"training-2","name":"Тест","description":"Персональное занятие","type":"personal",
+            "trainer":{"id":"trainer-2","name":"Степан","photo_url":null,"specialization":"Тест","rating":5},
+            "start_time":"2026-06-26T12:45:00","end_time":"2026-06-26T13:46:00",
+            "duration_minutes":61,"room":null,"max_participants":1,"current_participants":2,
+            "is_booked":true,"intensity":null,"image_url":null}}
+            """.utf8
+        )
+        let b = try AppJSON.decoder().decode(Booking.self, from: json)
+        XCTAssertEqual(b.status, "confirmed")
+        XCTAssertEqual(b.training.room, "")
+    }
+
     func testDecodeBookingStatusWaiting() throws {
         let json = Data(
             """
@@ -46,5 +79,53 @@ final class APIModelDecodingTests: XCTestCase {
         let b = try AppJSON.decoder().decode(Booking.self, from: json)
         XCTAssertTrue(b.isUpcomingList)
         XCTAssertEqual(b.status, "waiting")
+    }
+
+    func testDecodeLegalRequisitesPayload() throws {
+        let json = Data(
+            """
+            {"title":"Реквизиты","fields":[{"label":"ИНН","value":"254009880989"}]}
+            """.utf8
+        )
+        let doc = try AppJSON.decoder().decode(LegalDocumentResponse.self, from: json)
+        XCTAssertEqual(doc.title, "Реквизиты")
+        XCTAssertEqual(doc.fields?.count, 1)
+        XCTAssertEqual(doc.fields?.first?.value, "254009880989")
+    }
+
+    /// Контракт CRM / Android `Trainer` + `TrainerServiceOffer` (`photo_url`, `phone`, `description`, `services`/`price_from`).
+    func testDecodeTrainerWithServicesAndContacts() throws {
+        let json = Data(
+            """
+            {"id":"42","name":"Анна Иванова","photo_url":"https://example.com/a.jpg",
+            "specialization":"Силовой тренинг","rating":4.5,"phone":"+7 (900) 111-22-33",
+            "description":"Тренер с опытом","services":[{"name":"Персональная","price_from":2500},{"name":"","price_from":0}]}
+            """.utf8
+        )
+        let t = try AppJSON.decoder().decode(Trainer.self, from: json)
+        XCTAssertEqual(t.id, "42")
+        XCTAssertEqual(t.photoUrl, "https://example.com/a.jpg")
+        XCTAssertEqual(t.phone, "+7 (900) 111-22-33")
+        XCTAssertEqual(t.description, "Тренер с опытом")
+        XCTAssertEqual(t.rating, 4.5)
+        XCTAssertEqual(t.services.count, 2)
+        XCTAssertEqual(t.services[0].name, "Персональная")
+        XCTAssertEqual(t.services[0].priceFrom, 2500)
+        XCTAssertEqual(t.services[1].name, "")
+        XCTAssertEqual(t.services[1].priceFrom, 0)
+    }
+
+    func testDecodeTrainerDefaultsWhenOptionalFieldsMissing() throws {
+        let json = Data(
+            """
+            {"id":7,"name":"Без полей"}
+            """.utf8
+        )
+        let t = try AppJSON.decoder().decode(Trainer.self, from: json)
+        XCTAssertEqual(t.id, "7")
+        XCTAssertEqual(t.rating, 0)
+        XCTAssertNil(t.phone)
+        XCTAssertNil(t.description)
+        XCTAssertTrue(t.services.isEmpty)
     }
 }

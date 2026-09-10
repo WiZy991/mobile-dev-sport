@@ -17,6 +17,24 @@
 	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Приложение использует Face ID для безопасного входа в ваш аккаунт.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Геолокация нужна, чтобы построить маршрут до клуба на карте.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>yandexmaps</string>
+		<string>dgis</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>BrandLogo</string>
+	</dict>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

@@ -35,7 +35,10 @@ enum FitnessAPIError: Error, LocalizedError {
     case http(Int, String?)
     case decoding(Error)
     case emptyBody
-    case refreshFailed
+    /// Refresh отклонён сервером (401/403) — нужен повторный вход.
+    case sessionExpired
+    /// Временный сбой обновления (сеть/5xx) — сессию не сбрасываем.
+    case refreshTemporarilyUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -44,18 +47,25 @@ enum FitnessAPIError: Error, LocalizedError {
             return Self.userMessage(from: body, httpCode: code)
         case .decoding: return "Не удалось обработать ответ сервера"
         case .emptyBody: return "Пустой ответ сервера"
-        case .refreshFailed: return "Сессия истекла. Войдите снова."
+        case .sessionExpired: return "Сессия истекла. Войдите снова."
+        case .refreshTemporarilyUnavailable:
+            return "Не удалось обновить сессию. Проверьте интернет и попробуйте ещё раз."
         }
     }
+
+    /// Устаревший алиас — часть экранов могла ловить `.refreshFailed`.
+    static var refreshFailed: FitnessAPIError { .sessionExpired }
 
     static func userMessage(from body: String?, httpCode: Int? = nil) -> String {
         if let body, !body.isEmpty {
             if let data = body.data(using: .utf8),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             {
-                let error = (json["error"] as? String) ?? ""
+                let error = (json["error"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let message = (json["message"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let code = (json["code"] as? String) ?? ""
-                return mapMessage(error: error, code: code)
+                let server = !error.isEmpty ? error : message
+                return mapMessage(error: server, code: code)
             }
             return mapMessage(error: body, code: "")
         }
@@ -63,6 +73,25 @@ enum FitnessAPIError: Error, LocalizedError {
             return "Не удалось выполнить запрос (код \(httpCode))"
         }
         return "Не удалось выполнить запрос"
+    }
+
+    /// Коды, при которых Android сбрасывает сессию (`isSessionRejected`).
+    static func isSessionRejectedAuthCode(_ code: String?) -> Bool {
+        switch code?.trimmingCharacters(in: .whitespacesAndNewlines) {
+        case "invalid_refresh", "token_expired", "invalid_token", "user_blocked":
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func authCode(from body: String?) -> String? {
+        guard let body, let data = body.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let code = json["code"] as? String
+        else { return nil }
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     /// Код ошибки из тела ответа API (`code`), если есть.
@@ -79,9 +108,7 @@ enum FitnessAPIError: Error, LocalizedError {
         case "invalid_credentials":
             return "Неверный email или пароль"
         case "password_not_set":
-            return error.isEmpty
-                ? "Аккаунт с этим email уже есть в клубе, но пароль ещё не задан. Пройдите регистрацию с этим email и придумайте пароль."
-                : error
+            return "Аккаунт с этим email уже есть в клубе, но пароль ещё не задан.\n\nПройдите регистрацию с этим email и придумайте пароль — вход откроется сразу."
         case "email_unknown":
             return "Аккаунт не найден. Зарегистрируйтесь."
         case "password_required", "missing_password":
@@ -102,6 +129,40 @@ enum FitnessAPIError: Error, LocalizedError {
             return "Неверный текущий пароль"
         case "same_password":
             return "Новый пароль должен отличаться от текущего"
+        case "passport_locked", "profile_locked":
+            return "На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки."
+        case "channel_unavailable":
+            return error.isEmpty
+                ? "Отправка SMS сейчас недоступна. Войдите по почте или попробуйте позже."
+                : error
+        case "channel_undeliverable":
+            return error.isEmpty
+                ? "Не удалось доставить SMS на этот номер. Проверьте номер или войдите по почте."
+                : error
+        case "channel_failed":
+            return error.isEmpty
+                ? "Не удалось отправить SMS с кодом. Попробуйте позже или войдите по почте."
+                : error
+        case "otp_rate_limited":
+            return "Слишком много запросов кода. Подождите час."
+        case "otp_too_soon":
+            return "Повторная отправка будет доступна через несколько секунд"
+        case "otp_not_found":
+            return "Сначала запросите код"
+        case "otp_expired":
+            return "Код устарел, запросите новый"
+        case "otp_locked":
+            return "Слишком много попыток. Запросите новый код"
+        case "invalid_phone":
+            return "Укажите номер телефона полностью"
+        case "invalid_channel":
+            return "Не удалось отправить код на телефон"
+        case "invalid_otp", "invalid_code":
+            return error.isEmpty ? "Неверный код" : error
+        case "invalid_ticket", "ticket_expired":
+            return error.isEmpty
+                ? "Сессия регистрации устарела, подтвердите номер снова"
+                : error
         default:
             break
         }
@@ -115,7 +176,7 @@ enum FitnessAPIError: Error, LocalizedError {
         case "Укажите email и password":
             return "Введите email и пароль"
         case "Для этого аккаунта вход по паролю не настроен":
-            return "Для этого аккаунта вход по паролю не настроен. Зарегистрируйтесь или восстановите пароль."
+            return "Аккаунт с этим email уже есть в клубе, но пароль ещё не задан.\n\nПройдите регистрацию с этим email и придумайте пароль — вход откроется сразу."
         case "Пользователь с таким email уже зарегистрирован",
              "Пользователь с таким email уже существует",
              "User with this email already exists":
@@ -150,6 +211,15 @@ final class FitnessAPI: @unchecked Sendable {
     private var accessToken: String?
     private var refreshToken: String?
     private var userId: String?
+
+    /// Single-flight обновление access (как `synchronized` в `TokenRefreshAuthenticator`).
+    private var refreshTask: Task<AuthResponse, Error>?
+    private var refreshGeneration = 0
+
+    /// Успешный refresh — сохранить пару в Keychain (см. `WorldFitnessAppState`).
+    var onSessionRefreshed: ((AuthResponse) -> Void)?
+    /// Refresh отклонён сервером — локальный logout.
+    var onSessionInvalidated: (() -> Void)?
 
     /// Короткий кэш GET — чтобы повторный заход на экран не ждал сеть снова.
     private var getCache: [String: (data: Data, at: Date)] = [:]
@@ -233,30 +303,107 @@ final class FitnessAPI: @unchecked Sendable {
     }
 
     private func refreshTokensLocked() async throws {
+        let task: Task<AuthResponse, Error>
+        let generation: Int
+        lock.lock()
+        if let existing = refreshTask {
+            lock.unlock()
+            _ = try await existing.value
+            return
+        }
+        refreshGeneration += 1
+        generation = refreshGeneration
+        task = Task<AuthResponse, Error> {
+            try await self.performTokenRefresh()
+        }
+        refreshTask = task
+        lock.unlock()
+
+        defer {
+            lock.lock()
+            if refreshGeneration == generation {
+                refreshTask = nil
+            }
+            lock.unlock()
+        }
+        _ = try await task.value
+    }
+
+    /// Как Android `TokenRefreshAuthenticator.refreshAccess` + persist.
+    private func performTokenRefresh() async throws -> AuthResponse {
         let refresh: String?
         lock.lock()
         refresh = refreshToken
         lock.unlock()
 
-        guard let r = refresh, !r.isEmpty else { throw FitnessAPIError.refreshFailed }
+        guard let r = refresh?.trimmingCharacters(in: .whitespacesAndNewlines), !r.isEmpty else {
+            onSessionInvalidated?()
+            throw FitnessAPIError.sessionExpired
+        }
 
-        let url = try buildURL(path: "auth/refresh", query: [:])
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue("Bearer \(r)", forHTTPHeaderField: "Authorization")
+        do {
+            let url = try buildURL(path: "auth/refresh", query: [:])
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Accept")
+            req.setValue("Bearer \(r)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await session.data(for: req)
-        let http = response as? HTTPURLResponse
-        let code = http?.statusCode ?? 0
-        guard (200...299).contains(code) else { throw FitnessAPIError.refreshFailed }
+            let (data, response) = try await session.data(for: req)
+            let http = response as? HTTPURLResponse
+            let code = http?.statusCode ?? 0
+            let bodyText = String(data: data, encoding: .utf8)
+            let authCode = FitnessAPIError.authCode(from: bodyText)
 
-        let auth = try decoder.decode(AuthResponse.self, from: data)
+            if code == 401 || code == 403 || FitnessAPIError.isSessionRejectedAuthCode(authCode) {
+                onSessionInvalidated?()
+                throw FitnessAPIError.sessionExpired
+            }
+            guard (200...299).contains(code) else {
+                // 5xx / странный ответ — сессию не трогаем (как Android invalidateSession=false).
+                throw FitnessAPIError.refreshTemporarilyUnavailable
+            }
+
+            let auth = try decoder.decode(AuthResponse.self, from: data)
+            guard !auth.token.isEmpty, !auth.refreshToken.isEmpty else {
+                throw FitnessAPIError.refreshTemporarilyUnavailable
+            }
+
+            lock.lock()
+            accessToken = auth.token
+            refreshToken = auth.refreshToken
+            userId = auth.user.id
+            getCache.removeAll()
+            lock.unlock()
+
+            onSessionRefreshed?(auth)
+            return auth
+        } catch let e as FitnessAPIError {
+            throw e
+        } catch is URLError {
+            throw FitnessAPIError.refreshTemporarilyUnavailable
+        } catch {
+            // Декодирование / прочее — не сбрасываем сессию из-за одного битого ответа.
+            throw FitnessAPIError.refreshTemporarilyUnavailable
+        }
+    }
+
+    /// Проактивный refresh при старте (Android `bootstrapSession`).
+    func bootstrapRefresh() async {
         lock.lock()
-        accessToken = auth.token
-        refreshToken = auth.refreshToken
-        userId = auth.user.id
+        let hasRefresh = !(refreshToken ?? "").isEmpty
+        let hadAccess = !(accessToken ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         lock.unlock()
+        guard hasRefresh else { return }
+        do {
+            try await refreshTokensLocked()
+        } catch FitnessAPIError.sessionExpired {
+            // onSessionInvalidated уже вызван
+        } catch {
+            // Офлайн / 5xx: как Android — если access уже с диска, остаёмся; иначе сброс.
+            if !hadAccess {
+                onSessionInvalidated?()
+            }
+        }
     }
 
     private func data(
@@ -346,6 +493,10 @@ final class FitnessAPI: @unchecked Sendable {
         let code = http?.statusCode ?? 0
 
         if code == 401, allowRefreshRetry, authenticated {
+            let accessBefore: String?
+            lock.lock()
+            accessBefore = accessToken
+            lock.unlock()
             do {
                 try await refreshTokensLocked()
                 return try await performData(
@@ -358,8 +509,31 @@ final class FitnessAPI: @unchecked Sendable {
                     allowRefreshRetry: false,
                     useCache: false
                 )
+            } catch FitnessAPIError.sessionExpired {
+                throw FitnessAPIError.sessionExpired
+            } catch FitnessAPIError.refreshTemporarilyUnavailable {
+                // Как Android: refresh временно недоступен — отдаём исходный 401, сессию не сбрасываем.
+                let text = String(data: data, encoding: .utf8)
+                throw FitnessAPIError.http(code, text)
             } catch {
-                throw FitnessAPIError.refreshFailed
+                // Параллельный запрос уже обновил access — повторим с новым токеном.
+                lock.lock()
+                let accessAfter = accessToken
+                lock.unlock()
+                if let accessAfter, !accessAfter.isEmpty, accessAfter != accessBefore {
+                    return try await performData(
+                        method: method,
+                        path: path,
+                        query: query,
+                        body: body,
+                        contentType: contentType,
+                        authenticated: authenticated,
+                        allowRefreshRetry: false,
+                        useCache: false
+                    )
+                }
+                let text = String(data: data, encoding: .utf8)
+                throw FitnessAPIError.http(code, text)
             }
         }
 
@@ -414,25 +588,87 @@ final class FitnessAPI: @unchecked Sendable {
         return try decoder.decode(AuthResponse.self, from: data)
     }
 
+    func registerPhone(payload: RegisterRequest) async throws -> AuthResponse {
+        let body = try encoder.encode(payload)
+        let data = try await self.data(method: "POST", path: "auth/register/phone", body: body, authenticated: false)
+        return try decoder.decode(AuthResponse.self, from: data)
+    }
+
+    func checkRegisterEmail(_ email: String) async throws -> CheckEmailResponse {
+        let body = try encoder.encode(CheckEmailRequest(email: email))
+        let data = try await self.data(method: "POST", path: "auth/register/check-email", body: body, authenticated: false)
+        return try decoder.decode(CheckEmailResponse.self, from: data)
+    }
+
+    func otpChannels() async throws -> [OtpChannelStatus] {
+        let data = try await self.data(method: "GET", path: "auth/otp/channels", authenticated: false)
+        return try decoder.decode(OtpChannelsResponse.self, from: data).channels
+    }
+
+    func requestOtp(phone: String, channel: String) async throws -> OtpRequestResponse {
+        let body = try encoder.encode(OtpRequestBody(phone: phone, channel: channel))
+        let data = try await self.data(method: "POST", path: "auth/otp/request", body: body, authenticated: false)
+        return try decoder.decode(OtpRequestResponse.self, from: data)
+    }
+
+    func verifyOtp(phone: String, code: String) async throws -> OtpVerifyResponse {
+        let body = try encoder.encode(OtpVerifyBody(phone: phone, code: code))
+        let data = try await self.data(method: "POST", path: "auth/otp/verify", body: body, authenticated: false)
+        if let parsed = try? decoder.decode(OtpVerifyResponse.self, from: data) {
+            return parsed
+        }
+        // Ответ успешного входа = AuthResponse (token/refresh_token/user).
+        let auth = try decoder.decode(AuthResponse.self, from: data)
+        return OtpVerifyResponse(
+            token: auth.token,
+            refreshToken: auth.refreshToken,
+            user: auth.user,
+            registrationRequired: false,
+            otpTicket: nil,
+            phone: auth.user.phone
+        )
+    }
+
+    func resendEmailVerification() async throws -> EmailResendResponse {
+        let data = try await self.data(method: "POST", path: "user/email/resend", body: nil)
+        return try decoder.decode(EmailResendResponse.self, from: data)
+    }
+
+    /// Сохранить паспорт перед покупкой (как `AuthRepository.savePassportForPurchase`).
+    func savePassportForPurchase(
+        current: User,
+        name: String,
+        email: String,
+        dateOfBirth: String?,
+        series: String,
+        number: String,
+        issuedBy: String,
+        issueDate: String,
+        registrationAddress: String
+    ) async throws -> User {
+        let updated = current.withPassportForPurchase(
+            name: name,
+            email: email,
+            dateOfBirth: dateOfBirth,
+            series: series,
+            number: number,
+            issuedBy: issuedBy,
+            issueDate: issueDate,
+            registrationAddress: registrationAddress
+        )
+        return try await updateProfile(updated)
+    }
+
     func logout() async {
         _ = try? await data(method: "POST", path: "auth/logout", body: nil, authenticated: true)
     }
 
     /// Восстановление сессии по refresh (биометрический вход, как на Android).
     func restoreSessionWithRefreshToken(_ refresh: String) async throws -> AuthResponse {
-        let url = try buildURL(path: "auth/refresh", query: [:])
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue("Bearer \(refresh)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await session.data(for: req)
-        let http = response as? HTTPURLResponse
-        let code = http?.statusCode ?? 0
-        guard (200...299).contains(code) else {
-            throw FitnessAPIError.refreshFailed
-        }
-        return try decoder.decode(AuthResponse.self, from: data)
+        lock.lock()
+        refreshToken = refresh
+        lock.unlock()
+        return try await performTokenRefresh()
     }
 
     /// PKCE: получить URL авторизации Сбер ID (подписанный state/nonce на сервере).
@@ -838,6 +1074,8 @@ enum PurchaseSubscriptionOutcome: Sendable {
     case success(Subscription)
     case paymentRequired(paymentId: Int, paymentUrl: URL, amount: Double)
     case verificationRequired(authorizeURL: URL, message: String)
+    case passportRequired(String)
+    case emailUnverified(String)
     case error(String)
 }
 
@@ -871,18 +1109,27 @@ extension FitnessAPI {
         raw: String?,
         decoder: JSONDecoder
     ) -> PurchaseSubscriptionOutcome? {
-        guard httpCode == 403,
+        guard (httpCode == 403 || httpCode == 400 || httpCode == 422),
               let raw,
               let bodyData = raw.data(using: .utf8),
-              let parsed = try? decoder.decode(SubscriptionPurchaseErrorBody.self, from: bodyData),
-              parsed.code == "verification_required",
-              let urlStr = parsed.authorizeUrl,
-              let url = URL(string: urlStr)
+              let parsed = try? decoder.decode(SubscriptionPurchaseErrorBody.self, from: bodyData)
         else { return nil }
 
-        let msg = parsed.message
-            ?? "Требуется верификация через Сбер ID. После успеха вернитесь и нажмите «Купить» снова."
-        return .verificationRequired(authorizeURL: url, message: msg)
+        let msg = parsed.message?.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch parsed.code {
+        case "verification_required":
+            guard let urlStr = parsed.authorizeUrl, let url = URL(string: urlStr) else { return nil }
+            return .verificationRequired(
+                authorizeURL: url,
+                message: (msg?.isEmpty == false ? msg! : "Требуется верификация через Сбер ID. После успеха вернитесь и нажмите «Купить» снова.")
+            )
+        case "passport_required":
+            return .passportRequired(msg?.isEmpty == false ? msg! : "Для покупки заполните паспортные данные")
+        case "email_unverified":
+            return .emailUnverified(msg?.isEmpty == false ? msg! : "Подтвердите email, чтобы оформить абонемент")
+        default:
+            return nil
+        }
     }
 
     private static func humanizeApiError(httpCode: Int, raw: String) -> String {

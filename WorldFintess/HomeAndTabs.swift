@@ -314,10 +314,10 @@ struct HomeTabView: View {
         VStack(spacing: 0) {
             quickMenuRow(
                 icon: "qrcode",
-                title: "Вход/выход в зал",
+                title: isInsideGym ? "Выход из зала" : "Вход/выход в зал",
                 subtitle: isInsideGym ? "Показать QR-код для выхода" : "Показать QR-код для прохода"
             ) {
-                openQrSheet()
+                go(.qrCode)
             }
             dividerInset
             quickMenuRow(icon: "cart.fill", title: "Приобрести", subtitle: "Карты, Абонементы, Услуги") {
@@ -325,7 +325,11 @@ struct HomeTabView: View {
             }
             dividerInset
             quickMenuRow(icon: "mappin.circle.fill", title: "Мы на карте", subtitle: "Покажем кратчайший путь") {
-                go(.clubs)
+                if let clubId = preferredClubId {
+                    go(.clubDetail(clubId))
+                } else {
+                    go(.clubInfo)
+                }
             }
             dividerInset
             quickMenuRow(icon: "person.3.fill", title: "Наша команда", subtitle: "Опытные тренеры") {

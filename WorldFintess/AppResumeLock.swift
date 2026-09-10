@@ -1,8 +1,27 @@
 import LocalAuthentication
 import SwiftUI
 
-/// Блокировка при уходе в фон: разблокировка через Face ID / Touch ID или код-пароль устройства (`deviceOwnerAuthentication`).
+/// Блокировка после долгого отсутствия в приложении (как в банковских клиентах).
 enum AppResumeLock {
+    /// Порог неактивности перед запросом разблокировки.
+    static let inactivityLockTimeout: TimeInterval = 5 * 60
+
+    private static let lastBackgroundKey = "wf_last_background_at"
+
+    static func markEnteredBackground() {
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastBackgroundKey)
+    }
+
+    static func shouldRequireUnlockOnResume() -> Bool {
+        let ts = UserDefaults.standard.double(forKey: lastBackgroundKey)
+        guard ts > 0 else { return false }
+        return Date().timeIntervalSince1970 - ts >= inactivityLockTimeout
+    }
+
+    static func clearInactivityMarker() {
+        UserDefaults.standard.removeObject(forKey: lastBackgroundKey)
+    }
+
     @MainActor
     static func authenticateUserPresence() async -> Bool {
         let ctx = LAContext()

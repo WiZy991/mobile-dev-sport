@@ -34,16 +34,14 @@ enum GenderOption: String, CaseIterable, Identifiable {
 /// Шаги формы регистрации (как `RegisterFormStep` на Android).
 enum RegisterFormStep: Int, CaseIterable, Identifiable {
     case personal = 1
-    case passport = 2
-    case account = 3
+    case account = 2
 
     var id: Int { rawValue }
 
     var title: String {
         switch self {
         case .personal: return "Личные данные"
-        case .passport: return "Паспорт"
-        case .account: return "Аккаунт"
+        case .account: return "Пароль и согласие"
         }
     }
 
@@ -116,6 +114,7 @@ private struct RegisterStepErrors {
 
     private var allMessages: [String?] {
         [
+            clubError,
             lastNameError,
             firstNameError,
             birthDateError,
@@ -125,7 +124,6 @@ private struct RegisterStepErrors {
             passportError,
             passwordError,
             confirmPasswordError,
-            clubError,
             legalTermsError,
         ]
     }
@@ -149,6 +147,9 @@ private struct RegisterStepErrors {
 
 @MainActor
 final class RegisterFlowModel: ObservableObject {
+    /// Регистрация после phone OTP (`phoneRegistration` на Android).
+    var phoneOtpMode = false
+
     @Published var selectedClub: ClubItem?
     @Published var registrationType: RegistrationTypeOption = .client
     @Published var lastName = ""
@@ -185,12 +186,36 @@ final class RegisterFlowModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: String?
 
+    @Published var emailCheckLoading = false
+    @Published var emailTakenMaskedPhone: String?
+    @Published var supportEmail: String?
+    @Published var supportPhone: String?
+    @Published var showUnder18Dialog = false
+
+    var pendingAfterUnder18: Under18Continue?
+    var phoneLocked: Bool { phoneOtpMode }
+
+    enum Under18Continue {
+        case needClubPick
+        case register
+    }
+
     var primaryButtonTitle: String {
-        formStep == .account ? "Зарегистрироваться" : "Далее"
+        if phoneOtpMode && formStep == .personal {
+            return "Далее"
+        }
+        return formStep == .account ? "Зарегистрироваться" : "Далее"
     }
 
     var isCurrentStepValid: Bool {
         !validateStep(formStep).hasError
+    }
+
+    func applyPhoneOtpPrefill() {
+        guard phoneOtpMode else { return }
+        if let phone = AuthFlowStore.peekOtpPhone() {
+            phoneNationalDigits = normalizeRussianNationalDigits(phone)
+        }
     }
 
     func selectClub(from card: RegistrationVenueCard) {
@@ -217,6 +242,34 @@ final class RegisterFlowModel: ObservableObject {
         }
         referralError = nil
         return true
+    }
+
+    func submitRegisterEmail(api: FitnessAPI) async -> Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || !RegisterValidation.isValidEmail(trimmed) {
+            emailError = "Введите корректный email"
+            return false
+        }
+        emailCheckLoading = true
+        emailTakenMaskedPhone = nil
+        emailError = nil
+        defer { emailCheckLoading = false }
+        do {
+            let res = try await api.checkRegisterEmail(trimmed)
+            if res.exists {
+                emailTakenMaskedPhone = res.maskedPhone ?? "••••"
+                return false
+            }
+            email = trimmed
+            return true
+        } catch {
+            emailError = error.localizedDescription
+            return false
+        }
+    }
+
+    func dismissEmailTaken() {
+        emailTakenMaskedPhone = nil
     }
 
     func validatePassportDraft() -> Bool {
@@ -266,10 +319,8 @@ final class RegisterFlowModel: ObservableObject {
         switch formStep {
         case .personal:
             return
-        case .passport:
-            formStep = .personal
         case .account:
-            formStep = .passport
+            formStep = .personal
         }
         showValidationErrors = false
         validationSummary = nil
@@ -283,10 +334,12 @@ final class RegisterFlowModel: ObservableObject {
             applyValidationErrors(errors, summary: summaryForStep(formStep, errors), targetStep: formStep)
             return false
         }
+        if phoneOtpMode && formStep == .personal {
+            return true
+        }
         if formStep == .last { return true }
         switch formStep {
-        case .personal: formStep = .passport
-        case .passport: formStep = .account
+        case .personal: formStep = .account
         case .account: break
         }
         showValidationErrors = false
@@ -295,59 +348,129 @@ final class RegisterFlowModel: ObservableObject {
         return true
     }
 
-    func onPrimaryFormAction(api: FitnessAPI, onSuccess: @escaping (AuthResponse) -> Void) async {
+    /// Результат primary action: `needClubPick` для phone-path после personal.
+    enum PrimaryFormOutcome {
+        case advanced
+        case needClubPick
+        case registered(AuthResponse)
+        case failed
+    }
+
+    func onPrimaryFormAction(api: FitnessAPI) async -> PrimaryFormOutcome {
+        if phoneOtpMode && formStep == .personal {
+            guard advanceFormStep() else { return .failed }
+            if shouldShowUnder18Prompt() {
+                pendingAfterUnder18 = .needClubPick
+                showUnder18Dialog = true
+                return .failed
+            }
+            return .needClubPick
+        }
         if formStep == .account {
-            await register(api: api, onSuccess: onSuccess)
-        } else {
-            _ = advanceFormStep()
+            if shouldShowUnder18Prompt() {
+                pendingAfterUnder18 = .register
+                showUnder18Dialog = true
+                return .failed
+            }
+            if let response = await register(api: api) {
+                return .registered(response)
+            }
+            return .failed
+        }
+        return advanceFormStep() ? .advanced : .failed
+    }
+
+    func shouldShowUnder18Prompt() -> Bool {
+        guard let iso = RegisterDateParsing.toIsoDate(birthDateDisplay) else { return false }
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd"
+        guard let born = f.date(from: String(iso.prefix(10))) else { return false }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 0)!
+        let today = cal.startOfDay(for: Date())
+        guard let adultDay = cal.date(byAdding: .year, value: 18, to: cal.startOfDay(for: born)) else { return false }
+        // Как Android: born.plusYears(18).isAfter(today)
+        return adultDay > today
+    }
+
+    func dismissUnder18AndContinue(api: FitnessAPI) async -> PrimaryFormOutcome {
+        showUnder18Dialog = false
+        let pending = pendingAfterUnder18
+        pendingAfterUnder18 = nil
+        switch pending {
+        case .needClubPick:
+            return .needClubPick
+        case .register:
+            if let response = await register(api: api) {
+                return .registered(response)
+            }
+            return .failed
+        case nil:
+            return .failed
         }
     }
 
-    func register(api: FitnessAPI, onSuccess: @escaping (AuthResponse) -> Void) async {
+    func dismissUnder18() {
+        showUnder18Dialog = false
+        pendingAfterUnder18 = nil
+    }
+
+    @discardableResult
+    func register(api: FitnessAPI, onSuccess: ((AuthResponse) -> Void)? = nil) async -> AuthResponse? {
         let personal = validateStep(.personal)
-        let passportErrors = validateStep(.passport)
         let account = validateStep(.account)
-        let merged = personal.merging(passportErrors).merging(account)
+        let merged = personal.merging(account)
         if merged.hasError {
-            let target: RegisterFormStep =
-                personal.hasError ? .personal : (passportErrors.hasError ? .passport : .account)
+            let target: RegisterFormStep = personal.hasError ? .personal : .account
             applyValidationErrors(merged, summary: merged.firstMessage ?? "Заполните обязательные поля", targetStep: target)
-            return
+            return nil
         }
 
         guard let birthIso = RegisterDateParsing.toIsoDate(birthDateDisplay),
-              let gender,
-              let passportIssueIso = RegisterDateParsing.toIsoDate(passport.issuedDateDisplay)
-        else { return }
+              let gender
+        else { return nil }
 
         let fullName = [lastName, firstName, middleName]
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
-        let address = [passport.region, passport.city, passport.streetHouse]
-            .filter { !$0.isEmpty }
-            .joined(separator: ", ")
+
+        let otpTicket = AuthFlowStore.peekOtpTicket()
+        let phoneApi: String = {
+            let fromField = phoneForApi(phoneNationalDigits)
+            if !fromField.isEmpty { return fromField }
+            if let otpPhone = AuthFlowStore.peekOtpPhone() {
+                return phoneForApi(normalizeRussianNationalDigits(otpPhone))
+            }
+            return ""
+        }()
 
         let request = RegisterRequest(
             email: email,
-            password: password,
-            phone: phoneForApi(phoneNationalDigits),
+            password: (phoneOtpMode || otpTicket != nil) ? "" : password,
+            phone: phoneApi,
             name: fullName,
-            registrationType: registrationType.rawValue,
+            registrationType: "client",
             dateOfBirth: birthIso,
             gender: gender.rawValue,
-            passportSeries: passport.series,
-            passportNumber: passport.number,
-            passportIssuedBy: passport.issuedBy,
-            passportIssueDate: passportIssueIso,
-            registrationAddress: address,
-            promoCode: nil,
+            passportSeries: nil,
+            passportNumber: nil,
+            passportIssuedBy: nil,
+            passportIssueDate: nil,
+            registrationAddress: nil,
+            promoCode: promoCode.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
             newsletter: false,
             clubId: selectedClub?.id,
+            clubName: selectedClub?.name,
+            clubAddress: selectedClub?.address,
             referralSource: referralSource,
             referralSourceOther: referralSourceOther.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? nil
-                : String(referralSourceOther.prefix(255))
+                : String(referralSourceOther.prefix(255)),
+            otpTicket: otpTicket
         )
 
         isLoading = true
@@ -355,12 +478,21 @@ final class RegisterFlowModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let response = try await api.register(payload: request)
-            onSuccess(response)
+            let response: AuthResponse
+            if otpTicket != nil {
+                response = try await api.registerPhone(payload: request)
+                AuthFlowStore.clearOtpRegistration()
+            } else {
+                response = try await api.register(payload: request)
+            }
+            onSuccess?(response)
+            return response
         } catch let e as FitnessAPIError {
             error = e.localizedDescription
+            return nil
         } catch {
             self.error = error.localizedDescription
+            return nil
         }
     }
 
@@ -381,7 +513,7 @@ final class RegisterFlowModel: ObservableObject {
         var errors = RegisterStepErrors()
         switch step {
         case .personal:
-            if selectedClub == nil {
+            if !phoneOtpMode && selectedClub == nil {
                 errors.clubError = "Выберите клуб на предыдущем шаге"
             }
             if lastName.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -393,32 +525,23 @@ final class RegisterFlowModel: ObservableObject {
             if RegisterDateParsing.toIsoDate(birthDateDisplay) == nil {
                 errors.birthDateError = "Укажите дату рождения (дд.мм.гггг)"
             }
-            if phoneForApi(phoneNationalDigits).isEmpty {
-                errors.phoneError = "Введите полный номер телефона"
-            }
-            if email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                errors.emailError = "Введите email"
-            } else if !RegisterValidation.isValidEmail(email) {
-                errors.emailError = "Неверный формат email"
+            if !phoneOtpMode {
+                if phoneForApi(phoneNationalDigits).isEmpty {
+                    errors.phoneError = "Введите полный номер телефона"
+                }
+                if email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    errors.emailError = "Введите email"
+                } else if !RegisterValidation.isValidEmail(email) {
+                    errors.emailError = "Неверный формат email"
+                }
             }
             if gender == nil {
                 errors.genderError = "Выберите пол"
             }
-        case .passport:
-            if passport.series.filter({ $0.isASCII && $0.isNumber }).count != 4 {
-                errors.passportError = "Серия паспорта должна состоять из 4 цифр"
-            } else if passport.number.filter({ $0.isASCII && $0.isNumber }).count != 6 {
-                errors.passportError = "Номер паспорта должен состоять из 6 цифр"
-            } else if passport.issuedBy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                errors.passportError = "Укажите, кем выдан паспорт"
-            } else if RegisterDateParsing.toIsoDate(passport.issuedDateDisplay) == nil {
-                errors.passportError = "Укажите дату выдачи в формате дд.мм.гггг"
-            } else if passport.region.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || passport.city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || passport.streetHouse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                errors.passportError = "Заполните адрес прописки (регион, город, улица и дом)"
-            }
         case .account:
+            if phoneOtpMode || AuthFlowStore.peekOtpTicket() != nil {
+                break
+            }
             if password.isEmpty {
                 errors.passwordError = "Введите пароль"
             } else if password.count < 6 {
@@ -438,7 +561,6 @@ final class RegisterFlowModel: ObservableObject {
         let detail = errors.firstMessage
         switch step {
         case .personal: return detail ?? "Заполните личные данные"
-        case .passport: return detail ?? "Заполните паспортные данные"
         case .account: return detail ?? "Заполните пароль и подтвердите согласие"
         }
     }
@@ -463,22 +585,39 @@ final class RegisterFlowModel: ObservableObject {
 }
 
 enum RegisterDateParsing {
+    /// Только цифры → `дд.мм.гггг` (как `DateDotsVisualTransformation` на Android).
+    static func applyDotsMask(_ raw: String) -> String {
+        let digits = String(raw.filter(\.isNumber).prefix(8))
+        var out = ""
+        for (i, c) in digits.enumerated() {
+            if i == 2 || i == 4 { out.append(".") }
+            out.append(c)
+        }
+        return out
+    }
+
     static func toIsoDate(_ text: String) -> String? {
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
         let df = DateFormatter()
         // POSIX + GMT: стабильный разбор «дд.мм.гггг» без сюрпризов локали/DST.
         df.locale = Locale(identifier: "en_US_POSIX")
         df.timeZone = TimeZone(secondsFromGMT: 0)
         df.isLenient = false
-        for pattern in ["dd.MM.yyyy", "d.M.yyyy", "dd.M.yyyy", "d.MM.yyyy", "yyyy-MM-dd"] {
-            df.dateFormat = pattern
-            if let d = df.date(from: t) {
-                df.dateFormat = "yyyy-MM-dd"
+
+        if trimmed.contains("-") {
+            df.dateFormat = "yyyy-MM-dd"
+            if let d = df.date(from: String(trimmed.prefix(10))) {
                 return df.string(from: d)
             }
         }
-        return nil
+
+        let dotted = applyDotsMask(trimmed)
+        guard dotted.count == 10 else { return nil }
+        df.dateFormat = "dd.MM.yyyy"
+        guard let d = df.date(from: dotted) else { return nil }
+        df.dateFormat = "yyyy-MM-dd"
+        return df.string(from: d)
     }
 
     static func displayFromDate(_ date: Date) -> String {
@@ -500,63 +639,233 @@ enum RegisterValidation {
 // MARK: - Навигация регистрации
 
 private enum RegisterRoute: Hashable {
+    case emailCheck
     case clubPick
     case form
-    case passport
 }
 
 struct RegisterFlowView: View {
     @EnvironmentObject private var app: WorldFitnessAppState
     @Environment(\.dismiss) private var dismiss
+    var phoneOtpMode: Bool = false
     @StateObject private var model = RegisterFlowModel()
     @State private var path: [RegisterRoute] = []
 
     var body: some View {
         NavigationStack(path: $path) {
-            RegisterSurveyStepView(
-                model: model,
-                onBack: { dismiss() },
-                onSubmit: {
-                    if model.submitSurvey() {
-                        path.append(.clubPick)
-                    }
+            Group {
+                if phoneOtpMode {
+                    RegisterEmailCheckStepView(
+                        model: model,
+                        onBack: { dismiss() },
+                        onContinue: { path.append(.form) }
+                    )
+                } else {
+                    RegisterSurveyStepView(
+                        model: model,
+                        onBack: { dismiss() },
+                        onSubmit: {
+                            if model.submitSurvey() {
+                                path.append(.clubPick)
+                            }
+                        }
+                    )
                 }
-            )
+            }
             .navigationDestination(for: RegisterRoute.self) { route in
                 switch route {
+                case .emailCheck:
+                    RegisterEmailCheckStepView(
+                        model: model,
+                        onBack: { dismiss() },
+                        onContinue: { path.append(.form) }
+                    )
                 case .clubPick:
                     RegisterClubPickStepView(
                         selectedClubId: model.selectedClub?.id,
+                        isSubmitting: model.isLoading,
+                        submitError: model.error,
+                        phoneRegistration: phoneOtpMode,
                         onClubSelected: { model.selectClub(from: $0) },
-                        onContinue: { path.append(.form) },
+                        onContinue: {
+                            if phoneOtpMode {
+                                Task {
+                                    if let response = await model.register(api: app.api) {
+                                        applyRegistered(response)
+                                    }
+                                }
+                            } else {
+                                path.append(.form)
+                            }
+                        },
                         onBack: {
-                            if path.isEmpty { dismiss() } else { path.removeLast() }
+                            if phoneOtpMode {
+                                // Phone: club ← form
+                                if path.isEmpty { dismiss() } else { path.removeLast() }
+                            } else {
+                                // Email: club ← Login (как Android)
+                                dismiss()
+                            }
                         }
                     )
                 case .form:
                     RegisterFormView(
                         model: model,
-                        onBackToLogin: { dismiss() },
+                        onBackToLogin: {
+                            dismiss()
+                        },
                         onChangeClub: {
                             model.formStep = .personal
                             model.showValidationErrors = false
                             model.validationSummary = nil
-                            path = [.clubPick]
+                            if phoneOtpMode {
+                                path.append(.clubPick)
+                            } else {
+                                path = [.clubPick]
+                            }
                         },
-                        onOpenPassport: { path.append(.passport) },
+                        onNeedClubPick: {
+                            path.append(.clubPick)
+                        },
                         onRegistered: { response in
-                            app.applyAuth(response, markReturningCustomerOnDevice: false)
-                            app.markReturningCustomerOnDeviceAfterSuccessfulSignupFlow()
-                            app.pendingSecuritySetup = true
-                            dismiss()
+                            applyRegistered(response)
                         }
                     )
-                case .passport:
-                    RegisterPassportView(model: model) {
-                        path.removeLast()
-                    }
                 }
             }
+        }
+        .onAppear {
+            model.phoneOtpMode = phoneOtpMode
+            model.applyPhoneOtpPrefill()
+        }
+        .task {
+            if let info = try? await app.api.getClubInfo() {
+                model.supportEmail = info.email.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                model.supportPhone = info.phone.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            }
+        }
+    }
+
+    private func applyRegistered(_ response: AuthResponse) {
+        app.applyAuth(response, markReturningCustomerOnDevice: false)
+        app.markReturningCustomerOnDeviceAfterSuccessfulSignupFlow()
+        app.pendingSecuritySetup = true
+        dismiss()
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        let t = trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? nil : t
+    }
+}
+
+// MARK: - Email check (`RegisterEmailScreen.kt`)
+
+private struct RegisterEmailCheckStepView: View {
+    @EnvironmentObject private var app: WorldFitnessAppState
+    @ObservedObject var model: RegisterFlowModel
+    let onBack: () -> Void
+    let onContinue: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Theme.onBackground)
+                        .frame(width: 44, height: 44)
+                }
+                Text("Давайте познакомимся!")
+                    .font(FCTypography.titleLarge())
+                    .fontWeight(.bold)
+                    .foregroundStyle(Theme.onBackground)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+
+            Text("Введите email — так мы поймём, не регистрировались ли вы раньше.")
+                .font(FCTypography.bodyMedium())
+                .foregroundStyle(Theme.onSurfaceVariant)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+
+            TextField("Email", text: $model.email)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Theme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radius12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius12, style: .continuous)
+                        .stroke(model.emailError != nil ? Theme.error : Theme.outlineVariant, lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .onChange(of: model.email) { _, _ in model.emailError = nil }
+
+            if let err = model.emailError {
+                Text(err)
+                    .font(FCTypography.bodySmall())
+                    .foregroundStyle(Theme.error)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 6)
+            }
+
+            Spacer()
+
+            Button {
+                Task {
+                    if await model.submitRegisterEmail(api: app.api) {
+                        onContinue()
+                    }
+                }
+            } label: {
+                Group {
+                    if model.emailCheckLoading {
+                        ProgressView().tint(Theme.onPrimary)
+                    } else {
+                        Text("Далее")
+                            .fontWeight(.bold)
+                    }
+                }
+                .foregroundStyle(Theme.onPrimary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Theme.primary)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radius14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(model.emailCheckLoading)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationBarHidden(true)
+        .alert("Аккаунт уже есть", isPresented: Binding(
+            get: { model.emailTakenMaskedPhone != nil },
+            set: { if !$0 { model.dismissEmailTaken() } }
+        )) {
+            Button("Связаться с поддержкой") {
+                if let email = model.supportEmail, let u = URL(string: "mailto:\(email)") {
+                    UIApplication.shared.open(u)
+                } else if let phone = model.supportPhone {
+                    dialPhoneRaw(phone)
+                }
+            }
+            Button("Ввести другой email", role: .cancel) {
+                model.dismissEmailTaken()
+            }
+        } message: {
+            let phone = model.emailTakenMaskedPhone ?? "••••"
+            Text(
+                "Аккаунт с этой почтой уже есть. Телефон в профиле: \(phone). Обратитесь в поддержку, чтобы восстановить доступ."
+            )
         }
     }
 }
@@ -686,6 +995,9 @@ private struct RegisterSurveyStepView: View {
 private struct RegisterClubPickStepView: View {
     @EnvironmentObject private var app: WorldFitnessAppState
     let selectedClubId: String?
+    var isSubmitting: Bool = false
+    var submitError: String? = nil
+    var phoneRegistration: Bool = false
     let onClubSelected: (RegistrationVenueCard) -> Void
     let onContinue: () -> Void
     let onBack: () -> Void
@@ -749,7 +1061,7 @@ private struct RegisterClubPickStepView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 16)
                     } else if cards.isEmpty {
-                        Text("Нет доступных залов. Попробуйте позже или обратитесь в клуб.")
+                        Text("Нет залов. Отметьте «Показывать в приложении» у залов в CRM.")
                             .font(FCTypography.bodyMedium())
                             .foregroundStyle(Theme.loginOnBackground)
                             .frame(maxWidth: .infinity)
@@ -761,19 +1073,34 @@ private struct RegisterClubPickStepView: View {
                         }
                     }
 
-                    Button(action: onContinue) {
-                        Text("Продолжить регистрацию")
-                            .font(FCTypography.titleMedium())
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Theme.onPrimary)
+                    if let submitError {
+                        Text(submitError)
+                            .font(FCTypography.bodyMedium())
+                            .foregroundStyle(Color(red: 1, green: 0.88, blue: 0.7))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Theme.primary)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.radius14, style: .continuous))
+                            .multilineTextAlignment(.center)
+                            .padding(.vertical, 8)
+                    }
+
+                    Button(action: onContinue) {
+                        Group {
+                            if isSubmitting {
+                                ProgressView().tint(Theme.onPrimary)
+                            } else {
+                                Text(phoneRegistration ? "Зарегистрироваться" : "Продолжить регистрацию")
+                                    .font(FCTypography.titleMedium())
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .foregroundStyle(Theme.onPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Theme.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radius14, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .opacity(selectedClubId == nil ? 0.55 : 1)
-                    .disabled(selectedClubId == nil)
+                    .opacity(selectedClubId == nil || isSubmitting ? 0.55 : 1)
+                    .disabled(selectedClubId == nil || isSubmitting)
                     .padding(.top, 6)
                     .padding(.bottom, 36)
                 }
@@ -791,10 +1118,21 @@ private struct RegisterClubPickStepView: View {
         defer { loading = false }
         do {
             let clubs = try await app.api.getClubs()
-            cards = clubs.map(RegistrationVenueCard.init(from:))
+            if clubs.isEmpty {
+                cards = RegistrationVenues.orderedCards
+                if cards.isEmpty {
+                    loadError = nil
+                }
+            } else {
+                cards = clubs.map(RegistrationVenueCard.init(from:))
+            }
         } catch {
-            loadError = "Не удалось загрузить список залов"
-            cards = []
+            cards = RegistrationVenues.orderedCards
+            if cards.isEmpty {
+                loadError = "Не удалось загрузить список клубов"
+            } else {
+                loadError = nil
+            }
         }
     }
 
@@ -975,7 +1313,7 @@ private struct RegisterFormView: View {
     @ObservedObject var model: RegisterFlowModel
     let onBackToLogin: () -> Void
     let onChangeClub: () -> Void
-    let onOpenPassport: () -> Void
+    let onNeedClubPick: () -> Void
     let onRegistered: (AuthResponse) -> Void
 
     @State private var passwordVisible = false
@@ -1021,14 +1359,21 @@ private struct RegisterFormView: View {
                             )
                             .padding(.bottom, 12)
 
-                            selectedClubSummary
+                            if !model.phoneOtpMode {
+                                selectedClubSummary
+                            }
+
+                            if model.formStep == .personal {
+                                Text("Пожалуйста, вводите данные точно также, как они указаны в вашем паспорте. Иначе вы не сможете приобрести абонемент.")
+                                    .font(FCTypography.bodySmall())
+                                    .foregroundStyle(surface.opacity(0.9))
+                                    .padding(.bottom, 8)
+                            }
 
                             Group {
                                 switch model.formStep {
                                 case .personal:
                                     personalStepContent
-                                case .passport:
-                                    passportStepContent
                                 case .account:
                                     accountStepContent
                                 }
@@ -1062,7 +1407,17 @@ private struct RegisterFormView: View {
                 VStack(spacing: 8) {
                     Button {
                         Task {
-                            await model.onPrimaryFormAction(api: app.api, onSuccess: onRegistered)
+                            let outcome = await model.onPrimaryFormAction(api: app.api)
+                            switch outcome {
+                            case .advanced:
+                                break
+                            case .needClubPick:
+                                onNeedClubPick()
+                            case .registered(let response):
+                                onRegistered(response)
+                            case .failed:
+                                break
+                            }
                         }
                     } label: {
                         Group {
@@ -1077,12 +1432,24 @@ private struct RegisterFormView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
                         .background(
-                            surface.opacity(model.isLoading || !model.isCurrentStepValid ? 0.35 : 0.92)
+                            surface.opacity(
+                                model.isLoading || model.validationSummary != nil || !model.isCurrentStepValid
+                                    ? 0.35
+                                    : 0.92
+                            )
                         )
                         .clipShape(RoundedRectangle(cornerRadius: Theme.radius28, style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    // Не блокируем при невалидной форме — иначе `applyValidationErrors` не вызывается.
                     .disabled(model.isLoading)
+
+                    Button("Уже есть аккаунт? Войти", action: onBackToLogin)
+                        .buttonStyle(.plain)
+                        .font(FCTypography.titleSmall())
+                        .foregroundStyle(surface)
+                        .underline()
+                        .padding(.top, 4)
 
                     if let error = model.error {
                         Text(error)
@@ -1103,11 +1470,32 @@ private struct RegisterFormView: View {
         .sheet(isPresented: $showBirthPicker) {
             RegisterDatePickerSheet(
                 title: "Дата рождения",
-                onPick: { model.birthDateDisplay = RegisterDateParsing.displayFromDate($0) }
+                onPick: {
+                    model.birthDateDisplay = RegisterDateParsing.displayFromDate($0)
+                    model.birthDateError = nil
+                    model.validationSummary = nil
+                }
             )
         }
         .sheet(item: $legalPdfSheet) { asset in
             LegalPdfSheet(asset: asset) { legalPdfSheet = nil }
+        }
+        .alert("Внимание!", isPresented: $model.showUnder18Dialog) {
+            Button("Хорошо") {
+                Task {
+                    let outcome = await model.dismissUnder18AndContinue(api: app.api)
+                    switch outcome {
+                    case .needClubPick:
+                        onNeedClubPick()
+                    case .registered(let response):
+                        onRegistered(response)
+                    default:
+                        break
+                    }
+                }
+            }
+        } message: {
+            Text("Лица младше 18 лет могут посещать наши спортзалы только в сопровождении родителя, опекуна или профессионального тренера.")
         }
     }
 
@@ -1127,54 +1515,61 @@ private struct RegisterFormView: View {
         }
     }
 
+    private var birthDateBinding: Binding<String> {
+        Binding(
+            get: { model.birthDateDisplay },
+            set: { model.birthDateDisplay = RegisterDateParsing.applyDotsMask($0) }
+        )
+    }
+
     @ViewBuilder
     private var personalStepContent: some View {
-        registrationTypePicker
-            .padding(.top, 8)
-
-        orangeField("Фамилия", text: $model.lastName, error: model.fieldErr(model.lastNameError))
-        orangeField("Имя", text: $model.firstName, error: model.fieldErr(model.firstNameError))
+        orangeField(
+            "Фамилия",
+            text: $model.lastName,
+            error: model.fieldErr(model.lastNameError),
+            onEdit: { model.lastNameError = nil }
+        )
+        orangeField(
+            "Имя",
+            text: $model.firstName,
+            error: model.fieldErr(model.firstNameError),
+            onEdit: { model.firstNameError = nil }
+        )
         orangeField("Отчество", text: $model.middleName, error: nil)
 
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             orangeField(
                 "Дата рождения",
-                text: $model.birthDateDisplay,
+                text: birthDateBinding,
                 error: model.fieldErr(model.birthDateError),
                 placeholder: "дд.мм.гггг",
-                keyboard: .numbersAndPunctuation
+                keyboard: .numberPad,
+                onEdit: { model.birthDateError = nil }
             )
             Button { showBirthPicker = true } label: {
                 Image(systemName: "calendar")
                     .font(.title3)
                     .foregroundStyle(surface)
                     .frame(width: 44, height: 44)
+                    .padding(.top, 10)
             }
             .buttonStyle(.plain)
         }
 
-        phoneField
-
-        orangeField(
-            "E-mail",
-            text: $model.email,
-            error: model.fieldErr(model.emailError),
-            keyboard: .emailAddress,
-            email: true
-        )
+        if !model.phoneOtpMode {
+            phoneField
+            orangeField(
+                "E-mail",
+                text: $model.email,
+                error: model.fieldErr(model.emailError),
+                keyboard: .emailAddress,
+                email: true,
+                onEdit: { model.emailError = nil }
+            )
+        }
 
         genderPicker
-    }
-
-    @ViewBuilder
-    private var passportStepContent: some View {
-        Text("Укажите паспортные данные — они нужны для оформления абонемента и доступа в клуб.")
-            .font(FCTypography.bodyMedium())
-            .foregroundStyle(surface.opacity(0.9))
-            .padding(.bottom, 12)
-
-        passportCard
-            .padding(.top, 4)
     }
 
     @ViewBuilder
@@ -1185,13 +1580,23 @@ private struct RegisterFormView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 4)
 
-        orangeSecureField("Пароль", text: $model.password, visible: $passwordVisible, error: model.fieldErr(model.passwordError))
+        orangeSecureField(
+            "Пароль",
+            text: $model.password,
+            visible: $passwordVisible,
+            error: model.fieldErr(model.passwordError),
+            onEdit: { model.passwordError = nil }
+        )
         orangeSecureField(
             "Подтвердите пароль",
             text: $model.confirmPassword,
             visible: $confirmPasswordVisible,
-            error: model.fieldErr(model.confirmPasswordError)
+            error: model.fieldErr(model.confirmPasswordError),
+            onEdit: { model.confirmPasswordError = nil }
         )
+
+        orangeField("Промокод (необязательно)", text: $model.promoCode, error: nil)
+            .padding(.top, 4)
 
         registerLegalParagraph
             .padding(.top, 16)
@@ -1214,7 +1619,7 @@ private struct RegisterFormView: View {
                 Text(club.address)
                     .font(FCTypography.bodySmall())
                     .foregroundStyle(surface.opacity(0.88))
-                Button("Сменить зал", action: onChangeClub)
+                Button("Изменить", action: onChangeClub)
                     .font(FCTypography.bodySmall())
                     .foregroundStyle(surface)
                     .underline()
@@ -1262,17 +1667,14 @@ private struct RegisterFormView: View {
     private var phoneField: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                TextField(
-                    "",
-                    text: Binding(
-                        get: { formatRussianPhoneMask(model.phoneNationalDigits) },
-                        set: { model.phoneNationalDigits = normalizeRussianNationalDigits($0) }
-                    ),
-                    prompt: Text("+7 (999) 123-45-67").foregroundStyle(Theme.loginBackground.opacity(0.45))
+                RussianPhoneTextField(
+                    nationalDigits: $model.phoneNationalDigits,
+                    textColor: UIColor(Theme.loginBackground),
+                    font: UIFont.preferredFont(forTextStyle: .body),
+                    placeholder: "+7 (999) 123-45-67"
                 )
-                .keyboardType(.phonePad)
-                .foregroundStyle(Theme.loginBackground)
-                .font(FCTypography.bodyLarge())
+                .frame(maxWidth: .infinity)
+                .frame(height: 22)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 .background(surface)
@@ -1286,6 +1688,37 @@ private struct RegisterFormView: View {
                     .font(FCTypography.bodySmall())
                     .foregroundStyle(Color(red: 1, green: 0.88, blue: 0.7))
             }
+        }
+        .overlay(alignment: .topLeading) {
+            Text("Номер телефона")
+                .font(FCTypography.labelSmall())
+                .foregroundStyle(surface.opacity(0.78))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(Theme.primary)
+                .offset(x: 8, y: -8)
+        }
+        .padding(.top, 10)
+        .onChange(of: model.phoneNationalDigits) { _, _ in
+            model.phoneError = nil
+            model.validationSummary = nil
+        }
+    }
+
+    private var phoneFieldLocked: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TextField(
+                "",
+                text: .constant(formatRussianPhoneMask(model.phoneNationalDigits)),
+                prompt: Text("+7 (999) 123-45-67").foregroundStyle(Theme.loginBackground.opacity(0.45))
+            )
+            .disabled(true)
+            .foregroundStyle(Theme.loginBackground.opacity(0.75))
+            .font(FCTypography.bodyLarge())
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(surface.opacity(0.85))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radius14, style: .continuous))
         }
         .overlay(alignment: .topLeading) {
             Text("Номер телефона")
@@ -1331,44 +1764,6 @@ private struct RegisterFormView: View {
         }
     }
 
-    private var passportCard: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Button(action: onOpenPassport) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Паспорт")
-                            .font(FCTypography.titleSmall())
-                            .fontWeight(.semibold)
-                            .foregroundStyle(surface)
-                        Text(model.passport.summary)
-                            .font(FCTypography.bodySmall())
-                            .foregroundStyle(surface.opacity(0.88))
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .foregroundStyle(surface)
-                }
-                .padding(16)
-                .background(surface.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: Theme.radius14, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.radius14, style: .continuous)
-                        .stroke(
-                            model.fieldErr(model.passportError) != nil ? Color(red: 1, green: 0.88, blue: 0.7) : surface.opacity(0.35),
-                            lineWidth: 1
-                        )
-                )
-            }
-            .buttonStyle(.plain)
-
-            if let err = model.fieldErr(model.passportError) {
-                Text(err)
-                    .font(FCTypography.bodySmall())
-                    .foregroundStyle(Color(red: 1, green: 0.88, blue: 0.7))
-            }
-        }
-    }
-
     private var registerLegalParagraph: some View {
         let privacy = "legalpdf://\(LegalPdfAsset.privacyPolicy.rawValue)"
         let ua = "legalpdf://\(LegalPdfAsset.userAgreement.rawValue)"
@@ -1395,7 +1790,8 @@ private struct RegisterFormView: View {
         error: String?,
         placeholder: String? = nil,
         keyboard: UIKeyboardType = .default,
-        email: Bool = false
+        email: Bool = false,
+        onEdit: (() -> Void)? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             TextField(
@@ -1426,6 +1822,7 @@ private struct RegisterFormView: View {
         .padding(.top, 10)
         .onChange(of: text.wrappedValue) { _, _ in
             model.validationSummary = nil
+            onEdit?()
         }
     }
 
@@ -1433,7 +1830,8 @@ private struct RegisterFormView: View {
         _ label: String,
         text: Binding<String>,
         visible: Binding<Bool>,
-        error: String?
+        error: String?,
+        onEdit: (() -> Void)? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -1470,6 +1868,10 @@ private struct RegisterFormView: View {
             }
         }
         .padding(.top, 10)
+        .onChange(of: text.wrappedValue) { _, _ in
+            model.validationSummary = nil
+            onEdit?()
+        }
     }
 }
 
@@ -1515,7 +1917,17 @@ private struct RegisterPassportView: View {
                     passportField("Кем выдан", text: model.passportBinding(\.issuedBy), limit: 300, multiline: true)
 
                     HStack(spacing: 8) {
-                        passportField("Выдан", text: model.passportBinding(\.issuedDateDisplay), placeholder: "дд.мм.гггг")
+                        passportField(
+                            "Выдан",
+                            text: Binding(
+                                get: { model.passport.issuedDateDisplay },
+                                set: {
+                                    model.passport.issuedDateDisplay = RegisterDateParsing.applyDotsMask($0)
+                                    model.passportError = nil
+                                }
+                            ),
+                            placeholder: "дд.мм.гггг"
+                        )
                         Button { showIssuePicker = true } label: {
                             Image(systemName: "calendar")
                                 .font(.title3)

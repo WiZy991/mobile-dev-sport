@@ -96,18 +96,13 @@ struct SelectPreferredClubView: View {
                     if selected {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(Theme.primary)
+                            .foregroundStyle(.white)
                             .padding(12)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }
                 }
-                .clipShape(UnevenRoundedRectangle(
-                    topLeadingRadius: Theme.radius20,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: Theme.radius20,
-                    style: .continuous
-                ))
+                .frame(height: 132)
+                .clipped()
 
                 HStack(spacing: 8) {
                     Image(systemName: "mappin.and.ellipse")
@@ -176,10 +171,16 @@ struct SelectPreferredClubView: View {
             let list = try await app.api.getClubs()
             clubs = Self.orderedClubs(list)
             if clubs.isEmpty {
+                clubs = RegistrationVenues.orderedCards.map(RegistrationVenues.clubItem(for:))
+            }
+            if clubs.isEmpty {
                 error = "Нет доступных клубов"
             }
         } catch {
-            self.error = error.localizedDescription
+            clubs = RegistrationVenues.orderedCards.map(RegistrationVenues.clubItem(for:))
+            if clubs.isEmpty {
+                self.error = error.localizedDescription
+            }
         }
     }
 

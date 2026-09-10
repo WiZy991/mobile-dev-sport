@@ -112,6 +112,14 @@ struct QrAccessSheetContent: View {
             }
         }
         .task { await refreshGate() }
+        .task {
+            // Как Android: опрос access status ~каждые 8 с, пока экран открыт.
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                guard !Task.isCancelled else { return }
+                await pollAccessStatus()
+            }
+        }
         .onDisappear { rotor.stop() }
     }
 
@@ -149,6 +157,15 @@ struct QrAccessSheetContent: View {
         } else {
             ProgressView()
                 .tint(Theme.primary)
+        }
+    }
+
+    private func pollAccessStatus() async {
+        let inside = (try? await app.api.getAccessStatus(forceRefresh: true))?.isInside ?? isInsideGym
+        let changed = inside != isInsideGym
+        isInsideGym = inside
+        if changed {
+            await refreshGate()
         }
     }
 
@@ -202,7 +219,7 @@ struct QrFullScreenView: View {
 
                     Spacer().frame(height: 16)
 
-                    Text(isInsideGym ? "Выход из зала" : "Вход/выход в зал")
+                    Text(isInsideGym ? "Выход из зала" : "Вход в зал")
                         .font(FCTypography.titleMedium())
                         .fontWeight(.semibold)
                         .foregroundStyle(Theme.onBackground)
@@ -253,7 +270,23 @@ struct QrFullScreenView: View {
         .fcPrimaryNavigation(title: "Электронная карта")
         .background(Theme.background)
         .task { await refreshGate() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                guard !Task.isCancelled else { return }
+                await pollAccessStatus()
+            }
+        }
         .onDisappear { rotor.stop() }
+    }
+
+    private func pollAccessStatus() async {
+        let inside = (try? await app.api.getAccessStatus(forceRefresh: true))?.isInside ?? isInsideGym
+        let changed = inside != isInsideGym
+        isInsideGym = inside
+        if changed {
+            await refreshGate()
+        }
     }
 
     private var qrExpiryFooter: String {

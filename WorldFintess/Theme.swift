@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - FitnessClub Android parity (`Color.kt`, `colors.xml`, Material 3 light scheme)
 
@@ -13,14 +14,14 @@ enum Theme {
     static let secondaryVariant = Color(hex: 0x1A252F)
     static let onSecondary = Color.white
 
-    // Surfaces
-    static let background = Color(hex: 0xF5F5F5)
-    static let surface = Color.white
-    static let surfaceVariant = Color(hex: 0xF5F5F5) // Gray100
-    static let onBackground = Color(hex: 0x1C1B1F)
-    static let onSurface = Color(hex: 0x1C1B1F)
-    static let onSurfaceVariant = Color(hex: 0x757575) // Gray600-ish for secondary text
-    static let outlineVariant = Color(hex: 0xE0E0E0) // Gray300
+    // Surfaces (адаптивные под тёмную тему, значения тёмной — `Color.kt` Dark*)
+    static let background = Color(light: 0xF5F5F5, dark: 0x121212)
+    static let surface = Color(light: 0xFFFFFF, dark: 0x1E1E1E)
+    static let surfaceVariant = Color(light: 0xF5F5F5, dark: 0x2A2A2A)
+    static let onBackground = Color(light: 0x1C1B1F, dark: 0xE1E1E1)
+    static let onSurface = Color(light: 0x1C1B1F, dark: 0xE1E1E1)
+    static let onSurfaceVariant = Color(light: 0x757575, dark: 0xAAAAAA)
+    static let outlineVariant = Color(light: 0xE0E0E0, dark: 0x3A3A3A)
 
     // Status
     static let success = Color(hex: 0x4CAF50)
@@ -56,6 +57,47 @@ extension Color {
         let g = Double((hex >> 8) & 0xFF) / 255
         let b = Double(hex & 0xFF) / 255
         self.init(.sRGB, red: r, green: g, blue: b, opacity: alpha)
+    }
+
+    /// Динамический цвет: разные значения для светлой и тёмной темы.
+    init(light: UInt32, dark: UInt32) {
+        self.init(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? UIColor(hex: dark) : UIColor(hex: light)
+        })
+    }
+}
+
+extension UIColor {
+    convenience init(hex: UInt32, alpha: CGFloat = 1) {
+        let r = CGFloat((hex >> 16) & 0xFF) / 255
+        let g = CGFloat((hex >> 8) & 0xFF) / 255
+        let b = CGFloat(hex & 0xFF) / 255
+        self.init(red: r, green: g, blue: b, alpha: alpha)
+    }
+}
+
+/// Режим темы приложения (`ThemeMode` на Android: System/Light/Dark).
+enum AppThemeMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "Системная"
+        case .light: return "Светлая"
+        case .dark: return "Тёмная"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
     }
 }
 

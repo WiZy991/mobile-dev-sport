@@ -11,6 +11,13 @@ struct User: Codable, Identifiable, Hashable, Sendable {
     let bonusPoints: Int
     let passportVerificationStatus: String?
     let dateOfBirth: String?
+    let passportSeries: String?
+    let passportNumber: String?
+    let passportIssuedBy: String?
+    let passportIssueDate: String?
+    let registrationAddress: String?
+    let emailVerified: Bool
+    let profileLocked: Bool
     let createdAt: String?
     let isVerified: Bool
     let sberId: String?
@@ -30,6 +37,13 @@ struct User: Codable, Identifiable, Hashable, Sendable {
         bonusPoints: Int = 0,
         passportVerificationStatus: String? = nil,
         dateOfBirth: String? = nil,
+        passportSeries: String? = nil,
+        passportNumber: String? = nil,
+        passportIssuedBy: String? = nil,
+        passportIssueDate: String? = nil,
+        registrationAddress: String? = nil,
+        emailVerified: Bool = false,
+        profileLocked: Bool = false,
         createdAt: String? = nil,
         isVerified: Bool = false,
         sberId: String? = nil,
@@ -45,12 +59,31 @@ struct User: Codable, Identifiable, Hashable, Sendable {
         self.bonusPoints = bonusPoints
         self.passportVerificationStatus = passportVerificationStatus
         self.dateOfBirth = dateOfBirth
+        self.passportSeries = passportSeries
+        self.passportNumber = passportNumber
+        self.passportIssuedBy = passportIssuedBy
+        self.passportIssueDate = passportIssueDate
+        self.registrationAddress = registrationAddress
+        self.emailVerified = emailVerified
+        self.profileLocked = profileLocked
         self.createdAt = createdAt
         self.isVerified = isVerified
         self.sberId = sberId
         self.clubId = clubId
         self.clubName = clubName
         self.entryQrFormat = entryQrFormat
+    }
+
+    /// Как `User.isPassportCompleteForPurchase()` на Android.
+    var isPassportCompleteForPurchase: Bool {
+        let series = passportSeries?.filter { $0.isASCII && $0.isNumber } ?? ""
+        let number = passportNumber?.filter { $0.isASCII && $0.isNumber } ?? ""
+        return series.count == 4
+            && number.count == 6
+            && !(passportIssuedBy ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !(passportIssueDate ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !(registrationAddress ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !(dateOfBirth ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     init(from decoder: Decoder) throws {
@@ -66,6 +99,13 @@ struct User: Codable, Identifiable, Hashable, Sendable {
         bonusPoints = try c.decodeIfPresent(Int.self, forKey: .bonusPoints) ?? 0
         passportVerificationStatus = try c.decodeIfPresent(String.self, forKey: .passportVerificationStatus)
         dateOfBirth = try c.decodeIfPresent(String.self, forKey: .dateOfBirth)
+        passportSeries = try c.decodeIfPresent(String.self, forKey: .passportSeries)
+        passportNumber = try c.decodeIfPresent(String.self, forKey: .passportNumber)
+        passportIssuedBy = try c.decodeIfPresent(String.self, forKey: .passportIssuedBy)
+        passportIssueDate = try c.decodeIfPresent(String.self, forKey: .passportIssueDate)
+        registrationAddress = try c.decodeIfPresent(String.self, forKey: .registrationAddress)
+        emailVerified = try c.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
+        profileLocked = try c.decodeIfPresent(Bool.self, forKey: .profileLocked) ?? false
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
         isVerified = try c.decodeIfPresent(Bool.self, forKey: .isVerified) ?? false
         sberId = try c.decodeIfPresent(String.self, forKey: .sberId)
@@ -81,6 +121,8 @@ struct User: Codable, Identifiable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, email, phone, name, avatarUrl, bonusPoints
         case passportVerificationStatus, dateOfBirth, createdAt, isVerified, sberId, clubId, clubName, entryQrFormat
+        case passportSeries, passportNumber, passportIssuedBy, passportIssueDate, registrationAddress
+        case emailVerified, profileLocked
     }
 
     func encode(to encoder: Encoder) throws {
@@ -93,12 +135,54 @@ struct User: Codable, Identifiable, Hashable, Sendable {
         try c.encode(bonusPoints, forKey: .bonusPoints)
         try c.encodeIfPresent(passportVerificationStatus, forKey: .passportVerificationStatus)
         try c.encodeIfPresent(dateOfBirth, forKey: .dateOfBirth)
+        try c.encodeIfPresent(passportSeries, forKey: .passportSeries)
+        try c.encodeIfPresent(passportNumber, forKey: .passportNumber)
+        try c.encodeIfPresent(passportIssuedBy, forKey: .passportIssuedBy)
+        try c.encodeIfPresent(passportIssueDate, forKey: .passportIssueDate)
+        try c.encodeIfPresent(registrationAddress, forKey: .registrationAddress)
+        try c.encode(emailVerified, forKey: .emailVerified)
+        try c.encode(profileLocked, forKey: .profileLocked)
         try c.encodeIfPresent(createdAt, forKey: .createdAt)
         try c.encode(isVerified, forKey: .isVerified)
         try c.encodeIfPresent(sberId, forKey: .sberId)
         try c.encodeIfPresent(clubId, forKey: .clubId)
         try c.encodeIfPresent(clubName, forKey: .clubName)
         try c.encodeIfPresent(entryQrFormat, forKey: .entryQrFormat)
+    }
+
+    func withPassportForPurchase(
+        name: String,
+        email: String,
+        dateOfBirth: String?,
+        series: String,
+        number: String,
+        issuedBy: String,
+        issueDate: String,
+        registrationAddress: String
+    ) -> User {
+        User(
+            id: id,
+            email: email,
+            phone: phone,
+            name: name,
+            avatarUrl: avatarUrl,
+            bonusPoints: bonusPoints,
+            passportVerificationStatus: passportVerificationStatus,
+            dateOfBirth: dateOfBirth ?? self.dateOfBirth,
+            passportSeries: series,
+            passportNumber: number,
+            passportIssuedBy: issuedBy,
+            passportIssueDate: issueDate,
+            registrationAddress: registrationAddress,
+            emailVerified: emailVerified,
+            profileLocked: profileLocked,
+            createdAt: createdAt,
+            isVerified: isVerified,
+            sberId: sberId,
+            clubId: clubId,
+            clubName: clubName,
+            entryQrFormat: entryQrFormat
+        )
     }
 }
 
@@ -109,6 +193,12 @@ struct AuthResponse: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case token, refreshToken, user
+    }
+
+    init(token: String, refreshToken: String, user: User) {
+        self.token = token
+        self.refreshToken = refreshToken
+        self.user = user
     }
 
     init(from decoder: Decoder) throws {
@@ -288,6 +378,7 @@ struct RegisterRequest: Codable, Sendable {
     let registrationType: String?
     let dateOfBirth: String?
     let gender: String?
+    /// На регистрации всегда `null` (паспорт — перед покупкой), как на Android.
     let passportSeries: String?
     let passportNumber: String?
     let passportIssuedBy: String?
@@ -296,14 +387,149 @@ struct RegisterRequest: Codable, Sendable {
     let promoCode: String?
     let newsletter: Bool?
     let clubId: String?
+    let clubName: String?
+    let clubAddress: String?
     let referralSource: String?
     let referralSourceOther: String?
+    let otpTicket: String?
 
     enum CodingKeys: String, CodingKey {
         case email, password, phone, name, gender, newsletter
         case registrationType, dateOfBirth, passportSeries, passportNumber
         case passportIssuedBy, passportIssueDate, registrationAddress, promoCode, clubId
-        case referralSource, referralSourceOther
+        case clubName, clubAddress, referralSource, referralSourceOther, otpTicket
+    }
+}
+
+// MARK: - Phone OTP (`User.kt` Otp*)
+
+struct OtpRequestBody: Codable, Sendable {
+    let phone: String
+    let channel: String
+}
+
+struct OtpRequestResponse: Codable, Sendable {
+    let ok: Bool
+    let channel: String?
+    let resendAfterSec: Int
+    let ttlSec: Int
+    let deeplink: String?
+    let instruction: String?
+    let devCode: String?
+    let error: String?
+    let code: String?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, channel, deeplink, instruction, error, code
+        case resendAfterSec, ttlSec, devCode
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ok = try c.decodeIfPresent(Bool.self, forKey: .ok) ?? false
+        channel = try c.decodeIfPresent(String.self, forKey: .channel)
+        resendAfterSec = try c.decodeIfPresent(Int.self, forKey: .resendAfterSec) ?? 20
+        ttlSec = try c.decodeIfPresent(Int.self, forKey: .ttlSec) ?? 300
+        deeplink = try c.decodeIfPresent(String.self, forKey: .deeplink)
+        instruction = try c.decodeIfPresent(String.self, forKey: .instruction)
+        devCode = try c.decodeIfPresent(String.self, forKey: .devCode)
+        error = try c.decodeIfPresent(String.self, forKey: .error)
+        code = try c.decodeIfPresent(String.self, forKey: .code)
+    }
+}
+
+struct OtpVerifyBody: Codable, Sendable {
+    let phone: String
+    let code: String
+}
+
+struct OtpVerifyResponse: Codable, Sendable {
+    let token: String?
+    let refreshToken: String?
+    let user: User?
+    let registrationRequired: Bool
+    let otpTicket: String?
+    let phone: String?
+
+    enum CodingKeys: String, CodingKey {
+        case token, refreshToken, user, phone
+        case registrationRequired, otpTicket
+    }
+
+    init(
+        token: String?,
+        refreshToken: String?,
+        user: User?,
+        registrationRequired: Bool,
+        otpTicket: String?,
+        phone: String?
+    ) {
+        self.token = token
+        self.refreshToken = refreshToken
+        self.user = user
+        self.registrationRequired = registrationRequired
+        self.otpTicket = otpTicket
+        self.phone = phone
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        token = try c.decodeIfPresent(String.self, forKey: .token)
+        refreshToken = try c.decodeIfPresent(String.self, forKey: .refreshToken)
+        user = try c.decodeIfPresent(User.self, forKey: .user)
+        registrationRequired = try c.decodeIfPresent(Bool.self, forKey: .registrationRequired) ?? false
+        otpTicket = try c.decodeIfPresent(String.self, forKey: .otpTicket)
+        phone = try c.decodeIfPresent(String.self, forKey: .phone)
+    }
+}
+
+struct OtpChannelsResponse: Codable, Sendable {
+    let channels: [OtpChannelStatus]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        channels = (try? c.decode([OtpChannelStatus].self, forKey: .channels)) ?? []
+    }
+}
+
+struct OtpChannelStatus: Codable, Sendable {
+    let id: String
+    let available: Bool
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(String.self, forKey: .id)) ?? ""
+        available = try c.decodeIfPresent(Bool.self, forKey: .available) ?? false
+    }
+}
+
+struct CheckEmailRequest: Codable, Sendable {
+    let email: String
+}
+
+struct CheckEmailResponse: Codable, Sendable {
+    let exists: Bool
+    let maskedPhone: String?
+    let message: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        exists = try c.decodeIfPresent(Bool.self, forKey: .exists) ?? false
+        maskedPhone = try c.decodeIfPresent(String.self, forKey: .maskedPhone)
+        message = try c.decodeIfPresent(String.self, forKey: .message)
+    }
+}
+
+struct EmailResendResponse: Codable, Sendable {
+    let ok: Bool
+    let email: String?
+    let alreadyVerified: Bool
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ok = try c.decodeIfPresent(Bool.self, forKey: .ok) ?? false
+        email = try c.decodeIfPresent(String.self, forKey: .email)
+        alreadyVerified = try c.decodeIfPresent(Bool.self, forKey: .alreadyVerified) ?? false
     }
 }
 
@@ -459,23 +685,65 @@ enum TrainingIntensity: String, Codable, Sendable {
     case high
 }
 
+/// Услуга тренера из CRM (`TrainerServiceOffer` / `price_from`).
+struct TrainerServiceOffer: Codable, Hashable, Sendable {
+    let name: String
+    let priceFrom: Int
+
+    enum CodingKeys: String, CodingKey {
+        case name, priceFrom
+    }
+
+    init(name: String, priceFrom: Int) {
+        self.name = name
+        self.priceFrom = priceFrom
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = (try? c.decode(String.self, forKey: .name)) ?? ""
+        if let i = try? c.decode(Int.self, forKey: .priceFrom) {
+            priceFrom = max(0, i)
+        } else if let d = try? c.decode(Double.self, forKey: .priceFrom) {
+            priceFrom = max(0, Int(d))
+        } else {
+            priceFrom = 0
+        }
+    }
+}
+
 struct Trainer: Codable, Hashable, Sendable {
     let id: String?
     let name: String
     let photoUrl: String?
     let specialization: String?
     let rating: Double?
+    let phone: String?
+    let description: String?
+    let services: [TrainerServiceOffer]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, photoUrl, specialization, rating
+        case id, name, photoUrl, specialization, rating, phone, description, services
     }
 
-    init(id: String?, name: String, photoUrl: String?, specialization: String?, rating: Double?) {
+    init(
+        id: String?,
+        name: String,
+        photoUrl: String?,
+        specialization: String?,
+        rating: Double?,
+        phone: String? = nil,
+        description: String? = nil,
+        services: [TrainerServiceOffer] = []
+    ) {
         self.id = id
         self.name = name
         self.photoUrl = photoUrl
         self.specialization = specialization
         self.rating = rating
+        self.phone = phone
+        self.description = description
+        self.services = services
     }
 
     init(from decoder: Decoder) throws {
@@ -496,8 +764,12 @@ struct Trainer: Codable, Hashable, Sendable {
         } else if let i = try? c.decode(Int.self, forKey: .rating) {
             rating = Double(i)
         } else {
-            rating = nil
+            // Android: `rating: Float = 0f` — отсутствующее поле = 0.
+            rating = 0
         }
+        phone = try c.decodeIfPresent(String.self, forKey: .phone)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        services = (try? c.decode([TrainerServiceOffer].self, forKey: .services)) ?? []
     }
 }
 
@@ -1075,6 +1347,10 @@ struct ClubInfo: Codable, Hashable, Sendable {
     let shopConfig: ClubShopConfig?
     let appUpdate: AppUpdateInfo?
     let network: ClubNetworkInfo?
+    let welcomeBannerUrl: String?
+    let welcomeLegalText: String?
+    let visitingRulesUrl: String?
+    let safetyRulesUrl: String?
 
     /// Бренд для UI: `brand_name`, иначе fallback на «Доброзал».
     var resolvedBrandName: String {
@@ -1088,6 +1364,7 @@ struct ClubInfo: Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, promoTitle, promoSubtitle, name, brandName, address, phone, email
         case workingHours, amenities, latitude, longitude, shopConfig, appUpdate, network
+        case welcomeBannerUrl, welcomeLegalText, visitingRulesUrl, safetyRulesUrl
     }
 
     init(from decoder: Decoder) throws {
@@ -1107,6 +1384,10 @@ struct ClubInfo: Codable, Hashable, Sendable {
         shopConfig = try c.decodeIfPresent(ClubShopConfig.self, forKey: .shopConfig)
         appUpdate = try c.decodeIfPresent(AppUpdateInfo.self, forKey: .appUpdate)
         network = try c.decodeIfPresent(ClubNetworkInfo.self, forKey: .network)
+        welcomeBannerUrl = try c.decodeIfPresent(String.self, forKey: .welcomeBannerUrl)
+        welcomeLegalText = try c.decodeIfPresent(String.self, forKey: .welcomeLegalText)
+        visitingRulesUrl = try c.decodeIfPresent(String.self, forKey: .visitingRulesUrl)
+        safetyRulesUrl = try c.decodeIfPresent(String.self, forKey: .safetyRulesUrl)
     }
 }
 
