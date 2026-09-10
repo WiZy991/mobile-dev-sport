@@ -4,7 +4,10 @@ enum StaffApiError: LocalizedError {
     case http(status: Int, detail: String)
     case emptyBody
     case htmlResponse
-    case parseFailed(String)
+    /// Ошибка разбора JSON-ответа CRM.
+    case invalidJson
+    /// Бизнес/валидация (не путать с битым JSON).
+    case message(String)
 
     var errorDescription: String? {
         switch self {
@@ -14,8 +17,10 @@ enum StaffApiError: LocalizedError {
             return "Empty response body"
         case .htmlResponse:
             return "HTML response instead of JSON"
-        case .parseFailed(let message):
-            return "JSON parse failed: \(message)"
+        case .invalidJson:
+            return "Invalid JSON response"
+        case .message(let message):
+            return message
         }
     }
 }
@@ -108,7 +113,7 @@ final class StaffApiClient {
         let json = try await requireJson(from: request)
         let paymentUrl = (json["payment_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let paymentUrl, !paymentUrl.isEmpty else {
-            throw StaffApiError.parseFailed("Не получен URL оплаты (payment_url пустой)")
+            throw StaffApiError.message("Не получен URL оплаты (payment_url пустой)")
         }
         let onboardingJson = json["onboarding"] as? [String: Any] ?? [:]
         return RentalPaymentResult(
@@ -267,10 +272,14 @@ final class StaffApiClient {
         if let clientId { payload["client_id"] = clientId }
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
         let json = try await requireJson(from: request)
-        guard let training = json["training"] as? [String: Any] else {
-            throw StaffApiError.parseFailed("Сервер не вернул созданное занятие")
+        if let training = Self.asStringDict(json["training"]) {
+            return Self.parseScheduleItem(training)
         }
-        return Self.parseScheduleItem(training)
+        // Некоторые прокси/старые ответы отдают само занятие в корне.
+        if json["title"] != nil, json["startTime"] != nil || json["date"] != nil {
+            return Self.parseScheduleItem(json)
+        }
+        throw StaffApiError.message("Сервер не вернул созданное занятие")
     }
 
     func bookClientOnTraining(token: String, trainingId: String, clientId: Int) async throws {
@@ -306,10 +315,13 @@ final class StaffApiClient {
             "room": room ?? "",
         ])
         let json = try await requireJson(from: request)
-        guard let training = json["training"] as? [String: Any] else {
-            throw StaffApiError.parseFailed("Сервер не вернул обновлённое занятие")
+        if let training = Self.asStringDict(json["training"]) {
+            return Self.parseScheduleItem(training)
         }
-        return Self.parseScheduleItem(training)
+        if json["title"] != nil, json["startTime"] != nil || json["date"] != nil {
+            return Self.parseScheduleItem(json)
+        }
+        throw StaffApiError.message("Сервер не вернул обновлённое занятие")
     }
 
     func loadAdminData(token: String) async throws -> StaffAdminData {
@@ -673,8 +685,22 @@ final class StaffApiClient {
         return trimmed
     }
 
+    private static func asStringDict(_ value: Any?) -> [String: Any]? {
+        if let dict = value as? [String: Any] { return dict }
+        if let dict = value as? [AnyHashable: Any] {
+            var out: [String: Any] = [:]
+            out.reserveCapacity(dict.count)
+            for (key, nested) in dict {
+                guard let stringKey = key as? String else { continue }
+                out[stringKey] = nested
+            }
+            return out
+        }
+        return nil
+    }
+
     private static func parseScheduleItem(_ row: [String: Any]) -> ScheduleItem {
-        let bookingRows = row["bookings"] as? [[String: Any]] ?? []
+        let bookingRows = (row["bookings"] as? [Any] ?? []).compactMap { asStringDict($0) }
         let bookings = bookingRows.compactMap { b -> ScheduleBookingRow? in
             let id: String = {
                 if let s = b["id"] as? String, !s.isEmpty { return s }
@@ -711,8 +737,8 @@ final class StaffApiClient {
             dayLabel: row["dayLabel"] as? String ?? "",
             startTime: row["startTime"] as? String ?? "",
             endTime: row["endTime"] as? String ?? "",
-            startAt: row["startAt"] as? String ?? "",
-            endAt: row["endAt"] as? String ?? "",
+            startAt: (row["startAt"] as? String) ?? (row["start_at"] as? String) ?? "",
+            endAt: (row["endAt"] as? String) ?? (row["end_at"] as? String) ?? "",
             room: row["room"] as? String ?? "",
             clientNames: row.stringList("clientNames"),
             participants: row["participants"] as? String ?? "",
@@ -734,7 +760,7 @@ final class StaffApiClient {
 
     private func openRequest(path: String, method: String) throws -> URLRequest {
         guard let url = URL(string: baseUrl + path) else {
-            throw StaffApiError.parseFailed("Invalid URL")
+            throw StaffApiError.message("Invalid URL")
         }
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -753,7 +779,11 @@ final class StaffApiClient {
 
     private func requireJson(from request: URLRequest) async throws -> [String: Any] {
         let result = try await execute(request)
+        let trimmed = result.body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (200...299).contains(result.code) else {
+            if trimmed.hasPrefix("<") {
+                throw StaffApiError.htmlResponse
+            }
             let parsed = parseJson(result.body)
             let detail = parsed?["error"] as? String
                 ?? String(result.body.prefix(120))
@@ -762,8 +792,14 @@ final class StaffApiClient {
             let message = (detail.isEmpty ? "пустой ответ, код \(result.code)" : detail) + suffix
             throw StaffApiError.http(status: result.code, detail: message)
         }
+        if trimmed.isEmpty {
+            throw StaffApiError.emptyBody
+        }
+        if trimmed.hasPrefix("<") {
+            throw StaffApiError.htmlResponse
+        }
         guard let json = parseJson(result.body) else {
-            throw StaffApiError.parseFailed("Invalid JSON")
+            throw StaffApiError.invalidJson
         }
         return json
     }
@@ -774,10 +810,10 @@ final class StaffApiClient {
         if trimmed.isEmpty { return nil }
         if trimmed.hasPrefix("<") { return nil }
         guard let data = trimmed.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let object = try? JSONSerialization.jsonObject(with: data) else {
             return nil
         }
-        return object
+        return Self.asStringDict(object)
     }
 }
 

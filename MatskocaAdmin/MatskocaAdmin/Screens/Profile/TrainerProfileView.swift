@@ -106,10 +106,14 @@ struct TrainerProfileView: View {
         .background(StaffColors.background)
         .navigationTitle(controller.requiredMode ? "Заполните профиль" : "Профиль тренера")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             if let onBack, !controller.requiredMode {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Назад", action: onBack)
+                    Button(action: onBack) {
+                        Image(systemName: "chevron.left")
+                            .foregroundStyle(.white)
+                    }
                 }
             }
         }

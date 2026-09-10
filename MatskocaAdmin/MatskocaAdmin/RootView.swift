@@ -127,6 +127,12 @@ struct RootView: View {
                             rentalActive: workController?.state.home.entryQrActive ?? false,
                             blockedMessage: workController?.state.home.entryQrBlockedMessage,
                             entryQrFormat: workController?.state.home.entryQrFormat ?? "ascii",
+                            hallLabel: workController?.state.home.entryQrHallLabel,
+                            paidRentalClubs: workController?.state.home.entryQrPaidClubs ?? [],
+                            activeClubId: workController?.state.home.entryQrActiveClubId,
+                            onSelectClub: { clubId in
+                                workController?.handleAction("set_active_club:\(clubId)")
+                            },
                             onBack: { env.navigationPath.removeLast() }
                         )
                     case .rental:

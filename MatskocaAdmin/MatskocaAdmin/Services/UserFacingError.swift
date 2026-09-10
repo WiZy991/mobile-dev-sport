@@ -53,7 +53,11 @@ enum UserFacingError {
         if lower.contains("<!doctype html") || lower.contains("<html") || lower.contains("html response") {
             return "Сервер вернул техническую ошибку. Проверьте, что backend запущен."
         }
-        if lower.contains("json parse") || lower.contains("empty response") {
+        if lower.contains("empty response body") {
+            return "CRM вернул пустой ответ. Повторите попытку или проверьте backend."
+        }
+        // Только реальный битый JSON — не бизнес-ошибки валидации.
+        if lower == "invalid json response" || lower.contains("invalid json") {
             return "Не удалось прочитать ответ CRM. Запустите backend:\ncd crm-backend-symfony\nphp -S 0.0.0.0:8000 -t public public/index.php"
         }
         if raw.hasPrefix("HTTP ") {

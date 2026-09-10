@@ -4,16 +4,36 @@ struct WorkView: View {
     @Bindable var controller: WorkController
     @Environment(\.scenePhase) private var scenePhase
     @State private var showCreateSession = false
+    @State private var showEntryQrSheet = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            tabContent
-            if let error = controller.state.errorMessage {
-                StaffErrorState(message: error, onRetry: { controller.handleAction("retry") })
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                tabContent
+                if let error = controller.state.errorMessage {
+                    StaffErrorState(message: error, onRetry: { controller.handleAction("retry") })
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                }
+                bottomBar
             }
-            bottomBar
+
+            if controller.state.selectedTab == .home, controller.state.home.showEntryQr {
+                Button {
+                    showEntryQrSheet = true
+                } label: {
+                    Image(systemName: "qrcode")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(StaffColors.primary)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 72)
+                .accessibilityLabel("Проход в зал")
+            }
         }
         .background(StaffColors.background)
         .navigationTitle(controller.state.screenTitle)
@@ -41,6 +61,34 @@ struct WorkView: View {
         .staffToolbarStyle()
         .sheet(isPresented: $showCreateSession) {
             CreateSessionSheet(controller: controller)
+        }
+        .sheet(isPresented: $showEntryQrSheet) {
+            NavigationStack {
+                ScrollView {
+                    StaffEntryQrCard(
+                        staffUserId: controller.state.home.entryQrStaffUserId,
+                        rentalActive: controller.state.home.entryQrActive,
+                        blockedMessage: controller.state.home.entryQrBlockedMessage,
+                        entryQrFormat: controller.state.home.entryQrFormat,
+                        hallLabel: controller.state.home.entryQrHallLabel,
+                        paidRentalClubs: controller.state.home.entryQrPaidClubs,
+                        activeClubId: controller.state.home.entryQrActiveClubId,
+                        onSelectClub: { clubId in
+                            controller.handleAction("set_active_club:\(clubId)")
+                        }
+                    )
+                    .padding(16)
+                }
+                .background(StaffColors.background)
+                .navigationTitle("Проход в зал")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Закрыть") { showEntryQrSheet = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: Binding(
             get: { controller.state.assignDialog != nil },
@@ -101,18 +149,6 @@ struct WorkView: View {
                     if controller.state.home.showAdminButton {
                         StaffPrimaryButton(text: "Открыть админку") {
                             controller.handleAction("open_admin")
-                        }
-                    }
-                    if controller.state.home.showEntryQr {
-                        StaffEntryQrCard(
-                            staffUserId: controller.state.home.entryQrStaffUserId,
-                            rentalActive: controller.state.home.entryQrActive,
-                            blockedMessage: controller.state.home.entryQrBlockedMessage,
-                            entryQrFormat: controller.state.home.entryQrFormat,
-                            compact: true
-                        )
-                        StaffSecondaryButton(text: "Открыть на весь экран") {
-                            controller.handleAction("open_entry_qr")
                         }
                     }
                     if !controller.state.home.sections.isEmpty {
@@ -284,7 +320,7 @@ struct WorkView: View {
                     ForEach(controller.state.profile.paidRentalClubs) { club in
                         let isActive = club.clubId == controller.state.profile.activeClubId
                         StaffSecondaryButton(
-                            text: isActive ? "✓ \(club.title)" : club.title
+                            text: isActive ? "✓ \(club.shortName)" : club.shortName
                         ) {
                             controller.handleAction("set_active_club:\(club.clubId)")
                         }

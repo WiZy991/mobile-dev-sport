@@ -64,11 +64,37 @@ struct RentalClubOption: Identifiable, Equatable {
     let days: Int
     let entryQrFormat: String
 
+    /// Подпись без дубля «название · адрес», как Android `compactHallLabel`.
     var title: String {
-        if !address.isEmpty, !name.localizedCaseInsensitiveContains(address) {
-            return "\(name) · \(address)"
+        StaffHallLabel.compact(name: name, address: address)
+    }
+
+    /// Короткое имя для чипов QR / профиля.
+    var shortName: String {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return n.isEmpty ? title : n
+    }
+}
+
+enum StaffHallLabel {
+    static func compact(name: String?, address: String?) -> String {
+        let n = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let a = address?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if n.isEmpty { return a }
+        if a.isEmpty { return n }
+        if a.localizedCaseInsensitiveContains(n) { return n }
+        if n.localizedCaseInsensitiveContains(a) { return n }
+        let aNoCity = a.replacingOccurrences(
+            of: #"^г\.\s*[^,]+,\s*"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !aNoCity.isEmpty {
+            if aNoCity.caseInsensitiveCompare(n) == .orderedSame { return n }
+            if aNoCity.localizedCaseInsensitiveContains(n) { return n }
+            if n.localizedCaseInsensitiveContains(aNoCity) { return n }
         }
-        return name.isEmpty ? address : name
+        return "\(n) · \(a)"
     }
 }
 

@@ -80,9 +80,13 @@ struct RentalView: View {
         .background(StaffColors.background)
         .navigationTitle("Аренда клуба")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Назад", action: onBack)
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .foregroundStyle(.white)
+                }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Обновить", action: controller.reload)

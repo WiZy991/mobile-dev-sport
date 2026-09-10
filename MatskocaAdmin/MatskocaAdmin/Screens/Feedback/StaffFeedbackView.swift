@@ -61,9 +61,13 @@ struct StaffFeedbackView: View {
         .background(StaffColors.background)
         .navigationTitle("Обратная связь")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Назад", action: onBack)
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .foregroundStyle(.white)
+                }
             }
         }
         .staffToolbarStyle()

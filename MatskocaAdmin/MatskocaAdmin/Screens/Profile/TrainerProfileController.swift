@@ -160,7 +160,7 @@ final class TrainerProfileController {
     /// Как Android preparePhotoForUpload: downscale + JPEG 85.
     private static func preparePhotoForUpload(_ data: Data) throws -> Data {
         guard let image = UIImage(data: data) else {
-            throw StaffApiError.parseFailed("Не удалось обработать фото")
+            throw StaffApiError.message("Не удалось обработать фото")
         }
         let maxSide = max(image.size.width, image.size.height)
         let scaled: UIImage
@@ -178,7 +178,7 @@ final class TrainerProfileController {
             scaled = image
         }
         guard let jpeg = scaled.jpegData(compressionQuality: 0.85) else {
-            throw StaffApiError.parseFailed("Не удалось сжать фото")
+            throw StaffApiError.message("Не удалось сжать фото")
         }
         return jpeg
     }

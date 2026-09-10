@@ -281,6 +281,9 @@ final class WorkController {
         state.home.entryQrActive = active
         state.home.entryQrBlockedMessage = blocked
         state.home.entryQrFormat = onboarding.resolvedEntryQrFormat
+        state.home.entryQrHallLabel = onboarding.activeClub?.title ?? onboarding.activeClub?.name
+        state.home.entryQrPaidClubs = paidClubs
+        state.home.entryQrActiveClubId = onboarding.activeClubId
     }
 
     private func applyProfileRentalState(_ onboarding: StaffOnboarding) {
@@ -306,7 +309,7 @@ final class WorkController {
     }
 
     private func setActiveRentalClub(_ clubId: Int) {
-        runAsyncForTab(.profile) {
+        runAsyncForTab(state.selectedTab) {
             let onboarding = try await self.env.withRefresh { token in
                 try await self.env.apiClient.setActiveRentalClub(token: token, clubId: clubId)
             }
@@ -332,10 +335,10 @@ final class WorkController {
         let time = cal.dateComponents([.hour, .minute], from: startTime)
         guard let y = day.year, let m = day.month, let d = day.day,
               let hour = time.hour, let minute = time.minute else {
-            throw StaffApiError.parseFailed("Некорректная дата")
+            throw StaffApiError.message("Некорректная дата")
         }
         if durationMinutes <= 0 {
-            throw StaffApiError.parseFailed("Выберите длительность занятия")
+            throw StaffApiError.message("Выберите длительность занятия")
         }
         var startComponents = DateComponents()
         startComponents.year = y
@@ -345,15 +348,15 @@ final class WorkController {
         startComponents.minute = minute
         guard let start = cal.date(from: startComponents),
               let end = cal.date(byAdding: .minute, value: durationMinutes, to: start) else {
-            throw StaffApiError.parseFailed("Некорректная дата")
+            throw StaffApiError.message("Некорректная дата")
         }
         let endParts = cal.dateComponents([.year, .month, .day, .hour, .minute], from: end)
         // Как Android: занятие не должно переходить через полночь.
         if endParts.year != y || endParts.month != m || endParts.day != d || !endParts.isAfterSameDay(hour: hour, minute: minute) {
-            throw StaffApiError.parseFailed("Занятие должно заканчиваться в тот же день. Уменьшите длительность или измените время начала.")
+            throw StaffApiError.message("Занятие должно заканчиваться в тот же день. Уменьшите длительность или измените время начала.")
         }
         if start < Date() {
-            throw StaffApiError.parseFailed("Нельзя создать занятие в прошлом. Проверьте дату и время.")
+            throw StaffApiError.message("Нельзя создать занятие в прошлом. Проверьте дату и время.")
         }
         let dateLabel = String(format: "%04d-%02d-%02d", y, m, d)
         let startTimeLabel = String(format: "%02d:%02d", hour, minute)
@@ -437,6 +440,9 @@ final class WorkController {
             entryQrActive: preservedQr.entryQrActive,
             entryQrBlockedMessage: preservedQr.entryQrBlockedMessage,
             entryQrFormat: preservedQr.entryQrFormat,
+            entryQrHallLabel: preservedQr.entryQrHallLabel,
+            entryQrPaidClubs: preservedQr.entryQrPaidClubs,
+            entryQrActiveClubId: preservedQr.entryQrActiveClubId,
             needNotificationsPermission: preservedQr.needNotificationsPermission,
             loading: appData == nil
         )
@@ -444,12 +450,13 @@ final class WorkController {
         guard let data = appData else { return }
 
         let role = primaryRole()
+        // Как Android WorkActivity: админка только при admin.write / admin|manager.
+        // У ROLE_TRAINER CRM тоже отдаёт adminSections (расписание и т.п.) — это не повод
+        // показывать «Открыть админку».
         let showAdmin = env.roleConfig?.adminActions.contains("admin.write") == true
             || role == "ROLE_ADMIN"
             || role == "ROLE_SUPER_ADMIN"
             || role == "ROLE_MANAGER"
-            || !(env.roleConfig?.adminSections.isEmpty ?? true)
-            || allowedSections.contains("admin")
         let metrics = data.metrics.map { MetricUi(label: UiLabels.metricTitle($0.key), value: String($0.value)) }
         state.home = HomeTabUi(
             greeting: "Здравствуйте, \(data.employeeName)",
@@ -461,6 +468,9 @@ final class WorkController {
             entryQrActive: state.home.entryQrActive,
             entryQrBlockedMessage: state.home.entryQrBlockedMessage,
             entryQrFormat: state.home.entryQrFormat,
+            entryQrHallLabel: state.home.entryQrHallLabel,
+            entryQrPaidClubs: state.home.entryQrPaidClubs,
+            entryQrActiveClubId: state.home.entryQrActiveClubId,
             needNotificationsPermission: state.home.needNotificationsPermission,
             loading: true
         )
@@ -1109,10 +1119,10 @@ final class WorkController {
         let time = cal.dateComponents([.hour, .minute], from: startTime)
         guard let y = day.year, let m = day.month, let d = day.day,
               let hour = time.hour, let minute = time.minute else {
-            throw StaffApiError.parseFailed("Некорректная дата")
+            throw StaffApiError.message("Некорректная дата")
         }
         if durationMinutes <= 0 {
-            throw StaffApiError.parseFailed("Выберите длительность занятия")
+            throw StaffApiError.message("Выберите длительность занятия")
         }
         var startComponents = DateComponents()
         startComponents.year = y
@@ -1122,11 +1132,11 @@ final class WorkController {
         startComponents.minute = minute
         guard let start = cal.date(from: startComponents),
               let end = cal.date(byAdding: .minute, value: durationMinutes, to: start) else {
-            throw StaffApiError.parseFailed("Некорректная дата")
+            throw StaffApiError.message("Некорректная дата")
         }
         let endParts = cal.dateComponents([.year, .month, .day, .hour, .minute], from: end)
         if endParts.year != y || endParts.month != m || endParts.day != d || !endParts.isAfterSameDay(hour: hour, minute: minute) {
-            throw StaffApiError.parseFailed("Занятие должно заканчиваться в тот же день. Уменьшите длительность или измените время начала.")
+            throw StaffApiError.message("Занятие должно заканчиваться в тот же день. Уменьшите длительность или измените время начала.")
         }
         let dateLabel = String(format: "%04d-%02d-%02d", y, m, d)
         let startTimeLabel = String(format: "%02d:%02d", hour, minute)

@@ -5,6 +5,10 @@ struct StaffEntryQrCard: View {
     let rentalActive: Bool
     let blockedMessage: String?
     var entryQrFormat: String = "ascii"
+    var hallLabel: String? = nil
+    var paidRentalClubs: [RentalClubOption] = []
+    var activeClubId: Int? = nil
+    var onSelectClub: ((Int) -> Void)? = nil
     var compact: Bool = false
 
     @State private var secondsLeft = 15
@@ -16,6 +20,41 @@ struct StaffEntryQrCard: View {
             Text("Проход в зал")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(StaffColors.onSurface)
+            if let hallLabel, !hallLabel.isEmpty {
+                Text("Зал: \(hallLabel)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(StaffColors.onSurfaceVariant)
+            }
+            if paidRentalClubs.count > 1, onSelectClub != nil {
+                Text("На какой зал QR")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(StaffColors.onSurfaceVariant)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(paidRentalClubs) { club in
+                            let selected = club.clubId == activeClubId
+                            Button {
+                                onSelectClub?(club.clubId)
+                            } label: {
+                                Text(club.shortName)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(selected ? StaffColors.primary.opacity(0.18) : StaffColors.primary.opacity(0.08))
+                                    .foregroundStyle(StaffColors.primary)
+                                    .clipShape(Capsule())
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(selected ? StaffColors.primary : Color.clear, lineWidth: 1.5)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
             if !rentalActive || staffUserId <= 0 {
                 StaffInfoBanner(
                     text: blockedMessage ?? "Оплатите аренду клуба, чтобы пройти в зал по QR."
@@ -53,6 +92,7 @@ struct StaffEntryQrCard: View {
         .onChange(of: staffUserId) { _, _ in restartRotation() }
         .onChange(of: rentalActive) { _, _ in restartRotation() }
         .onChange(of: entryQrFormat) { _, _ in restartRotation() }
+        .onChange(of: activeClubId) { _, _ in restartRotation() }
         .onDisappear { rotationTask?.cancel() }
     }
 
@@ -86,6 +126,10 @@ struct StaffEntryQrScreen: View {
     let rentalActive: Bool
     let blockedMessage: String?
     var entryQrFormat: String = "ascii"
+    var hallLabel: String? = nil
+    var paidRentalClubs: [RentalClubOption] = []
+    var activeClubId: Int? = nil
+    var onSelectClub: ((Int) -> Void)? = nil
     let onBack: () -> Void
 
     var body: some View {
@@ -94,7 +138,11 @@ struct StaffEntryQrScreen: View {
                 staffUserId: staffUserId,
                 rentalActive: rentalActive,
                 blockedMessage: blockedMessage,
-                entryQrFormat: entryQrFormat
+                entryQrFormat: entryQrFormat,
+                hallLabel: hallLabel,
+                paidRentalClubs: paidRentalClubs,
+                activeClubId: activeClubId,
+                onSelectClub: onSelectClub
             )
             .padding(24)
             Spacer()
@@ -103,9 +151,13 @@ struct StaffEntryQrScreen: View {
         .background(StaffColors.background)
         .navigationTitle("Проход в зал")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Назад", action: onBack)
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .foregroundStyle(.white)
+                }
             }
         }
         .staffToolbarStyle()

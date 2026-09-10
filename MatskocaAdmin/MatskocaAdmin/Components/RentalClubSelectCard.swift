@@ -14,10 +14,15 @@ struct RentalClubSelectCard: View {
                         .foregroundStyle(StaffColors.onSurface)
                         .multilineTextAlignment(.leading)
                     if !club.address.isEmpty {
-                        Text(club.address)
-                            .font(.caption)
-                            .foregroundStyle(StaffColors.onSurfaceVariant)
-                            .multilineTextAlignment(.leading)
+                        let addressShownInName = club.name.localizedCaseInsensitiveContains(club.address)
+                            || club.address.localizedCaseInsensitiveContains(club.name)
+                            || StaffHallLabel.compact(name: club.name, address: club.address) == club.name
+                        if !addressShownInName {
+                            Text(club.address)
+                                .font(.caption)
+                                .foregroundStyle(StaffColors.onSurfaceVariant)
+                                .multilineTextAlignment(.leading)
+                        }
                     }
                     Text(String(format: "%.0f ₽ / %d дн.", club.amountRub, club.days))
                         .font(.caption)

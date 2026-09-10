@@ -67,6 +67,9 @@ struct HomeTabUi {
     var entryQrActive: Bool = false
     var entryQrBlockedMessage: String?
     var entryQrFormat: String = "ascii"
+    var entryQrHallLabel: String?
+    var entryQrPaidClubs: [RentalClubOption] = []
+    var entryQrActiveClubId: Int?
     var needNotificationsPermission: Bool = false
     var sections: [HomeSectionUi] = []
     var sectionTitle: String?

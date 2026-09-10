@@ -16,10 +16,14 @@ struct LegalPdfView: View {
         }
         .navigationTitle(doc.title)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(onBack != nil)
         .toolbar {
             if let onBack {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Назад", action: onBack)
+                    Button(action: onBack) {
+                        Image(systemName: "chevron.left")
+                            .foregroundStyle(.white)
+                    }
                 }
             }
         }
