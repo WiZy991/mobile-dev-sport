@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// Добровольно-принудительное обновление: если на сервере `ios_min_version_code`
-/// выше текущего `CFBundleVersion` — показываем диалог.
+/// Добровольно-принудительное обновление: если на сервере `ios_min_version`
+/// (например `1.0.9`) выше текущей Version (`CFBundleShortVersionString`) — диалог.
 /// При force нельзя закрыть (как Android `ForceUpdateGate`).
 struct ForceUpdateGate: ViewModifier {
     @EnvironmentObject private var app: WorldFitnessAppState
@@ -54,9 +54,41 @@ struct ForceUpdateGate: ViewModifier {
         guard let info = try? await app.api.getClubInfo(),
               let updateInfo = info.appUpdate
         else { return }
-        let minBuild = updateInfo.iosMinVersionCode
-        guard minBuild > 0, minBuild > AppConfiguration.appBuildNumber else { return }
+        guard needsUpdate(updateInfo) else { return }
         await MainActor.run { update = updateInfo }
+    }
+
+    /// Сначала маркетинговая Version (`1.0.8`); иначе fallback на Build (старый `ios_min_version_code`).
+    private func needsUpdate(_ info: AppUpdateInfo) -> Bool {
+        let minVersion = info.iosMinVersion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !minVersion.isEmpty {
+            return AppVersionCompare.is(AppConfiguration.appVersion, lessThan: minVersion)
+        }
+        let minBuild = info.iosMinVersionCode
+        return minBuild > 0 && minBuild > AppConfiguration.appBuildNumber
+    }
+}
+
+enum AppVersionCompare {
+    /// Semver-подобное сравнение: `1.0.8` < `1.0.9`, `1.0` < `1.0.1`.
+    static func is(_ current: String, lessThan minimum: String) -> Bool {
+        let c = parts(current)
+        let m = parts(minimum)
+        let n = max(c.count, m.count)
+        guard n > 0 else { return false }
+        for i in 0..<n {
+            let a = i < c.count ? c[i] : 0
+            let b = i < m.count ? m[i] : 0
+            if a != b { return a < b }
+        }
+        return false
+    }
+
+    private static func parts(_ raw: String) -> [Int] {
+        raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: ".")
+            .map { Int($0.filter(\.isNumber)) ?? 0 }
     }
 }
 

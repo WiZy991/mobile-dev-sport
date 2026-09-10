@@ -1302,6 +1302,8 @@ struct ClubItem: Codable, Identifiable, Hashable, Sendable {
 struct AppUpdateInfo: Codable, Hashable, Sendable {
     let androidMinVersionCode: Int
     let iosMinVersionCode: Int
+    /// Маркетинговая версия iOS (`1.0.9`), сравнение с `CFBundleShortVersionString`.
+    let iosMinVersion: String?
     let force: Bool
     let iosForce: Bool?
     let message: String?
@@ -1315,13 +1317,14 @@ struct AppUpdateInfo: Codable, Hashable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case androidMinVersionCode, iosMinVersionCode, force, iosForce, message, iosMessage
+        case androidMinVersionCode, iosMinVersionCode, iosMinVersion, force, iosForce, message, iosMessage
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         androidMinVersionCode = (try? c.decode(Int.self, forKey: .androidMinVersionCode)) ?? 0
         iosMinVersionCode = (try? c.decode(Int.self, forKey: .iosMinVersionCode)) ?? 0
+        iosMinVersion = try c.decodeIfPresent(String.self, forKey: .iosMinVersion)
         force = (try? c.decode(Bool.self, forKey: .force)) ?? false
         iosForce = try c.decodeIfPresent(Bool.self, forKey: .iosForce)
         message = try c.decodeIfPresent(String.self, forKey: .message)

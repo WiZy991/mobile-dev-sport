@@ -5,12 +5,12 @@ enum AppConfiguration {
     /// Отображаемое название приложения (иконка на домашнем экране, заголовки, шаринг).
     static let appDisplayName = "Доброзал"
 
-    /// `MARKETING_VERSION` из Xcode (`CFBundleShortVersionString`).
+    /// `MARKETING_VERSION` из Xcode (`CFBundleShortVersionString`) — то, что вы меняете как «версию» (1.0.8).
     static var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
     }
 
-    /// `CURRENT_PROJECT_VERSION` из Xcode (`CFBundleVersion`).
+    /// `CURRENT_PROJECT_VERSION` из Xcode (`CFBundleVersion`) — Build, часто остаётся 1.
     static var appBuild: String {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
     }
