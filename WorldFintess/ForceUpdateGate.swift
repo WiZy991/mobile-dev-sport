@@ -62,7 +62,7 @@ struct ForceUpdateGate: ViewModifier {
     private func needsUpdate(_ info: AppUpdateInfo) -> Bool {
         let minVersion = info.iosMinVersion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !minVersion.isEmpty {
-            return AppVersionCompare.is(AppConfiguration.appVersion, lessThan: minVersion)
+            return AppVersionCompare.isLessThan(AppConfiguration.appVersion, minVersion)
         }
         let minBuild = info.iosMinVersionCode
         return minBuild > 0 && minBuild > AppConfiguration.appBuildNumber
@@ -71,7 +71,7 @@ struct ForceUpdateGate: ViewModifier {
 
 enum AppVersionCompare {
     /// Semver-подобное сравнение: `1.0.8` < `1.0.9`, `1.0` < `1.0.1`.
-    static func is(_ current: String, lessThan minimum: String) -> Bool {
+    static func isLessThan(_ current: String, _ minimum: String) -> Bool {
         let c = parts(current)
         let m = parts(minimum)
         let n = max(c.count, m.count)
