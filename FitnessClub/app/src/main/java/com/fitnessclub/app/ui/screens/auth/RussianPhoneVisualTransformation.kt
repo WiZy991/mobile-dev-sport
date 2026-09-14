@@ -6,7 +6,7 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 
 /**
- * В стейте — только 10 национальных цифр; на экране — `+7 (XXX) XXX-XX-XX`.
+ * В стейте — только 10 национальных цифр; на экране — `+7 900 000 00 00`.
  * Цифра `7` в префиксе «+7» не участвует в offset mapping (в стейте только национальные цифры).
  */
 class RussianPhoneVisualTransformation : VisualTransformation {

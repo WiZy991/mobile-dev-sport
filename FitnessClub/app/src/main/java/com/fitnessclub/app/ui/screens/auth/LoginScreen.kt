@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
@@ -56,15 +54,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Email
@@ -78,14 +71,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
-import com.fitnessclub.app.R
 import com.fitnessclub.app.data.auth.SberAuthDeepLinkBus
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import com.fitnessclub.app.data.config.Brand
-import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.ui.components.BrandHeader
 import kotlin.math.roundToInt
 
@@ -98,9 +88,7 @@ private val SberButtonGreen = Color(0xFF21A038)
 fun LoginScreen(
     viewModel: LoginViewModel,
     startWithSber: Boolean = false,
-    onNavigateToRegister: () -> Unit,
-    onNavigateToPhoneRegister: () -> Unit = onNavigateToRegister,
-    onOpenLegalPdf: (LegalPdfAsset) -> Unit = {},
+    onNavigateToPhoneRegister: () -> Unit = {},
     onLoginSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -181,33 +169,31 @@ fun LoginScreen(
                 .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "ВХОД",
-                color = LoginSurfaceWhite.copy(0.9f),
-                style = MaterialTheme.typography.labelLarge,
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
+            // Иностранные номера и полноценный словесный логотип — не в этом релизе.
             BrandHeader(
                 brandName = Brand.name,
-                subtitle = if (uiState.hasCompletedRegistration) {
-                    "Вход в аккаунт"
-                } else {
-                    "Вход или регистрация"
-                },
+                subtitle = null,
             )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = "Вход по номеру телефона",
-                color = LoginSurfaceWhite.copy(0.92f),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
             if (uiState.otpStep == LoginOtpStep.PHONE) {
+                Text(
+                    text = "Войти или создать аккаунт",
+                    color = LoginSurfaceWhite,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Пришлём код подтверждения",
+                    color = LoginSurfaceWhite.copy(0.92f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(20.dp))
                 LoginCredentialField(
                     value = russianPhoneFieldValue(uiState.phoneNationalDigits),
                     onValueChange = { viewModel.onPhoneChange(it.text) },
@@ -217,41 +203,6 @@ fun LoginScreen(
                     imeAction = ImeAction.Done,
                     onImeAction = { viewModel.requestOtp() },
                 )
-                Spacer(Modifier.height(12.dp))
-                Text("Куда отправить код", color = LoginSurfaceWhite.copy(0.9f), style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("telegram" to "Telegram", "max" to "Max", "whatsapp" to "WhatsApp").forEach { (id, label) ->
-                        val selected = uiState.otpChannel == id
-                        val available = uiState.otpChannelAvailable[id] ?: true
-                        OutlinedButton(
-                            onClick = { viewModel.onOtpChannelChange(id) },
-                            enabled = available,
-                            modifier = Modifier.weight(1f),
-                            border = BorderStroke(
-                                1.dp,
-                                when {
-                                    !available -> LoginSurfaceWhite.copy(0.2f)
-                                    selected -> LoginSurfaceWhite
-                                    else -> LoginSurfaceWhite.copy(0.4f)
-                                },
-                            ),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = LoginSurfaceWhite.copy(if (available) 1f else 0.4f),
-                                containerColor = if (selected && available) LoginSurfaceWhite.copy(0.2f) else Color.Transparent,
-                                disabledContentColor = LoginSurfaceWhite.copy(0.35f),
-                            ),
-                        ) { Text(label, style = MaterialTheme.typography.labelSmall) }
-                    }
-                }
-                if (uiState.otpChannelsLoaded && uiState.otpChannelAvailable.values.any { !it }) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Серым отмечены каналы, которые сервер ещё не умеет отправлять.",
-                        color = LoginSurfaceWhite.copy(0.75f),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
                 Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = { viewModel.requestOtp() },
@@ -263,7 +214,7 @@ fun LoginScreen(
                     if (uiState.isLoading) {
                         CircularProgressIndicator(Modifier.size(22.dp), color = LoginBackground, strokeWidth = 2.dp)
                     } else {
-                        Text("Получить код для входа", fontWeight = FontWeight.Bold)
+                        Text("Продолжить", fontWeight = FontWeight.Bold)
                     }
                 }
                 TextButton(
@@ -271,23 +222,46 @@ fun LoginScreen(
                         openSupportContact(context, uiState.supportEmail, uiState.supportPhone)
                     },
                 ) {
-                    Text("Связаться с поддержкой", color = LoginSurfaceWhite.copy(0.92f))
+                    Text(
+                        "Связаться с поддержкой",
+                        color = LoginSurfaceWhite.copy(0.92f),
+                        textDecoration = TextDecoration.Underline,
+                    )
+                }
+                TextButton(onClick = { viewModel.toggleEmailLogin() }) {
+                    Text(
+                        if (uiState.showEmailLogin) "Скрыть другие варианты входа" else "Другие варианты входа",
+                        color = LoginSurfaceWhite,
+                        textDecoration = TextDecoration.Underline,
+                    )
                 }
             } else {
-                Text("Код из мессенджера", color = LoginSurfaceWhite, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = "Код подтверждения",
+                    color = LoginSurfaceWhite,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 uiState.otpInstruction?.let {
                     Spacer(Modifier.height(6.dp))
                     Text(it, color = LoginSurfaceWhite.copy(0.9f), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
                 }
-                uiState.otpDeeplink?.let { link ->
-                    TextButton(onClick = {
-                        runCatching {
-                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link)))
+                if (uiState.otpChannel == "max") {
+                    uiState.otpDeeplink?.let { link ->
+                        TextButton(onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                            }
+                        }) {
+                            Text(
+                                "Открыть Max",
+                                color = LoginSurfaceWhite,
+                                textDecoration = TextDecoration.Underline,
+                            )
                         }
-                    }) { Text("Открыть Max", color = LoginSurfaceWhite) }
-                }
-                uiState.otpDevCode?.let {
-                    Text("Debug: $it", color = LoginSurfaceWhite.copy(0.7f), style = MaterialTheme.typography.labelSmall)
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
                 Box(Modifier.offset { IntOffset(otpShake.value.roundToInt(), 0) }) {
@@ -310,10 +284,15 @@ fun LoginScreen(
                         if (uiState.resendSecondsLeft > 0) "Отправить повторно (${uiState.resendSecondsLeft})"
                         else "Отправить повторно",
                         color = LoginSurfaceWhite.copy(if (uiState.resendSecondsLeft == 0) 1f else 0.5f),
+                        textDecoration = TextDecoration.Underline,
                     )
                 }
                 TextButton(onClick = { viewModel.backToPhoneStep() }) {
-                    Text("Изменить номер", color = LoginSurfaceWhite.copy(0.85f))
+                    Text(
+                        "Назад",
+                        color = LoginSurfaceWhite.copy(0.85f),
+                        textDecoration = TextDecoration.Underline,
+                    )
                 }
             }
 
@@ -322,15 +301,7 @@ fun LoginScreen(
                 Text(err, color = LoginSurfaceWhite, textAlign = TextAlign.Center)
             }
 
-            Spacer(Modifier.height(16.dp))
-            TextButton(onClick = { viewModel.toggleEmailLogin() }) {
-                Text(
-                    if (uiState.showEmailLogin) "Скрыть вход по почте" else "Войти по почте или Сбер ID",
-                    color = LoginSurfaceWhite,
-                    textDecoration = TextDecoration.Underline,
-                )
-            }
-
+            if (uiState.otpStep == LoginOtpStep.PHONE) {
             AnimatedVisibility(
                 visible = uiState.showEmailLogin,
                 enter = fadeIn() + expandVertically(),
@@ -477,21 +448,6 @@ fun LoginScreen(
                 }
             }
 
-            val legal = loginLegalAnnotatedString()
-            ClickableText(
-                text = legal,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    color = LoginSurfaceWhite.copy(0.88f),
-                    textAlign = TextAlign.Center
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { offset ->
-                    legal.getStringAnnotations("PDF", offset, offset).firstOrNull()?.let { tag ->
-                        LegalPdfAsset.fromAnnotation(tag.item)?.let(onOpenLegalPdf)
-                    }
-                }
-            )
-
             Spacer(Modifier.height(20.dp))
             Button(
                 onClick = { viewModel.loginWithSberId() },
@@ -527,30 +483,7 @@ fun LoginScreen(
             )
             }
             }
-
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = if (uiState.hasCompletedRegistration) {
-                    "Нужен другой аккаунт?"
-                } else {
-                    stringResource(R.string.brand_first_time)
-                },
-                color = LoginSurfaceWhite.copy(0.88f),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Зарегистрироваться",
-                color = LoginSurfaceWhite,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier
-                    .clickable(onClick = onNavigateToRegister)
-                    .padding(vertical = 8.dp),
-                textAlign = TextAlign.Center,
-            )
+            }
 
             Spacer(Modifier.height(24.dp))
         }
@@ -727,20 +660,5 @@ private fun openSupportContact(context: android.content.Context, email: String?,
         else -> null
     }
     intent?.let { runCatching { context.startActivity(it) } }
-}
-
-private fun loginLegalAnnotatedString(): AnnotatedString = buildAnnotatedString {
-    append("Продолжая использовать приложение, Вы принимаете условия ")
-    pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
-    withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Пользовательского соглашения")
-    }
-    pop()
-    append(" и подтверждаете ознакомление с ")
-    pushStringAnnotation("PDF", LegalPdfAsset.PRIVACY_POLICY.name)
-    withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-        append("Политикой конфиденциальности")
-    }
-    pop()
 }
 

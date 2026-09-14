@@ -16,7 +16,7 @@ final class OnboardingQuestCatalog
         ];
     }
 
-    /** @return array{units: list<array<string, mixed>>, totalLessons: int} */
+    /** @return array{units: list<array<string, mixed>>, totalLessons: int, mascot: array<string, mixed>, heartsMax: int, xpPerLesson: int, xpBonusPerfect: int} */
     public function export(): array
     {
         $units = [
@@ -29,9 +29,41 @@ final class OnboardingQuestCatalog
             $this->unitFinish(),
         ];
 
+        return $this->pack($units);
+    }
+
+    /**
+     * Убирает юниты, где есть шаги по разделам, которых нет в меню сотрудника
+     * (иначе тур_click по [data-dz-nav="leads"] зависает без кнопки «Дальше»).
+     *
+     * @param list<string> $allowedSections
+     *
+     * @return array{units: list<array<string, mixed>>, totalLessons: int, mascot: array<string, mixed>, heartsMax: int, xpPerLesson: int, xpBonusPerfect: int}
+     */
+    public function exportForSections(array $allowedSections): array
+    {
+        $allowed = array_fill_keys($allowedSections, true);
+        $units = [];
+        foreach ($this->export()['units'] as $unit) {
+            if ($this->unitRequiresMissingSection($unit, $allowed)) {
+                continue;
+            }
+            $units[] = $unit;
+        }
+
+        return $this->pack($units);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $units
+     *
+     * @return array{units: list<array<string, mixed>>, totalLessons: int, mascot: array<string, mixed>, heartsMax: int, xpPerLesson: int, xpBonusPerfect: int}
+     */
+    private function pack(array $units): array
+    {
         $total = 0;
         foreach ($units as $unit) {
-            $total += count($unit['lessons']);
+            $total += count($unit['lessons'] ?? []);
         }
 
         return [
@@ -42,6 +74,24 @@ final class OnboardingQuestCatalog
             'xpPerLesson' => 15,
             'xpBonusPerfect' => 5,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $unit
+     * @param array<string, true>  $allowed
+     */
+    private function unitRequiresMissingSection(array $unit, array $allowed): bool
+    {
+        foreach ($unit['lessons'] ?? [] as $lesson) {
+            foreach ($lesson['steps'] ?? [] as $step) {
+                $section = (string) ($step['section'] ?? '');
+                if ($section !== '' && !isset($allowed[$section])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /** @return array<string, mixed> */
@@ -262,16 +312,12 @@ final class OnboardingQuestCatalog
                     'summary' => 'Раздел заявок',
                     'icon' => '🎯',
                     'steps' => [
-                        $this->tourClick(
-                            'clients',
-                            '[data-dz-nav="leads"]',
-                            'Заявки с сайта и приложения попадают в «Лиды». Нажми — откроем раздел!',
-                            'excited',
-                        ),
+                        // Без обязательного клика по меню: если пункта «Лиды» нет / модуль выключен,
+                        // tour_click раньше прятал «Дальше» и обучение зависало.
                         $this->tour(
                             'leads',
                             '[data-dz-tour="leads-header"]',
-                            'Лид — человек, который ещё не купил абонемент, но заинтересовался клубом.',
+                            'Заявки с сайта и приложения попадают в «Лиды». Лид — человек, который ещё не купил абонемент, но заинтересовался клубом.',
                             'happy',
                         ),
                         $this->quiz(
@@ -325,16 +371,10 @@ final class OnboardingQuestCatalog
                     'summary' => 'Прайс абонементов',
                     'icon' => '💳',
                     'steps' => [
-                        $this->tourClick(
-                            'leads',
-                            '[data-dz-nav="subscriptions"]',
-                            'Абонементы — в этом разделе. Нажми «Абонементы» в меню!',
-                            'excited',
-                        ),
                         $this->tour(
                             'subscriptions',
                             '[data-dz-tour="subscriptions-plans"]',
-                            'Здесь тарифные планы: 1, 3, 6, 12 месяцев. Цену можно менять в CRM.',
+                            'Абонементы — в этом разделе. Здесь тарифные планы: 1, 3, 6, 12 месяцев. Цену можно менять в CRM.',
                             'neutral',
                         ),
                         $this->quiz(

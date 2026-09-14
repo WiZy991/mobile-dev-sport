@@ -82,11 +82,9 @@ fun HomeScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(
-                            painter = painterResource(R.drawable.ic_launcher_foreground),
+                            painter = painterResource(R.drawable.ic_brand_mark),
                             contentDescription = null,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape),
+                            modifier = Modifier.size(32.dp),
                             contentScale = ContentScale.Fit,
                         )
                         Spacer(modifier = Modifier.width(8.dp))

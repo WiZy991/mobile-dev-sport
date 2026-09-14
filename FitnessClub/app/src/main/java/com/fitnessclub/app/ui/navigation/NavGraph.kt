@@ -131,13 +131,9 @@ fun NavGraph(
             LoginScreen(
                 viewModel = viewModel,
                 startWithSber = startWithSber,
-                onNavigateToRegister = {
-                    navController.navigate(Screen.Register.route)
-                },
                 onNavigateToPhoneRegister = {
                     navController.navigate(Screen.Register.route)
                 },
-                onOpenLegalPdf = openLegalPdf,
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(navController.graph.id) { inclusive = true }
@@ -164,8 +160,11 @@ fun NavGraph(
                             popUpTo(RegisterRoutes.START) { inclusive = true }
                         }
                     } else if (phone == false) {
-                        navController.navigate(RegisterRoutes.SURVEY) {
-                            popUpTo(RegisterRoutes.START) { inclusive = true }
+                        if (!navController.popBackStack(Screen.Login.route, inclusive = false)) {
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(Screen.Register.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     }
                 }
@@ -238,15 +237,7 @@ fun NavGraph(
                         if (registerState.phoneRegistration == true) {
                             viewModel.register()
                         } else {
-                            navController.navigate(RegisterRoutes.FORM)
-                        }
-                    },
-                    onRequestSberRegistration = { clubId ->
-                        viewModel.prepareSberRegistration(clubId) {
-                            navController.navigate(Screen.Login.createRoute(startSber = true)) {
-                                popUpTo(navController.graph.id) { inclusive = true }
-                                launchSingleTop = true
-                            }
+                            navController.popBackStack(Screen.Login.route, inclusive = false)
                         }
                     },
                 )

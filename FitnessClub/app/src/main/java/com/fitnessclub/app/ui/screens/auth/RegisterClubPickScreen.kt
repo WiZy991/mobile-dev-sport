@@ -29,7 +29,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,7 +38,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,7 +79,6 @@ fun RegisterClubPickScreen(
     onBack: () -> Unit,
     onPicked: (ClubItem) -> Unit,
     onContinueToRegister: () -> Unit = {},
-    onRequestSberRegistration: (String) -> Unit = {},
     apiClubs: List<ClubItem> = emptyList(),
     clubsLoading: Boolean = false,
     clubsLoadError: String? = null,
@@ -91,7 +88,6 @@ fun RegisterClubPickScreen(
 ) {
     val scroll = rememberScrollState()
     var expandedIds by remember { mutableStateOf(setOf<String>()) }
-    var showSberDialog by remember { mutableStateOf(false) }
     // Прайс-лист в карточке — только у Доброзала.
     val showPriceList = !Brand.isWhiteLabel
 
@@ -342,47 +338,7 @@ fun RegisterClubPickScreen(
                     Text(if (phoneRegistration) "Зарегистрироваться" else "Продолжить регистрацию")
                 }
             }
-            if (!phoneRegistration) {
-            TextButton(
-                onClick = { showSberDialog = true },
-                enabled = selectedClubId != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 28.dp),
-            ) {
-                Text("Или зарегистрироваться через Сбер ID", color = Color.White)
-            }
-            } else {
-                Spacer(Modifier.height(28.dp))
-            }
-        }
-
-        if (showSberDialog) {
-            AlertDialog(
-                onDismissRequest = { showSberDialog = false },
-                title = { Text("Зарегистрироваться с помощью Сбер ID") },
-                text = {
-                    Text(
-                        "Продолжим через Сбер ID. Откроется защищённый вход, после успешной авторизации вы вернётесь в приложение.",
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val clubId = selectedClubId
-                        showSberDialog = false
-                        if (clubId != null) {
-                            onRequestSberRegistration(clubId)
-                        }
-                    }) {
-                        Text("Войти через Сбер ID")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showSberDialog = false }) {
-                        Text("Позже")
-                    }
-                },
-            )
+            Spacer(Modifier.height(28.dp))
         }
     }
 }

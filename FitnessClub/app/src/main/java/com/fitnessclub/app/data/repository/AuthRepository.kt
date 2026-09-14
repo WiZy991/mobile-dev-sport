@@ -205,6 +205,33 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun requestOtp(phone: String, channel: String): ApiResult<OtpRequestResponse> {
+        val first = requestOtpOnce(phone, channel)
+        if (channel != "auto" && channel.isNotBlank()) {
+            return first
+        }
+        // Старый CRM отклоняет channel=auto — тот же порядок, что autoPriority на сервере.
+        if (first is ApiResult.Error && first.authCode == "invalid_channel") {
+            for (fallback in listOf("telegram", "whatsapp", "max")) {
+                val retry = requestOtpOnce(phone, fallback)
+                if (retry is ApiResult.Success) {
+                    return retry
+                }
+                if (retry is ApiResult.Error &&
+                    retry.authCode !in setOf(
+                        "invalid_channel",
+                        "channel_unavailable",
+                        "channel_failed",
+                        "channel_undeliverable",
+                    )
+                ) {
+                    return retry
+                }
+            }
+        }
+        return first
+    }
+
+    private suspend fun requestOtpOnce(phone: String, channel: String): ApiResult<OtpRequestResponse> {
         return try {
             val response = api.requestOtp(OtpRequestBody(phone, channel))
             val body = response.body()
@@ -552,15 +579,15 @@ class AuthRepository @Inject constructor(
     private fun otpSendFailureMessage(http: Int, parsed: ParsedAuthError): String {
         val fromCode = when (parsed.authCode?.trim()) {
             "channel_unavailable" ->
-                parsed.message.ifBlank { "Этот канал сейчас недоступен. Выберите другой или войдите по почте." }
+                parsed.message.ifBlank { "Сейчас не удалось отправить код. Попробуйте позже или войдите по почте." }
             "channel_undeliverable" ->
-                parsed.message.ifBlank { "Этот номер не принимает код в выбранном мессенджере. Выберите другой канал." }
+                parsed.message.ifBlank { "Не удалось доставить код. Запросите повторно или войдите по почте." }
             "channel_failed" ->
-                parsed.message.ifBlank { "Не удалось отправить код. Попробуйте другой канал или войдите по почте." }
+                parsed.message.ifBlank { "Не удалось отправить код. Попробуйте позже или войдите по почте." }
             "otp_rate_limited" -> "Слишком много запросов кода. Подождите час."
             "otp_too_soon" -> "Повторная отправка будет доступна через несколько секунд"
             "invalid_phone" -> "Укажите номер телефона полностью"
-            "invalid_channel" -> "Выберите Telegram, Max или WhatsApp"
+            "invalid_channel" -> "Не удалось отправить код. Попробуйте позже или войдите по почте."
             else -> null
         }
         if (fromCode != null) return fromCode
@@ -581,11 +608,11 @@ class AuthRepository @Inject constructor(
             "passport_locked", "profile_locked" ->
                 return "На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки."
             "channel_unavailable" ->
-                return text.ifBlank { "Этот канал сейчас недоступен. Выберите другой или войдите по почте." }
+                return text.ifBlank { "Сейчас не удалось отправить код. Попробуйте позже или войдите по почте." }
             "channel_undeliverable" ->
-                return text.ifBlank { "Этот номер не принимает код в выбранном мессенджере. Выберите другой канал." }
+                return text.ifBlank { "Не удалось доставить код. Запросите повторно или войдите по почте." }
             "channel_failed" ->
-                return text.ifBlank { "Не удалось отправить код. Попробуйте другой канал или войдите по почте." }
+                return text.ifBlank { "Не удалось отправить код. Попробуйте позже или войдите по почте." }
         }
         return when (text.trim()) {
         "Укажите email и password", "Введите пароль" -> loginPasswordRequiredMessage()

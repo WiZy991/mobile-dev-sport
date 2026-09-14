@@ -14,7 +14,8 @@ final class PhoneOtpService
 {
     private const TTL_SECONDS = 300;
     private const MAX_ATTEMPTS = 5;
-    private const RESEND_SECONDS = 20;
+    private const RESEND_SECONDS_FIRST = 20;
+    private const RESEND_SECONDS_NEXT = 45;
     private const HOUR_LIMIT = 5;
     private const TICKET_TTL_SECONDS = 1800;
 
@@ -61,10 +62,11 @@ final class PhoneOtpService
             throw new \DomainException('invalid_phone');
         }
         $channel = strtolower(trim($channel));
-        if ($channel === '' || !OtpChannel::isValid($channel)) {
-            // Старые клиенты могли слать telegram/max/whatsapp — переводим на SMS.
-            $channel = OtpChannel::SMS;
+        if ($channel === '' || OtpChannel::isAuto($channel) || !OtpChannel::isValid($channel)) {
+            // auto / пустой / старые telegram|max|whatsapp → SMS.
+            $channel = OtpChannel::AUTO;
         }
+        $channel = $this->resolveChannel($channel);
 
         $sender = $this->senders[$channel] ?? null;
         $configured = $sender instanceof OtpSenderInterface && $sender->isConfigured();
@@ -72,7 +74,7 @@ final class PhoneOtpService
             throw new \DomainException('channel_unavailable');
         }
 
-        $this->assertRateLimit($phone);
+        $priorCount = $this->assertRateLimit($phone);
 
         $code = (string) random_int(100000, 999999);
         $challenge = new PhoneOtpChallenge();
@@ -103,7 +105,7 @@ final class PhoneOtpService
         $payload = [
             'ok' => true,
             'channel' => $channel,
-            'resend_after_sec' => self::RESEND_SECONDS,
+            'resend_after_sec' => $this->resendAfterForResponse($priorCount),
             'ttl_sec' => self::TTL_SECONDS,
             'instruction' => $delivery->instruction
                 ?? 'Код отправлен в SMS на ваш номер телефона',
@@ -274,7 +276,47 @@ final class PhoneOtpService
         return $row;
     }
 
-    private function assertRateLimit(string $phone): void
+    /**
+     * Пустой / auto → первый настроенный sender (сейчас SMS).
+     */
+    private function resolveChannel(string $requested): string
+    {
+        if (!OtpChannel::isAuto($requested)) {
+            return $requested;
+        }
+        foreach (OtpChannel::autoPriority() as $id) {
+            $sender = $this->senders[$id] ?? null;
+            if ($sender instanceof OtpSenderInterface && $sender->isConfigured()) {
+                return $id;
+            }
+        }
+        if ($this->debug) {
+            return OtpChannel::SMS;
+        }
+
+        throw new \DomainException('channel_unavailable');
+    }
+
+    /** Сколько секунд клиент должен ждать до следующей отправки после этого запроса. */
+    private function resendAfterForResponse(int $priorCount): int
+    {
+        return $priorCount >= 1 ? self::RESEND_SECONDS_NEXT : self::RESEND_SECONDS_FIRST;
+    }
+
+    private function minIntervalBeforeNextRequest(int $priorCount): int
+    {
+        if ($priorCount <= 0) {
+            return 0;
+        }
+        if ($priorCount === 1) {
+            return self::RESEND_SECONDS_FIRST;
+        }
+
+        return self::RESEND_SECONDS_NEXT;
+    }
+
+    /** @return int число challenge за последний час до этой отправки */
+    private function assertRateLimit(string $phone): int
     {
         $sinceHour = (new \DateTimeImmutable('-1 hour'))->format('Y-m-d H:i:s');
         $countHour = (int) $this->em->createQueryBuilder()
@@ -290,21 +332,26 @@ final class PhoneOtpService
             throw new \DomainException('otp_rate_limited');
         }
 
-        $latest = $this->em->createQueryBuilder()
-            ->select('c')
-            ->from(PhoneOtpChallenge::class, 'c')
-            ->where('c.phone = :phone')
-            ->orderBy('c.id', 'DESC')
-            ->setParameter('phone', $phone)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
-        if ($latest instanceof PhoneOtpChallenge) {
-            $elapsed = time() - $latest->getCreatedAt()->getTimestamp();
-            if ($elapsed < self::RESEND_SECONDS) {
-                throw new \DomainException('otp_too_soon');
+        $minInterval = $this->minIntervalBeforeNextRequest($countHour);
+        if ($minInterval > 0) {
+            $latest = $this->em->createQueryBuilder()
+                ->select('c')
+                ->from(PhoneOtpChallenge::class, 'c')
+                ->where('c.phone = :phone')
+                ->orderBy('c.id', 'DESC')
+                ->setParameter('phone', $phone)
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getOneOrNullResult();
+            if ($latest instanceof PhoneOtpChallenge) {
+                $elapsed = time() - $latest->getCreatedAt()->getTimestamp();
+                if ($elapsed < $minInterval) {
+                    throw new \DomainException('otp_too_soon');
+                }
             }
         }
+
+        return $countHour;
     }
 
     private function extractMaxStartText(array $payload): ?string

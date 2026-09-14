@@ -46,7 +46,6 @@ class LoginViewModel @Inject constructor(
     init {
         refreshBiometricOffer()
         loadClubBrandName()
-        loadOtpChannels()
         viewModelScope.launch {
             authFlowStore.hasCompletedRegistration.collect { completed ->
                 _uiState.value = _uiState.value.copy(hasCompletedRegistration = completed)
@@ -70,28 +69,6 @@ class LoginViewModel @Inject constructor(
                     )
                 }
                 else -> Unit
-            }
-        }
-    }
-
-    private fun loadOtpChannels() {
-        viewModelScope.launch {
-            when (val result = authRepository.otpChannels()) {
-                is ApiResult.Success -> {
-                    val available = result.data.associate { it.id to it.available }
-                    val current = _uiState.value.otpChannel
-                    val selected = if (available[current] == true) {
-                        current
-                    } else {
-                        listOf("telegram", "max", "whatsapp").firstOrNull { available[it] == true } ?: current
-                    }
-                    _uiState.value = _uiState.value.copy(
-                        otpChannelAvailable = available,
-                        otpChannelsLoaded = true,
-                        otpChannel = selected,
-                    )
-                }
-                else -> _uiState.value = _uiState.value.copy(otpChannelsLoaded = true)
             }
         }
     }
@@ -176,7 +153,8 @@ class LoginViewModel @Inject constructor(
         val national = nationalDigitsFromPhoneField(raw, _uiState.value.phoneNationalDigits)
         _uiState.value = _uiState.value.copy(
             phoneNationalDigits = national,
-            phoneError = null
+            phoneError = null,
+            otpSendCount = if (national != _uiState.value.phoneNationalDigits) 0 else _uiState.value.otpSendCount,
         )
     }
 
@@ -348,7 +326,7 @@ class LoginViewModel @Inject constructor(
             "email_unknown" -> {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    validationSummary = "Аккаунт не найден. Зарегистрируйтесь.",
+                    validationSummary = "Аккаунт не найден. Войдите по номеру телефона.",
                     loginHintCode = "email_unknown",
                     passwordError = null,
                     showValidationAttempted = true,
@@ -466,17 +444,6 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    fun onOtpChannelChange(channel: String) {
-        val available = _uiState.value.otpChannelAvailable
-        if (available.isNotEmpty() && available[channel] == false) {
-            _uiState.value = _uiState.value.copy(
-                error = "Этот канал ещё не подключён. Выберите другой или войдите по почте / Сбер ID.",
-            )
-            return
-        }
-        _uiState.value = _uiState.value.copy(otpChannel = channel, error = null)
-    }
-
     fun onOtpCodeChange(code: String) {
         val digits = code.filter { it.isDigit() }.take(6)
         _uiState.value = _uiState.value.copy(otpCode = digits, otpError = null)
@@ -493,15 +460,28 @@ class LoginViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, phoneError = null)
-            when (val r = authRepository.requestOtp(phone, _uiState.value.otpChannel)) {
+            when (val r = authRepository.requestOtp(phone, "auto")) {
                 is ApiResult.Success -> {
+                    if (BuildConfig.DEBUG && !r.data.devCode.isNullOrBlank()) {
+                        android.util.Log.d("LoginOtp", "dev_code=${r.data.devCode}")
+                    }
+                    val attempt = _uiState.value.otpSendCount
+                    val fallback = if (attempt == 0) 20 else 45
+                    val server = r.data.resendAfterSec
+                    val waitSec = when {
+                        server >= 45 -> server
+                        attempt == 0 -> server.coerceAtLeast(20)
+                        else -> 45
+                    }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         otpStep = LoginOtpStep.CODE,
+                        otpChannel = r.data.channel ?: "auto",
                         otpInstruction = r.data.instruction,
                         otpDeeplink = r.data.deeplink,
-                        otpDevCode = r.data.devCode,
-                        resendSecondsLeft = r.data.resendAfterSec.coerceAtLeast(20),
+                        otpDevCode = null,
+                        otpSendCount = attempt + 1,
+                        resendSecondsLeft = waitSec.coerceAtLeast(fallback),
                         otpCode = "",
                     )
                     tickResend()
@@ -552,7 +532,13 @@ class LoginViewModel @Inject constructor(
     }
 
     fun backToPhoneStep() {
-        _uiState.value = _uiState.value.copy(otpStep = LoginOtpStep.PHONE, otpCode = "", otpError = null)
+        _uiState.value = _uiState.value.copy(
+            otpStep = LoginOtpStep.PHONE,
+            otpCode = "",
+            otpError = null,
+            otpInstruction = null,
+            otpDeeplink = null,
+        )
     }
 
     private fun tickResend() {
@@ -574,9 +560,7 @@ data class LoginUiState(
     val phoneError: String? = null,
     val credentialsStep: Boolean = false,
     val otpStep: LoginOtpStep = LoginOtpStep.PHONE,
-    val otpChannel: String = "telegram",
-    val otpChannelAvailable: Map<String, Boolean> = emptyMap(),
-    val otpChannelsLoaded: Boolean = false,
+    val otpChannel: String = "auto",
     val otpCode: String = "",
     val otpError: String? = null,
     val otpShakeNonce: Int = 0,
@@ -585,6 +569,7 @@ data class LoginUiState(
     val otpInstruction: String? = null,
     val otpDeeplink: String? = null,
     val otpDevCode: String? = null,
+    val otpSendCount: Int = 0,
     val resendSecondsLeft: Int = 0,
     val showEmailLogin: Boolean = false,
     val email: String = "",

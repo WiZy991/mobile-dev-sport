@@ -436,12 +436,16 @@
                     this.el.text.textContent = step.text || step.title || '';
                 }
                 if (isClick) {
-                    this.el.next?.classList.add('d-none');
                     this.el.hole?.classList.add('dz-tour-hole-click');
                     if (target) {
+                        this.el.next?.classList.add('d-none');
                         this.setupClickAdvance(target);
                     } else {
+                        // Цель клика нет в DOM (нет пункта меню / модуль выключен) —
+                        // иначе тур зависает без кнопки «Дальше».
                         this.hideTapPaw();
+                        if (this.el.next) this.el.next.textContent = this.labels.continue;
+                        this.el.next?.classList.remove('d-none');
                     }
                 } else if (step.type === 'checkpoint') {
                     this.hideTapPaw();

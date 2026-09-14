@@ -3,6 +3,7 @@
 namespace App\Twig;
 
 use App\Entity\StaffUser;
+use App\Service\Admin\AdminMenuBuilder;
 use App\Service\Admin\OnboardingQuestCatalog;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -15,6 +16,7 @@ final class OnboardingTwigExtension extends AbstractExtension
 
     public function __construct(
         private readonly OnboardingQuestCatalog $catalog,
+        private readonly AdminMenuBuilder $menuBuilder,
         private readonly Security $security,
         private readonly UrlGeneratorInterface $urlGenerator,
     ) {
@@ -51,8 +53,14 @@ final class OnboardingTwigExtension extends AbstractExtension
 
     private function questJson(): string
     {
+        $user = $this->security->getUser();
+        $menu = $this->menuBuilder->buildFor($user);
+        $quest = $menu === []
+            ? $this->catalog->export()
+            : $this->catalog->exportForSections(array_keys($menu));
+
         return json_encode(
-            $this->catalog->export(),
+            $quest,
             JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP,
         );
     }

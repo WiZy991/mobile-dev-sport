@@ -184,30 +184,27 @@ fun WelcomeScreen(
     }
 }
 
+private fun welcomePrivacyAsset(): LegalPdfAsset =
+    if (Brand.isWhiteLabel) LegalPdfAsset.PRIVACY_POLICY else LegalPdfAsset.DOBROZAL_PRIVACY
+
 private fun welcomeLegalAnnotatedString(custom: String?) = buildAnnotatedString {
     append(
         custom?.takeIf { it.isNotBlank() }
             ?: "Нажимая «Продолжить», вы соглашаетесь с ",
     )
-    if (custom.isNullOrBlank()) {
-        pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
-        withStyle(SpanStyle(textDecoration = TextDecoration.Underline, fontWeight = FontWeight.SemiBold)) {
-            append("политиками и документами")
-        }
-        pop()
-        append(" (пользовательское соглашение и политика конфиденциальности).")
-    } else {
+    if (!custom.isNullOrBlank()) {
         append(" ")
-        pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
-        withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-            append("Пользовательское соглашение")
-        }
-        pop()
-        append(" · ")
-        pushStringAnnotation("PDF", LegalPdfAsset.PRIVACY_POLICY.name)
-        withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-            append("Политика конфиденциальности")
-        }
-        pop()
     }
+    val linkStyle = SpanStyle(textDecoration = TextDecoration.Underline, fontWeight = FontWeight.SemiBold)
+    pushStringAnnotation("PDF", LegalPdfAsset.USER_AGREEMENT.name)
+    withStyle(linkStyle) { append("пользовательским соглашением") }
+    pop()
+    append(", ")
+    pushStringAnnotation("PDF", welcomePrivacyAsset().name)
+    withStyle(linkStyle) { append("политикой конфиденциальности") }
+    pop()
+    append(" и ")
+    pushStringAnnotation("PDF", LegalPdfAsset.CONSENT_USER.name)
+    withStyle(linkStyle) { append("согласием на обработку персональных данных") }
+    pop()
 }

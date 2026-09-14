@@ -15,8 +15,9 @@ fun normalizeRussianNationalDigits(input: String): String {
 }
 
 /**
- * Разбор текста из поля с маской `+7 (XXX) XXX-XX-XX`.
- * Backspace по скобке/пробелу снимает последнюю цифру, а не «застревает» в префиксе.
+ * Разбор текста из поля с маской `+7 900 000 00 00` (без скобок: скобки = необязательный код города).
+ * Иностранные номера — не в этом релизе.
+ * Backspace по пробелу снимает последнюю цифру, а не «застревает» в префиксе.
  */
 fun nationalDigitsFromPhoneField(raw: String, previousNational: String): String {
     val prevFormatted = formatRussianPhoneMask(previousNational)
@@ -36,20 +37,20 @@ fun russianPhoneFieldValue(nationalDigits: String): TextFieldValue {
     return TextFieldValue(text = formatted, selection = TextRange(formatted.length))
 }
 
-/** Полный вид номера для поля ввода: `+7 (XXX) XXX-XX-XX` (в стейте — только 10 национальных цифр). */
+/** Полный вид номера для поля ввода: `+7 900 000 00 00` (в стейте — только 10 национальных цифр). */
 fun formatRussianPhoneMask(national10: String): String {
     val d = national10.take(10)
-    if (d.isEmpty()) return "+7 ("
-    val sb = StringBuilder("+7 (")
+    if (d.isEmpty()) return "+7 "
+    val sb = StringBuilder("+7 ")
     sb.append(d.take(3))
     if (d.length < 3) return sb.toString()
-    sb.append(") ")
+    sb.append(" ")
     sb.append(d.substring(3, minOf(6, d.length)))
     if (d.length <= 6) return sb.toString()
-    sb.append("-")
+    sb.append(" ")
     sb.append(d.substring(6, minOf(8, d.length)))
     if (d.length <= 8) return sb.toString()
-    sb.append("-")
+    sb.append(" ")
     sb.append(d.substring(8, d.length))
     return sb.toString()
 }

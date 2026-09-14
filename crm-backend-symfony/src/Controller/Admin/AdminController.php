@@ -3512,7 +3512,7 @@ class AdminController extends AbstractController
         if ($section === 'onboarding') {
             $staff = $this->getUser();
             $userId = $staff instanceof StaffUser ? (string) $staff->getId() : 'guest';
-            $questData = $this->onboardingQuestCatalog->export();
+            $questData = $this->onboardingQuestCatalog->exportForSections(array_keys($menu));
 
             return $this->render('admin/onboarding.html.twig', [
                 'menu' => $menu,
