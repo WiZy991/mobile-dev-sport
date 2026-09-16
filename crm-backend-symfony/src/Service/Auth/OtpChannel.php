@@ -24,7 +24,7 @@ final class OtpChannel
 
     /**
      * Первый живой sender при channel=auto / пустом channel.
-     * Сейчас OTP только через SMS (sms.ru).
+     * Сейчас OTP только через SMS (smsc.ru).
      *
      * @return list<string>
      */

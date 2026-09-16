@@ -9,15 +9,17 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * OTP по SMS на номер телефона (sms.ru).
- * Если API-ключ не задан — канал считается не настроенным (в debug код всё равно выдаётся в `dev_code`).
+ * OTP по SMS через SMS Центр (smsc.ru).
+ * Нужны SMSC_LOGIN и SMSC_PASSWORD в .env.
  */
-final class SmsRuOtpSender implements OtpSenderInterface
+final class SmscOtpSender implements OtpSenderInterface
 {
     public function __construct(
         private readonly HttpClientInterface $httpClient,
-        #[Autowire('%env(default:sms_ru_api_id_default:SMS_RU_API_ID)%')]
-        private readonly string $apiId = '',
+        #[Autowire('%env(default:smsc_login_default:SMSC_LOGIN)%')]
+        private readonly string $login = '',
+        #[Autowire('%env(default:smsc_password_default:SMSC_PASSWORD)%')]
+        private readonly string $password = '',
         private readonly ?LoggerInterface $logger = null,
     ) {
     }
@@ -29,7 +31,7 @@ final class SmsRuOtpSender implements OtpSenderInterface
 
     public function isConfigured(): bool
     {
-        return trim($this->apiId) !== '';
+        return trim($this->login) !== '' && trim($this->password) !== '';
     }
 
     public function send(string $phoneE164, string $code, PhoneOtpChallengeContext $context): OtpDeliveryResult
@@ -42,45 +44,42 @@ final class SmsRuOtpSender implements OtpSenderInterface
         $msg = sprintf('Код для входа: %s', $code);
 
         try {
-            $response = $this->httpClient->request('POST', 'https://sms.ru/sms/send', [
+            // https://smsc.ru/api/ — HTTP API send.php, fmt=3 (JSON)
+            $response = $this->httpClient->request('POST', 'https://smsc.ru/sys/send.php', [
                 'timeout' => 15,
                 'body' => [
-                    'api_id' => trim($this->apiId),
-                    'to' => $to,
-                    'msg' => $msg,
-                    'json' => 1,
+                    'login' => trim($this->login),
+                    'psw' => trim($this->password),
+                    'phones' => $to,
+                    'mes' => $msg,
+                    'charset' => 'utf-8',
+                    'fmt' => 3,
                 ],
             ]);
             $status = $response->getStatusCode();
             $payload = $response->toArray(false);
-            $ok = (int) ($payload['status'] ?? 0) === 100
-                || (string) ($payload['status'] ?? '') === 'OK';
 
-            // sms.ru: status_code 100 = OK; per-number status in sms.<phone>.status
-            if (!$ok && isset($payload['sms']) && \is_array($payload['sms'])) {
-                foreach ($payload['sms'] as $row) {
-                    if (\is_array($row) && (int) ($row['status_code'] ?? 0) === 100) {
-                        $ok = true;
-                        break;
-                    }
-                }
-            }
+            $errorCode = isset($payload['error_code']) ? (int) $payload['error_code'] : 0;
+            $ok = $status >= 200 && $status < 300
+                && $errorCode === 0
+                && isset($payload['id']);
 
-            if ($status >= 200 && $status < 300 && $ok) {
+            if ($ok) {
                 return OtpDeliveryResult::success(
                     null,
                     'Код отправлен в SMS на ваш номер телефона',
                 );
             }
 
-            $this->logger?->warning('SMS.ru OTP failed', [
+            $this->logger?->warning('SMSC.ru OTP failed', [
                 'status' => $status,
-                'payload' => $payload,
+                'error_code' => $errorCode,
+                'error' => $payload['error'] ?? null,
             ]);
 
             return OtpDeliveryResult::fail('channel_failed', 'Не удалось отправить SMS с кодом');
         } catch (\Throwable $e) {
-            $this->logger?->error('SMS.ru OTP exception', ['e' => $e->getMessage()]);
+            $this->logger?->error('SMSC.ru OTP exception', ['e' => $e->getMessage()]);
 
             return OtpDeliveryResult::fail('channel_failed', 'Не удалось отправить SMS с кодом');
         }
