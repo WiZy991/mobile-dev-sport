@@ -47,7 +47,6 @@ final class LegalApiController extends AbstractController
                     ['label' => 'Банк', 'value' => 'АО «Альфа-Банк», г. Москва'],
                     ['label' => 'БИК', 'value' => '040813770'],
                     ['label' => 'Корреспондентский счёт', 'value' => '30101810900000000770'],
-                    ['label' => 'Телефон', 'value' => '+7 (902) 483-42-69'],
                     ['label' => 'Электронная почта', 'value' => 'avto24vl@mail.ru'],
                 ],
             ]);
