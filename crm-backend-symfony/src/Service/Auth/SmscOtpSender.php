@@ -16,11 +16,11 @@ final class SmscOtpSender implements OtpSenderInterface
 {
     public function __construct(
         private readonly HttpClientInterface $httpClient,
+        private readonly LoggerInterface $logger,
         #[Autowire('%env(default:smsc_login_default:SMSC_LOGIN)%')]
         private readonly string $login = '',
         #[Autowire('%env(default:smsc_password_default:SMSC_PASSWORD)%')]
         private readonly string $password = '',
-        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -71,15 +71,18 @@ final class SmscOtpSender implements OtpSenderInterface
                 );
             }
 
-            $this->logger?->warning('SMSC.ru OTP failed', [
-                'status' => $status,
+            $this->logger->warning('SMSC.ru OTP failed', [
+                'http_status' => $status,
                 'error_code' => $errorCode,
                 'error' => $payload['error'] ?? null,
+                'payload' => $payload,
+                'phone' => $to,
             ]);
 
+            // 3 = нет денег; 1/2 = логин/пароль; 4 = IP запрещён в кабинете smsc
             return OtpDeliveryResult::fail('channel_failed', 'Не удалось отправить SMS с кодом');
         } catch (\Throwable $e) {
-            $this->logger?->error('SMSC.ru OTP exception', ['e' => $e->getMessage()]);
+            $this->logger->error('SMSC.ru OTP exception', ['e' => $e->getMessage()]);
 
             return OtpDeliveryResult::fail('channel_failed', 'Не удалось отправить SMS с кодом');
         }
