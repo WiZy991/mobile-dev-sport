@@ -19,11 +19,12 @@
     pointer-events: none;
     background: transparent;
 }
-.dz-tour-root.dz-tour-click-mode .dz-tour-stage {
-    pointer-events: none;
-}
-.dz-tour-root.dz-tour-click-mode .dz-tour-stage .dz-comic-bubble-inner,
-.dz-tour-root.dz-tour-click-mode .dz-tour-stage .dz-tour-next {
+/*
+ * Не ставим pointer-events:none на stage: на Windows touch тап не доходит
+ * до потомков с pointer-events:auto («Далее» / облако). Stage уезжает в portal на body.
+ */
+.dz-tour-root.dz-tour-click-mode .dz-tour-stage,
+.dz-tour-stage.dz-tour-stage-click-mode {
     pointer-events: auto;
 }
 
@@ -40,6 +41,8 @@
     pointer-events: auto;
     cursor: pointer;
     animation: dz-hole-pulse 1.4s ease-in-out infinite;
+    /* touch: огромный box-shadow иногда перехватывает тапы — дырка должна ловить только свой бокс */
+    touch-action: manipulation;
 }
 .dz-tour-hole.dz-tour-hole-click {
     animation: dz-hole-pulse 1.4s ease-in-out infinite;
@@ -83,13 +86,6 @@
 }
 .dz-tour-stage-portal {
     z-index: 10056;
-}
-.dz-tour-stage.dz-tour-stage-click-mode {
-    pointer-events: none;
-}
-.dz-tour-stage.dz-tour-stage-click-mode .dz-comic-bubble-inner,
-.dz-tour-stage.dz-tour-stage-click-mode .dz-tour-next {
-    pointer-events: auto;
 }
 
 /* Облако сверху, Тренер сразу под хвостиком */
@@ -201,13 +197,16 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-weight: 800;
-    padding: 10px 16px;
+    padding: 12px 16px;
+    min-height: 44px;
     border: none;
     border-radius: 12px;
     background: #58cc02;
     color: #fff;
     box-shadow: 0 4px 0 #46a302;
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(88, 204, 2, 0.35);
 }
 .dz-tour-next:hover { background: #61d802; }
 .dz-tour-next:active { transform: translateY(2px); box-shadow: 0 2px 0 #46a302; }
@@ -216,7 +215,8 @@
 .dz-tour-quiz { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .dz-tour-quiz .dz-quiz-option {
     text-align: left;
-    padding: 10px 12px;
+    padding: 12px;
+    min-height: 44px;
     border-radius: 10px;
     border: 2px solid #d0d5de;
     background: #f4f6fa;
@@ -224,6 +224,7 @@
     font-size: 0.85rem;
     cursor: pointer;
     color: #1a1f2e;
+    touch-action: manipulation;
 }
 .dz-tour-quiz .dz-quiz-option:hover:not(:disabled) { border-color: #ff5b2e; background: #fff; }
 .dz-tour-quiz .dz-quiz-correct { border-color: #14b88a !important; background: #d4f5eb !important; }
@@ -255,6 +256,7 @@
     font-size: 1rem;
     cursor: pointer;
     flex-shrink: 0;
+    touch-action: manipulation;
 }
 .dz-tour-exit:hover { color: #fff; border-color: #ff5b2e; }
 .dz-tour-topbar-progress {
@@ -323,6 +325,12 @@
 .dz-celebration-xp { font-size: 2rem; font-weight: 800; color: #ffcb45; }
 .dz-celebration-title { font-size: 1.25rem; font-weight: 800; color: #f7f6f1; margin: 8px 0; }
 .dz-celebration-text { color: #b8c0d0; margin-bottom: 16px; }
+.dz-celebration .dz-btn,
+.dz-celebration [data-dz-celebration-close] {
+    min-height: 44px;
+    touch-action: manipulation;
+    cursor: pointer;
+}
 .dz-confetti-canvas {
     position: fixed;
     inset: 0;

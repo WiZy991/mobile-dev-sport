@@ -74,6 +74,20 @@
                             <label class="form-label small">Адрес (город, улица, этаж)</label>
                             <input type="text" name="address" class="form-control form-control-sm" value="{{ club.address }}" placeholder="г. Владивосток, ул. …">
                         </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">Широта</label>
+                            <input type="text" name="latitude" class="form-control form-control-sm" value="{{ club.latitude }}" placeholder="43.305608" inputmode="decimal">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">Долгота</label>
+                            <input type="text" name="longitude" class="form-control form-control-sm" value="{{ club.longitude }}" placeholder="131.956621" inputmode="decimal">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <p class="form-text small mb-2">
+                                Для карты в приложении («Мы на карте»). Координаты: Яндекс/Google Maps → ПКМ по точке → скопировать.
+                                Пусто — подставятся запасные координаты по адресу (если есть).
+                            </p>
+                        </div>
                         <div class="col-md-4">
                             <label class="form-label small">Телефон</label>
                             <input type="text" name="phone" class="form-control form-control-sm" value="{{ club.phone }}">

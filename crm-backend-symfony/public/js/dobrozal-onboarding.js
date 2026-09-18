@@ -6,6 +6,45 @@
 
     const STORAGE_PREFIX = 'dobrozal_onboarding_';
 
+    /**
+     * Мышь → click; тач/перо на Windows часто не синтезируют click
+     * (особенно при pointer-events:none у родителя). Дебаунс против double-fire.
+     */
+    function bindTap(el, handler, capture) {
+        if (!el) return;
+        let last = 0;
+        const run = (e) => {
+            const now = Date.now();
+            if (now - last < 450) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            last = now;
+            handler(e);
+        };
+        const onPointerUp = (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+            e.preventDefault();
+            e.stopPropagation();
+            run(e);
+        };
+        const onClick = (e) => run(e);
+        el.addEventListener('pointerup', onPointerUp, capture);
+        el.addEventListener('click', onClick, capture);
+        if (!el._dzTapUnbind) el._dzTapUnbind = [];
+        el._dzTapUnbind.push(() => {
+            el.removeEventListener('pointerup', onPointerUp, capture);
+            el.removeEventListener('click', onClick, capture);
+        });
+    }
+
+    function unbindTap(el) {
+        (el?._dzTapUnbind || []).forEach((fn) => fn());
+        if (el) el._dzTapUnbind = [];
+    }
+
     function readLabels(el) {
         const d = el.dataset;
         return {
@@ -232,13 +271,17 @@
         }
 
         bindEvents() {
-            this.el.next?.addEventListener('click', () => this.onNext());
-            this.el.exit?.addEventListener('click', () => {
+            bindTap(this.el.next, () => this.onNext());
+            bindTap(this.el.exit, () => {
                 if (confirm(this.labels.exitTour)) {
                     this.endTour();
                 }
             });
             this.el.backdrop?.addEventListener('click', (e) => {
+                if (e.target === this.el.backdrop) e.preventDefault();
+            });
+            this.el.backdrop?.addEventListener('pointerup', (e) => {
+                if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
                 if (e.target === this.el.backdrop) e.preventDefault();
             });
         }
@@ -307,9 +350,7 @@
         }
 
         cleanupClick() {
-            (this.clickHandlers || []).forEach(({ el, fn, capture }) => {
-                el?.removeEventListener('click', fn, capture);
-            });
+            (this.clickHandlers || []).forEach(({ el }) => unbindTap(el));
             this.clickHandlers = [];
             this.root?.classList.remove('dz-tour-click-mode');
             this.el.stage?.classList.remove('dz-tour-stage-click-mode');
@@ -359,14 +400,13 @@
 
         bindClickAdvance(el, target) {
             if (!el) return;
-            const fn = (e) => {
+            bindTap(el, (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 this.cleanupClick();
                 this.handleClickAdvance(target || el);
-            };
-            el.addEventListener('click', fn, true);
-            this.clickHandlers.push({ el, fn, capture: true });
+            }, true);
+            this.clickHandlers.push({ el });
         }
 
         setupClickAdvance(target) {
@@ -774,7 +814,7 @@
                 btn.type = 'button';
                 btn.className = 'dz-quiz-option';
                 btn.textContent = opt;
-                btn.addEventListener('click', () => this.answerQuiz(step, i, btn));
+                bindTap(btn, () => this.answerQuiz(step, i, btn));
                 this.el.quiz.appendChild(btn);
             });
             const t = this.resolveTarget(step);
@@ -874,7 +914,8 @@
                 this.el.overlayContent.appendChild(clone);
             }
             this.el.overlay.classList.remove('d-none');
-            this.el.overlayContent.querySelector('[data-dz-celebration-close]')?.addEventListener('click', () => {
+            const closeBtn = this.el.overlayContent.querySelector('[data-dz-celebration-close]');
+            bindTap(closeBtn, () => {
                 this.el.overlay.classList.add('d-none');
                 this.el.confetti?.classList.add('d-none');
                 const next = this.nextLessonId(this.currentLesson?.id);
@@ -1021,13 +1062,14 @@
         }
 
         bindEvents() {
-            this.el.path?.addEventListener('click', (e) => {
-                const row = e.target.closest('[data-lesson-id]');
-                if (!row || row.classList.contains('dz-lesson-locked')) return;
+            const onPathActivate = (e) => {
+                const row = (e.target && e.target.closest) ? e.target.closest('[data-lesson-id]') : null;
+                if (!row || row.classList.contains('dz-lesson-locked') || row.disabled) return;
                 const id = row.getAttribute('data-lesson-id');
                 if (id) this.tour.startLesson(id);
-            });
-            this.root.querySelector('[data-dz-reset]')?.addEventListener('click', () => {
+            };
+            bindTap(this.el.path, onPathActivate);
+            bindTap(this.root.querySelector('[data-dz-reset]'), () => {
                 if (confirm(this.labels.resetConfirm)) {
                     this.tour.state = this.tour.defaultState();
                     this.tour.saveState();

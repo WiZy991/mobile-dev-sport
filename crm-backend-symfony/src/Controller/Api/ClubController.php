@@ -330,15 +330,14 @@ class ClubController extends AbstractController
             $preferredClubId = $preferred->getId();
             $clubName = $this->hallDisplayLabel($preferred);
             $address = $this->hallFullAddress($preferred);
-            $known = $this->knownVenueCoordinates($preferred);
-            if ($known !== null) {
-                [$lat, $lon] = $known;
+            // Сначала координаты из карточки зала в CRM; запасные — только если пусто.
+            if ($preferred->getLatitude() !== null && $preferred->getLongitude() !== null) {
+                $lat = (float) $preferred->getLatitude();
+                $lon = (float) $preferred->getLongitude();
             } else {
-                if ($preferred->getLatitude() !== null) {
-                    $lat = (float) $preferred->getLatitude();
-                }
-                if ($preferred->getLongitude() !== null) {
-                    $lon = (float) $preferred->getLongitude();
+                $known = $this->knownVenueCoordinates($preferred);
+                if ($known !== null) {
+                    [$lat, $lon] = $known;
                 }
             }
             if ($preferred->getPhone()) {

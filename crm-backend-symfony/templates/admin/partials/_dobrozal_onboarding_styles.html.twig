@@ -172,12 +172,15 @@
     gap: 12px;
     width: 100%;
     padding: 12px 14px;
+    min-height: 48px;
     border-radius: var(--dz-radius-sm);
     border: 2px solid var(--dz-border);
     background: rgba(0, 0, 0, 0.2);
     color: var(--dz-text);
     text-align: left;
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(255, 91, 46, 0.25);
     transition: border-color 0.15s, background 0.15s;
 }
 .dz-lesson-row:hover:not(:disabled) {

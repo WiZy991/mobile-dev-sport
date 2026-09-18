@@ -125,6 +125,11 @@ class AdminFranchiseController extends AbstractController
             $club->setAddress($address);
         }
 
+        $latRaw = trim((string) $request->request->get('latitude', ''));
+        $lngRaw = trim((string) $request->request->get('longitude', ''));
+        $club->setLatitude($latRaw !== '' && is_numeric($latRaw) ? (float) $latRaw : null);
+        $club->setLongitude($lngRaw !== '' && is_numeric($lngRaw) ? (float) $lngRaw : null);
+
         $club->setPhone($this->trimOrNull($request->request->get('phone')));
         $club->setEmail($this->trimOrNull($request->request->get('email')));
         $club->setWorkingHours($this->trimOrNull($request->request->get('working_hours')));

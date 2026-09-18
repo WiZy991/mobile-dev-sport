@@ -19,6 +19,14 @@
             Ничего вписывать не нужно. Выложили 39 в Google Play → выкатили этот бэк → один раз откройте приложение 39 на телефоне.
             Здесь появится «39», и у всех на старой сборке сам вылезет баннер «обновитесь» с крестиком.
         </p>
+        <p class="small text-warning mb-2">
+            Если баннер есть, а в Play обновления нет — скорее всего открывали тестовую/новую APK раньше публикации.
+            Тогда «маяк» выше номера в магазине. Нажмите сброс ниже.
+        </p>
+        <form method="post" action="{{ path('admin_section', {section: 'mobileapps'}) }}" class="mb-3" onsubmit="return confirm('Сбросить маяк версии? Баннер обновления пропадет у тех, у кого сборка не ниже ручного минимума.');">
+            <input type="hidden" name="form" value="android_reset_seen">
+            <button type="submit" class="btn btn-sm btn-outline-warning">Сбросить маяк версии (убрать ложный баннер)</button>
+        </form>
         <details class="small">
             <summary class="text-secondary mb-2">Редко нужно: свой текст или запретить закрыть баннер</summary>
             <form method="post" action="{{ path('admin_section', {section: 'mobileapps'}) }}" class="row g-2 mt-1">

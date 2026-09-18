@@ -4175,6 +4175,15 @@ class AdminController extends AbstractController
                 return $this->redirectToRoute('admin_section', ['section' => 'mobileapps']);
             }
 
+            if ($request->isMethod('POST') && $request->request->get('form') === 'android_reset_seen') {
+                $this->clubSettings->set('android_seen_version_ru_worldcashfit_app', '0');
+                $this->clubSettings->set('android_seen_version_ru_academywrestling_app', '0');
+                $this->em->flush();
+                $this->addFlash('success', 'Сброшен «маяк» версии Android. Ложный баннер обновления больше не должен показываться, пока кто-то снова не откроет сборку новее, чем в Play.');
+
+                return $this->redirectToRoute('admin_section', ['section' => 'mobileapps']);
+            }
+
             if ($request->isMethod('POST') && $request->request->get('form') === 'ios_app_update') {
                 $iosMinVersion = trim((string) $request->request->get('ios_min_version', ''));
                 $iosMessage = trim((string) $request->request->get('ios_update_message', ''));
