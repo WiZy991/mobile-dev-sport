@@ -315,8 +315,11 @@
         hideTour() {
             this.root.classList.add('d-none');
             this.root.classList.remove('dz-tour-active');
+            this.unmountCelebrationPortal();
             this.unmountStagePortal();
             this.cleanupClick();
+            if (this.el.stage) this.el.stage.style.display = '';
+            if (this.el.hole) this.el.hole.style.display = '';
             if (this._stageResizeObs) {
                 this._stageResizeObs.disconnect();
                 this._stageResizeObs = null;
@@ -338,14 +341,55 @@
                 document.body.appendChild(stage);
             }
             stage.classList.add('dz-tour-stage-portal');
+            stage.style.display = '';
         }
 
         unmountStagePortal() {
             const stage = this.el.stage;
             if (!stage || !this.stageHome) return;
             stage.classList.remove('dz-tour-stage-portal', 'dz-tour-stage-click-mode');
+            stage.style.display = '';
             if (stage.parentNode !== this.stageHome) {
                 this.stageHome.appendChild(stage);
+            }
+        }
+
+        /** Модалка «Урок пройден» — на body выше stage (иначе на ultrawide заяц перекрывает кнопку). */
+        mountCelebrationPortal() {
+            const overlay = this.el.overlay;
+            const confetti = this.el.confetti;
+            if (overlay) {
+                if (!this.overlayHome) this.overlayHome = overlay.parentNode;
+                if (overlay.parentNode !== document.body) {
+                    document.body.appendChild(overlay);
+                }
+                overlay.classList.add('dz-tour-overlay-portal');
+            }
+            if (confetti) {
+                if (!this.confettiHome) this.confettiHome = confetti.parentNode;
+                if (confetti.parentNode !== document.body) {
+                    document.body.appendChild(confetti);
+                }
+                confetti.classList.add('dz-tour-confetti-portal');
+            }
+        }
+
+        unmountCelebrationPortal() {
+            const overlay = this.el.overlay;
+            const confetti = this.el.confetti;
+            if (overlay) {
+                overlay.classList.add('d-none');
+                overlay.classList.remove('dz-tour-overlay-portal');
+                if (this.overlayHome && overlay.parentNode !== this.overlayHome) {
+                    this.overlayHome.appendChild(overlay);
+                }
+            }
+            if (confetti) {
+                confetti.classList.add('d-none');
+                confetti.classList.remove('dz-tour-confetti-portal');
+                if (this.confettiHome && confetti.parentNode !== this.confettiHome) {
+                    this.confettiHome.appendChild(confetti);
+                }
             }
         }
 
@@ -593,6 +637,29 @@
             return Math.min(280, window.innerWidth * 0.22);
         }
 
+        /**
+         * На ultrawide контент узкий по центру — clamp тура к main.content,
+         * иначе облако уезжает в пустоту и перекрывает модалки.
+         */
+        contentBounds() {
+            const main = document.querySelector('main.content');
+            if (main) {
+                const r = main.getBoundingClientRect();
+                if (r.width > 200) {
+                    return {
+                        left: Math.max(8, r.left),
+                        right: Math.min(window.innerWidth - 8, r.right),
+                        width: r.width,
+                    };
+                }
+            }
+            return {
+                left: this.sidebarRightEdge() + 8,
+                right: window.innerWidth - 8,
+                width: window.innerWidth - this.sidebarRightEdge() - 16,
+            };
+        }
+
         clamp(n, min, max) {
             return Math.max(min, Math.min(max, n));
         }
@@ -742,7 +809,9 @@
             const margin = 16;
             const bottomSafe = this.topbarInset();
             const topSafe = 12;
-            const stageW = Math.min(340, stage.offsetWidth || stage.getBoundingClientRect().width || 320);
+            const bounds = this.contentBounds();
+            const maxStageW = Math.min(340, Math.max(260, bounds.width - margin * 2));
+            const stageW = Math.min(maxStageW, stage.offsetWidth || stage.getBoundingClientRect().width || 320);
             stage.style.width = stageW + 'px';
             const stageH = stage.offsetHeight || 380;
             let top;
@@ -753,13 +822,15 @@
             if (r) {
                 const sidebarEdge = this.sidebarRightEdge();
                 const inSidebar = r.right <= sidebarEdge + 4;
-                const onRight = r.left >= window.innerWidth * 0.62;
+                // На широких экранах «правая треть окна» слишком далеко — ориентируемся на колонку контента.
+                const contentMid = (bounds.left + bounds.right) / 2;
+                const onRight = r.left >= contentMid + bounds.width * 0.12;
 
                 if (inSidebar) {
-                    left = r.right + margin;
+                    left = Math.max(r.right + margin, bounds.left + margin);
                     top = r.top + r.height / 2 - this.measureBubbleTailY();
                     tailPlacement = 'left';
-                } else if (onRight) {
+                } else if (onRight && r.left - stageW - margin >= bounds.left) {
                     left = r.left - stageW - margin;
                     top = r.top + r.height / 2 - this.measureBubbleTailY();
                     tailPlacement = 'right';
@@ -784,12 +855,13 @@
                 }
 
                 top = this.fitStageInViewport(top);
-                left = this.clamp(left, margin, window.innerWidth - stageW - margin);
+                left = this.clamp(left, bounds.left + margin, bounds.right - stageW - margin);
             } else {
                 top = window.innerHeight - bottomSafe - stageH - margin;
-                left = window.innerWidth - stageW - margin - 20;
+                left = bounds.right - stageW - margin - 20;
                 tailPlacement = 'top';
                 top = this.fitStageInViewport(top);
+                left = this.clamp(left, bounds.left + margin, bounds.right - stageW - margin);
             }
 
             stage.style.top = top + 'px';
@@ -897,7 +969,16 @@
         }
 
         showCelebration(xpGain) {
+            // Stage на body выше root — на ultrawide/таче перекрывает «Следующий урок».
+            this.cleanupClick();
+            this.unhighlight();
+            this.hideTapPaw();
+            if (this.el.stage) this.el.stage.style.display = 'none';
+            if (this.el.hole) this.el.hole.style.display = 'none';
+            if (this.el.backdrop) this.el.backdrop.style.pointerEvents = 'none';
+
             this.setMood('celebrate');
+            this.mountCelebrationPortal();
             this.el.confetti?.classList.remove('d-none');
             this.fireConfetti();
             if (!this.el.overlay || !this.el.overlayContent) return;
@@ -916,8 +997,8 @@
             this.el.overlay.classList.remove('d-none');
             const closeBtn = this.el.overlayContent.querySelector('[data-dz-celebration-close]');
             bindTap(closeBtn, () => {
-                this.el.overlay.classList.add('d-none');
-                this.el.confetti?.classList.add('d-none');
+                this.unmountCelebrationPortal();
+                if (this.el.backdrop) this.el.backdrop.style.pointerEvents = '';
                 const next = this.nextLessonId(this.currentLesson?.id);
                 this.hideTour();
                 if (next && this.isLessonUnlocked(next)) {

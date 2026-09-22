@@ -314,27 +314,61 @@
     padding: 24px;
     pointer-events: auto;
 }
+/* На body выше stage-portal (10056), иначе заяц перекрывает кнопку на ultrawide */
+.dz-overlay.dz-tour-overlay-portal {
+    z-index: 10082;
+}
 .dz-celebration {
     background: #2a3140;
     border-radius: 20px;
     padding: 28px 32px;
     text-align: center;
     border: 2px solid #ffcb45;
-    max-width: 360px;
+    max-width: min(360px, calc(100vw - 48px));
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
 }
 .dz-celebration-xp { font-size: 2rem; font-weight: 800; color: #ffcb45; }
 .dz-celebration-title { font-size: 1.25rem; font-weight: 800; color: #f7f6f1; margin: 8px 0; }
 .dz-celebration-text { color: #b8c0d0; margin-bottom: 16px; }
 .dz-celebration .dz-btn,
 .dz-celebration [data-dz-celebration-close] {
-    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 16px;
     touch-action: manipulation;
     cursor: pointer;
+    pointer-events: auto;
+    position: relative;
+    z-index: 2;
 }
 .dz-confetti-canvas {
     position: fixed;
     inset: 0;
     z-index: 10061;
     pointer-events: none;
+}
+.dz-confetti-canvas.dz-tour-confetti-portal {
+    z-index: 10081;
+    pointer-events: none;
+}
+
+@media (min-width: 1600px) {
+    .dz-tour-stage {
+        max-width: min(360px, 28vw);
+    }
+    .dz-tour-mascot-wrap {
+        width: 160px;
+        min-height: 140px;
+    }
+    .dz-tour-mascot-wrap .dz-mascot-img {
+        height: 140px;
+        max-width: 160px;
+    }
 }
 </style>

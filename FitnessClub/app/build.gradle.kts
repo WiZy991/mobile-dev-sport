@@ -108,7 +108,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Google Play Vitals: без R8 обфускация ~1% и предупреждение в Console.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
