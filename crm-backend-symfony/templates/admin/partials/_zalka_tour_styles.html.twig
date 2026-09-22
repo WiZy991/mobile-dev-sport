@@ -6,7 +6,21 @@
     z-index: 10050;
     pointer-events: none;
 }
-.dz-tour-root.dz-tour-active { pointer-events: auto; }
+.dz-tour-root.dz-tour-celebrating .dz-tour-stage,
+.dz-tour-root.dz-tour-celebrating .dz-tour-hole,
+.dz-tour-root.dz-tour-celebrating .dz-tour-tap-paw,
+.dz-tour-root.dz-tour-celebrating .dz-tour-backdrop {
+    display: none !important;
+    pointer-events: none !important;
+}
+/* Stage на body вне root — прячем явно через класс на html/body соседнем элементе */
+body.dz-tour-celebrating-body .dz-tour-stage-portal,
+body.dz-tour-celebrating-body .dz-tour-hole,
+body.dz-tour-celebrating-body .dz-tour-tap-paw {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+}
 
 .dz-tour-backdrop {
     position: fixed;

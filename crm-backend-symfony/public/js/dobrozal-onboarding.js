@@ -305,6 +305,9 @@
         }
 
         showTour() {
+            this.celebrationOpen = false;
+            this.root.classList.remove('dz-tour-celebrating');
+            document.body.classList.remove('dz-tour-celebrating-body');
             this.root.classList.remove('d-none');
             this.root.classList.add('dz-tour-active');
             this.mountStagePortal();
@@ -313,6 +316,9 @@
         }
 
         hideTour() {
+            this.celebrationOpen = false;
+            this.root.classList.remove('dz-tour-celebrating');
+            document.body.classList.remove('dz-tour-celebrating-body');
             this.root.classList.add('d-none');
             this.root.classList.remove('dz-tour-active');
             this.unmountCelebrationPortal();
@@ -320,6 +326,7 @@
             this.cleanupClick();
             if (this.el.stage) this.el.stage.style.display = '';
             if (this.el.hole) this.el.hole.style.display = '';
+            if (this.el.backdrop) this.el.backdrop.style.pointerEvents = '';
             if (this._stageResizeObs) {
                 this._stageResizeObs.disconnect();
                 this._stageResizeObs = null;
@@ -334,6 +341,7 @@
         mountStagePortal() {
             const stage = this.el.stage;
             if (!stage) return;
+            if (this.celebrationOpen) return;
             if (!this.stageHome) {
                 this.stageHome = stage.parentNode;
             }
@@ -553,6 +561,7 @@
 
             if (!this.resizeHandler) {
                 this.resizeHandler = () => {
+                    if (this.celebrationOpen) return;
                     const s = this.currentLesson?.steps?.[this.currentStepIndex];
                     if (!s) return;
                     const t = this.resolveTarget(s);
@@ -573,6 +582,7 @@
             if (img && !img.dataset.dzBound) {
                 img.dataset.dzBound = '1';
                 img.addEventListener('load', () => {
+                    if (this.celebrationOpen) return;
                     const s = this.currentLesson?.steps?.[this.currentStepIndex];
                     if (!s) return;
                     this.scheduleStageLayout(this.resolveTarget(s));
@@ -686,6 +696,7 @@
         }
 
         ensureMascotVisible() {
+            if (this.celebrationOpen) return;
             const stage = this.el.stage;
             const mascot = this.el.mascot;
             if (!stage || !mascot) return;
@@ -718,7 +729,7 @@
             this._stageResizeObs = new ResizeObserver(() => {
                 cancelAnimationFrame(raf);
                 raf = requestAnimationFrame(() => {
-                    if (this.root.classList.contains('d-none')) return;
+                    if (this.celebrationOpen || this.root.classList.contains('d-none')) return;
                     const s = this.currentLesson?.steps?.[this.currentStepIndex];
                     if (!s) return;
                     const top = parseFloat(stage.style.top);
@@ -745,6 +756,7 @@
         }
 
         refineStageVerticalAlign(target, tailPlacement) {
+            if (this.celebrationOpen) return;
             if (!target || !this.el.stage) return;
             if (tailPlacement !== 'left' && tailPlacement !== 'right') return;
             const r = this.anchorRect(target);
@@ -757,7 +769,9 @@
         }
 
         scheduleStageLayout(target) {
+            if (this.celebrationOpen) return;
             const run = () => {
+                if (this.celebrationOpen) return;
                 this.positionStage(target);
                 this.refineStageVerticalAlign(target, this._lastTailPlacement);
                 const stage = this.el.stage;
@@ -802,6 +816,7 @@
         }
 
         positionStage(target) {
+            if (this.celebrationOpen) return;
             const stage = this.el.stage;
             if (!stage) return;
             this.mountStagePortal();
@@ -969,11 +984,22 @@
         }
 
         showCelebration(xpGain) {
-            // Stage на body выше root — на ultrawide/таче перекрывает «Следующий урок».
+            // Только модалка «Урок пройден». Квиз/заяц не должны оставаться на экране.
+            this.celebrationOpen = true;
+            this.root.classList.add('dz-tour-celebrating');
+            document.body.classList.add('dz-tour-celebrating-body');
             this.cleanupClick();
             this.unhighlight();
             this.hideTapPaw();
-            if (this.el.stage) this.el.stage.style.display = 'none';
+            if (this.el.quiz) {
+                this.el.quiz.innerHTML = '';
+                this.el.quiz.classList.add('d-none');
+            }
+            if (this.el.next) this.el.next.classList.add('d-none');
+            if (this.el.stage) {
+                this.el.stage.style.display = 'none';
+                this.el.stage.setAttribute('aria-hidden', 'true');
+            }
             if (this.el.hole) this.el.hole.style.display = 'none';
             if (this.el.backdrop) this.el.backdrop.style.pointerEvents = 'none';
 
@@ -997,7 +1023,11 @@
             this.el.overlay.classList.remove('d-none');
             const closeBtn = this.el.overlayContent.querySelector('[data-dz-celebration-close]');
             bindTap(closeBtn, () => {
+                this.celebrationOpen = false;
+                this.root.classList.remove('dz-tour-celebrating');
+                document.body.classList.remove('dz-tour-celebrating-body');
                 this.unmountCelebrationPortal();
+                if (this.el.stage) this.el.stage.removeAttribute('aria-hidden');
                 if (this.el.backdrop) this.el.backdrop.style.pointerEvents = '';
                 const next = this.nextLessonId(this.currentLesson?.id);
                 this.hideTour();
