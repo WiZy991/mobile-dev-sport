@@ -115,7 +115,39 @@ class AdminFranchiseController extends AbstractController
     public function save(int $id, Request $request): Response
     {
         $club = $this->findClubOrFail($id);
+        $form = (string) $request->request->get('form', 'storefront');
 
+        if ($form === 'access') {
+            $this->applyAccessSettings($club, $request);
+            $this->em->flush();
+            $this->addFlash('success', 'Настройки СКУД / PERCo сохранены. Витрина зала не менялась.');
+
+            return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
+        }
+
+        // По умолчанию и form=storefront — только витрина (без PERCo).
+        $this->applyStorefrontSettings($club, $request);
+        $file = $request->files->get('registration_image');
+        if ($file instanceof UploadedFile && $file->isValid()) {
+            try {
+                $club->setRegistrationImagePath($this->storeClubRegistrationImage($file));
+            } catch (\Throwable $e) {
+                $this->addFlash('danger', $e->getMessage());
+
+                return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
+            }
+        }
+        if ($request->request->get('remove_registration_image') === '1') {
+            $club->setRegistrationImagePath(null);
+        }
+        $this->em->flush();
+        $this->addFlash('success', 'Витрина зала сохранена. Настройки СКУД не трогались.');
+
+        return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
+    }
+
+    private function applyStorefrontSettings(Club $club, Request $request): void
+    {
         $name = trim((string) $request->request->get('name', ''));
         if ($name !== '') {
             $club->setName($name);
@@ -134,22 +166,11 @@ class AdminFranchiseController extends AbstractController
         $club->setEmail($this->trimOrNull($request->request->get('email')));
         $club->setWorkingHours($this->trimOrNull($request->request->get('working_hours')));
         $club->setShowInApp($request->request->get('show_in_app') === '1');
+    }
+
+    private function applyAccessSettings(Club $club, Request $request): void
+    {
         $club->setEntryQrFormat((string) $request->request->get('entry_qr_format', Club::ENTRY_QR_ASCII));
-
-        $file = $request->files->get('registration_image');
-        if ($file instanceof UploadedFile && $file->isValid()) {
-            try {
-                $club->setRegistrationImagePath($this->storeClubRegistrationImage($file));
-            } catch (\Throwable $e) {
-                $this->addFlash('danger', $e->getMessage());
-
-                return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
-            }
-        }
-        if ($request->request->get('remove_registration_image') === '1') {
-            $club->setRegistrationImagePath(null);
-        }
-
         $club->setPercoBaseUrl($this->trimOrNull($request->request->get('perco_base_url')));
         $club->setPercoLogin($this->trimOrNull($request->request->get('perco_login')));
         $newPassword = (string) $request->request->get('perco_password', '');
@@ -159,11 +180,6 @@ class AdminFranchiseController extends AbstractController
         $deviceId = trim((string) $request->request->get('perco_entry_device_id', ''));
         $club->setPercoEntryDeviceId($deviceId === '' ? null : (int) $deviceId);
         $club->setPercoVerifySsl($request->request->get('perco_verify_ssl') === '1');
-
-        $this->em->flush();
-        $this->addFlash('success', 'Настройки клуба сохранены.');
-
-        return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
     }
 
     public function regenerateToken(int $id, Request $request): Response
@@ -226,6 +242,7 @@ class AdminFranchiseController extends AbstractController
 
     public function clearGateway(int $id, Request $request): Response
     {
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
         $club = $this->findClubOrFail($id);
         if (!$request->isMethod('POST')) {
             return $this->redirectToRoute('admin_franchise_edit', ['id' => $club->getId()]);
@@ -243,9 +260,20 @@ class AdminFranchiseController extends AbstractController
 
     public function deleteClub(int $id, Request $request): Response
     {
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
         $club = $this->findClubOrFail($id);
         if (!$request->isMethod('POST')) {
             return $this->redirectToRoute('admin_franchise_list');
+        }
+
+        $confirm = trim((string) $request->request->get('confirm_name', ''));
+        if ($confirm !== $club->getName()) {
+            $this->addFlash('danger', 'Удаление отменено: введите точное название клуба для подтверждения.');
+
+            return $this->redirectToRoute(
+                $request->request->get('redirect') === 'list' ? 'admin_franchise_list' : 'admin_franchise_edit',
+                ['id' => $club->getId()],
+            );
         }
 
         $deps = $this->clubDeletion->describeDependencies($club);

@@ -18,21 +18,50 @@
     </div>
 
     <div class="content-card mt-3">
-        <div class="mb-2 text-primary small fw-semibold text-uppercase">Настройки</div>
-        <div class="d-flex flex-column gap-2 mb-3">
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-                <a href="{{ path('admin_settings_club') }}" class="btn btn-sm btn-outline-primary">Настройки клуба</a>
-                <span class="text-secondary small">Адрес, телефон, часы работы для приложения</span>
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Где что лежит</div>
+        <p class="small text-secondary mb-3">Один тип данных — в одном месте. Неправильная «Сохранить» больше не должна затирать соседний блок.</p>
+        <div class="d-flex flex-column gap-3">
+            <div>
+                <div class="small fw-semibold mb-1">Сеть и витрина приложения</div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <a href="{{ path('admin_settings_club') }}" class="btn btn-sm btn-outline-primary">Настройки клуба</a>
+                    <span class="text-secondary small">Адрес сети, контакты, документы, магазин, соцсети</span>
+                </div>
             </div>
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-                <a href="{{ path('admin_section', {section: 'documents'}) }}" class="btn btn-sm btn-outline-secondary">Документы</a>
-                <span class="text-secondary small">PDF-шаблоны договоров, анкет</span>
+            <div>
+                <div class="small fw-semibold mb-1">Залы и СКУД / шлюзы</div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <a href="{{ path('admin_franchise_list') }}" class="btn btn-sm btn-outline-info">Клубы</a>
+                    <span class="text-secondary small">Название зала, карта, PERCo на шлюзе, токен, опасная зона</span>
+                </div>
+                <div class="text-secondary small mt-1">Глобальный СКУД (если один сервер на сеть) — в конце «Настройки клуба», отдельной кнопкой.</div>
             </div>
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-                <a href="{{ path('admin_section', {section: 'promocodes'}) }}" class="btn btn-sm btn-outline-secondary">Промокоды</a>
-                <span class="text-secondary small">Скидки и акции</span>
+            <div>
+                <div class="small fw-semibold mb-1">Документы и акции</div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <a href="{{ path('admin_section', {section: 'documents'}) }}" class="btn btn-sm btn-outline-secondary">Документы</a>
+                    <a href="{{ path('admin_section', {section: 'promocodes'}) }}" class="btn btn-sm btn-outline-secondary">Промокоды</a>
+                    <a href="{{ path('admin_section', {section: 'promotions'}) }}" class="btn btn-sm btn-outline-secondary">Акции</a>
+                </div>
+            </div>
+            <div>
+                <div class="small fw-semibold mb-1">Персонал и роли</div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <a href="{{ path('admin_section', {section: 'crm_staff'}) }}" class="btn btn-sm btn-outline-secondary">Персонал CRM</a>
+                    <span class="text-secondary small">Кто видит beta и опасные действия</span>
+                </div>
+            </div>
+            <div>
+                <div class="small fw-semibold mb-1">Мобильные приложения</div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <a href="{{ path('admin_section', {section: 'mobileapps'}) }}" class="btn btn-sm btn-outline-secondary">Мобильные приложения</a>
+                    <span class="text-secondary small">Мин. версии, принудительное обновление</span>
+                </div>
             </div>
         </div>
+    </div>
+
+    <div class="content-card mt-3">
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Автоматика (сервер)</div>
         <p class="small text-secondary mb-2">
             Уведомления в приложении за 5–7 дней до окончания абонемента:

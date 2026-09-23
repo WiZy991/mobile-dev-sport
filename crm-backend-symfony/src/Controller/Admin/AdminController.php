@@ -2747,6 +2747,63 @@ class AdminController extends AbstractController
         };
 
         if ($request->isMethod('POST')) {
+            $form = (string) $request->request->get('form', 'network');
+
+            if ($form === 'access') {
+                $enabledModules = $this->clubModules->enabledKeys();
+                if ($request->request->get('perco_enabled') === '1' && !\in_array('access', $enabledModules, true)) {
+                    $enabledModules[] = 'access';
+                } elseif ($request->request->get('perco_enabled') !== '1') {
+                    $enabledModules = array_values(array_filter($enabledModules, static fn (string $k) => $k !== 'access'));
+                }
+                $this->clubModules->saveEnabledKeys($enabledModules);
+
+                $this->persistSetting('perco_base_url', trim((string) $request->request->get('perco_base_url', '')) ?: null);
+                $this->persistSetting('perco_login', trim((string) $request->request->get('perco_login', '')) ?: null);
+                $percoPass = (string) $request->request->get('perco_password', '');
+                if ($percoPass !== '') {
+                    $this->persistSetting('perco_password', $percoPass);
+                }
+                $percoVerify = $request->request->get('perco_verify_ssl') === '1' ? '1' : '0';
+                $this->persistSetting('perco_verify_ssl', $percoVerify);
+                $this->persistSetting('perco_entry_device_id', trim((string) $request->request->get('perco_entry_device_id', '')) ?: null);
+                $this->persistSetting('perco_cmd_number', trim((string) $request->request->get('perco_cmd_number', '')) ?: null);
+                $this->persistSetting('perco_cmd_type', trim((string) $request->request->get('perco_cmd_type', '')) ?: null);
+                $this->persistSetting('perco_cmd_value', trim((string) $request->request->get('perco_cmd_value', '')) ?: null);
+                $this->persistSetting('perco_cmd_param', trim((string) $request->request->get('perco_cmd_param', '')) ?: null);
+                $this->em->flush();
+                $this->addFlash('success', 'Настройки СКУД сохранены. Остальные поля сети не менялись.');
+
+                return $this->redirectToRoute('admin_settings_club');
+            }
+
+            if ($form === 'modules') {
+                $enabledModules = $request->request->all('enabled_modules');
+                $moduleKeys = \is_array($enabledModules) ? array_map('strval', $enabledModules) : [];
+                // Не снимаем access, если СКУД уже включён через отдельную форму.
+                if ($this->clubModules->isEnabled('access') && !\in_array('access', $moduleKeys, true)) {
+                    $moduleKeys[] = 'access';
+                }
+                $this->clubModules->saveEnabledKeys($moduleKeys);
+                $this->em->flush();
+                $this->addFlash('success', 'Модули CRM обновлены.');
+
+                return $this->redirectToRoute('admin_settings_club');
+            }
+
+            if ($form === 'beta') {
+                $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
+                $this->persistSetting(
+                    'crm_show_beta_features',
+                    $request->request->getBoolean('crm_show_beta_features') ? '1' : '0',
+                );
+                $this->em->flush();
+                $this->addFlash('success', 'Режим beta-разделов обновлён.');
+
+                return $this->redirectToRoute('admin_settings_club');
+            }
+
+            // form=network (по умолчанию) — витрина сети, без СКУД.
             $keys = ['name', 'address', 'phone', 'email', 'working_hours', 'amenities', 'latitude', 'longitude', 'promo_home_title', 'promo_home_subtitle', 'offer_url', 'privacy_url', 'visiting_rules_url', 'safety_rules_url', 'shop_tab_order', 'shop_default_tab', 'hide_empty_shop_tabs', 'network_about', 'contact_phone', 'contact_email', 'trainer_rental_amount_rub', 'welcome_banner_url', 'welcome_legal_text'];
             foreach ($keys as $key) {
                 $value = trim((string) ($request->request->get($key) ?? ''));
@@ -2758,7 +2815,6 @@ class AdminController extends AbstractController
                 $request->request->all('social_url'),
             );
             $this->clubSettings->set('social_links', ClubSocialLinks::encode($socialLinks));
-            // Совместимость со старыми полями / экраном «О сети»
             $this->clubSettings->set('contact_website', ClubSocialLinks::firstUrlByType($socialLinks, 'website'));
             $this->clubSettings->set('social_vk', ClubSocialLinks::firstUrlByType($socialLinks, 'vk'));
             $this->clubSettings->set('social_telegram', ClubSocialLinks::firstUrlByType($socialLinks, 'telegram'));
@@ -2769,7 +2825,6 @@ class AdminController extends AbstractController
                     'trainer_rental_amount_kopecks',
                     (string) ($amount * 100)
                 );
-                // Та же сумма — на все клубы без своей цены (чтобы сразу видны в staffapp).
                 foreach ($this->em->getRepository(Club::class)->findAll() as $clubEntity) {
                     if (!$clubEntity instanceof Club) {
                         continue;
@@ -2799,7 +2854,6 @@ class AdminController extends AbstractController
                     }
                 }
             } elseif ($rentalRub !== '' && is_numeric($rentalRub)) {
-                // Старая форма без полей по клубам: одна сумма на все залы.
                 $amount = max(1, (int) round((float) $rentalRub));
                 foreach ($this->em->getRepository(Club::class)->findAll() as $clubEntity) {
                     if ($clubEntity instanceof Club) {
@@ -2808,32 +2862,9 @@ class AdminController extends AbstractController
                 }
             }
 
-            $enabledModules = $request->request->all('enabled_modules');
-            $moduleKeys = \is_array($enabledModules) ? array_map('strval', $enabledModules) : [];
-            if ($request->request->get('perco_enabled') === '1' && !\in_array('access', $moduleKeys, true)) {
-                $moduleKeys[] = 'access';
-            } elseif ($request->request->get('perco_enabled') !== '1') {
-                $moduleKeys = array_values(array_filter($moduleKeys, static fn (string $k) => $k !== 'access'));
-            }
-            $this->clubModules->saveEnabledKeys($moduleKeys);
-
-            $this->persistSetting('perco_base_url', trim((string) $request->request->get('perco_base_url', '')) ?: null);
-            $this->persistSetting('perco_login', trim((string) $request->request->get('perco_login', '')) ?: null);
-            $percoPass = (string) $request->request->get('perco_password', '');
-            if ($percoPass !== '') {
-                $this->persistSetting('perco_password', $percoPass);
-            }
-            $percoVerify = $request->request->get('perco_verify_ssl') === '1' ? '1' : '0';
-            $this->persistSetting('perco_verify_ssl', $percoVerify);
-            $this->persistSetting('perco_entry_device_id', trim((string) $request->request->get('perco_entry_device_id', '')) ?: null);
-            $this->persistSetting('perco_cmd_number', trim((string) $request->request->get('perco_cmd_number', '')) ?: null);
-            $this->persistSetting('perco_cmd_type', trim((string) $request->request->get('perco_cmd_type', '')) ?: null);
-            $this->persistSetting('perco_cmd_value', trim((string) $request->request->get('perco_cmd_value', '')) ?: null);
-            $this->persistSetting('perco_cmd_param', trim((string) $request->request->get('perco_cmd_param', '')) ?: null);
-
             $this->syncPrimaryClubFromSettings();
             $this->em->flush();
-            $this->addFlash('success', 'Настройки клуба сохранены. Данные обновятся в приложении: «О клубе», «О сети и контакты», карта.');
+            $this->addFlash('success', 'Настройки сети / витрины сохранены. СКУД не менялся.');
 
             return $this->redirectToRoute('admin_settings_club');
         }
@@ -2852,6 +2883,7 @@ class AdminController extends AbstractController
             'current' => 'settings',
             'club_modules' => ClubModuleRegistry::OPTIONAL,
             'enabled_modules' => $this->clubModules->enabledKeys(),
+            'crm_show_beta_features' => ($getSetting('crm_show_beta_features', '0') === '1'),
             'social_catalog' => ClubSocialLinks::CATALOG,
             'social_links' => $socialLinks,
             'club' => [

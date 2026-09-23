@@ -12,9 +12,13 @@ final class AdminMenuBuilder
 {
     public function __construct(
         private readonly ClubModuleRegistry $clubModules,
+        private readonly ClubSettingsStore $clubSettings,
         private readonly string $defaultOrganizationSlug = 'demo',
     ) {
     }
+
+    /** Экспериментальные разделы: суперадмин видит всегда, остальные — при crm_show_beta_features=1. */
+    private const BETA_SECTIONS = ['messengers', 'calls', 'deals'];
 
     /** @var array<string, string> ключ section => подпись */
     private const FULL_MENU = [
@@ -174,6 +178,9 @@ final class AdminMenuBuilder
             if (!$this->clubModules->isSectionEnabled($key)) {
                 continue;
             }
+            if (\in_array($key, self::BETA_SECTIONS, true) && !$this->areBetaFeaturesVisible($user)) {
+                continue;
+            }
             if ($key === 'crm_staff' && !array_intersect($user->getRoles(), ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])) {
                 continue;
             }
@@ -186,10 +193,19 @@ final class AdminMenuBuilder
             )) {
                 continue;
             }
-            $menu[$key] = $label;
+            $menu[$key] = \in_array($key, self::BETA_SECTIONS, true) ? ($label . ' · beta') : $label;
         }
 
         return $menu;
+    }
+
+    public function areBetaFeaturesVisible(StaffUser $user): bool
+    {
+        if (\in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true)) {
+            return true;
+        }
+
+        return ($this->clubSettings->get('crm_show_beta_features') ?? '0') === '1';
     }
 
     /** @return list<string> */
@@ -236,6 +252,9 @@ final class AdminMenuBuilder
             !array_intersect($roles, ['ROLE_PLATFORM_ADMIN', 'ROLE_SUPER_ADMIN'])
             || !$this->isMainOrganizationUser($user)
         )) {
+            return false;
+        }
+        if (\in_array($section, self::BETA_SECTIONS, true) && !$this->areBetaFeaturesVisible($user)) {
             return false;
         }
         if (\in_array('ROLE_PLATFORM_ADMIN', $roles, true)) {

@@ -79,15 +79,19 @@
                         </td>
                         <td class="text-end text-nowrap">
                             <a href="{{ path('admin_franchise_edit', {id: r.club.id}) }}" class="btn btn-sm btn-outline-light">Открыть</a>
-                            {% if r.has_token %}
-                                <form method="post" action="{{ path('admin_franchise_clear_gateway', {id: r.club.id}) }}" class="d-inline" onsubmit="return confirm('Сбросить шлюз «{{ r.club.name|e('js') }}»? Токен перестанет работать, очередь команд очистится.');">
+                            {% if is_granted('ROLE_SUPER_ADMIN') %}
+                                {% if r.has_token %}
+                                    <form method="post" action="{{ path('admin_franchise_clear_gateway', {id: r.club.id}) }}" class="d-inline" onsubmit="return confirm('Сбросить шлюз «{{ r.club.name|e('js') }}»? Токен перестанет работать, очередь команд очистится.');">
+                                        <input type="hidden" name="redirect" value="list">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning">Сбросить шлюз</button>
+                                    </form>
+                                {% endif %}
+                                <form method="post" action="{{ path('admin_franchise_delete', {id: r.club.id}) }}" class="d-inline" onsubmit="var n=this.confirm_name.value; if(n!=={{ r.club.name|json_encode|raw }}){alert('Введите точное название клуба.'); return false;} return confirm('Удалить клуб «{{ r.club.name|e('js') }}» безвозвратно?');">
                                     <input type="hidden" name="redirect" value="list">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning">Сбросить шлюз</button>
+                                    <input type="text" name="confirm_name" class="form-control form-control-sm d-inline-block" style="width:8rem" placeholder="название" autocomplete="off" required title="Введите название клуба для подтверждения">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
                                 </form>
                             {% endif %}
-                            <form method="post" action="{{ path('admin_franchise_delete', {id: r.club.id}) }}" class="d-inline" onsubmit="return confirm('Удалить клуб «{{ r.club.name|e('js') }}» безвозвратно? Клиенты и абонементы будут отвязаны от этого клуба.');">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
-                            </form>
                         </td>
                     </tr>
                     {% endfor %}

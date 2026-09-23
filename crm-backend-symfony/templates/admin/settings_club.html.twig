@@ -15,6 +15,7 @@
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Информация о клубе</div>
         <p class="small text-secondary mb-3">Эти данные отображаются клиентам в мобильном приложении: «Мы на карте» / «О клубе», «О сети и контакты», карта. После сохранения перезайдите в приложение или обновите экран.</p>
         <form method="post" action="{{ path('admin_settings_club') }}">
+            <input type="hidden" name="form" value="network">
             <div class="row g-2 mb-2">
                 <div class="col-md-6">
                     <label class="form-label small">Название клуба</label>
@@ -249,28 +250,42 @@
                 </div>
             </template>
 
-            <hr class="border-secondary my-3">
+            <div class="col-12 mt-3">
+                <button type="submit" class="btn btn-primary">Сохранить сеть / витрину</button>
+                <span class="small text-secondary ms-2">Модули и СКУД сохраняются отдельно ниже.</span>
+            </div>
+        </form>
+    </div>
 
-            <div class="mb-2 text-primary small fw-semibold text-uppercase">Модули CRM</div>
-            <p class="small text-secondary mb-2">Отключённые модули скрываются из меню для всех сотрудников. Базовые разделы (клиенты, расписание, абонементы…) всегда доступны.</p>
+    <div class="content-card mb-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Модули CRM</div>
+        <p class="small text-secondary mb-2">Отключённые модули скрываются из меню. СКУД / QR-доступ включается в блоке ниже, не здесь.</p>
+        <form method="post" action="{{ path('admin_settings_club') }}">
+            <input type="hidden" name="form" value="modules">
             <div class="row g-2 mb-3">
                 {% for key, label in club_modules %}
+                    {% if key != 'access' %}
                     <div class="col-md-4">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="enabled_modules[]" value="{{ key }}" id="mod_{{ key }}" {{ key in enabled_modules ? 'checked' : '' }}>
                             <label class="form-check-label small" for="mod_{{ key }}">{{ label }}</label>
                         </div>
                     </div>
+                    {% endif %}
                 {% endfor %}
             </div>
+            <button type="submit" class="btn btn-primary">Сохранить модули</button>
+        </form>
+    </div>
 
-            <hr class="border-secondary my-3">
-
-            <div class="mb-2 text-primary small fw-semibold text-uppercase">Вход по QR / турникет (СКУД)</div>
-            <p class="small text-secondary mb-2">
-                Настройка автоматического открытия турникета при сканировании QR-кода из приложения.
-                Обычно заполняет технический специалист клуба. После изменений сохраните настройки и нажмите «Проверить подключение».
-            </p>
+    <div class="content-card mb-3 border-warning">
+        <div class="mb-2 text-warning small fw-semibold text-uppercase">Вход по QR / турникет (СКУД)</div>
+        <p class="small text-secondary mb-2">
+            Отдельная форма: сохранение не затрагивает витрину сети. Обычно заполняет техспециалист.
+            Для залов франшизы предпочтительны настройки в карточке клуба («Клубы»).
+        </p>
+        <form method="post" action="{{ path('admin_settings_club') }}">
+            <input type="hidden" name="form" value="access">
             <input type="hidden" name="perco_enabled" value="0">
             <div class="row g-2 align-items-end">
                 <div class="col-12">
@@ -326,7 +341,7 @@
                     </details>
                 </div>
                 <div class="col-12 mt-2 d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <button type="submit" class="btn btn-warning">Сохранить СКУД</button>
                     {% if admin_can_mutate() %}
                     <button type="submit" class="btn btn-outline-secondary btn-sm" formaction="{{ path('admin_perco_test') }}" formmethod="post">Проверить подключение</button>
                     {% endif %}
@@ -334,6 +349,25 @@
             </div>
         </form>
     </div>
+
+    {% if is_granted('ROLE_SUPER_ADMIN') %}
+    <div class="content-card mb-3">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Beta-разделы</div>
+        <p class="small text-secondary mb-2">
+            Сделки, мессенджеры и звонки скрыты из меню у обычных сотрудников, пока флаг выключен.
+            Суперадмин видит их всегда (подпись «beta» в меню).
+        </p>
+        <form method="post" action="{{ path('admin_settings_club') }}">
+            <input type="hidden" name="form" value="beta">
+            <input type="hidden" name="crm_show_beta_features" value="0">
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" name="crm_show_beta_features" value="1" id="crm_show_beta" {{ crm_show_beta_features ? 'checked' : '' }}>
+                <label class="form-check-label small" for="crm_show_beta">Показывать beta-разделы всем сотрудникам с доступом к ним</label>
+            </div>
+            <button type="submit" class="btn btn-outline-primary btn-sm">Сохранить режим beta</button>
+        </form>
+    </div>
+    {% endif %}
 <script>
 (() => {
     const rows = document.getElementById('social-links-rows');
