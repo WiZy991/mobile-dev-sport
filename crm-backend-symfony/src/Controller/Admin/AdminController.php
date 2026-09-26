@@ -3524,8 +3524,9 @@ class AdminController extends AbstractController
         $dateFrom = $dateFromRaw ? new \DateTimeImmutable($dateFromRaw) : null;
         $dateTo = $dateToRaw ? (new \DateTimeImmutable($dateToRaw))->modify('+1 day') : null;
         $qb = $this->em->createQueryBuilder()
-            ->select('s', 'sc')
+            ->select('s', 'su', 'sc')
             ->from(Sale::class, 's')
+            ->leftJoin('s.user', 'su')
             ->leftJoin('s.club', 'sc')
             ->orderBy('s.createdAt', 'DESC');
         if ($dateFrom) {
@@ -3537,25 +3538,32 @@ class AdminController extends AbstractController
         if ($clubId) {
             $qb->andWhere('s.club = :club')->setParameter('club', $clubId);
         }
+
+        /** @var list<Sale> $sales */
         $sales = $qb->getQuery()->getResult();
 
-        $response = new StreamedResponse(function () use ($sales) {
+        // Плоские строки до StreamedResponse — иначе lazy/EM в колбэке даёт пустой файл.
+        $rows = [];
+        foreach ($sales as $s) {
+            $rows[] = [
+                $s->getId(),
+                $s->getUser() ? $s->getUser()->getName() : $s->getClientName(),
+                $s->getProductName(),
+                $s->getQuantity(),
+                number_format($s->getPrice(), 2, '.', ''),
+                number_format($s->getTotal(), 2, '.', ''),
+                SalePaymentMethodCatalog::label($s->getPaymentMethod()),
+                $s->getClub()?->getName() ?? '',
+                $s->getCreatedAt()->format('d.m.Y H:i'),
+            ];
+        }
+
+        $response = new StreamedResponse(function () use ($rows) {
             $handle = fopen('php://output', 'w');
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
             fputcsv($handle, ['ID', 'Клиент', 'Товар/услуга', 'Кол-во', 'Цена', 'Сумма', 'Оплата', 'Клуб', 'Дата'], ';');
-            foreach ($sales as $s) {
-                $clientName = $s->getUser() ? $s->getUser()->getName() : $s->getClientName();
-                fputcsv($handle, [
-                    $s->getId(),
-                    $clientName,
-                    $s->getProductName(),
-                    $s->getQuantity(),
-                    number_format($s->getPrice(), 2, '.', ''),
-                    number_format($s->getTotal(), 2, '.', ''),
-                    SalePaymentMethodCatalog::label($s->getPaymentMethod()),
-                    $s->getClub()?->getName() ?? '',
-                    $s->getCreatedAt()->format('d.m.Y H:i'),
-                ], ';');
+            foreach ($rows as $row) {
+                fputcsv($handle, $row, ';');
             }
             fclose($handle);
         });
