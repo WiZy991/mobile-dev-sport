@@ -239,7 +239,8 @@ class SubscriptionController extends AbstractController
             ->setPrice($price)
             ->setTotal($price)
             ->setPaymentMethod('app_acquiring_stub')
-            ->setSubscription($sub);
+            ->setSubscription($sub)
+            ->setClub($issueClub);
         if ($promo) {
             $sale->setPromoCode($promo);
             $sale->setDiscountAmount($discountAmount);

@@ -52,7 +52,8 @@ class ProductController extends AbstractController
             ->setQuantity($quantity)
             ->setPrice($price)
             ->setTotal($total)
-            ->setPaymentMethod($paymentMethod);
+            ->setPaymentMethod($paymentMethod)
+            ->setClub($user->getClub());
 
         $this->em->persist($sale);
         $this->em->flush();

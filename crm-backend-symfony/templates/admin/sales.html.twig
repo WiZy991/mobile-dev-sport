@@ -6,7 +6,7 @@
     <div class="content-header">
         <h1 class="h4 mb-0">Продажи</h1>
         <div>
-            <a href="{{ path('admin_sales_export') }}?date_from={{ dateFrom|default('') }}&date_to={{ dateTo|default('') }}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
+            <a href="{{ path('admin_sales_export') }}?date_from={{ dateFrom|default('') }}&date_to={{ dateTo|default('') }}{% if filterClubId %}&club_id={{ filterClubId }}{% endif %}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
             {% if admin_can_mutate() %}
             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNewSale">
                 + Новая продажа
@@ -25,10 +25,36 @@
                 <label class="form-label small text-secondary mb-0">По</label>
                 <input type="date" name="date_to" class="form-control form-control-sm" value="{{ dateTo ?? '' }}">
             </div>
+            {% if clubs is defined and clubs|length > 0 %}
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Клуб</label>
+                <select name="club_id" class="form-select form-select-sm" style="min-width: 10rem;">
+                    <option value="">Все клубы</option>
+                    {% for c in clubs %}
+                        <option value="{{ c.id }}" {{ filterClubId == c.id ? 'selected' }}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Тип / оплата</label>
+                <select name="payment_method" class="form-select form-select-sm" style="min-width: 12rem;">
+                    <option value="">Все</option>
+                    {% for code, label in sale_payment_form_options() %}
+                        <option value="{{ code }}" {{ filterPaymentMethod == code ? 'selected' }}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="alfa_sbp" {{ filterPaymentMethod == 'alfa_sbp' ? 'selected' }}>СБП (Альфа)</option>
+                    <option value="alfa_acquiring" {{ filterPaymentMethod == 'alfa_acquiring' ? 'selected' }}>Эквайринг (Альфа)</option>
+                </select>
+            </div>
             <div class="col-auto">
                 <button type="submit" class="btn btn-sm btn-primary">Фильтр</button>
             </div>
         </form>
+        <p class="small text-secondary mb-0 mt-2">
+            Старые ручные выдачи абонемента писались как «Наличные» — это не значит, что брали кэш.
+            Новые: выбирайте <strong>Сертификат</strong> / <strong>Уже оплачено</strong> / <strong>Бартер</strong> / <strong>Служебный</strong>.
+        </p>
     </div>
 
     {% if admin_can_mutate() %}
@@ -71,6 +97,7 @@
                     <th>Сумма</th>
                     <th>Промо</th>
                     <th>Оплата</th>
+                    <th>Клуб</th>
                     <th>Абонемент</th>
                     <th>Дата</th>
                 </tr>
@@ -95,13 +122,14 @@
                             {% endif %}
                         </td>
                         <td>{% if sale.promoCode %}<code class="small">{{ sale.promoCode.code }}</code>{% else %}—{% endif %}</td>
-                        <td>{{ sale.paymentMethod }}</td>
+                        <td>{{ sale_payment_label(sale.paymentMethod) }}</td>
+                        <td>{{ sale.club ? sale.club.name : '—' }}</td>
                         <td>{% if sale.subscription %}<a href="{{ path('admin_section', {section: 'subscriptions'}) }}#sub-{{ sale.subscription.id }}" class="link-light">#{{ sale.subscription.id }}</a>{% else %}—{% endif %}</td>
                         <td>{{ sale.createdAt|date('d.m.Y H:i') }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="{{ admin_can_mutate() ? 11 : 10 }}" class="text-center text-secondary">
+                        <td colspan="{{ admin_can_mutate() ? 12 : 11 }}" class="text-center text-secondary">
                             Пока нет ни одной продажи.
                         </td>
                     </tr>
@@ -118,7 +146,9 @@
             itemLabel: 'продаж',
             query: {
                 date_from: dateFrom|default(''),
-                date_to: dateTo|default('')
+                date_to: dateTo|default(''),
+                club_id: filterClubId|default(''),
+                payment_method: filterPaymentMethod|default('')
             }
         } %}
     </div>
@@ -166,13 +196,25 @@
                                 <input type="number" step="0.01" name="price" class="form-control form-control-sm" id="salePrice" required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small text-secondary">Оплата</label>
-                                <select name="payment_method" class="form-select form-select-sm">
-                                    <option value="cash">Наличные</option>
-                                    <option value="card">Карта</option>
-                                    <option value="bonus">Бонусы</option>
+                                <label class="form-label small text-secondary">Оплата / тип</label>
+                                <select name="payment_method" class="form-select form-select-sm" required>
+                                    <option value="">— выберите —</option>
+                                    {% for code, label in sale_payment_form_options() %}
+                                        <option value="{{ code }}">{{ label }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
+                            {% if clubs is defined and clubs|length > 0 %}
+                            <div class="col-md-3">
+                                <label class="form-label small text-secondary">Клуб</label>
+                                <select name="club_id" class="form-select form-select-sm" {{ clubs|length > 1 ? 'required' : '' }}>
+                                    {% if clubs|length > 1 %}<option value="">— выберите —</option>{% endif %}
+                                    {% for c in clubs %}
+                                        <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
                             <div class="col-md-3">
                                 <label class="form-label small text-secondary">Промокод</label>
                                 <input type="text" name="promo_code" class="form-control form-control-sm" placeholder="SUMMER20">

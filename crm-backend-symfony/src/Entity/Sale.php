@@ -37,8 +37,8 @@ class Sale implements TenantAware
     #[ORM\Column(type: 'float')]
     private float $total;
 
-    #[ORM\Column(type: 'string', length: 20)]
-    private string $paymentMethod = 'cash'; // cash, card, bonus
+    #[ORM\Column(type: 'string', length: 32)]
+    private string $paymentMethod = 'cash';
 
     #[ORM\ManyToOne(targetEntity: PromoCode::class)]
     #[ORM\JoinColumn(nullable: true)]
@@ -53,6 +53,10 @@ class Sale implements TenantAware
     #[ORM\ManyToOne(targetEntity: Subscription::class)]
     #[ORM\JoinColumn(nullable: true)]
     private ?Subscription $subscription = null;
+
+    #[ORM\ManyToOne(targetEntity: Club::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Club $club = null;
 
     public function __construct()
     {
@@ -92,5 +96,8 @@ class Sale implements TenantAware
 
     public function getSubscription(): ?Subscription { return $this->subscription; }
     public function setSubscription(?Subscription $s): self { $this->subscription = $s; return $this; }
+
+    public function getClub(): ?Club { return $this->club; }
+    public function setClub(?Club $club): self { $this->club = $club; return $this; }
 }
 

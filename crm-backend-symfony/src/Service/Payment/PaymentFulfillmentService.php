@@ -105,7 +105,8 @@ class PaymentFulfillmentService
             ->setPrice($price)
             ->setTotal($price)
             ->setPaymentMethod($paymentMethod)
-            ->setSubscription($sub);
+            ->setSubscription($sub)
+            ->setClub($issueClub);
         if ($promo) {
             $sale->setPromoCode($promo);
             $sale->setDiscountAmount($payment->getDiscountAmount());
@@ -214,7 +215,8 @@ class PaymentFulfillmentService
             ->setQuantity(1)
             ->setPrice($price)
             ->setTotal($price)
-            ->setPaymentMethod($this->resolvePaymentMethod($paymentWay));
+            ->setPaymentMethod($this->resolvePaymentMethod($paymentWay))
+            ->setClub($club);
         if ($staff->getOrganization() !== null) {
             $sale->setOrganization($staff->getOrganization());
         }

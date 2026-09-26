@@ -179,6 +179,9 @@
 
     <div class="content-card mb-3 mt-3">
         <div class="mb-2 text-primary small fw-semibold text-uppercase">Выдать абонемент клиенту</div>
+        <p class="small text-secondary mb-2">
+            Обязательно укажите <strong>тип выдачи</strong>: иначе раньше всё писалось как «наличные» и путало кассу.
+        </p>
         <form method="post" action="{{ path('admin_subscription_issue') }}">
             {% if statusFilter %}<input type="hidden" name="return_status" value="{{ statusFilter }}">{% endif %}
             <div class="row g-2 align-items-end">
@@ -203,6 +206,15 @@
                                 {% set fd = subscription_freeze_days_for_plan(plan) %}
                                 {% if fd > 0 %} (заморозка {{ fd }} дн.){% else %} (без заморозки){% endif %}
                             </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary">Тип выдачи</label>
+                    <select name="issue_type" class="form-select form-select-sm" required>
+                        <option value="">— выберите —</option>
+                        {% for code, label in sale_payment_issue_options() %}
+                            <option value="{{ code }}">{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -232,9 +244,14 @@
                     <input type="number" name="freeze_days_total" id="issue-freeze-days" class="form-control form-control-sm" min="0" placeholder="по тарифу">
                 </div>
                 <div class="col-md-2 mt-2 mt-md-0">
-                    <button type="submit" class="btn btn-sm btn-success w-100">Выдать абонемент</button>
+                    <button type="submit" class="btn btn-sm btn-success w-100">Выдать</button>
                 </div>
             </div>
+            <ul class="small text-secondary mb-0 mt-2 ps-3">
+                <li><strong>Сертификат</strong> — подарочный / сертификат, сумма тарифа в учёте.</li>
+                <li><strong>Уже оплачено (вне CRM)</strong> — сбой оплаты или продали мимо кассы; сумма есть, но это не «нал».</li>
+                <li><strong>Бартер</strong> / <strong>Служебный</strong> — сумма 0 (блогер, персонал).</li>
+            </ul>
         </form>
     </div>
 
