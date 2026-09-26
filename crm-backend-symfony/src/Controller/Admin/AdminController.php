@@ -3522,8 +3522,11 @@ class AdminController extends AbstractController
         $dateToRaw = trim((string) $request->query->get('date_to', ''));
         $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
         $paymentFilter = trim((string) $request->query->get('payment_method', ''));
+        $format = strtolower(trim((string) $request->query->get('format', 'xlsx')));
+        if (!\in_array($format, ['xlsx', 'csv'], true)) {
+            $format = 'xlsx';
+        }
 
-        // Сырой SQL — без StreamedResponse и без lazy Doctrine (иначе файл 0 байт).
         $conn = $this->em->getConnection();
         $hasSaleClub = $this->salesTableHasClubId();
 
@@ -3536,7 +3539,6 @@ class AdminController extends AbstractController
             . ($hasSaleClub ? ' LEFT JOIN clubs c ON c.id = s.club_id' : '')
             . ' WHERE 1=1';
         $params = [];
-        $types = [];
 
         if ($dateFromRaw !== '') {
             $sql .= ' AND s.created_at >= :dateFrom';
@@ -3570,58 +3572,101 @@ class AdminController extends AbstractController
         $sql .= ' ORDER BY s.created_at DESC';
 
         try {
-            $rows = $conn->fetchAllAssociative($sql, $params, $types);
+            $rows = $conn->fetchAllAssociative($sql, $params);
         } catch (\Throwable $e) {
-            $csv = chr(0xEF) . chr(0xBB) . chr(0xBF)
-                . "Ошибка экспорта;{$e->getMessage()}\n";
-
-            return new Response($csv, 200, [
-                'Content-Type' => 'text/csv; charset=UTF-8',
-                'Content-Disposition' => 'attachment; filename="sales_error.csv"',
-            ]);
+            return new Response(
+                'Ошибка экспорта: ' . $e->getMessage(),
+                500,
+                ['Content-Type' => 'text/plain; charset=UTF-8'],
+            );
         }
 
-        $lines = [chr(0xEF) . chr(0xBB) . chr(0xBF) . 'ID;Клиент;Товар/услуга;Кол-во;Цена;Сумма;Оплата;Клуб;Дата'];
+        $sheetRows = [];
         foreach ($rows as $r) {
             $client = (string) (($r['user_name'] ?? '') !== '' && ($r['user_name'] ?? null) !== null
                 ? $r['user_name']
                 : ($r['client_name'] ?? ''));
-            $lines[] = implode(';', [
-                $this->csvCell((string) ($r['id'] ?? '')),
-                $this->csvCell($client),
-                $this->csvCell((string) ($r['product_name'] ?? '')),
-                $this->csvCell((string) ($r['quantity'] ?? '')),
-                $this->csvCell(number_format((float) ($r['price'] ?? 0), 2, '.', '')),
-                $this->csvCell(number_format((float) ($r['total'] ?? 0), 2, '.', '')),
-                $this->csvCell(SalePaymentMethodCatalog::label((string) ($r['payment_method'] ?? ''))),
-                $this->csvCell((string) ($r['club_name'] ?? '')),
-                $this->csvCell($this->formatSqlDateTime((string) ($r['created_at'] ?? ''))),
-            ]);
-        }
-        // Даже без продаж — заголовок + служебная строка, чтобы файл не был 0 байт.
-        if ($rows === []) {
-            $lines[] = $this->csvCell('нет строк') . ';;;;;;;;';
+            $sheetRows[] = [
+                (int) ($r['id'] ?? 0),
+                $client,
+                (string) ($r['product_name'] ?? ''),
+                (int) ($r['quantity'] ?? 0),
+                round((float) ($r['price'] ?? 0), 2),
+                round((float) ($r['total'] ?? 0), 2),
+                SalePaymentMethodCatalog::label((string) ($r['payment_method'] ?? '')),
+                (string) ($r['club_name'] ?? ''),
+                $this->formatSqlDateTime((string) ($r['created_at'] ?? '')),
+            ];
         }
 
-        $csv = implode("\r\n", $lines) . "\r\n";
-
-        $filename = 'sales';
+        $filenameBase = 'sales';
         if ($dateFromRaw !== '') {
-            $filename .= '_' . $dateFromRaw;
+            $filenameBase .= '_' . $dateFromRaw;
         }
         if ($dateToRaw !== '') {
-            $filename .= '_' . $dateToRaw;
+            $filenameBase .= '_' . $dateToRaw;
         }
         if ($clubId) {
-            $filename .= '_club' . $clubId;
+            $filenameBase .= '_club' . $clubId;
         }
-        $filename .= '_n' . \count($rows);
+        $filenameBase .= '_n' . \count($sheetRows);
 
-        return new Response($csv, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
-            'Content-Length' => (string) \strlen($csv),
-            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+        if ($format === 'csv') {
+            // CSV только как запасной вариант; для WPS/Excel лучше xlsx.
+            $lines = ['sep=;', 'ID;Клиент;Товар/услуга;Кол-во;Цена;Сумма;Оплата;Клуб;Дата'];
+            foreach ($sheetRows as $row) {
+                $lines[] = implode(';', array_map(fn ($v) => $this->csvCell((string) $v), $row));
+            }
+            if ($sheetRows === []) {
+                $lines[] = 'нет строк;;;;;;;;';
+            }
+            $csv = chr(0xEF) . chr(0xBB) . chr(0xBF) . implode("\r\n", $lines) . "\r\n";
+
+            return new Response($csv, 200, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="' . $filenameBase . '.csv"',
+                'Content-Length' => (string) \strlen($csv),
+                'Cache-Control' => 'no-store',
+            ]);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Продажи');
+        $sheet->fromArray(
+            ['ID', 'Клиент', 'Товар/услуга', 'Кол-во', 'Цена', 'Сумма', 'Оплата', 'Клуб', 'Дата'],
+            null,
+            'A1',
+        );
+        if ($sheetRows !== []) {
+            $sheet->fromArray($sheetRows, null, 'A2');
+        } else {
+            $sheet->setCellValue('A2', 'Нет продаж за выбранный период');
+        }
+        foreach (range('A', 'I') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'sales_xlsx_');
+        if ($tmp === false) {
+            return new Response('Не удалось создать временный файл', 500);
+        }
+        try {
+            (new Xlsx($spreadsheet))->save($tmp);
+            $binary = file_get_contents($tmp);
+        } finally {
+            @unlink($tmp);
+            $spreadsheet->disconnectWorksheets();
+        }
+        if ($binary === false || $binary === '') {
+            return new Response('Пустой Excel после генерации', 500);
+        }
+
+        return new Response($binary, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $filenameBase . '.xlsx"',
+            'Content-Length' => (string) \strlen($binary),
+            'Cache-Control' => 'no-store',
         ]);
     }
 
