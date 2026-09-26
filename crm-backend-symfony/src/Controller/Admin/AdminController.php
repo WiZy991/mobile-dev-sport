@@ -3515,85 +3515,152 @@ class AdminController extends AbstractController
         return $response;
     }
 
-    #[Route('/sales/export', name: 'admin_sales_export', priority: 20, methods: ['GET'])]
+    #[Route('/sales/export', name: 'admin_sales_export', priority: 30, methods: ['GET'])]
     public function exportSales(Request $request): Response
     {
-        $dateFromRaw = $request->query->get('date_from');
-        $dateToRaw = $request->query->get('date_to');
+        $dateFromRaw = trim((string) $request->query->get('date_from', ''));
+        $dateToRaw = trim((string) $request->query->get('date_to', ''));
         $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
         $paymentFilter = trim((string) $request->query->get('payment_method', ''));
-        $dateFrom = $dateFromRaw ? new \DateTimeImmutable((string) $dateFromRaw) : null;
-        $dateTo = $dateToRaw ? (new \DateTimeImmutable((string) $dateToRaw))->modify('+1 day') : null;
 
-        $filterClub = null;
-        if ($clubId) {
-            $filterClub = $this->em->getRepository(Club::class)->find($clubId);
-            if (!$filterClub instanceof Club) {
-                $filterClub = null;
-                $clubId = null;
-            }
-        }
+        // Сырой SQL — без StreamedResponse и без lazy Doctrine (иначе файл 0 байт).
+        $conn = $this->em->getConnection();
+        $hasSaleClub = $this->salesTableHasClubId();
 
-        $qb = $this->em->createQueryBuilder()
-            ->select('s', 'su', 'sc', 'ss')
-            ->from(Sale::class, 's')
-            ->leftJoin('s.user', 'su')
-            ->leftJoin('s.club', 'sc')
-            ->leftJoin('s.subscription', 'ss')
-            ->orderBy('s.createdAt', 'DESC');
-        if ($dateFrom) {
-            $qb->andWhere('s.createdAt >= :from')->setParameter('from', $dateFrom);
+        $sql = 'SELECT s.id, s.client_name, s.product_name, s.quantity, s.price, s.total,
+                       s.payment_method, s.created_at,
+                       u.name AS user_name'
+            . ($hasSaleClub ? ', c.name AS club_name' : ', NULL AS club_name')
+            . ' FROM sales s'
+            . ' LEFT JOIN users u ON u.id = s.user_id'
+            . ($hasSaleClub ? ' LEFT JOIN clubs c ON c.id = s.club_id' : '')
+            . ' WHERE 1=1';
+        $params = [];
+        $types = [];
+
+        if ($dateFromRaw !== '') {
+            $sql .= ' AND s.created_at >= :dateFrom';
+            $params['dateFrom'] = $dateFromRaw . ' 00:00:00';
         }
-        if ($dateTo) {
-            $qb->andWhere('s.createdAt < :to')->setParameter('to', $dateTo);
+        if ($dateToRaw !== '') {
+            $sql .= ' AND s.created_at < :dateTo';
+            $params['dateTo'] = (new \DateTimeImmutable($dateToRaw))->modify('+1 day')->format('Y-m-d') . ' 00:00:00';
         }
         if ($paymentFilter !== '') {
-            $qb->andWhere('s.paymentMethod = :pm')->setParameter('pm', $paymentFilter);
+            $sql .= ' AND s.payment_method = :pm';
+            $params['pm'] = $paymentFilter;
         }
-        $this->applySaleClubFilter($qb, $filterClub);
-
-        /** @var list<Sale> $sales */
-        $sales = $qb->getQuery()->getResult();
-
-        $handle = fopen('php://temp', 'r+');
-        fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($handle, ['ID', 'Клиент', 'Товар/услуга', 'Кол-во', 'Цена', 'Сумма', 'Оплата', 'Клуб', 'Дата'], ';');
-        foreach ($sales as $s) {
-            $clubName = $s->getClub()?->getName()
-                ?? $s->getSubscription()?->getClub()?->getName()
-                ?? $s->getUser()?->getClub()?->getName()
-                ?? '';
-            fputcsv($handle, [
-                $s->getId(),
-                $s->getUser() ? $s->getUser()->getName() : $s->getClientName(),
-                $s->getProductName(),
-                $s->getQuantity(),
-                number_format($s->getPrice(), 2, '.', ''),
-                number_format($s->getTotal(), 2, '.', ''),
-                SalePaymentMethodCatalog::label($s->getPaymentMethod()),
-                $clubName,
-                $s->getCreatedAt()->format('d.m.Y H:i'),
-            ], ';');
+        if ($clubId && $hasSaleClub) {
+            $sql .= ' AND (
+                s.club_id = :clubId
+                OR (s.club_id IS NULL AND EXISTS (
+                    SELECT 1 FROM subscriptions sub WHERE sub.id = s.subscription_id AND sub.club_id = :clubId
+                ))
+                OR (s.club_id IS NULL AND s.subscription_id IS NULL AND u.club_id = :clubId)
+            )';
+            $params['clubId'] = $clubId;
+        } elseif ($clubId && !$hasSaleClub) {
+            $sql .= ' AND (
+                EXISTS (SELECT 1 FROM subscriptions sub WHERE sub.id = s.subscription_id AND sub.club_id = :clubId)
+                OR (s.subscription_id IS NULL AND u.club_id = :clubId)
+            )';
+            $params['clubId'] = $clubId;
         }
-        rewind($handle);
-        $csv = stream_get_contents($handle) ?: '';
-        fclose($handle);
+
+        $sql .= ' ORDER BY s.created_at DESC';
+
+        try {
+            $rows = $conn->fetchAllAssociative($sql, $params, $types);
+        } catch (\Throwable $e) {
+            $csv = chr(0xEF) . chr(0xBB) . chr(0xBF)
+                . "Ошибка экспорта;{$e->getMessage()}\n";
+
+            return new Response($csv, 200, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="sales_error.csv"',
+            ]);
+        }
+
+        $lines = [chr(0xEF) . chr(0xBB) . chr(0xBF) . 'ID;Клиент;Товар/услуга;Кол-во;Цена;Сумма;Оплата;Клуб;Дата'];
+        foreach ($rows as $r) {
+            $client = (string) (($r['user_name'] ?? '') !== '' && ($r['user_name'] ?? null) !== null
+                ? $r['user_name']
+                : ($r['client_name'] ?? ''));
+            $lines[] = implode(';', [
+                $this->csvCell((string) ($r['id'] ?? '')),
+                $this->csvCell($client),
+                $this->csvCell((string) ($r['product_name'] ?? '')),
+                $this->csvCell((string) ($r['quantity'] ?? '')),
+                $this->csvCell(number_format((float) ($r['price'] ?? 0), 2, '.', '')),
+                $this->csvCell(number_format((float) ($r['total'] ?? 0), 2, '.', '')),
+                $this->csvCell(SalePaymentMethodCatalog::label((string) ($r['payment_method'] ?? ''))),
+                $this->csvCell((string) ($r['club_name'] ?? '')),
+                $this->csvCell($this->formatSqlDateTime((string) ($r['created_at'] ?? ''))),
+            ]);
+        }
+        // Даже без продаж — заголовок + служебная строка, чтобы файл не был 0 байт.
+        if ($rows === []) {
+            $lines[] = $this->csvCell('нет строк') . ';;;;;;;;';
+        }
+
+        $csv = implode("\r\n", $lines) . "\r\n";
 
         $filename = 'sales';
-        if ($dateFromRaw) {
+        if ($dateFromRaw !== '') {
             $filename .= '_' . $dateFromRaw;
         }
-        if ($dateToRaw) {
+        if ($dateToRaw !== '') {
             $filename .= '_' . $dateToRaw;
         }
         if ($clubId) {
             $filename .= '_club' . $clubId;
         }
+        $filename .= '_n' . \count($rows);
 
         return new Response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+            'Content-Length' => (string) \strlen($csv),
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
         ]);
+    }
+
+    private function csvCell(string $value): string
+    {
+        $value = str_replace(['"', "\r", "\n"], ['""', ' ', ' '], $value);
+        if (str_contains($value, ';') || str_contains($value, '"')) {
+            return '"' . $value . '"';
+        }
+
+        return $value;
+    }
+
+    private function formatSqlDateTime(string $raw): string
+    {
+        if ($raw === '') {
+            return '';
+        }
+        try {
+            return (new \DateTimeImmutable($raw))->format('d.m.Y H:i');
+        } catch (\Throwable) {
+            return $raw;
+        }
+    }
+
+    private function salesTableHasClubId(): bool
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+        try {
+            $cols = $this->em->getConnection()->createSchemaManager()->listTableColumns('sales');
+            $cached = isset($cols['club_id']);
+        } catch (\Throwable) {
+            $cached = false;
+        }
+
+        return $cached;
     }
 
     /**
@@ -3604,7 +3671,13 @@ class AdminController extends AbstractController
         if (!$club instanceof Club) {
             return;
         }
-        // Алиасы su / ss должны быть уже в join (sales list / export).
+        if (!$this->salesTableHasClubId()) {
+            $qb->andWhere(
+                '(ss.club = :saleClub) OR (IDENTITY(ss.club) IS NULL AND su.club = :saleClub)'
+            )->setParameter('saleClub', $club);
+
+            return;
+        }
         $qb->andWhere(
             '(s.club = :saleClub)
              OR (s.club IS NULL AND ss.club = :saleClub)
@@ -3909,13 +3982,15 @@ class AdminController extends AbstractController
                 }
             }
             $qb = $this->em->createQueryBuilder()
-                ->select('s', 'su', 'sp', 'ss', 'sc')
+                ->select('s', 'su', 'sp', 'ss')
                 ->from(Sale::class, 's')
                 ->leftJoin('s.user', 'su')
                 ->leftJoin('s.promoCode', 'sp')
                 ->leftJoin('s.subscription', 'ss')
-                ->leftJoin('s.club', 'sc')
                 ->orderBy('s.createdAt', 'DESC');
+            if ($this->salesTableHasClubId()) {
+                $qb->addSelect('sc')->leftJoin('s.club', 'sc');
+            }
             if ($dateFrom) {
                 $qb->andWhere('s.createdAt >= :from')->setParameter('from', $dateFrom);
             }
@@ -4264,7 +4339,12 @@ class AdminController extends AbstractController
                 ->where('s.createdAt >= :start')->andWhere('s.createdAt < :end')
                 ->setParameter('start', $dayStart)->setParameter('end', $dayEnd);
             if ($clubId) {
-                $qbBase->andWhere('s.club = :club')->setParameter('club', $clubId);
+                if ($this->salesTableHasClubId()) {
+                    $qbBase->andWhere('s.club = :club')->setParameter('club', $clubId);
+                } else {
+                    // Колонки ещё нет — не фильтруем по клубу в кассе.
+                    $clubId = null;
+                }
             }
             $revenueToday = (float) (clone $qbBase)->select('COALESCE(SUM(s.total), 0)')
                 ->andWhere('s.paymentMethod NOT IN (:nonRev)')
@@ -4274,11 +4354,13 @@ class AdminController extends AbstractController
                     SalePaymentMethodCatalog::BONUS,
                 ])
                 ->getQuery()->getSingleScalarResult();
-            $salesToday = (clone $qbBase)
-                ->select('s', 'sc')
-                ->leftJoin('s.club', 'sc')
-                ->orderBy('s.createdAt', 'DESC')
-                ->getQuery()->getResult();
+            $salesTodayQb = (clone $qbBase)
+                ->select('s')
+                ->orderBy('s.createdAt', 'DESC');
+            if ($this->salesTableHasClubId()) {
+                $salesTodayQb->addSelect('sc')->leftJoin('s.club', 'sc');
+            }
+            $salesToday = $salesTodayQb->getQuery()->getResult();
             $breakdownRaw = (clone $qbBase)
                 ->select('s.paymentMethod, SUM(s.total) as totalSum')
                 ->groupBy('s.paymentMethod')

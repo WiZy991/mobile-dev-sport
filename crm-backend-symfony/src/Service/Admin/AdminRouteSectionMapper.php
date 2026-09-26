@@ -46,6 +46,8 @@ final class AdminRouteSectionMapper
         'admin_task_update' => 'tasks',
         'admin_task_delete' => 'tasks',
         'admin_sale_new' => 'sales',
+        'admin_sales_export' => 'sales',
+        'admin_sales_bulk_delete' => 'sales',
         'admin_training_new' => 'schedule',
         'admin_training_update' => 'schedule',
         'admin_training_delete' => 'schedule',
