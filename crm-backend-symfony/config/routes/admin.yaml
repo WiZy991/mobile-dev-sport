@@ -331,6 +331,7 @@ admin_sales_export:
   path: /admin/sales/export
   controller: App\Controller\Admin\AdminController::exportSales
   methods: [GET]
+  # Выше catch-all /admin/{section}; дублирует attribute-route с priority.
 
 admin_note_new:
   path: /admin/clients/{id}/notes

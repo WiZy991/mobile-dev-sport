@@ -6,7 +6,12 @@
     <div class="content-header">
         <h1 class="h4 mb-0">Продажи</h1>
         <div>
-            <a href="{{ path('admin_sales_export') }}?date_from={{ dateFrom|default('') }}&date_to={{ dateTo|default('') }}{% if filterClubId %}&club_id={{ filterClubId }}{% endif %}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
+            <a href="{{ path('admin_sales_export', {
+                date_from: dateFrom|default(''),
+                date_to: dateTo|default(''),
+                club_id: filterClubId|default(''),
+                payment_method: filterPaymentMethod|default('')
+            }) }}" class="btn btn-sm btn-outline-success me-2">Скачать CSV</a>
             {% if admin_can_mutate() %}
             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNewSale">
                 + Новая продажа

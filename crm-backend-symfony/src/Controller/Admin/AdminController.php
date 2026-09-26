@@ -3515,19 +3515,31 @@ class AdminController extends AbstractController
         return $response;
     }
 
-    #[Route('/sales/export', name: 'admin_sales_export', methods: ['GET'])]
-    public function exportSales(Request $request): StreamedResponse
+    #[Route('/sales/export', name: 'admin_sales_export', priority: 20, methods: ['GET'])]
+    public function exportSales(Request $request): Response
     {
         $dateFromRaw = $request->query->get('date_from');
         $dateToRaw = $request->query->get('date_to');
         $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
-        $dateFrom = $dateFromRaw ? new \DateTimeImmutable($dateFromRaw) : null;
-        $dateTo = $dateToRaw ? (new \DateTimeImmutable($dateToRaw))->modify('+1 day') : null;
+        $paymentFilter = trim((string) $request->query->get('payment_method', ''));
+        $dateFrom = $dateFromRaw ? new \DateTimeImmutable((string) $dateFromRaw) : null;
+        $dateTo = $dateToRaw ? (new \DateTimeImmutable((string) $dateToRaw))->modify('+1 day') : null;
+
+        $filterClub = null;
+        if ($clubId) {
+            $filterClub = $this->em->getRepository(Club::class)->find($clubId);
+            if (!$filterClub instanceof Club) {
+                $filterClub = null;
+                $clubId = null;
+            }
+        }
+
         $qb = $this->em->createQueryBuilder()
-            ->select('s', 'su', 'sc')
+            ->select('s', 'su', 'sc', 'ss')
             ->from(Sale::class, 's')
             ->leftJoin('s.user', 'su')
             ->leftJoin('s.club', 'sc')
+            ->leftJoin('s.subscription', 'ss')
             ->orderBy('s.createdAt', 'DESC');
         if ($dateFrom) {
             $qb->andWhere('s.createdAt >= :from')->setParameter('from', $dateFrom);
@@ -3535,17 +3547,23 @@ class AdminController extends AbstractController
         if ($dateTo) {
             $qb->andWhere('s.createdAt < :to')->setParameter('to', $dateTo);
         }
-        if ($clubId) {
-            $qb->andWhere('s.club = :club')->setParameter('club', $clubId);
+        if ($paymentFilter !== '') {
+            $qb->andWhere('s.paymentMethod = :pm')->setParameter('pm', $paymentFilter);
         }
+        $this->applySaleClubFilter($qb, $filterClub);
 
         /** @var list<Sale> $sales */
         $sales = $qb->getQuery()->getResult();
 
-        // Плоские строки до StreamedResponse — иначе lazy/EM в колбэке даёт пустой файл.
-        $rows = [];
+        $handle = fopen('php://temp', 'r+');
+        fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        fputcsv($handle, ['ID', 'Клиент', 'Товар/услуга', 'Кол-во', 'Цена', 'Сумма', 'Оплата', 'Клуб', 'Дата'], ';');
         foreach ($sales as $s) {
-            $rows[] = [
+            $clubName = $s->getClub()?->getName()
+                ?? $s->getSubscription()?->getClub()?->getName()
+                ?? $s->getUser()?->getClub()?->getName()
+                ?? '';
+            fputcsv($handle, [
                 $s->getId(),
                 $s->getUser() ? $s->getUser()->getName() : $s->getClientName(),
                 $s->getProductName(),
@@ -3553,20 +3571,14 @@ class AdminController extends AbstractController
                 number_format($s->getPrice(), 2, '.', ''),
                 number_format($s->getTotal(), 2, '.', ''),
                 SalePaymentMethodCatalog::label($s->getPaymentMethod()),
-                $s->getClub()?->getName() ?? '',
+                $clubName,
                 $s->getCreatedAt()->format('d.m.Y H:i'),
-            ];
+            ], ';');
         }
+        rewind($handle);
+        $csv = stream_get_contents($handle) ?: '';
+        fclose($handle);
 
-        $response = new StreamedResponse(function () use ($rows) {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($handle, ['ID', 'Клиент', 'Товар/услуга', 'Кол-во', 'Цена', 'Сумма', 'Оплата', 'Клуб', 'Дата'], ';');
-            foreach ($rows as $row) {
-                fputcsv($handle, $row, ';');
-            }
-            fclose($handle);
-        });
         $filename = 'sales';
         if ($dateFromRaw) {
             $filename .= '_' . $dateFromRaw;
@@ -3577,10 +3589,27 @@ class AdminController extends AbstractController
         if ($clubId) {
             $filename .= '_club' . $clubId;
         }
-        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
-        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '.csv"');
 
-        return $response;
+        return new Response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+        ]);
+    }
+
+    /**
+     * Фильтр продаж по клубу: sale.club, иначе клуб абонемента / клиента (старые записи без sales.club_id).
+     */
+    private function applySaleClubFilter(QueryBuilder $qb, ?Club $club): void
+    {
+        if (!$club instanceof Club) {
+            return;
+        }
+        // Алиасы su / ss должны быть уже в join (sales list / export).
+        $qb->andWhere(
+            '(s.club = :saleClub)
+             OR (s.club IS NULL AND ss.club = :saleClub)
+             OR (s.club IS NULL AND IDENTITY(ss.club) IS NULL AND su.club = :saleClub)'
+        )->setParameter('saleClub', $club);
     }
 
     #[Route('/{section}', name: 'admin_section', methods: ['GET', 'POST'])]
@@ -3871,6 +3900,14 @@ class AdminController extends AbstractController
             $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
             $paymentFilter = trim((string) $request->query->get('payment_method', ''));
             $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
+            $filterClub = null;
+            if ($clubId) {
+                $filterClub = $this->em->getRepository(Club::class)->find($clubId);
+                if (!$filterClub instanceof Club) {
+                    $filterClub = null;
+                    $clubId = null;
+                }
+            }
             $qb = $this->em->createQueryBuilder()
                 ->select('s', 'su', 'sp', 'ss', 'sc')
                 ->from(Sale::class, 's')
@@ -3885,9 +3922,7 @@ class AdminController extends AbstractController
             if ($dateTo) {
                 $qb->andWhere('s.createdAt < :to')->setParameter('to', $dateTo);
             }
-            if ($clubId) {
-                $qb->andWhere('s.club = :club')->setParameter('club', $clubId);
-            }
+            $this->applySaleClubFilter($qb, $filterClub);
             if ($paymentFilter !== '') {
                 $qb->andWhere('s.paymentMethod = :pm')->setParameter('pm', $paymentFilter);
             }
