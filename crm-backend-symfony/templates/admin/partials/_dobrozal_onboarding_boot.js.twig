@@ -7,6 +7,35 @@
 
     const STORAGE_PREFIX = 'dobrozal_onboarding_';
 
+    /**
+     * Мышь → click; тач/перо на Windows часто не синтезируют click.
+     * Дебаунс против double-fire.
+     */
+    function bindTap(el, handler, capture) {
+        if (!el) return;
+        let last = 0;
+        const run = (e) => {
+            const now = Date.now();
+            if (now - last < 450) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            last = now;
+            handler(e);
+        };
+        const onPointerUp = (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+            e.preventDefault();
+            e.stopPropagation();
+            run(e);
+        };
+        const onClick = (e) => run(e);
+        el.addEventListener('pointerup', onPointerUp, capture);
+        el.addEventListener('click', onClick, capture);
+    }
+
     function readLabels(el) {
         const d = el.dataset;
         return {
@@ -76,6 +105,7 @@
             this.currentStepIndex = 0;
             this.clickHandlers = [];
             this.resizeHandler = null;
+            this.celebrationOpen = false;
             this.cacheDom();
             this.bindEvents();
             if (this.state.activeLesson) {
@@ -263,18 +293,42 @@
         }
 
         showTour() {
+            this.celebrationOpen = false;
+            this.root.classList.remove('dz-tour-celebrating');
+            document.body.classList.remove('dz-tour-celebrating-body');
             this.root.classList.remove('d-none');
             this.root.classList.add('dz-tour-active');
+            if (this.el.stage) {
+                this.el.stage.classList.remove('dz-tour-stage-suppressed');
+                this.el.stage.style.display = '';
+                this.el.stage.style.visibility = '';
+                this.el.stage.style.pointerEvents = '';
+                this.el.stage.removeAttribute('aria-hidden');
+            }
+            if (this.el.hole) this.el.hole.style.display = '';
+            if (this.el.backdrop) this.el.backdrop.style.pointerEvents = '';
             this.mountStagePortal();
             this.bindStageResizeObserver();
             this.renderHud();
         }
 
         hideTour() {
+            this.celebrationOpen = false;
+            this.root.classList.remove('dz-tour-celebrating');
+            document.body.classList.remove('dz-tour-celebrating-body');
             this.root.classList.add('d-none');
             this.root.classList.remove('dz-tour-active');
+            this.unmountCelebrationPortal();
             this.unmountStagePortal();
             this.cleanupClick();
+            if (this.el.stage) {
+                this.el.stage.classList.remove('dz-tour-stage-suppressed');
+                this.el.stage.style.display = '';
+                this.el.stage.style.visibility = '';
+                this.el.stage.style.pointerEvents = '';
+            }
+            if (this.el.hole) this.el.hole.style.display = '';
+            if (this.el.backdrop) this.el.backdrop.style.pointerEvents = '';
             if (this._stageResizeObs) {
                 this._stageResizeObs.disconnect();
                 this._stageResizeObs = null;
@@ -289,6 +343,7 @@
         mountStagePortal() {
             const stage = this.el.stage;
             if (!stage) return;
+            if (this.celebrationOpen) return;
             if (!this.stageHome) {
                 this.stageHome = stage.parentNode;
             }
@@ -296,14 +351,60 @@
                 document.body.appendChild(stage);
             }
             stage.classList.add('dz-tour-stage-portal');
+            stage.classList.remove('dz-tour-stage-suppressed');
+            stage.style.display = '';
+            stage.style.visibility = '';
+            stage.style.pointerEvents = '';
         }
 
         unmountStagePortal() {
             const stage = this.el.stage;
             if (!stage || !this.stageHome) return;
-            stage.classList.remove('dz-tour-stage-portal', 'dz-tour-stage-click-mode');
+            stage.classList.remove('dz-tour-stage-portal', 'dz-tour-stage-click-mode', 'dz-tour-stage-suppressed');
+            stage.style.display = '';
+            stage.style.visibility = '';
+            stage.style.pointerEvents = '';
             if (stage.parentNode !== this.stageHome) {
                 this.stageHome.appendChild(stage);
+            }
+        }
+
+        /** Модалка «Урок пройден» на body выше stage (иначе квиз/заяц перекрывают кнопку). */
+        mountCelebrationPortal() {
+            const overlay = this.el.overlay;
+            const confetti = this.el.confetti;
+            if (overlay) {
+                if (!this.overlayHome) this.overlayHome = overlay.parentNode;
+                if (overlay.parentNode !== document.body) {
+                    document.body.appendChild(overlay);
+                }
+                overlay.classList.add('dz-tour-overlay-portal');
+            }
+            if (confetti) {
+                if (!this.confettiHome) this.confettiHome = confetti.parentNode;
+                if (confetti.parentNode !== document.body) {
+                    document.body.appendChild(confetti);
+                }
+                confetti.classList.add('dz-tour-confetti-portal');
+            }
+        }
+
+        unmountCelebrationPortal() {
+            const overlay = this.el.overlay;
+            const confetti = this.el.confetti;
+            if (overlay) {
+                overlay.classList.add('d-none');
+                overlay.classList.remove('dz-tour-overlay-portal');
+                if (this.overlayHome && overlay.parentNode !== this.overlayHome) {
+                    this.overlayHome.appendChild(overlay);
+                }
+            }
+            if (confetti) {
+                confetti.classList.add('d-none');
+                confetti.classList.remove('dz-tour-confetti-portal');
+                if (this.confettiHome && confetti.parentNode !== this.confettiHome) {
+                    this.confettiHome.appendChild(confetti);
+                }
             }
         }
 
@@ -466,6 +567,7 @@
 
             if (!this.resizeHandler) {
                 this.resizeHandler = () => {
+                    if (this.celebrationOpen) return;
                     const s = this.currentLesson?.steps?.[this.currentStepIndex];
                     if (!s) return;
                     const t = this.resolveTarget(s);
@@ -486,6 +588,7 @@
             if (img && !img.dataset.dzBound) {
                 img.dataset.dzBound = '1';
                 img.addEventListener('load', () => {
+                    if (this.celebrationOpen) return;
                     const s = this.currentLesson?.steps?.[this.currentStepIndex];
                     if (!s) return;
                     this.scheduleStageLayout(this.resolveTarget(s));
@@ -576,6 +679,7 @@
         }
 
         ensureMascotVisible() {
+            if (this.celebrationOpen) return;
             const stage = this.el.stage;
             const mascot = this.el.mascot;
             if (!stage || !mascot) return;
@@ -608,7 +712,7 @@
             this._stageResizeObs = new ResizeObserver(() => {
                 cancelAnimationFrame(raf);
                 raf = requestAnimationFrame(() => {
-                    if (this.root.classList.contains('d-none')) return;
+                    if (this.celebrationOpen || this.root.classList.contains('d-none')) return;
                     const s = this.currentLesson?.steps?.[this.currentStepIndex];
                     if (!s) return;
                     const top = parseFloat(stage.style.top);
@@ -635,6 +739,7 @@
         }
 
         refineStageVerticalAlign(target, tailPlacement) {
+            if (this.celebrationOpen) return;
             if (!target || !this.el.stage) return;
             if (tailPlacement !== 'left' && tailPlacement !== 'right') return;
             const r = this.anchorRect(target);
@@ -647,7 +752,9 @@
         }
 
         scheduleStageLayout(target) {
+            if (this.celebrationOpen) return;
             const run = () => {
+                if (this.celebrationOpen) return;
                 this.positionStage(target);
                 this.refineStageVerticalAlign(target, this._lastTailPlacement);
                 const stage = this.el.stage;
@@ -692,22 +799,26 @@
         }
 
         positionStage(target) {
+            if (this.celebrationOpen) return;
             const stage = this.el.stage;
             if (!stage) return;
             this.mountStagePortal();
 
-            const margin = 16;
+            const margin = 12;
             const bottomSafe = this.topbarInset();
-            const topSafe = 12;
-            const stageW = Math.min(340, stage.offsetWidth || stage.getBoundingClientRect().width || 320);
+            const topSafe = 10;
+            const stageW = Math.min(340, Math.max(260, window.innerWidth - margin * 2));
             stage.style.width = stageW + 'px';
             const stageH = stage.offsetHeight || 380;
+            const vh = window.innerHeight;
+            // На узких/низких экранах квиз высокий — ставим сверху, не поверх нижних кнопок.
+            const preferTop = vh < 740 || stageH > vh * 0.48;
             let top;
             let left;
             let tailPlacement = 'left';
 
             const r = this.anchorRect(target);
-            if (r) {
+            if (r && !preferTop) {
                 const sidebarEdge = this.sidebarRightEdge();
                 const inSidebar = r.right <= sidebarEdge + 4;
                 const onRight = r.left >= window.innerWidth * 0.62;
@@ -716,7 +827,7 @@
                     left = r.right + margin;
                     top = r.top + r.height / 2 - this.measureBubbleTailY();
                     tailPlacement = 'left';
-                } else if (onRight) {
+                } else if (onRight && r.left - stageW - margin >= margin) {
                     left = r.left - stageW - margin;
                     top = r.top + r.height / 2 - this.measureBubbleTailY();
                     tailPlacement = 'right';
@@ -742,11 +853,17 @@
 
                 top = this.fitStageInViewport(top);
                 left = this.clamp(left, margin, window.innerWidth - stageW - margin);
-            } else {
-                top = window.innerHeight - bottomSafe - stageH - margin;
-                left = window.innerWidth - stageW - margin - 20;
-                tailPlacement = 'top';
+            } else if (r && preferTop) {
+                top = topSafe;
+                left = this.clamp(r.left + r.width / 2 - stageW / 2, margin, window.innerWidth - stageW - margin);
+                tailPlacement = 'bottom';
                 top = this.fitStageInViewport(top);
+            } else {
+                top = preferTop ? topSafe : (window.innerHeight - bottomSafe - stageH - margin);
+                left = window.innerWidth - stageW - margin - 12;
+                tailPlacement = preferTop ? 'bottom' : 'top';
+                top = this.fitStageInViewport(top);
+                left = this.clamp(left, margin, window.innerWidth - stageW - margin);
             }
 
             stage.style.top = top + 'px';
@@ -757,6 +874,7 @@
             this._lastTailPlacement = tailPlacement;
             this.ensureMascotVisible();
             requestAnimationFrame(() => {
+                if (this.celebrationOpen) return;
                 this.refineStageVerticalAlign(target, tailPlacement);
                 this.alignBubbleTail(target, tailPlacement);
                 this.ensureMascotVisible();
@@ -771,7 +889,7 @@
                 btn.type = 'button';
                 btn.className = 'dz-quiz-option';
                 btn.textContent = opt;
-                btn.addEventListener('click', () => this.answerQuiz(step, i, btn));
+                bindTap(btn, () => this.answerQuiz(step, i, btn));
                 this.el.quiz.appendChild(btn);
             });
             const t = this.resolveTarget(step);
@@ -854,7 +972,30 @@
         }
 
         showCelebration(xpGain) {
+            // Только модалка «Урок пройден». Квиз/заяц не должны оставаться поверх кнопки.
+            this.celebrationOpen = true;
+            this.root.classList.add('dz-tour-celebrating');
+            document.body.classList.add('dz-tour-celebrating-body');
+            this.cleanupClick();
+            this.unhighlight();
+            this.hideTapPaw();
+            if (this.el.quiz) {
+                this.el.quiz.innerHTML = '';
+                this.el.quiz.classList.add('d-none');
+            }
+            if (this.el.next) this.el.next.classList.add('d-none');
+            if (this.el.stage) {
+                this.el.stage.classList.add('dz-tour-stage-suppressed');
+                this.el.stage.style.display = 'none';
+                this.el.stage.style.visibility = 'hidden';
+                this.el.stage.style.pointerEvents = 'none';
+                this.el.stage.setAttribute('aria-hidden', 'true');
+            }
+            if (this.el.hole) this.el.hole.style.display = 'none';
+            if (this.el.backdrop) this.el.backdrop.style.pointerEvents = 'none';
+
             this.setMood('celebrate');
+            this.mountCelebrationPortal();
             this.el.confetti?.classList.remove('d-none');
             this.fireConfetti();
             if (!this.el.overlay || !this.el.overlayContent) return;
@@ -871,9 +1012,17 @@
                 this.el.overlayContent.appendChild(clone);
             }
             this.el.overlay.classList.remove('d-none');
-            this.el.overlayContent.querySelector('[data-dz-celebration-close]')?.addEventListener('click', () => {
-                this.el.overlay.classList.add('d-none');
-                this.el.confetti?.classList.add('d-none');
+            const closeBtn = this.el.overlayContent.querySelector('[data-dz-celebration-close]');
+            bindTap(closeBtn, () => {
+                this.celebrationOpen = false;
+                this.root.classList.remove('dz-tour-celebrating');
+                document.body.classList.remove('dz-tour-celebrating-body');
+                this.unmountCelebrationPortal();
+                if (this.el.stage) {
+                    this.el.stage.classList.remove('dz-tour-stage-suppressed');
+                    this.el.stage.removeAttribute('aria-hidden');
+                }
+                if (this.el.backdrop) this.el.backdrop.style.pointerEvents = '';
                 const next = this.nextLessonId(this.currentLesson?.id);
                 this.hideTour();
                 if (next && this.isLessonUnlocked(next)) {
