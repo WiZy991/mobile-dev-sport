@@ -129,7 +129,7 @@
                         </td>
                         <td>{% if sale.promoCode %}<code class="small">{{ sale.promoCode.code }}</code>{% else %}—{% endif %}</td>
                         <td>{{ sale_payment_label(sale.paymentMethod) }}</td>
-                        <td>{{ sale.club ? sale.club.name : '—' }}</td>
+                        <td>{{ sale.clubDisplayName != '' ? sale.clubDisplayName : '—' }}</td>
                         <td>{% if sale.subscription %}<a href="{{ path('admin_section', {section: 'subscriptions'}) }}#sub-{{ sale.subscription.id }}" class="link-light">#{{ sale.subscription.id }}</a>{% else %}—{% endif %}</td>
                         <td>{{ sale.createdAt|date('d.m.Y H:i') }}</td>
                     </tr>

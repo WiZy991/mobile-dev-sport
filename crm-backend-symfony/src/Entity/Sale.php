@@ -99,5 +99,28 @@ class Sale implements TenantAware
 
     public function getClub(): ?Club { return $this->club; }
     public function setClub(?Club $club): self { $this->club = $club; return $this; }
+
+    /**
+     * Название клуба для списка/кассы: из sale.club или хвоста
+     * «Аренда клуба (тренер) — N дн. — {клуб}» (старые записи без club_id).
+     */
+    public function getClubDisplayName(): string
+    {
+        if ($this->club !== null) {
+            $name = trim($this->club->getName());
+            if ($name !== '') {
+                return $name;
+            }
+        }
+        if (!str_starts_with($this->productName, 'Аренда клуба (тренер)')) {
+            return '';
+        }
+        $parts = explode(' — ', $this->productName);
+        if (\count($parts) < 3) {
+            return '';
+        }
+
+        return trim((string) $parts[\array_key_last($parts)]);
+    }
 }
 

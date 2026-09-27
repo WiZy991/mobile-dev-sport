@@ -3586,15 +3586,23 @@ class AdminController extends AbstractController
             $client = (string) (($r['user_name'] ?? '') !== '' && ($r['user_name'] ?? null) !== null
                 ? $r['user_name']
                 : ($r['client_name'] ?? ''));
+            $productName = (string) ($r['product_name'] ?? '');
+            $clubName = trim((string) ($r['club_name'] ?? ''));
+            if ($clubName === '' && str_starts_with($productName, 'Аренда клуба (тренер)')) {
+                $parts = explode(' — ', $productName);
+                if (\count($parts) >= 3) {
+                    $clubName = trim((string) $parts[\array_key_last($parts)]);
+                }
+            }
             $sheetRows[] = [
                 (int) ($r['id'] ?? 0),
                 $client,
-                (string) ($r['product_name'] ?? ''),
+                $productName,
                 (int) ($r['quantity'] ?? 0),
                 round((float) ($r['price'] ?? 0), 2),
                 round((float) ($r['total'] ?? 0), 2),
                 SalePaymentMethodCatalog::label((string) ($r['payment_method'] ?? '')),
-                (string) ($r['club_name'] ?? ''),
+                $clubName,
                 $this->formatSqlDateTime((string) ($r['created_at'] ?? '')),
             ];
         }

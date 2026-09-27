@@ -63,7 +63,7 @@
                         <td>{{ sale.createdAt|date('H:i') }}</td>
                         <td>{{ sale.user ? sale.user.name : sale.clientName }}</td>
                         <td>{{ sale.productName }}</td>
-                        <td>{{ sale.club ? sale.club.name : '—' }}</td>
+                        <td>{{ sale.clubDisplayName != '' ? sale.clubDisplayName : '—' }}</td>
                         <td>{{ sale.quantity }}</td>
                         <td>{{ sale.total|number_format(0, '', ' ') }} ₽</td>
                         <td>{{ sale_payment_label(sale.paymentMethod) }}</td>
