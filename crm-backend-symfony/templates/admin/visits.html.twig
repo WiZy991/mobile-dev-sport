@@ -20,7 +20,7 @@
             <div class="d-flex flex-column align-items-end gap-2">
                 <div class="small text-secondary text-end">
                     Считается с 23:15 до 23:15 по Владивостоку; в зале не дольше 3 часов.<br>
-                    Последнее <em>granted</em>-событие клиента — <code>entry</code>. Выход по QR как раньше.
+                    Клиенты и тренеры (приложение специалиста). Последнее <em>granted</em>-событие — <code>entry</code>.
                 </div>
                 {% if admin_can_mutate() and currentlyInside|default(0) > 0 %}
                     <form method="post" action="{{ path('admin_visits_clear_hall') }}"
@@ -36,7 +36,7 @@
                 <table class="table table-sm table-dark align-middle mb-0">
                     <thead class="sticky-top">
                         <tr>
-                            <th>Клиент</th>
+                            <th>Кто</th>
                             <th>Телефон</th>
                             <th>Клуб</th>
                             <th class="text-end">Зашёл</th>
@@ -47,16 +47,29 @@
                         {% for row in currentlyInsideList %}
                             <tr>
                                 <td>
-                                    <a href="{{ path('admin_client_show', {id: row.user.id}) }}" class="link-light text-decoration-none">{{ row.user.name }}</a>
+                                    {% if row.kind == 'staff' and row.staff %}
+                                        <span class="badge text-bg-secondary me-1">Тренер</span>
+                                        {{ row.name }}
+                                    {% elseif row.user %}
+                                        <a href="{{ path('admin_client_show', {id: row.user.id}) }}" class="link-light text-decoration-none">{{ row.name }}</a>
+                                    {% else %}
+                                        {{ row.name }}
+                                    {% endif %}
                                 </td>
-                                <td>{{ row.user.phone }}</td>
+                                <td>{{ row.phone|default('—') }}</td>
                                 <td>{{ row.club_name|default('—') }}</td>
                                 <td class="text-end">{{ row.entered_at|date('H:i', 'Asia/Vladivostok') }}</td>
                                 {% if admin_can_mutate() %}
                                 <td class="text-end">
-                                    <form method="post" action="{{ path('admin_visits_force_exit', {userId: row.user.id}) }}" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary py-0">Вышел</button>
-                                    </form>
+                                    {% if row.kind == 'staff' and row.staff %}
+                                        <form method="post" action="{{ path('admin_visits_force_exit_staff', {staffId: row.staff.id}) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary py-0">Вышел</button>
+                                        </form>
+                                    {% elseif row.user %}
+                                        <form method="post" action="{{ path('admin_visits_force_exit', {userId: row.user.id}) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary py-0">Вышел</button>
+                                        </form>
+                                    {% endif %}
                                 </td>
                                 {% endif %}
                             </tr>
@@ -184,7 +197,7 @@
                 <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Клиент</th>
+                    <th>Кто</th>
                     <th>Телефон</th>
                     <th>Клуб</th>
                     <th>Устройство</th>
@@ -198,11 +211,14 @@
                         <td>
                             {% if visit.user %}
                                 <a href="{{ path('admin_client_show', {id: visit.user.id}) }}" class="link-light text-decoration-none">{{ visit.user.name }}</a>
+                            {% elseif visit.staffUser %}
+                                <span class="badge text-bg-secondary me-1">Тренер</span>
+                                {{ visit.staffUser.name != '' ? visit.staffUser.name : visit.staffUser.email }}
                             {% else %}
-                                —
+                                {{ visit.visitorDisplayName }}
                             {% endif %}
                         </td>
-                        <td>{{ visit.user ? visit.user.phone : '—' }}</td>
+                        <td>{{ visit.visitorPhone }}</td>
                         <td>{{ visit.club ? visit.club.name : '—' }}</td>
                         <td>{{ visit.deviceId ?? '—' }}</td>
                         <td>{{ visit.createdAt|date('d.m.Y H:i:s', 'Asia/Vladivostok') }}</td>

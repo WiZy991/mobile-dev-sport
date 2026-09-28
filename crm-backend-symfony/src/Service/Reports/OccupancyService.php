@@ -6,6 +6,7 @@ namespace App\Service\Reports;
 
 use App\Entity\AccessLog;
 use App\Entity\Club;
+use App\Entity\StaffUser;
 use App\Entity\User;
 use App\Service\ClubTimezone;
 use Doctrine\DBAL\Connection;
@@ -15,10 +16,10 @@ use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
 /**
- * «Сколько людей сейчас в зале» и кто именно.
+ * «Сколько людей сейчас в зале» и кто именно (клиенты + тренеры из приложения специалиста).
  *
- * Логика: за окно присутствия для каждого клиента берём ПОСЛЕДНЕЕ granted-событие.
- * Если оно entry — клиент в зале; если exit — вышел.
+ * Логика: за окно присутствия для каждого посетителя берём ПОСЛЕДНЕЕ granted-событие.
+ * Если оно entry — человек в зале; если exit — вышел.
  *
  * Окно суток: с 23:15 до 23:15 по Владивостоку (не полночь UTC и не 23:15 UTC).
  * Максимум в зале: 3 часа с последнего входа (потом авто-exit в лог; QR-выход не трогаем).
@@ -39,11 +40,29 @@ final class OccupancyService
     /** Кэш на запрос: сеть из одного зала или из нескольких. */
     private ?bool $singleClubNetwork = null;
 
+    /** Есть ли access_logs.staff_user_id (после миграции). */
+    private ?bool $hasStaffUserColumn = null;
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         #[Autowire(service: 'cache.app')]
         private readonly CacheInterface $cache,
     ) {
+    }
+
+    private function accessLogsHaveStaffUser(): bool
+    {
+        if ($this->hasStaffUserColumn !== null) {
+            return $this->hasStaffUserColumn;
+        }
+        try {
+            $cols = $this->connection()->createSchemaManager()->listTableColumns('access_logs');
+            $this->hasStaffUserColumn = isset($cols['staff_user_id']) || isset($cols['STAFF_USER_ID']);
+        } catch (\Throwable) {
+            $this->hasStaffUserColumn = false;
+        }
+
+        return $this->hasStaffUserColumn;
     }
 
     /**
@@ -123,7 +142,7 @@ final class OccupancyService
         return $this->singleClubNetwork;
     }
 
-    /** Сколько клиентов сейчас в зале (без клуба — по всей сети). */
+    /** Сколько человек сейчас в зале (клиенты + тренеры; без клуба — по всей сети). */
     public function countCurrentlyInside(?Club $club = null): int
     {
         $cacheKey = 'occupancy.count.' . ($club?->getId() ?? 'all');
@@ -138,13 +157,22 @@ final class OccupancyService
     }
 
     /**
-     * @return list<array{user: User, entered_at: \DateTimeImmutable, club_id: ?int, club_name: ?string}>
+     * @return list<array{
+     *     kind: 'user'|'staff',
+     *     user: ?User,
+     *     staff: ?StaffUser,
+     *     name: string,
+     *     phone: string,
+     *     entered_at: \DateTimeImmutable,
+     *     club_id: ?int,
+     *     club_name: ?string
+     * }>
      */
     public function listCurrentlyInside(?Club $club = null, int $limit = 200): array
     {
         $sql = $this->buildCurrentlyInsideSql(
             $club,
-            selectColumns: 't.user_id AS user_id, t.last_at AS entered_at, t.last_club_id AS club_id',
+            selectColumns: 't.person_kind AS person_kind, t.person_id AS person_id, t.last_at AS entered_at, t.last_club_id AS club_id',
             orderBy: 'entered_at DESC',
             limit: $limit,
             stayFilter: 'fresh',
@@ -155,12 +183,37 @@ final class OccupancyService
             return [];
         }
 
-        $userIds = array_values(array_unique(array_map(static fn (array $r): int => (int) $r['user_id'], $rows)));
-        /** @var User[] $users */
-        $users = $this->em->getRepository(User::class)->findBy(['id' => $userIds]);
-        $byId = [];
-        foreach ($users as $u) {
-            $byId[$u->getId()] = $u;
+        $userIds = [];
+        $staffIds = [];
+        foreach ($rows as $r) {
+            $id = (int) ($r['person_id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if (($r['person_kind'] ?? '') === 'staff') {
+                $staffIds[] = $id;
+            } else {
+                $userIds[] = $id;
+            }
+        }
+        $userIds = array_values(array_unique($userIds));
+        $staffIds = array_values(array_unique($staffIds));
+
+        $usersById = [];
+        if ($userIds !== []) {
+            /** @var User[] $users */
+            $users = $this->em->getRepository(User::class)->findBy(['id' => $userIds]);
+            foreach ($users as $u) {
+                $usersById[$u->getId()] = $u;
+            }
+        }
+        $staffById = [];
+        if ($staffIds !== []) {
+            /** @var StaffUser[] $staffList */
+            $staffList = $this->em->getRepository(StaffUser::class)->findBy(['id' => $staffIds]);
+            foreach ($staffList as $s) {
+                $staffById[$s->getId()] = $s;
+            }
         }
 
         $clubIds = [];
@@ -182,15 +235,42 @@ final class OccupancyService
 
         $result = [];
         foreach ($rows as $r) {
-            $user = $byId[(int) $r['user_id']] ?? null;
-            if (!$user) {
+            $kind = ($r['person_kind'] ?? '') === 'staff' ? 'staff' : 'user';
+            $personId = (int) ($r['person_id'] ?? 0);
+            $user = $kind === 'user' ? ($usersById[$personId] ?? null) : null;
+            $staff = $kind === 'staff' ? ($staffById[$personId] ?? null) : null;
+            if ($kind === 'user' && !$user instanceof User) {
+                continue;
+            }
+            if ($kind === 'staff' && !$staff instanceof StaffUser) {
                 continue;
             }
             $clubRaw = $r['club_id'] ?? null;
             $clubId = $clubRaw !== null && $clubRaw !== '' ? (int) $clubRaw : null;
             $clubEntity = $clubId !== null ? ($clubsById[$clubId] ?? null) : null;
+            if ($kind === 'staff' && $staff instanceof StaffUser) {
+                $name = trim($staff->getName());
+                if ($name === '') {
+                    $name = trim($staff->getEmail());
+                }
+                if ($name === '') {
+                    $name = 'Тренер #' . $staff->getId();
+                }
+                $phone = trim((string) ($staff->getTrainer()?->getPhone() ?? ''));
+            } else {
+                /** @var User $user */
+                $name = trim($user->getName());
+                if ($name === '') {
+                    $name = 'Клиент #' . $user->getId();
+                }
+                $phone = trim($user->getPhone());
+            }
             $result[] = [
+                'kind' => $kind,
                 'user' => $user,
+                'staff' => $staff,
+                'name' => $name,
+                'phone' => $phone !== '' ? $phone : '—',
                 'entered_at' => new \DateTimeImmutable((string) $r['entered_at'], new \DateTimeZone('UTC')),
                 'club_id' => $clubId,
                 'club_name' => $clubEntity?->getName(),
@@ -216,6 +296,22 @@ final class OccupancyService
         $this->invalidateCountCache($club);
     }
 
+    public function forceExitStaff(StaffUser $staff, ?Club $club = null, string $reason = 'admin_force_exit'): void
+    {
+        $log = (new AccessLog())
+            ->setStaffUser($staff)
+            ->setClub($club)
+            ->setRawData('ADMIN:FORCE_EXIT:STAFF:' . $staff->getId())
+            ->setDeviceId('crm-admin')
+            ->setEventType('exit')
+            ->setResult('granted')
+            ->setReason($reason);
+
+        $this->em->persist($log);
+        $this->em->flush();
+        $this->invalidateCountCache($club);
+    }
+
     /**
      * @return int число созданных exit-событий
      */
@@ -229,13 +325,20 @@ final class OccupancyService
                 $rowClub = $this->em->find(Club::class, $row['club_id']);
             }
             $log = (new AccessLog())
-                ->setUser($row['user'])
                 ->setClub($rowClub instanceof Club ? $rowClub : null)
-                ->setRawData('ADMIN:FORCE_EXIT:' . $row['user']->getId())
                 ->setDeviceId('crm-admin')
                 ->setEventType('exit')
                 ->setResult('granted')
                 ->setReason('admin_clear_hall');
+            if ($row['kind'] === 'staff' && $row['staff'] instanceof StaffUser) {
+                $log->setStaffUser($row['staff'])
+                    ->setRawData('ADMIN:FORCE_EXIT:STAFF:' . $row['staff']->getId());
+            } elseif ($row['user'] instanceof User) {
+                $log->setUser($row['user'])
+                    ->setRawData('ADMIN:FORCE_EXIT:' . $row['user']->getId());
+            } else {
+                continue;
+            }
             $this->em->persist($log);
             ++$count;
         }
@@ -257,7 +360,7 @@ final class OccupancyService
     {
         $sql = $this->buildCurrentlyInsideSql(
             $club,
-            selectColumns: 't.user_id AS user_id, t.last_at AS entered_at, t.last_club_id AS club_id',
+            selectColumns: 't.person_kind AS person_kind, t.person_id AS person_id, t.last_at AS entered_at, t.last_club_id AS club_id',
             orderBy: 'entered_at ASC',
             limit: 500,
             stayFilter: 'stale',
@@ -269,23 +372,32 @@ final class OccupancyService
 
         $count = 0;
         foreach ($rows as $r) {
-            $user = $this->em->find(User::class, (int) $r['user_id']);
-            if (!$user instanceof User) {
-                continue;
-            }
+            $kind = ($r['person_kind'] ?? '') === 'staff' ? 'staff' : 'user';
+            $personId = (int) ($r['person_id'] ?? 0);
             $rowClub = $club;
             $clubRaw = $r['club_id'] ?? null;
             if ($rowClub === null && $clubRaw !== null && $clubRaw !== '') {
                 $rowClub = $this->em->find(Club::class, (int) $clubRaw);
             }
             $log = (new AccessLog())
-                ->setUser($user)
                 ->setClub($rowClub instanceof Club ? $rowClub : null)
-                ->setRawData('AUTO:MAX_STAY:' . $user->getId())
                 ->setDeviceId('crm-auto-exit')
                 ->setEventType('exit')
                 ->setResult('granted')
                 ->setReason('auto_max_stay_3h');
+            if ($kind === 'staff') {
+                $staff = $this->em->find(StaffUser::class, $personId);
+                if (!$staff instanceof StaffUser) {
+                    continue;
+                }
+                $log->setStaffUser($staff)->setRawData('AUTO:MAX_STAY:STAFF:' . $staff->getId());
+            } else {
+                $user = $this->em->find(User::class, $personId);
+                if (!$user instanceof User) {
+                    continue;
+                }
+                $log->setUser($user)->setRawData('AUTO:MAX_STAY:' . $user->getId());
+            }
             $this->em->persist($log);
             ++$count;
         }
@@ -342,18 +454,37 @@ final class OccupancyService
                 : ' AND ranked.created_at < :min_entry';
         }
 
-        $inner = 'SELECT ranked.user_id AS user_id,
+        // Клиент (user_id) или тренер (staff_user_id) — отдельные «личности» в зале.
+        if ($this->accessLogsHaveStaffUser()) {
+            $personKey = "CASE
+                WHEN al.user_id IS NOT NULL THEN CONCAT('u', al.user_id)
+                ELSE CONCAT('s', al.staff_user_id)
+            END";
+            $personKind = "CASE WHEN al.user_id IS NOT NULL THEN 'user' ELSE 'staff' END";
+            $personId = 'COALESCE(al.user_id, al.staff_user_id)';
+            $personFilter = '(al.user_id IS NOT NULL OR al.staff_user_id IS NOT NULL)';
+        } else {
+            $personKey = "CONCAT('u', al.user_id)";
+            $personKind = "'user'";
+            $personId = 'al.user_id';
+            $personFilter = 'al.user_id IS NOT NULL';
+        }
+
+        $inner = "SELECT ranked.person_kind AS person_kind,
+                         ranked.person_id AS person_id,
                          ranked.event_type AS last_type,
-                         DATE_FORMAT(ranked.created_at, \'%Y-%m-%d %H:%i:%s\') AS last_at,
-                         IFNULL(ranked.club_id, \'\') AS last_club_id
+                         DATE_FORMAT(ranked.created_at, '%Y-%m-%d %H:%i:%s') AS last_at,
+                         IFNULL(ranked.club_id, '') AS last_club_id
                   FROM (
-                      SELECT al.user_id, al.event_type, al.created_at, al.club_id,
-                             ROW_NUMBER() OVER (PARTITION BY al.user_id ORDER BY al.id DESC) AS rn
+                      SELECT {$personKind} AS person_kind,
+                             {$personId} AS person_id,
+                             al.event_type, al.created_at, al.club_id,
+                             ROW_NUMBER() OVER (PARTITION BY {$personKey} ORDER BY al.id DESC) AS rn
                       FROM access_logs al
-                      WHERE al.result = \'granted\'
-                        AND al.user_id IS NOT NULL
+                      WHERE al.result = 'granted'
+                        AND {$personFilter}
                         AND al.created_at >= :from
-                        AND al.created_at < :to' . $scope['sql'] . '
+                        AND al.created_at < :to" . $scope['sql'] . '
                   ) ranked
                   WHERE ranked.rn = 1
                     AND ranked.event_type = \'entry\'' . $staySql;
@@ -373,7 +504,21 @@ final class OccupancyService
     /** Сейчас ли клиент в зале — то же правило, что и счётчик (окно + ≤3 ч). */
     public function isUserCurrentlyInside(User $user, ?Club $club = null): bool
     {
-        $row = $this->lastGrantedEventRow($user, $club);
+        $row = $this->lastGrantedEventRowForUser($user, $club);
+        if ($row === null || ($row['event_type'] ?? '') !== 'entry') {
+            return false;
+        }
+
+        return $this->entryStillFresh((string) $row['created_at']);
+    }
+
+    /** Сейчас ли тренер в зале. */
+    public function isStaffCurrentlyInside(StaffUser $staff, ?Club $club = null): bool
+    {
+        if (!$this->accessLogsHaveStaffUser()) {
+            return false;
+        }
+        $row = $this->lastGrantedEventRowForStaff($staff, $club);
         if ($row === null || ($row['event_type'] ?? '') !== 'entry') {
             return false;
         }
@@ -388,7 +533,7 @@ final class OccupancyService
      */
     public function lastGrantedEvent(User $user, ?Club $club = null): ?array
     {
-        return $this->lastGrantedEventRow($user, $club);
+        return $this->lastGrantedEventRowForUser($user, $club);
     }
 
     /**
@@ -433,22 +578,40 @@ final class OccupancyService
      */
     public function secondsSinceLastGrantedEntry(User $user, ?Club $club = null): ?int
     {
+        return $this->secondsSinceLastGrantedEntryForColumn('user_id', (int) $user->getId(), $club);
+    }
+
+    public function secondsSinceLastGrantedStaffEntry(StaffUser $staff, ?Club $club = null): ?int
+    {
+        if (!$this->accessLogsHaveStaffUser()) {
+            return null;
+        }
+
+        return $this->secondsSinceLastGrantedEntryForColumn('staff_user_id', (int) $staff->getId(), $club);
+    }
+
+    private function secondsSinceLastGrantedEntryForColumn(string $column, int $id, ?Club $club): ?int
+    {
+        if (!\in_array($column, ['user_id', 'staff_user_id'], true) || $id <= 0) {
+            return null;
+        }
+
         $window = $this->presenceWindow();
         $scope = $this->clubScopeSql($club);
         $params = [
-            'user_id' => $user->getId(),
+            'pid' => $id,
             'from' => $window['from'],
             'to' => $window['to'],
         ] + $scope['params'];
 
         $row = $this->connection()->executeQuery(
-            'SELECT created_at
+            "SELECT created_at
              FROM access_logs
-             WHERE result = \'granted\'
-               AND event_type = \'entry\'
-               AND user_id = :user_id
+             WHERE result = 'granted'
+               AND event_type = 'entry'
+               AND {$column} = :pid
                AND created_at >= :from
-               AND created_at < :to' . $scope['sql'] . '
+               AND created_at < :to" . $scope['sql'] . '
              ORDER BY id DESC
              LIMIT 1',
             $params,
@@ -467,22 +630,42 @@ final class OccupancyService
     /**
      * @return array{event_type: string, id: int, created_at: string}|null
      */
-    private function lastGrantedEventRow(User $user, ?Club $club = null): ?array
+    private function lastGrantedEventRowForUser(User $user, ?Club $club = null): ?array
     {
+        return $this->lastGrantedEventRowForColumn('user_id', (int) $user->getId(), $club);
+    }
+
+    /**
+     * @return array{event_type: string, id: int, created_at: string}|null
+     */
+    private function lastGrantedEventRowForStaff(StaffUser $staff, ?Club $club = null): ?array
+    {
+        return $this->lastGrantedEventRowForColumn('staff_user_id', (int) $staff->getId(), $club);
+    }
+
+    /**
+     * @return array{event_type: string, id: int, created_at: string}|null
+     */
+    private function lastGrantedEventRowForColumn(string $column, int $id, ?Club $club = null): ?array
+    {
+        if (!\in_array($column, ['user_id', 'staff_user_id'], true) || $id <= 0) {
+            return null;
+        }
+
         $window = $this->presenceWindow();
         $scope = $this->clubScopeSql($club);
         $params = [
-            'user_id' => $user->getId(),
+            'pid' => $id,
             'from' => $window['from'],
             'to' => $window['to'],
         ] + $scope['params'];
 
-        $sql = 'SELECT event_type, id, DATE_FORMAT(created_at, \'%Y-%m-%d %H:%i:%s\') AS created_at
+        $sql = "SELECT event_type, id, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at
                 FROM access_logs
-                WHERE result = \'granted\'
-                  AND user_id = :user_id
+                WHERE result = 'granted'
+                  AND {$column} = :pid
                   AND created_at >= :from
-                  AND created_at < :to' . $scope['sql'] . '
+                  AND created_at < :to" . $scope['sql'] . '
                 ORDER BY id DESC
                 LIMIT 1';
 

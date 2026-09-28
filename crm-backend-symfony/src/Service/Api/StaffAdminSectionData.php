@@ -199,13 +199,14 @@ final class StaffAdminSectionData
             ), $this->em->getRepository(Sale::class)->findBy([], ['createdAt' => 'DESC'], 40)),
             'visits' => array_map(function (AccessLog $log) {
                 $user = $log->getUser();
+                $staff = $log->getStaffUser();
 
                 return $this->row(
-                    $user?->getName() ?? 'Гость',
+                    $log->getVisitorDisplayName() !== '—' ? $log->getVisitorDisplayName() : ($user?->getName() ?? 'Гость'),
                     $log->getEventType() === 'exit' ? 'Выход' : 'Вход',
                     $log->getCreatedAt()->format('d.m.Y H:i') . ' · ' . ($log->getResult() === 'granted' ? 'разрешено' : 'отказ'),
                     $user?->getId(),
-                    $user !== null ? 'client' : null,
+                    $user !== null ? 'client' : ($staff !== null ? 'staff' : null),
                 );
             }, $this->em->getRepository(AccessLog::class)->findBy([], ['createdAt' => 'DESC'], 40)),
             'schedule' => array_map(function (Training $training) {

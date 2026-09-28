@@ -104,7 +104,7 @@ class GatewayController extends AbstractController
         }
 
         if ($entryParsed['kind'] === 'staff') {
-            return $this->handleStaffEntry($club, $entryParsed['parts'], $log);
+            return $this->handleStaffEntry($club, $entryParsed['parts'], $log, $allowExitToggle);
         }
 
         // Wiegand (7 цифр): в payload нет признака «клиент/тренер» — только id % 10000.
@@ -117,7 +117,7 @@ class GatewayController extends AbstractController
                 return $this->denied($log, 'ambiguous_qr', 409, ['club_id' => $club->getId()]);
             }
             if ($staffMatches !== []) {
-                return $this->grantStaffEntryValidated($club, $staffMatches[0], $log);
+                return $this->grantStaffEntryValidated($club, $staffMatches[0], $log, $allowExitToggle);
             }
             // Иначе — клиентский путь ниже (тот же user_id / timestamp из Wiegand).
         }
@@ -542,7 +542,7 @@ class GatewayController extends AbstractController
      *
      * @param string[] $parts
      */
-    private function handleStaffEntry(Club $club, array $parts, AccessLog $log): JsonResponse
+    private function handleStaffEntry(Club $club, array $parts, AccessLog $log, bool $allowExitToggle = true): JsonResponse
     {
         if (count($parts) !== 4) {
             return $this->denied($log, 'invalid_format', 400);
@@ -559,6 +559,8 @@ class GatewayController extends AbstractController
         if (!$staff instanceof StaffUser) {
             return $this->denied($log, 'staff_not_found', 404);
         }
+
+        $log->setStaffUser($staff);
 
         $dup = $this->occupancyService->findRecentGrantedByRawQr($log->getRawData(), self::QR_DEDUPE_SECONDS);
         if ($dup !== null) {
@@ -589,7 +591,7 @@ class GatewayController extends AbstractController
             ]);
         }
 
-        return $this->grantStaffEntryValidated($club, $staff, $log);
+        return $this->grantStaffEntryValidated($club, $staff, $log, $allowExitToggle);
     }
 
     /**
@@ -599,7 +601,10 @@ class GatewayController extends AbstractController
         Club $club,
         StaffUser $staff,
         AccessLog $log,
+        bool $allowExitToggle = true,
     ): JsonResponse {
+        $log->setStaffUser($staff);
+
         $dup = $this->occupancyService->findRecentGrantedByRawQr($log->getRawData(), self::QR_DEDUPE_SECONDS);
         if ($dup !== null) {
             $passage = ($dup['event_type'] === 'exit') ? 'exit' : 'entry';
@@ -628,6 +633,46 @@ class GatewayController extends AbstractController
             if (!$this->clubRentals->hasValidRentalForClub($staff, $club)) {
                 return $this->denied($log, 'staff_rental_wrong_club', 403, ['club_id' => $club->getId()]);
             }
+        }
+
+        // Повторный скан при одном считывателе = выход (как у клиентов).
+        if ($this->occupancyService->isStaffCurrentlyInside($staff, null)) {
+            if (!$allowExitToggle) {
+                return $this->denied($log, 'already_inside', 403);
+            }
+
+            $sinceEntry = $this->occupancyService->secondsSinceLastGrantedStaffEntry($staff, null);
+            if ($sinceEntry !== null && $sinceEntry < self::EXIT_GRACE_SECONDS) {
+                return $this->json($this->grantedPayload($club, [
+                    'access_granted' => true,
+                    'reason' => 'ok',
+                    'passage' => 'entry',
+                    'duplicate' => true,
+                    'success' => true,
+                    'user' => [
+                        'id' => 'staff-' . $staff->getId(),
+                        'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                        'phone' => $staff->getTrainer()?->getPhone(),
+                    ],
+                ]));
+            }
+
+            $log->setEventType('exit')->setResult('granted')->setReason('ok');
+            $this->em->persist($log);
+            $this->em->flush();
+            $this->occupancyService->notifyPresenceChanged($club);
+
+            return $this->json($this->grantedPayload($club, [
+                'access_granted' => true,
+                'reason' => 'ok',
+                'passage' => 'exit',
+                'success' => true,
+                'user' => [
+                    'id' => 'staff-' . $staff->getId(),
+                    'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                    'phone' => $staff->getTrainer()?->getPhone(),
+                ],
+            ]));
         }
 
         $log->setResult('granted')->setReason('ok');
@@ -704,6 +749,9 @@ class GatewayController extends AbstractController
 
     private function grantStaffExit(Club $club, ?StaffUser $staff, AccessLog $log): JsonResponse
     {
+        if ($staff instanceof StaffUser) {
+            $log->setStaffUser($staff);
+        }
         $log->setResult('granted')->setReason('ok');
         $this->em->persist($log);
         $this->em->flush();

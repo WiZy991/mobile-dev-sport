@@ -3325,7 +3325,7 @@ class AdminController extends AbstractController
 
         $clubId = null;
         foreach ($this->occupancy->listCurrentlyInside(null, 200) as $row) {
-            if ($row['user']->getId() === $userId) {
+            if (($row['kind'] ?? '') === 'user' && $row['user']?->getId() === $userId) {
                 $clubId = $row['club_id'];
                 break;
             }
@@ -3333,6 +3333,31 @@ class AdminController extends AbstractController
         $club = $clubId !== null ? $this->em->find(Club::class, $clubId) : null;
         $this->occupancy->forceExit($user, $club instanceof Club ? $club : null);
         $this->addFlash('success', 'Выход отмечен для «' . $user->getName() . '».');
+
+        return $this->redirectToRoute('admin_section', ['section' => 'visits']);
+    }
+
+    #[Route('/visits/force-exit-staff/{staffId}', name: 'admin_visits_force_exit_staff', requirements: ['staffId' => '\\d+'], methods: ['POST'])]
+    public function forceExitStaff(int $staffId): Response
+    {
+        $staff = $this->em->getRepository(StaffUser::class)->find($staffId);
+        if (!$staff instanceof StaffUser) {
+            $this->addFlash('danger', 'Тренер не найден.');
+
+            return $this->redirectToRoute('admin_section', ['section' => 'visits']);
+        }
+
+        $clubId = null;
+        foreach ($this->occupancy->listCurrentlyInside(null, 200) as $row) {
+            if (($row['kind'] ?? '') === 'staff' && $row['staff']?->getId() === $staffId) {
+                $clubId = $row['club_id'];
+                break;
+            }
+        }
+        $club = $clubId !== null ? $this->em->find(Club::class, $clubId) : null;
+        $this->occupancy->forceExitStaff($staff, $club instanceof Club ? $club : null);
+        $name = trim($staff->getName()) !== '' ? $staff->getName() : $staff->getEmail();
+        $this->addFlash('success', 'Выход отмечен для тренера «' . $name . '».');
 
         return $this->redirectToRoute('admin_section', ['section' => 'visits']);
     }
@@ -3345,10 +3370,11 @@ class AdminController extends AbstractController
         $clubId = $request->query->get('club_id') ? (int) $request->query->get('club_id') : null;
 
         $qb = $this->em->createQueryBuilder()
-            ->select('a', 'c', 'au')
+            ->select('a', 'c', 'au', 'asf')
             ->from(AccessLog::class, 'a')
             ->leftJoin('a.club', 'c')
             ->leftJoin('a.user', 'au')
+            ->leftJoin('a.staffUser', 'asf')
             ->where('a.result = :result')
             ->andWhere('a.eventType = :eventType')
             ->andWhere('a.createdAt >= :from')
@@ -3370,7 +3396,6 @@ class AdminController extends AbstractController
         $byClub = [];
         $allRows = [];
         foreach ($visits as $v) {
-            $user = $v->getUser();
             $club = $v->getClub();
             $clubKey = $club?->getId() ?? 0;
             $clubName = $club?->getName() ?? 'Без клуба';
@@ -3379,8 +3404,8 @@ class AdminController extends AbstractController
             }
             $row = [
                 $v->getId() ?? 0,
-                $user?->getName() ?: '—',
-                $user?->getPhone() ?: '—',
+                $v->getVisitorDisplayName(),
+                $v->getVisitorPhone(),
                 $clubName,
                 $v->getDeviceId() ?? '—',
                 $v->getCreatedAt()->setTimezone($clubTz)->format('d.m.Y H:i:s'),
@@ -3407,7 +3432,7 @@ class AdminController extends AbstractController
 
         $response = new StreamedResponse(function () use ($clubSheets, $allRows): void {
             $spreadsheet = new Spreadsheet();
-            $headers = ['ID', 'Клиент', 'Телефон', 'Клуб', 'Устройство', 'Дата и время (Владивосток)'];
+            $headers = ['ID', 'Кто', 'Телефон', 'Клуб', 'Устройство', 'Дата и время (Владивосток)'];
 
             $summary = $spreadsheet->getActiveSheet();
             $summary->setTitle('Все клубы');
@@ -4120,10 +4145,11 @@ class AdminController extends AbstractController
             }
             $visitStats = $this->visitReport->countByClub($period->from, $period->toExclusive);
             $qb = $this->em->createQueryBuilder()
-                ->select('a', 'c', 'au')
+                ->select('a', 'c', 'au', 'asf')
                 ->from(AccessLog::class, 'a')
                 ->leftJoin('a.club', 'c')
                 ->leftJoin('a.user', 'au')
+                ->leftJoin('a.staffUser', 'asf')
                 ->where('a.result = :result')
                 ->andWhere('a.eventType = :eventType')
                 ->andWhere('a.createdAt >= :from')

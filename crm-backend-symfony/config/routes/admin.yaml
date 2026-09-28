@@ -317,6 +317,12 @@ admin_visits_force_exit:
   methods: [POST]
   requirements: { userId: '\d+' }
 
+admin_visits_force_exit_staff:
+  path: /admin/visits/force-exit-staff/{staffId}
+  controller: App\Controller\Admin\AdminController::forceExitStaff
+  methods: [POST]
+  requirements: { staffId: '\d+' }
+
 admin_clients_export:
   path: /admin/clients/export
   controller: App\Controller\Admin\AdminController::exportClients

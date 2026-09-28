@@ -368,6 +368,8 @@ class AccessController extends AbstractController
             return $this->json($response, 404);
         }
 
+        $log->setStaffUser($staff);
+
         $nowMs = (int) (microtime(true) * 1000);
         if (!FitnessClubEntryQrTimestamp::isFresh($timestamp, $nowMs)) {
             $log->setReason('qr_expired');
@@ -404,6 +406,49 @@ class AccessController extends AbstractController
 
                 return $this->json($response, 403);
             }
+        }
+
+        if ($this->occupancyService->isStaffCurrentlyInside($staff, null)) {
+            $sinceEntry = $this->occupancyService->secondsSinceLastGrantedStaffEntry($staff, null);
+            if ($sinceEntry !== null && $sinceEntry < self::EXIT_GRACE_SECONDS) {
+                $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
+
+                return $this->json($this->mergeEntrySuccess(
+                    [
+                        'access_granted' => true,
+                        'reason' => 'ok',
+                        'passage' => 'entry',
+                        'duplicate' => true,
+                        'success' => true,
+                        'user' => [
+                            'id' => 'staff-' . $staff->getId(),
+                            'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                            'phone' => $staff->getTrainer()?->getPhone(),
+                        ],
+                    ],
+                    $percoUnlock,
+                ));
+            }
+            $log->setEventType('exit')->setResult('granted')->setReason('ok');
+            $this->em->persist($log);
+            $this->em->flush();
+            $this->occupancyService->notifyPresenceChanged(null);
+            $percoUnlock = $this->percoWebClient->tryOpenEntryAfterGranted();
+
+            return $this->json($this->mergeEntrySuccess(
+                [
+                    'access_granted' => true,
+                    'reason' => 'ok',
+                    'passage' => 'exit',
+                    'success' => true,
+                    'user' => [
+                        'id' => 'staff-' . $staff->getId(),
+                        'name' => $staff->getName() !== '' ? $staff->getName() : $staff->getEmail(),
+                        'phone' => $staff->getTrainer()?->getPhone(),
+                    ],
+                ],
+                $percoUnlock,
+            ));
         }
 
         $log->setResult('granted')->setReason('ok');

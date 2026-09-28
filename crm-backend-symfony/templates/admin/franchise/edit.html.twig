@@ -27,7 +27,7 @@
                 </div>
             </div>
             <div class="small text-secondary" style="max-width: 480px;">
-                Учитываются клиенты этого клуба с 23:15 до 23:15 по Владивостоку; не дольше 3 часов с входа.
+                Учитываются клиенты и тренеры этого клуба с 23:15 до 23:15 по Владивостоку; не дольше 3 часов с входа.
                 Выход по QR работает как раньше. Время «Зашёл» — местное (Владивосток).
             </div>
         </div>
@@ -37,7 +37,7 @@
                 <table class="table table-sm table-dark align-middle mb-0">
                     <thead class="sticky-top">
                         <tr>
-                            <th>Клиент</th>
+                            <th>Кто</th>
                             <th>Телефон</th>
                             <th class="text-end">Зашёл</th>
                         </tr>
@@ -45,8 +45,16 @@
                     <tbody>
                         {% for row in inside_list %}
                             <tr>
-                                <td><a href="{{ path('admin_client_show', {id: row.user.id}) }}" class="link-light text-decoration-none">{{ row.user.name }}</a></td>
-                                <td>{{ row.user.phone }}</td>
+                                <td>
+                                    {% if row.kind == 'staff' %}
+                                        <span class="badge text-bg-secondary me-1">Тренер</span>{{ row.name }}
+                                    {% elseif row.user %}
+                                        <a href="{{ path('admin_client_show', {id: row.user.id}) }}" class="link-light text-decoration-none">{{ row.name }}</a>
+                                    {% else %}
+                                        {{ row.name }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.phone|default('—') }}</td>
                                 <td class="text-end">{{ row.entered_at|date('H:i', 'Asia/Vladivostok') }}</td>
                             </tr>
                         {% endfor %}

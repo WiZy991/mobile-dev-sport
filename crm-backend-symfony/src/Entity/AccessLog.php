@@ -26,6 +26,11 @@ class AccessLog implements TenantAware
     #[ORM\JoinColumn(nullable: true)]
     private ?User $user = null;
 
+    /** Тренер / сотрудник (приложение специалиста); взаимоисключающе с user для обычных проходов. */
+    #[ORM\ManyToOne(targetEntity: StaffUser::class)]
+    #[ORM\JoinColumn(name: 'staff_user_id', nullable: true, onDelete: 'SET NULL')]
+    private ?StaffUser $staffUser = null;
+
     /** Клуб, в котором произошёл проход. Для франшизы — обязателен; для legacy эндпоинта — может быть null. */
     #[ORM\ManyToOne(targetEntity: Club::class)]
     #[ORM\JoinColumn(name: 'club_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
@@ -68,6 +73,50 @@ class AccessLog implements TenantAware
     {
         $this->user = $user;
         return $this;
+    }
+
+    public function getStaffUser(): ?StaffUser
+    {
+        return $this->staffUser;
+    }
+
+    public function setStaffUser(?StaffUser $staffUser): self
+    {
+        $this->staffUser = $staffUser;
+        return $this;
+    }
+
+    /** Имя для журнала: клиент или тренер. */
+    public function getVisitorDisplayName(): string
+    {
+        if ($this->user !== null) {
+            $name = trim($this->user->getName());
+
+            return $name !== '' ? $name : 'Клиент #' . ($this->user->getId() ?? '');
+        }
+        if ($this->staffUser !== null) {
+            $name = trim($this->staffUser->getName());
+            if ($name === '') {
+                $name = trim($this->staffUser->getEmail());
+            }
+            $label = $name !== '' ? $name : ('Тренер #' . ($this->staffUser->getId() ?? ''));
+
+            return $label . ' (тренер)';
+        }
+
+        return '—';
+    }
+
+    public function getVisitorPhone(): string
+    {
+        if ($this->user !== null) {
+            $phone = trim($this->user->getPhone());
+
+            return $phone !== '' ? $phone : '—';
+        }
+        $phone = $this->staffUser?->getTrainer()?->getPhone();
+
+        return $phone !== null && trim($phone) !== '' ? trim($phone) : '—';
     }
 
     public function getClub(): ?Club
