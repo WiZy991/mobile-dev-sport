@@ -47,6 +47,7 @@ use App\Service\Admin\SalePaymentMethodCatalog;
 use App\Service\ClubTimezone;
 use App\Service\Security\PassportAccessPolicy;
 use App\Service\Integration\PercoWebClient;
+use App\Service\Reports\AccessLogStaffLinker;
 use App\Service\Reports\OccupancyService;
 use App\Service\Reports\VisitPeriodResolver;
 use App\Service\Reports\VisitReportService;
@@ -72,6 +73,7 @@ class AdminController extends AbstractController
         private readonly PercoWebClient $percoWebClient,
         private readonly ClientImportService $clientImportService,
         private readonly OccupancyService $occupancy,
+        private readonly AccessLogStaffLinker $accessLogStaffLinker,
         private readonly VisitPeriodResolver $visitPeriodResolver,
         private readonly VisitReportService $visitReport,
         private readonly PassportAccessPolicy $passportAccess,
@@ -3390,6 +3392,7 @@ class AdminController extends AbstractController
 
         /** @var list<AccessLog> $visits */
         $visits = $qb->getQuery()->getResult();
+        $this->accessLogStaffLinker->attachMissingStaff($visits);
 
         // Плоские строки до StreamedResponse — иначе lazy/EM в колбэке даёт пустой файл.
         /** @var array<int, array{name: string, rows: list<list<string|int>>}> $byClub */
@@ -4163,6 +4166,7 @@ class AdminController extends AbstractController
                 $qb->andWhere('a.club = :club')->setParameter('club', $filterClub);
             }
             [$accessLogs, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($qb, 'a', $request, 100);
+            $this->accessLogStaffLinker->attachMissingStaff($accessLogs);
 
             return $this->render('admin/visits.html.twig', [
                 'menu' => $menu,

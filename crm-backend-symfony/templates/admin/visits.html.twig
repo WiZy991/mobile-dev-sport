@@ -215,7 +215,7 @@
                                 <span class="badge text-bg-secondary me-1">Тренер</span>
                                 {{ visit.staffUser.name != '' ? visit.staffUser.name : visit.staffUser.email }}
                             {% else %}
-                                {{ visit.visitorDisplayName }}
+                                <span class="text-secondary" title="{{ visit.rawData }}">Без профиля</span>
                             {% endif %}
                         </td>
                         <td>{{ visit.visitorPhone }}</td>
