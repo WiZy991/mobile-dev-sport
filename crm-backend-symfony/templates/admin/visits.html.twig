@@ -201,7 +201,9 @@
                     <th>Телефон</th>
                     <th>Клуб</th>
                     <th>Устройство</th>
-                    <th>Дата и время</th>
+                    <th>Вход</th>
+                    <th>Выход</th>
+                    <th>В зале</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -221,11 +223,27 @@
                         <td>{{ visit.visitorPhone }}</td>
                         <td>{{ visit.club ? visit.club.name : '—' }}</td>
                         <td>{{ visit.deviceId ?? '—' }}</td>
-                        <td>{{ visit.createdAt|date('d.m.Y H:i:s', 'Asia/Vladivostok') }}</td>
+                        <td class="text-nowrap">{{ visit.createdAt|date('d.m.Y H:i', 'Asia/Vladivostok') }}</td>
+                        {% set vx = visitExits[visit.id] ?? null %}
+                        <td class="text-nowrap">
+                            {% if vx %}
+                                {{ vx.exit_at|date(vx.exit_at|date('Y-m-d', 'Asia/Vladivostok') == visit.createdAt|date('Y-m-d', 'Asia/Vladivostok') ? 'H:i' : 'd.m H:i', 'Asia/Vladivostok') }}
+                                {% if vx.auto %}<span class="text-secondary small" title="Выход не отмечен — CRM закрыла визит через 3 часа">(авто)</span>{% endif %}
+                            {% else %}
+                                <span class="text-secondary">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">
+                            {% if vx %}
+                                {{ vx.duration_min >= 60 ? (vx.duration_min // 60) ~ ' ч ' : '' }}{{ vx.duration_min % 60 }} мин
+                            {% else %}
+                                <span class="text-secondary">—</span>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="6" class="text-center text-secondary">
+                        <td colspan="8" class="text-center text-secondary">
                             За выбранный период нет успешных входов по QR.
                         </td>
                     </tr>

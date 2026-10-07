@@ -11,6 +11,7 @@
                 date_to: dateTo|default(''),
                 club_id: filterClubId|default(''),
                 payment_method: filterPaymentMethod|default(''),
+                product: filterProduct|default(''),
                 format: 'xlsx'
             }) }}" class="btn btn-sm btn-outline-success me-2">Скачать Excel</a>
             {% if admin_can_mutate() %}
@@ -51,6 +52,17 @@
                     {% endfor %}
                     <option value="alfa_sbp" {{ filterPaymentMethod == 'alfa_sbp' ? 'selected' }}>СБП (Альфа)</option>
                     <option value="alfa_acquiring" {{ filterPaymentMethod == 'alfa_acquiring' ? 'selected' }}>Эквайринг (Альфа)</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Абонемент</label>
+                <select name="product" class="form-select form-select-sm" style="min-width: 12rem;">
+                    <option value="">Все</option>
+                    {% for p in salePlans|default([]) %}
+                        {% set pv = 'plan:' ~ p.id %}
+                        <option value="{{ pv }}" {{ filterProduct|default('') == pv ? 'selected' }}>{{ p.name }}</option>
+                    {% endfor %}
+                    <option value="trainer_rental" {{ filterProduct|default('') == 'trainer_rental' ? 'selected' }}>Аренда клуба (тренер)</option>
                 </select>
             </div>
             <div class="col-auto">
@@ -154,7 +166,8 @@
                 date_from: dateFrom|default(''),
                 date_to: dateTo|default(''),
                 club_id: filterClubId|default(''),
-                payment_method: filterPaymentMethod|default('')
+                payment_method: filterPaymentMethod|default(''),
+                product: filterProduct|default('')
             }
         } %}
     </div>

@@ -51,6 +51,7 @@ use App\Service\Reports\AccessLogStaffLinker;
 use App\Service\Reports\OccupancyService;
 use App\Service\Reports\VisitPeriodResolver;
 use App\Service\Reports\VisitReportService;
+use App\Service\Reports\VisitSessionResolver;
 use App\Service\Staff\StaffClubRentalService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
@@ -74,6 +75,7 @@ class AdminController extends AbstractController
         private readonly ClientImportService $clientImportService,
         private readonly OccupancyService $occupancy,
         private readonly AccessLogStaffLinker $accessLogStaffLinker,
+        private readonly VisitSessionResolver $visitSessions,
         private readonly VisitPeriodResolver $visitPeriodResolver,
         private readonly VisitReportService $visitReport,
         private readonly PassportAccessPolicy $passportAccess,
@@ -857,18 +859,14 @@ class AdminController extends AbstractController
             ->from(AccessLog::class, 'a')
             ->where('a.user = :user')->andWhere('a.result = :result')
             ->setParameter('user', $client)->setParameter('result', 'granted')
-            ->orderBy('a.createdAt', 'DESC')
-            ->setMaxResults(20)
+            ->orderBy('a.id', 'DESC')
+            ->setMaxResults(400)
             ->getQuery()->getResult();
-        foreach ($accessLogs as $a) {
-            if ($a->getEventType() === 'exit') {
-                $activities[] = ['type' => 'exit', 'entity' => $a, 'date' => $a->getCreatedAt()];
-            } else {
-                $activities[] = ['type' => 'visit', 'entity' => $a, 'date' => $a->getCreatedAt()];
-            }
+        foreach ($this->visitSessions->sessionsFromLogs($accessLogs) as $session) {
+            $activities[] = ['type' => 'visit', 'entity' => $session, 'date' => $session['date']];
         }
         usort($activities, fn ($a, $b) => $b['date'] <=> $a['date']);
-        $activities = array_slice($activities, 0, 30);
+        $activities = array_slice($activities, 0, 300);
 
         $allTags = $this->em->getRepository(Tag::class)->findBy([], ['name' => 'ASC']);
         $allClubs = $this->em->getRepository(Club::class)->findBy([], ['name' => 'ASC']);
@@ -3393,12 +3391,14 @@ class AdminController extends AbstractController
         /** @var list<AccessLog> $visits */
         $visits = $qb->getQuery()->getResult();
         $this->accessLogStaffLinker->attachMissingStaff($visits);
+        $visitExits = $this->visitSessions->exitsForEntries($visits);
 
         // Плоские строки до StreamedResponse — иначе lazy/EM в колбэке даёт пустой файл.
         /** @var array<int, array{name: string, rows: list<list<string|int>>}> $byClub */
         $byClub = [];
         $allRows = [];
         foreach ($visits as $v) {
+            $vx = $visitExits[$v->getId() ?? 0] ?? null;
             $club = $v->getClub();
             $clubKey = $club?->getId() ?? 0;
             $clubName = $club?->getName() ?? 'Без клуба';
@@ -3412,6 +3412,10 @@ class AdminController extends AbstractController
                 $clubName,
                 $v->getDeviceId() ?? '—',
                 $v->getCreatedAt()->setTimezone($clubTz)->format('d.m.Y H:i:s'),
+                $vx !== null
+                    ? $vx['exit_at']->setTimezone($clubTz)->format('d.m.Y H:i:s') . ($vx['auto'] ? ' (авто)' : '')
+                    : '—',
+                $vx !== null ? $vx['duration_min'] : '—',
             ];
             $byClub[$clubKey]['rows'][] = $row;
             $allRows[] = $row;
@@ -3435,7 +3439,7 @@ class AdminController extends AbstractController
 
         $response = new StreamedResponse(function () use ($clubSheets, $allRows): void {
             $spreadsheet = new Spreadsheet();
-            $headers = ['ID', 'Кто', 'Телефон', 'Клуб', 'Устройство', 'Дата и время (Владивосток)'];
+            $headers = ['ID', 'Кто', 'Телефон', 'Клуб', 'Устройство', 'Вход (Владивосток)', 'Выход (Владивосток)', 'В зале, мин'];
 
             $summary = $spreadsheet->getActiveSheet();
             $summary->setTitle('Все клубы');
@@ -3445,7 +3449,7 @@ class AdminController extends AbstractController
                 $summary->fromArray($row, null, 'A' . $r);
                 ++$r;
             }
-            foreach (range('A', 'F') as $col) {
+            foreach (range('A', 'H') as $col) {
                 $summary->getColumnDimension($col)->setAutoSize(true);
             }
 
@@ -3458,7 +3462,7 @@ class AdminController extends AbstractController
                     $sheet->fromArray($row, null, 'A' . $r);
                     ++$r;
                 }
-                foreach (range('A', 'F') as $col) {
+                foreach (range('A', 'H') as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
             }
@@ -3579,6 +3583,21 @@ class AdminController extends AbstractController
         if ($paymentFilter !== '') {
             $sql .= ' AND s.payment_method = :pm';
             $params['pm'] = $paymentFilter;
+        }
+        $productFilter = trim((string) $request->query->get('product', ''));
+        if ($productFilter === 'trainer_rental') {
+            $sql .= ' AND s.product_name LIKE :trainerRental';
+            $params['trainerRental'] = 'Аренда клуба (тренер)%';
+        } elseif (str_starts_with($productFilter, 'plan:')) {
+            $plan = $this->em->getRepository(SubscriptionPlan::class)->find((int) substr($productFilter, 5));
+            if ($plan instanceof SubscriptionPlan) {
+                $sql .= ' AND (
+                    EXISTS (SELECT 1 FROM subscriptions psub WHERE psub.id = s.subscription_id AND psub.plan_id = :salePlanId)
+                    OR (s.subscription_id IS NULL AND s.product_name LIKE :salePlanName)
+                )';
+                $params['salePlanId'] = $plan->getId();
+                $params['salePlanName'] = '%: ' . $plan->getName();
+            }
         }
         if ($clubId && $hasSaleClub) {
             $sql .= ' AND (
@@ -3764,6 +3783,34 @@ class AdminController extends AbstractController
              OR (s.club IS NULL AND ss.club = :saleClub)
              OR (s.club IS NULL AND IDENTITY(ss.club) IS NULL AND su.club = :saleClub)'
         )->setParameter('saleClub', $club);
+    }
+
+    /**
+     * Фильтр «Абонемент» в продажах: plan:{id} — тариф (по абонементу продажи или по названию
+     * «…: {тариф}» у старых записей), trainer_rental — аренда клуба тренером.
+     *
+     * @return string нормализованное значение фильтра ('' = не применён)
+     */
+    private function applySaleProductFilter(QueryBuilder $qb, string $filter): string
+    {
+        if ($filter === 'trainer_rental') {
+            $qb->andWhere('s.productName LIKE :trainerRental')
+                ->setParameter('trainerRental', 'Аренда клуба (тренер)%');
+
+            return $filter;
+        }
+        if (!str_starts_with($filter, 'plan:')) {
+            return '';
+        }
+        $plan = $this->em->getRepository(SubscriptionPlan::class)->find((int) substr($filter, 5));
+        if (!$plan instanceof SubscriptionPlan) {
+            return '';
+        }
+        $qb->andWhere('(IDENTITY(ss.plan) = :salePlanId) OR (s.subscription IS NULL AND s.productName LIKE :salePlanName)')
+            ->setParameter('salePlanId', $plan->getId())
+            ->setParameter('salePlanName', '%: ' . $plan->getName());
+
+        return $filter;
     }
 
     #[Route('/{section}', name: 'admin_section', methods: ['GET', 'POST'])]
@@ -4082,8 +4129,13 @@ class AdminController extends AbstractController
             if ($paymentFilter !== '') {
                 $qb->andWhere('s.paymentMethod = :pm')->setParameter('pm', $paymentFilter);
             }
+            $productFilter = trim((string) $request->query->get('product', ''));
+            $productFilter = $this->applySaleProductFilter($qb, $productFilter);
             [$sales, $page, $totalItems, $totalPages, $perPage] = $this->paginateQb($qb, 's', $request);
             $products = $this->em->getRepository(Product::class)->findBy(['isActive' => true], ['name' => 'ASC']);
+            $salePlans = $this->planCatalog->sortForDisplay(
+                $this->em->getRepository(SubscriptionPlan::class)->findAll()
+            );
 
             return $this->render('admin/sales.html.twig', [
                 'menu' => $menu,
@@ -4091,6 +4143,8 @@ class AdminController extends AbstractController
                 'sales' => $sales,
                 'products' => $products,
                 'clubs' => $allClubs,
+                'salePlans' => $salePlans,
+                'filterProduct' => $productFilter,
                 'filterClubId' => $clubId,
                 'filterPaymentMethod' => $paymentFilter,
                 'dateFrom' => $dateFromRaw,
@@ -4172,6 +4226,7 @@ class AdminController extends AbstractController
                 'menu' => $menu,
                 'current' => $section,
                 'visits' => $accessLogs,
+                'visitExits' => $this->visitSessions->exitsForEntries($accessLogs),
                 'visitPeriod' => $period,
                 'visitStats' => $visitStats,
                 'clubs' => $allClubs,

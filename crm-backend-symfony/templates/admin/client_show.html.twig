@@ -184,12 +184,31 @@
     </div>
     {% endif %}
 
+    {% set activityPreview = 10 %}
+    {% set activityList = activities|default([]) %}
     <div class="content-card mb-3">
-        <div class="mb-2 text-primary small fw-semibold text-uppercase">Лента активности</div>
-        <div class="small">
-            {% for a in activities|default([]) %}
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="text-primary small fw-semibold text-uppercase">Лента активности</div>
+            {% if activityList|length > 0 %}
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="activity-feed-toggle"
+                        data-bs-toggle="collapse" data-bs-target="#activity-feed-body" aria-expanded="true">
+                    Свернуть
+                </button>
+            {% endif %}
+        </div>
+        <div class="small collapse show" id="activity-feed-body">
+            {% for a in activityList %}
+                {% if loop.index == activityPreview + 1 %}
+                    <div class="collapse" id="activity-feed-more">
+                {% endif %}
                 <div class="d-flex align-items-start mb-2 pb-2 border-bottom border-secondary">
-                    <span class="text-muted me-2" style="min-width: 65px;">{{ a.date|date('d.m H:i') }}</span>
+                    <span class="text-secondary me-2 text-nowrap" style="min-width: 92px;">
+                        {% if a.type == 'subscription' %}
+                            {{ a.date|date('d.m.Y') }}
+                        {% else %}
+                            {{ a.date|date('d.m.Y H:i', 'Asia/Vladivostok') }}
+                        {% endif %}
+                    </span>
                     {% if a.type == 'sale' %}
                         <span class="badge bg-success me-2">Продажа</span> {{ a.entity.productName }} — {{ a.entity.total|number_format(0, '', ' ') }} ₽
                     {% elseif a.type == 'subscription' %}
@@ -201,16 +220,58 @@
                     {% elseif a.type == 'note' %}
                         <span class="badge bg-secondary me-2">Заметка</span> {{ a.entity.text|slice(0, 80) }}{% if a.entity.text|length > 80 %}...{% endif %}
                     {% elseif a.type == 'visit' %}
-                        <span class="badge bg-success me-2">Вход QR</span> вход в зал
-                    {% elseif a.type == 'exit' %}
-                        <span class="badge bg-secondary me-2">Выход QR</span> выход из зала
+                        {% set s = a.entity %}
+                        {% if s.entry %}
+                            <span class="badge bg-success me-2">Визит</span>
+                            <span>
+                                вход <strong>{{ s.entry.createdAt|date('H:i', 'Asia/Vladivostok') }}</strong>
+                                {% if s.exit %}
+                                    → выход <strong>{{ s.exit.createdAt|date('H:i', 'Asia/Vladivostok') }}</strong>{% if s.exit.createdAt|date('Y-m-d', 'Asia/Vladivostok') != s.entry.createdAt|date('Y-m-d', 'Asia/Vladivostok') %} ({{ s.exit.createdAt|date('d.m', 'Asia/Vladivostok') }}){% endif %}
+                                    {% if s.duration_min is not null %}
+                                        <span class="text-secondary">· {{ s.duration_min >= 60 ? (s.duration_min // 60) ~ ' ч ' : '' }}{{ s.duration_min % 60 }} мин</span>
+                                    {% endif %}
+                                    {% if s.auto %}<span class="text-secondary">(авто-выход)</span>{% endif %}
+                                {% else %}
+                                    <span class="text-secondary">→ выход не отмечен</span>
+                                {% endif %}
+                                {% if s.entry.club %}<span class="text-secondary">· {{ s.entry.club.name }}</span>{% endif %}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary me-2">Выход QR</span>
+                            выход <strong>{{ s.exit.createdAt|date('H:i', 'Asia/Vladivostok') }}</strong>
+                            <span class="text-secondary">(вход не найден)</span>
+                        {% endif %}
                     {% endif %}
                 </div>
+                {% if loop.last and loop.length > activityPreview %}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-link px-0" id="activity-feed-more-btn"
+                            data-bs-toggle="collapse" data-bs-target="#activity-feed-more" aria-expanded="false"
+                            data-label-more="Показать все ({{ loop.length }})" data-label-less="Скрыть старые">
+                        Показать все ({{ loop.length }})
+                    </button>
+                {% endif %}
             {% else %}
                 <div class="text-secondary">Пока нет активности</div>
             {% endfor %}
         </div>
     </div>
+    <script>
+        (function () {
+            var body = document.getElementById('activity-feed-body');
+            var toggle = document.getElementById('activity-feed-toggle');
+            if (body && toggle) {
+                body.addEventListener('shown.bs.collapse', function (e) { if (e.target === body) toggle.textContent = 'Свернуть'; });
+                body.addEventListener('hidden.bs.collapse', function (e) { if (e.target === body) toggle.textContent = 'Развернуть'; });
+            }
+            var more = document.getElementById('activity-feed-more');
+            var moreBtn = document.getElementById('activity-feed-more-btn');
+            if (more && moreBtn) {
+                more.addEventListener('shown.bs.collapse', function (e) { e.stopPropagation(); moreBtn.textContent = moreBtn.dataset.labelLess; });
+                more.addEventListener('hidden.bs.collapse', function (e) { e.stopPropagation(); moreBtn.textContent = moreBtn.dataset.labelMore; });
+            }
+        })();
+    </script>
 
     {% if not client.hasRequiredDataForSubscription and subscriptions|length == 0 %}
     <div class="alert alert-warning mb-3">
