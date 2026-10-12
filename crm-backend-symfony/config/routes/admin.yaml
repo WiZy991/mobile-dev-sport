@@ -306,6 +306,16 @@ admin_visits_export:
   controller: App\Controller\Admin\AdminController::exportVisits
   methods: [GET]
 
+admin_visits_scanner:
+  path: /admin/visits/scanner
+  controller: App\Controller\Admin\AdminVisitScannerController::page
+  methods: [GET]
+
+admin_visits_scan:
+  path: /admin/visits/scan
+  controller: App\Controller\Admin\AdminVisitScannerController::scan
+  methods: [POST]
+
 admin_visits_clear_hall:
   path: /admin/visits/clear-hall
   controller: App\Controller\Admin\AdminController::clearHall

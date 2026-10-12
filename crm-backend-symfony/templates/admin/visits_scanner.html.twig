@@ -1,0 +1,185 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}CRM FitnessClub — Сканер на ресепшене{% endblock %}
+
+{% block body %}
+    <div class="content-header">
+        <h1 class="h4 mb-0">Сканер на ресепшене</h1>
+        <a href="{{ path('admin_section', {section: 'visits'}) }}" class="btn btn-sm btn-outline-secondary">← Посещения</a>
+    </div>
+
+    <div class="content-card mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0">Клуб</label>
+                <select id="scan-club" class="form-select form-select-sm" style="min-width: 14rem;">
+                    {% for c in clubs %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-secondary mb-0 d-block">Режим</label>
+                <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="scan-mode" id="scan-mode-auto" value="auto" checked>
+                    <label class="btn btn-outline-primary" for="scan-mode-auto">Авто (вход / выход)</label>
+                    <input type="radio" class="btn-check" name="scan-mode" id="scan-mode-entry" value="entry">
+                    <label class="btn btn-outline-success" for="scan-mode-entry">Только вход</label>
+                    <input type="radio" class="btn-check" name="scan-mode" id="scan-mode-exit" value="exit">
+                    <label class="btn btn-outline-secondary" for="scan-mode-exit">Только выход</label>
+                </div>
+            </div>
+        </div>
+        <p class="small text-secondary mb-0 mt-2">
+            «Авто»: первый скан — вход (проверка абонемента, списание посещения), повторный скан того, кто уже в зале, — выход.
+            Дверь эта страница не открывает — только отмечает проход в журнале.
+        </p>
+    </div>
+
+    <div class="content-card mb-3 text-center" id="scan-card">
+        <input type="text" id="scan-input" class="form-control form-control-lg text-center mx-auto mb-3"
+               style="max-width: 32rem;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+               placeholder="Поднесите QR к сканеру">
+        <div id="scan-result" class="py-3">
+            <div class="h5 text-secondary mb-0">Ожидание скана…</div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="mb-2 text-primary small fw-semibold text-uppercase">Последние сканы</div>
+        <table class="table table-sm table-dark align-middle mb-0">
+            <thead>
+            <tr>
+                <th style="width: 6rem;">Время</th>
+                <th>Кто</th>
+                <th>Результат</th>
+            </tr>
+            </thead>
+            <tbody id="scan-history">
+            <tr class="scan-history-empty"><td colspan="3" class="text-center text-secondary">Пока пусто</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    (function () {
+        var input = document.getElementById('scan-input');
+        var result = document.getElementById('scan-result');
+        var card = document.getElementById('scan-card');
+        var history = document.getElementById('scan-history');
+        var clubSelect = document.getElementById('scan-club');
+        var STORAGE_CLUB = 'dz.scanner.club';
+        var STORAGE_MODE = 'dz.scanner.mode';
+        var busy = false;
+
+        // USB-сканер «печатает» как клавиатура: при русской раскладке латиница и «:» приходят кириллицей.
+        var ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,ёЁ"№;?';
+        var en = "qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:\"ZXCVBNM<>?`~@#$&";
+        function fixLayout(s) {
+            if (!/[а-яё]/i.test(s)) { return s; }
+            var out = '';
+            for (var i = 0; i < s.length; i++) {
+                var idx = ru.indexOf(s[i]);
+                out += idx >= 0 ? en[idx] : s[i];
+            }
+            return out;
+        }
+
+        var savedClub = localStorage.getItem(STORAGE_CLUB);
+        if (savedClub && clubSelect.querySelector('option[value="' + savedClub + '"]')) {
+            clubSelect.value = savedClub;
+        }
+        clubSelect.addEventListener('change', function () { localStorage.setItem(STORAGE_CLUB, clubSelect.value); refocus(); });
+        var savedMode = localStorage.getItem(STORAGE_MODE);
+        if (savedMode && document.getElementById('scan-mode-' + savedMode)) {
+            document.getElementById('scan-mode-' + savedMode).checked = true;
+        }
+        document.querySelectorAll('input[name="scan-mode"]').forEach(function (r) {
+            r.addEventListener('change', function () { localStorage.setItem(STORAGE_MODE, r.value); refocus(); });
+        });
+
+        function mode() {
+            var r = document.querySelector('input[name="scan-mode"]:checked');
+            return r ? r.value : 'auto';
+        }
+        function refocus() {
+            if (document.activeElement !== input && document.activeElement !== clubSelect) {
+                input.focus();
+            }
+        }
+        input.focus();
+        setInterval(refocus, 1000);
+
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+            });
+        }
+
+        function show(ok, title, subtitle) {
+            card.classList.remove('border-success', 'border-danger');
+            card.classList.add(ok ? 'border-success' : 'border-danger');
+            card.style.borderWidth = '2px';
+            card.style.borderStyle = 'solid';
+            result.innerHTML =
+                '<div class="display-6 ' + (ok ? 'text-success' : 'text-danger') + '">' + esc(title) + '</div>' +
+                (subtitle ? '<div class="h5 mt-2 mb-0">' + esc(subtitle) + '</div>' : '');
+        }
+
+        function addHistory(ok, who, text) {
+            var empty = history.querySelector('.scan-history-empty');
+            if (empty) { empty.remove(); }
+            var tr = document.createElement('tr');
+            var now = new Date();
+            tr.innerHTML = '<td>' + now.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) + '</td>' +
+                '<td>' + esc(who || '—') + '</td>' +
+                '<td class="' + (ok ? 'text-success' : 'text-danger') + '">' + esc(text) + '</td>';
+            history.insertBefore(tr, history.firstChild);
+            while (history.children.length > 30) { history.removeChild(history.lastChild); }
+        }
+
+        function submit(raw) {
+            var qr = fixLayout(raw.trim());
+            if (qr === '' || busy) { return; }
+            busy = true;
+            result.innerHTML = '<div class="h5 text-secondary mb-0">Проверяем…</div>';
+            fetch('{{ path('admin_visits_scan') }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                credentials: 'same-origin',
+                body: JSON.stringify({qr: qr, mode: mode(), club_id: clubSelect.value})
+            }).then(function (r) {
+                return r.json().catch(function () { return {access_granted: false, message: 'Ошибка сервера (' + r.status + ')'}; });
+            }).then(function (data) {
+                var who = data.user && data.user.name ? data.user.name : '';
+                if (data.access_granted) {
+                    var isExit = data.passage === 'exit';
+                    var title = isExit ? 'Выход' : 'Вход';
+                    if (data.duplicate) { title += ' (уже отмечен)'; }
+                    show(true, title, who);
+                    addHistory(true, who, title);
+                } else {
+                    var msg = data.message || data.reason || 'Отказ';
+                    show(false, 'Отказ', (who ? who + ' — ' : '') + msg);
+                    addHistory(false, who, msg);
+                }
+            }).catch(function () {
+                show(false, 'Нет связи с CRM', 'Проверьте интернет и повторите скан');
+                addHistory(false, '', 'Нет связи с CRM');
+            }).finally(function () {
+                busy = false;
+                refocus();
+            });
+        }
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                var v = input.value;
+                input.value = '';
+                submit(v);
+            }
+        });
+    })();
+    </script>
+{% endblock %}
