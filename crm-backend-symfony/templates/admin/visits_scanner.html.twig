@@ -155,8 +155,12 @@
                 if (data.access_granted) {
                     var isExit = data.passage === 'exit';
                     var title = isExit ? 'Выход' : 'Вход';
-                    if (data.duplicate) { title += ' (уже отмечен)'; }
-                    show(true, title, who);
+                    var sub = who;
+                    if (data.duplicate) {
+                        title = isExit ? 'Выход уже отмечен' : 'Вход уже отмечен';
+                        sub = who + (isExit ? '' : ' — только что прошёл. Для выхода сканируйте через минуту');
+                    }
+                    show(true, title, sub);
                     addHistory(true, who, title);
                 } else {
                     var msg = data.message || data.reason || 'Отказ';
@@ -172,12 +176,24 @@
             });
         }
 
+        // Сканер без суффикса Enter: код приходит пачкой символов — отправляем после короткой паузы.
+        var idleTimer = null;
+        function flush() {
+            clearTimeout(idleTimer);
+            var v = input.value;
+            input.value = '';
+            submit(v);
+        }
+        input.addEventListener('input', function () {
+            clearTimeout(idleTimer);
+            if (input.value.trim().length >= 7) {
+                idleTimer = setTimeout(flush, 250);
+            }
+        });
         input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' || e.key === 'Tab') {
                 e.preventDefault();
-                var v = input.value;
-                input.value = '';
-                submit(v);
+                flush();
             }
         });
     })();
