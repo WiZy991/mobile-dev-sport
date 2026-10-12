@@ -158,7 +158,12 @@
                     var sub = who;
                     if (data.duplicate) {
                         title = isExit ? 'Выход уже отмечен' : 'Вход уже отмечен';
-                        sub = who + (isExit ? '' : ' — только что прошёл. Для выхода сканируйте через минуту');
+                        if (data.duplicate_reason === 'same_qr') {
+                            sub = who + ' — этот QR уже отсканирован. Обновите код в приложении и сканируйте снова';
+                        } else if (data.duplicate_reason === 'just_entered') {
+                            var wait = Math.max(1, (data.exit_grace_seconds || 10) - (data.seconds_since_entry || 0));
+                            sub = who + ' — вошёл ' + (data.seconds_since_entry || 0) + ' с назад. Для выхода сканируйте через ' + wait + ' с';
+                        }
                     }
                     show(true, title, sub);
                     addHistory(true, who, title);

@@ -56,6 +56,13 @@ class GatewayController extends AbstractController
     private const QR_DEDUPE_SECONDS = 90;
     /** Сразу после входа не считать повторный скан выходом (эхо считывателя). */
     private const EXIT_GRACE_SECONDS = 45;
+    /** Ручной сканер на ресепшене: эха PERCo нет, QR в приложении меняется каждые 15 с. */
+    private const RECEPTION_QR_DEDUPE_SECONDS = 15;
+    private const RECEPTION_EXIT_GRACE_SECONDS = 10;
+
+    private int $qrDedupeSeconds = self::QR_DEDUPE_SECONDS;
+    private int $exitGraceSeconds = self::EXIT_GRACE_SECONDS;
+
     private const ALARM_TYPES = [
         AccessAlarm::TYPE_TAILGATING,
         AccessAlarm::TYPE_GROUP_ENTRY,
@@ -86,6 +93,9 @@ class GatewayController extends AbstractController
         // false — раздельные считыватели: повторный скан на входе не пишет exit.
         $allowExitToggle = !\array_key_exists('allow_exit_toggle', $data)
             || filter_var($data['allow_exit_toggle'], \FILTER_VALIDATE_BOOLEAN);
+        $reception = filter_var($data['reception'] ?? false, \FILTER_VALIDATE_BOOLEAN);
+        $this->qrDedupeSeconds = $reception ? self::RECEPTION_QR_DEDUPE_SECONDS : self::QR_DEDUPE_SECONDS;
+        $this->exitGraceSeconds = $reception ? self::RECEPTION_EXIT_GRACE_SECONDS : self::EXIT_GRACE_SECONDS;
 
         $log = (new AccessLog())
             ->setRawData($qr)
@@ -139,7 +149,7 @@ class GatewayController extends AbstractController
         }
 
         // Тот же QR уже прошёл (скан + эхо PERCo) — не плодим entry/exit и не списываем посещение.
-        $dup = $this->occupancyService->findRecentGrantedByRawQr($qr, self::QR_DEDUPE_SECONDS);
+        $dup = $this->occupancyService->findRecentGrantedByRawQr($qr, $this->qrDedupeSeconds);
         if ($dup !== null) {
             $passage = ($dup['event_type'] === 'exit') ? 'exit' : 'entry';
 
@@ -148,6 +158,7 @@ class GatewayController extends AbstractController
                 'reason' => 'ok',
                 'passage' => $passage,
                 'duplicate' => true,
+                'duplicate_reason' => 'same_qr',
                 'success' => true,
                 'user' => [
                     'id' => 'user-' . $user->getId(),
@@ -165,12 +176,15 @@ class GatewayController extends AbstractController
             }
 
             $sinceEntry = $this->occupancyService->secondsSinceLastGrantedEntry($user, null);
-            if ($sinceEntry !== null && $sinceEntry < self::EXIT_GRACE_SECONDS) {
+            if ($sinceEntry !== null && $sinceEntry < $this->exitGraceSeconds) {
                 return $this->json($this->grantedPayload($club, [
                     'access_granted' => true,
                     'reason' => 'ok',
                     'passage' => 'entry',
                     'duplicate' => true,
+                    'duplicate_reason' => 'just_entered',
+                    'seconds_since_entry' => $sinceEntry,
+                    'exit_grace_seconds' => $this->exitGraceSeconds,
                     'success' => true,
                     'user' => [
                         'id' => 'user-' . $user->getId(),
@@ -562,7 +576,7 @@ class GatewayController extends AbstractController
 
         $log->setStaffUser($staff);
 
-        $dup = $this->occupancyService->findRecentGrantedByRawQr($log->getRawData(), self::QR_DEDUPE_SECONDS);
+        $dup = $this->occupancyService->findRecentGrantedByRawQr($log->getRawData(), $this->qrDedupeSeconds);
         if ($dup !== null) {
             $passage = ($dup['event_type'] === 'exit') ? 'exit' : 'entry';
 
@@ -571,6 +585,7 @@ class GatewayController extends AbstractController
                 'reason' => 'ok',
                 'passage' => $passage,
                 'duplicate' => true,
+                'duplicate_reason' => 'same_qr',
                 'success' => true,
                 'user' => [
                     'id' => 'staff-' . $staff->getId(),
@@ -605,7 +620,7 @@ class GatewayController extends AbstractController
     ): JsonResponse {
         $log->setStaffUser($staff);
 
-        $dup = $this->occupancyService->findRecentGrantedByRawQr($log->getRawData(), self::QR_DEDUPE_SECONDS);
+        $dup = $this->occupancyService->findRecentGrantedByRawQr($log->getRawData(), $this->qrDedupeSeconds);
         if ($dup !== null) {
             $passage = ($dup['event_type'] === 'exit') ? 'exit' : 'entry';
 
@@ -614,6 +629,7 @@ class GatewayController extends AbstractController
                 'reason' => 'ok',
                 'passage' => $passage,
                 'duplicate' => true,
+                'duplicate_reason' => 'same_qr',
                 'success' => true,
                 'user' => [
                     'id' => 'staff-' . $staff->getId(),
@@ -642,12 +658,15 @@ class GatewayController extends AbstractController
             }
 
             $sinceEntry = $this->occupancyService->secondsSinceLastGrantedStaffEntry($staff, null);
-            if ($sinceEntry !== null && $sinceEntry < self::EXIT_GRACE_SECONDS) {
+            if ($sinceEntry !== null && $sinceEntry < $this->exitGraceSeconds) {
                 return $this->json($this->grantedPayload($club, [
                     'access_granted' => true,
                     'reason' => 'ok',
                     'passage' => 'entry',
                     'duplicate' => true,
+                    'duplicate_reason' => 'just_entered',
+                    'seconds_since_entry' => $sinceEntry,
+                    'exit_grace_seconds' => $this->exitGraceSeconds,
                     'success' => true,
                     'user' => [
                         'id' => 'staff-' . $staff->getId(),

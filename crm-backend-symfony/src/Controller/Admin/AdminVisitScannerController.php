@@ -64,6 +64,7 @@ final class AdminVisitScannerController extends AbstractController
         $payload = [
             'qr' => mb_substr($qr, 0, 255),
             'device_id' => self::DEVICE_ID,
+            'reception' => true,
         ];
         if (!$isExit) {
             // auto: повторный скан того, кто уже в зале, = выход; entry: повторный скан = отказ.
