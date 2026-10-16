@@ -47,7 +47,26 @@ fun BrandHeader(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (showLogo) {
+        if (showLogo && Brand.isWhiteLabel) {
+            // Эмблема франшизы — круглая, с текстом внутри: в 48 dp не читается.
+            Image(
+                painter = painterResource(R.drawable.ic_brand_mark),
+                contentDescription = null,
+                modifier = Modifier.size(120.dp),
+                contentScale = ContentScale.Fit,
+            )
+            Text(
+                text = title,
+                color = textColor,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                fontSize = 26.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else if (showLogo) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

@@ -56,4 +56,4 @@ echo "Reloading nginx..."
 docker compose exec nginx nginx -s reload
 
 echo "OK: trusted Let's Encrypt certificate installed for ${DOMAIN}"
-echo "Renewal: certbot renew (add to cron, then copy certs and reload nginx)"
+echo "Авто-продление с установкой в nginx: bash scripts/letsencrypt-renew.sh"
