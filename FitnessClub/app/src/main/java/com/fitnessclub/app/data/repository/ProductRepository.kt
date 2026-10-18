@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.api.Product
 import com.fitnessclub.app.data.api.PurchaseProductRequest
@@ -21,10 +22,10 @@ class ProductRepository @Inject constructor(
                 val items = response.body()!!.map { it.toShopItem() }
                 ApiResult.Success(items)
             } else {
-                ApiResult.Error(response.message() ?: "Ошибка загрузки товаров", response.code())
+                ApiResult.Error("Ошибка загрузки товаров", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 
@@ -38,7 +39,7 @@ class ProductRepository @Inject constructor(
                 ApiResult.Error(errorBody, response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Ошибка покупки")
+            ApiResult.Error(e.userMessage("Ошибка покупки"))
         }
     }
 }

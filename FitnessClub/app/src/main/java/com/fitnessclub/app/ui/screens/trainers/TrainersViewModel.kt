@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.trainers
 
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.api.userMessage
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,7 +34,12 @@ class TrainersViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             
-            val result = fitnessApi.getTrainers()
+            val result = try {
+                fitnessApi.getTrainers()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.userMessage("Ошибка загрузки")) }
+                return@launch
+            }
             if (result.isSuccessful) {
                 val apiTrainers = result.body() ?: emptyList()
                 val trainers = apiTrainers.map { t ->
@@ -57,7 +63,7 @@ class TrainersViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         trainers = emptyList(),
-                        error = result.message() ?: "Ошибка загрузки"
+                        error = "Ошибка загрузки"
                     )
                 }
             }

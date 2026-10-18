@@ -137,7 +137,18 @@ data class SubscriptionPlan(
     val features: List<String>? = null,
     
     @SerializedName("is_popular")
-    val isPopular: Boolean = false
+    val isPopular: Boolean = false,
+
+    @SerializedName("freeze_days_total")
+    val freezeDaysTotal: Int? = null,
+
+    /** Полные условия тарифа из CRM (поле «Подробные условия»). */
+    @SerializedName("details")
+    val details: String? = null,
+
+    /** Клуб, в котором будет действовать абонемент (зал покупки). */
+    @SerializedName("club_name")
+    val clubName: String? = null,
 ) {
     val safeId: String get() = id ?: "plan-0"
     val safeName: String get() = name ?: ""

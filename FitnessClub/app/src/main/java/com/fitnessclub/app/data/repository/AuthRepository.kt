@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.local.AuthFlowStore
 import com.fitnessclub.app.data.local.BiometricLoginStore
@@ -72,7 +73,7 @@ class AuthRepository @Inject constructor(
                 emit(ApiResult.Error(authErrorMessage(response, "Не удалось начать вход через Сбер ID"), response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 
@@ -113,7 +114,7 @@ class AuthRepository @Inject constructor(
                 emit(ApiResult.Error(authErrorMessage(response, "Не удалось завершить вход через Сбер ID"), response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
     
@@ -132,7 +133,7 @@ class AuthRepository @Inject constructor(
                 emit(ApiResult.Error(auth.message, response.code(), auth.authCode))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 
@@ -186,7 +187,7 @@ class AuthRepository @Inject constructor(
                 emit(ApiResult.Error(authErrorMessage(response, "Ошибка регистрации"), response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 
@@ -200,7 +201,7 @@ class AuthRepository @Inject constructor(
                 ApiResult.Error("Не удалось получить список каналов", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 
@@ -246,7 +247,7 @@ class AuthRepository @Inject constructor(
                 )
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Нет связи с сервером. Проверьте интернет.")
+            ApiResult.Error(e.userMessage("Нет связи с сервером. Проверьте интернет."))
         }
     }
 
@@ -265,21 +266,26 @@ class AuthRepository @Inject constructor(
                 ApiResult.Error(authErrorMessage(response, "Неверный код"), response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 
-    suspend fun checkRegisterEmail(email: String): ApiResult<CheckEmailResponse> {
+    suspend fun checkRegisterEmail(email: String, otpTicket: String?): ApiResult<CheckEmailResponse> {
         return try {
-            val response = api.checkRegisterEmail(CheckEmailRequest(email))
+            val response = api.checkRegisterEmail(CheckEmailRequest(email, otpTicket))
             val body = response.body()
             if (response.isSuccessful && body != null) {
+                if (body.loggedIn) {
+                    tokenManager.saveTokens(body.token!!, body.refreshToken!!)
+                    tokenManager.saveUser(body.user!!)
+                    onAuthenticated()
+                }
                 ApiResult.Success(body)
             } else {
                 ApiResult.Error(authErrorMessage(response, "Не удалось проверить email"), response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 
@@ -293,7 +299,7 @@ class AuthRepository @Inject constructor(
                 ApiResult.Error(authErrorMessage(response, "Не удалось отправить письмо"), response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
     
@@ -342,7 +348,7 @@ class AuthRepository @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 
@@ -369,7 +375,7 @@ class AuthRepository @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
     
@@ -472,7 +478,7 @@ class AuthRepository @Inject constructor(
                 ApiResult.Error(parsed.message, response.code(), parsed.authCode)
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 
@@ -518,7 +524,7 @@ class AuthRepository @Inject constructor(
                 ApiResult.Error(authErrorMessage(response, "Не удалось сохранить клуб"), response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
     
@@ -542,7 +548,7 @@ class AuthRepository @Inject constructor(
                 emit(ApiResult.Error(authErrorMessage(response, "Не удалось сменить пароль"), response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 

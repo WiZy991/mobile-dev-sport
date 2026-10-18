@@ -43,6 +43,7 @@ fun RegisterEmailScreen(
     viewModel: RegisterViewModel,
     onBack: () -> Unit,
     onContinue: () -> Unit,
+    onLoggedIn: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -82,7 +83,7 @@ fun RegisterEmailScreen(
         }
         Spacer(Modifier.weight(1f))
         Button(
-            onClick = { viewModel.submitRegisterEmail(onContinue) },
+            onClick = { viewModel.submitRegisterEmail(onContinue, onLoggedIn) },
             enabled = !state.emailCheckLoading,
             modifier = Modifier
                 .fillMaxWidth()

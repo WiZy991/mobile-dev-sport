@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.api.PromoCodeRequest
 import com.fitnessclub.app.data.api.PromoValidationResponse
@@ -36,12 +37,12 @@ class SubscriptionRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка загрузки абонементов", response.code()))
+                emit(ApiResult.Error("Ошибка загрузки абонементов", response.code()))
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
     
@@ -72,7 +73,7 @@ class SubscriptionRepository @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Не удалось загрузить тарифы")
+            ApiResult.Error(e.userMessage("Не удалось загрузить тарифы"))
         }
     }
 
@@ -98,7 +99,7 @@ class SubscriptionRepository @Inject constructor(
                 PromoValidationResult(isValid = false, error = "Не удалось проверить промокод")
             }
         } catch (e: Exception) {
-            PromoValidationResult(isValid = false, error = e.message ?: "Неизвестная ошибка")
+            PromoValidationResult(isValid = false, error = e.userMessage("Неизвестная ошибка"))
         }
     }
 
@@ -113,10 +114,10 @@ class SubscriptionRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {
-                ApiResult.Error(response.message() ?: "Ошибка расчёта цены", response.code())
+                ApiResult.Error("Ошибка расчёта цены", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 
@@ -181,14 +182,14 @@ class SubscriptionRepository @Inject constructor(
                             parsedCode = parsed?.code,
                             parsedMessage = parsed?.message,
                             parsedError = parsed?.error,
-                            fallback = response.message() ?: "Ошибка инициализации оплаты",
+                            fallback = "Ошибка инициализации оплаты",
                         )
                         PurchaseSubscriptionOutcome.Error(msg, response.code())
                     }
                 }
             }
         } catch (e: Exception) {
-            PurchaseSubscriptionOutcome.Error(e.message ?: "Неизвестная ошибка", null)
+            PurchaseSubscriptionOutcome.Error(e.userMessage("Неизвестная ошибка"), null)
         }
     }
 
@@ -198,10 +199,10 @@ class SubscriptionRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {
-                ApiResult.Error(response.message() ?: "Ошибка статуса оплаты", response.code())
+                ApiResult.Error("Ошибка статуса оплаты", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
     
@@ -212,10 +213,10 @@ class SubscriptionRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка заморозки", response.code()))
+                emit(ApiResult.Error("Ошибка заморозки", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
     
@@ -226,10 +227,10 @@ class SubscriptionRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка разморозки", response.code()))
+                emit(ApiResult.Error("Ошибка разморозки", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 
@@ -240,10 +241,10 @@ class SubscriptionRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка отмены абонемента", response.code()))
+                emit(ApiResult.Error("Ошибка отмены абонемента", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 }

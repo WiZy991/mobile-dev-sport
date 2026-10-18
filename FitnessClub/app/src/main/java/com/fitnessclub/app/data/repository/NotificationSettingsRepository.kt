@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.model.NotificationSettings
 import com.fitnessclub.app.push.PushTokenRegistrar
@@ -24,7 +25,7 @@ class NotificationSettingsRepository @Inject constructor(
                 emit(ApiResult.Error("Не удалось загрузить настройки уведомлений", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 
@@ -40,7 +41,7 @@ class NotificationSettingsRepository @Inject constructor(
                 emit(ApiResult.Error("Не удалось сохранить настройки", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 

@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.purchases
 
 import androidx.lifecycle.ViewModel
+import com.fitnessclub.app.data.api.userMessage
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.api.PurchaseItem
@@ -46,7 +47,7 @@ class PurchaseHistoryViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isLoading = false, error = e.message ?: "Ошибка сети")
+                    it.copy(isLoading = false, error = e.userMessage("Ошибка сети"))
                 }
             }
         }

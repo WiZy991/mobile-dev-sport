@@ -29,7 +29,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
@@ -44,6 +43,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.fitnessclub.app.ui.components.calmTextFieldColors
+import com.fitnessclub.app.ui.screens.profile.DateDotsVisualTransformation
 import com.fitnessclub.app.ui.theme.Primary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,12 +147,17 @@ fun RegisterPassportScreen(
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth()) {
                 TextField(
-                    value = p.issuedDateDisplay,
-                    onValueChange = viewModel::onPassportIssuedDateChange,
+                    value = p.issuedDateDisplay.filter { it.isDigit() }.take(8),
+                    onValueChange = { raw ->
+                        val digits = raw.filter { it.isDigit() }.take(8)
+                        viewModel.onPassportIssuedDateChange(DateDotsVisualTransformation.formatDateDots(digits))
+                    },
                     label = { Text("Выдан") },
                     placeholder = { Text("дд.мм.гггг") },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
+                    visualTransformation = remember { DateDotsVisualTransformation() },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = lightFieldColors()
                 )
                 IconButton(onClick = { issuePickerOpen = true }) {
@@ -208,7 +214,4 @@ fun RegisterPassportScreen(
 }
 
 @Composable
-private fun lightFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = Color.Transparent,
-    unfocusedContainerColor = Color.Transparent
-)
+private fun lightFieldColors() = calmTextFieldColors(containerColor = Color.Transparent)

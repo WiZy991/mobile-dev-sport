@@ -504,7 +504,7 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-    fun submitRegisterEmail(onOk: () -> Unit) {
+    fun submitRegisterEmail(onOk: () -> Unit, onLoggedIn: () -> Unit) {
         val email = _uiState.value.email.trim()
         if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             _uiState.update { it.copy(emailError = "Введите корректный email") }
@@ -512,8 +512,15 @@ class RegisterViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(emailCheckLoading = true, emailTakenMaskedPhone = null, emailError = null) }
-            when (val r = authRepository.checkRegisterEmail(email)) {
+            val ticket = _uiState.value.otpTicket.takeIf { it.isNotBlank() }
+            when (val r = authRepository.checkRegisterEmail(email, ticket)) {
                 is ApiResult.Success -> {
+                    if (r.data.loggedIn) {
+                        authFlowStore.clearOtpRegistration()
+                        _uiState.update { it.copy(emailCheckLoading = false) }
+                        onLoggedIn()
+                        return@launch
+                    }
                     persistDraft()
                     if (r.data.exists) {
                         _uiState.update {

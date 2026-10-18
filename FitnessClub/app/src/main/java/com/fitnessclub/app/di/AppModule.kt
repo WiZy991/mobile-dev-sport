@@ -4,6 +4,7 @@ import android.util.Log
 import android.content.Context
 import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.api.NetworkErrorInterceptor
 import com.fitnessclub.app.data.auth.TokenRefreshAuthenticator
 import com.fitnessclub.app.data.local.TokenManager
 import com.google.gson.Gson
@@ -48,6 +49,7 @@ object AppModule {
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .authenticator(tokenRefreshAuthenticator)
+            .addInterceptor(NetworkErrorInterceptor())
 
         if (BuildConfig.DEBUG) {
             val loggingInterceptor = HttpLoggingInterceptor { message -> Log.d("FC_HTTP", message) }.apply {

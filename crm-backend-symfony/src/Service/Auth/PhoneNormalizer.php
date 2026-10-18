@@ -38,6 +38,17 @@ final class PhoneNormalizer
         return substr($e164, -10);
     }
 
+    /**
+     * LIKE-шаблон по цифрам с «%» между ними: в БД номер бывает «+7 (914) 707-08-00», «8 914 7070800» и т.п.
+     * Совпадения нужно дополнительно сверять через {@see national10()}.
+     */
+    public static function looseLikePattern(string $digits): string
+    {
+        $digits = preg_replace('/\D+/', '', $digits) ?? '';
+
+        return '%' . implode('%', str_split($digits)) . '%';
+    }
+
     /** +7 914 *** ** 21 — без полного номера. */
     public static function mask(?string $raw): string
     {

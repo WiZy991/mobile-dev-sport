@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.personal
 
 import com.fitnessclub.app.data.api.FitnessApi
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.model.TrainingType
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -226,7 +227,7 @@ class PersonalTrainingViewModel @Inject constructor(
                             timeSlots = emptyList(),
                             trainingTypeOptions = emptyList(),
                             trainerNameOptions = emptyList(),
-                            error = result.message() ?: "Ошибка загрузки"
+                            error = "Ошибка загрузки"
                         )
                     }
                 }
@@ -238,7 +239,7 @@ class PersonalTrainingViewModel @Inject constructor(
                         timeSlots = emptyList(),
                         trainingTypeOptions = emptyList(),
                         trainerNameOptions = emptyList(),
-                        error = e.message ?: "Ошибка загрузки"
+                        error = e.userMessage("Ошибка загрузки")
                     )
                 }
             }
@@ -268,7 +269,7 @@ class PersonalTrainingViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isLoading = false, error = e.message ?: "Ошибка сети")
+                    it.copy(isLoading = false, error = e.userMessage("Ошибка сети"))
                 }
             }
         }

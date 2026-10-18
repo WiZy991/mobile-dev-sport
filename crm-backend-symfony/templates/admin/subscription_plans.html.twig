@@ -149,6 +149,10 @@
                                     <label class="form-label small text-secondary mb-0">Описание</label>
                                     <input type="text" name="description" class="form-control form-control-sm" value="{{ plan.description ?? '' }}" placeholder="Необязательно">
                                 </div>
+                                <div class="col-12">
+                                    <label class="form-label small text-secondary mb-0">Подробные условия — клиент видит их в приложении под «Подробнее» перед оплатой</label>
+                                    <textarea name="details" class="form-control form-control-sm" rows="4" placeholder="Например: время посещения, какие зоны входят, правила заморозки, возврат, ограничения по возрасту…">{{ plan.details ?? '' }}</textarea>
+                                </div>
                                 <div class="col-md-4">
                                     <div class="form-check mt-1">
                                         <input type="checkbox" name="is_popular" value="1" class="form-check-input" id="plan-popular-{{ plan.id }}" {{ plan.isPopular ? 'checked' : '' }}>

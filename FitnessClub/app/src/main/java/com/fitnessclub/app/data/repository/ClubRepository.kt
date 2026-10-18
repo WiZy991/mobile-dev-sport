@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.BuildConfig
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.ClubInfo
 import com.fitnessclub.app.data.api.FitnessApi
@@ -25,10 +26,10 @@ class ClubRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {
-                ApiResult.Error(response.message() ?: "Ошибка загрузки информации", response.code())
+                ApiResult.Error("Ошибка загрузки информации", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 
@@ -38,10 +39,10 @@ class ClubRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {
-                ApiResult.Error(response.message() ?: "Ошибка загрузки", response.code())
+                ApiResult.Error("Ошибка загрузки", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 
@@ -51,10 +52,10 @@ class ClubRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {
-                ApiResult.Error(response.message() ?: "Ошибка загрузки", response.code())
+                ApiResult.Error("Ошибка загрузки", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 

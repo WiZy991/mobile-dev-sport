@@ -30,6 +30,28 @@
 -keepclassmembers class com.fitnessclub.app.data.repository.** {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+# Дневник тренировок лежит на телефоне JSON-ом с именами полей без @SerializedName:
+# переименование полей R8 = старые записи не читаются и затираются.
+-keep class com.fitnessclub.app.data.local.DiaryExercise { <fields>; <init>(...); }
+-keep class com.fitnessclub.app.data.local.TrainingDiaryEntry { <fields>; <init>(...); }
+-keepclassmembers class com.fitnessclub.app.ui.** {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+# Gson TypeToken (R8 full mode срезает generic-сигнатуру анонимного подкласса)
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep,allowobfuscation class * extends com.google.gson.reflect.TypeToken
+
+# Retrofit 2.9 + suspend + R8 full mode (правила из retrofit2.pro 2.11)
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
+-if interface * { @retrofit2.http.* <methods>; }
+-keep,allowobfuscation interface <1>
+-if interface * { @retrofit2.http.* <methods>; }
+-keep,allowobfuscation interface * extends <1>
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+-if interface * { @retrofit2.http.* public *** *(...); }
+-keep,allowoptimization,allowshrinking,allowobfuscation class <3>
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
 
 # ——— Hilt / Dagger (правила из библиотеки; Application нужен multidex) ———
 -keep class com.fitnessclub.app.FitnessClubApp { *; }

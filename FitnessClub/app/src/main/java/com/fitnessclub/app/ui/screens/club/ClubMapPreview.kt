@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.club
 
 import android.Manifest
+import com.fitnessclub.app.data.api.userMessage
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -204,7 +205,7 @@ fun ClubMapPreview(
                     drawRoute(map, from, data.points, data.distanceKm, data.durationMin)
                 },
                 onFailure = { e ->
-                    statusText = e.message ?: "Не удалось построить маршрут"
+                    statusText = e.userMessage("Не удалось построить маршрут")
                     Toast.makeText(context, statusText, Toast.LENGTH_SHORT).show()
                 },
             )

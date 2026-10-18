@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.AccessStatus
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.FitnessApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,10 +33,10 @@ class AccessRepository @Inject constructor(
                 lastFetchAtMs = System.currentTimeMillis()
                 ApiResult.Success(status)
             } else {
-                ApiResult.Error(response.message() ?: "Ошибка загрузки статуса", response.code())
+                ApiResult.Error("Ошибка загрузки статуса", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Неизвестная ошибка")
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
         }
     }
 

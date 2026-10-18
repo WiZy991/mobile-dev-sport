@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.model.Booking
 import com.fitnessclub.app.data.model.Training
@@ -21,10 +22,10 @@ class TrainingRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка загрузки расписания", response.code()))
+                emit(ApiResult.Error("Ошибка загрузки расписания", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
     
@@ -35,10 +36,10 @@ class TrainingRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка загрузки тренировки", response.code()))
+                emit(ApiResult.Error("Ошибка загрузки тренировки", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
     
@@ -49,10 +50,10 @@ class TrainingRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка загрузки записей", response.code()))
+                emit(ApiResult.Error("Ошибка загрузки записей", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
     
@@ -63,10 +64,10 @@ class TrainingRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка записи", response.code()))
+                emit(ApiResult.Error("Ошибка записи", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
     
@@ -77,10 +78,10 @@ class TrainingRepository @Inject constructor(
             if (response.isSuccessful) {
                 emit(ApiResult.Success(Unit))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка отмены записи", response.code()))
+                emit(ApiResult.Error("Ошибка отмены записи", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
     
@@ -91,10 +92,10 @@ class TrainingRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 emit(ApiResult.Success(response.body()!!))
             } else {
-                emit(ApiResult.Error(response.message() ?: "Ошибка", response.code()))
+                emit(ApiResult.Error("Ошибка", response.code()))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.message ?: "Неизвестная ошибка"))
+            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
         }
     }
 }

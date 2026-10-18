@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.trainers
 
 import androidx.lifecycle.SavedStateHandle
+import com.fitnessclub.app.data.api.userMessage
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.FitnessApi
@@ -42,18 +43,16 @@ class TrainerDetailsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val res = fitnessApi.getTrainerDetails(trainerId)
+            val res = try {
+                fitnessApi.getTrainerDetails(trainerId)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.userMessage("Не удалось загрузить")) }
+                return@launch
+            }
             if (res.isSuccessful && res.body() != null) {
                 _uiState.update { it.copy(isLoading = false, trainer = res.body()) }
             } else {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = res.errorBody()?.string()?.take(200)
-                            ?: res.message()
-                            ?: "Не удалось загрузить",
-                    )
-                }
+                _uiState.update { it.copy(isLoading = false, error = "Не удалось загрузить данные тренера") }
             }
         }
     }

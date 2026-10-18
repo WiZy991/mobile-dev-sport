@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.subscriptions
 
 import androidx.lifecycle.ViewModel
+import com.fitnessclub.app.data.api.userMessage
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.SubscriptionPlan
@@ -123,7 +124,7 @@ class SubscriptionPlansViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = e.message ?: "Ошибка загрузки",
+                        error = e.userMessage("Ошибка загрузки"),
                         plans = emptyList()
                     )
                 }

@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.documents
 
 import androidx.lifecycle.ViewModel
+import com.fitnessclub.app.data.api.userMessage
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.ApiDocument
 import com.fitnessclub.app.data.api.FitnessApi
@@ -53,7 +54,7 @@ class DocumentsViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isLoading = false, error = e.message ?: "Ошибка сети")
+                    it.copy(isLoading = false, error = e.userMessage("Ошибка сети"))
                 }
             }
         }
@@ -88,7 +89,7 @@ class DocumentsViewModel @Inject constructor(
                     onError(err)
                 }
             } catch (e: Exception) {
-                val err = e.message ?: "Ошибка"
+                val err = e.userMessage("Не удалось открыть документ")
                 _uiState.update { it.copy(isUploading = false, error = err) }
                 onError(err)
             }

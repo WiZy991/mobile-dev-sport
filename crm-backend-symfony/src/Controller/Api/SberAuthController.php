@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Service\Admin\SberIdOAuthService;
 use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\Api\SberIdProfileApplicator;
+use App\Service\Auth\PhoneNormalizer;
 use App\Service\Api\SberIdTokenValidator;
 use App\Service\Api\SberIdUserinfoJsonLogger;
 use App\Service\Api\SberMobileAuthService;
@@ -569,7 +570,7 @@ HTML;
             ->select('u')
             ->from(User::class, 'u')
             ->where('u.phone LIKE :tail')
-            ->setParameter('tail', '%' . $last10)
+            ->setParameter('tail', PhoneNormalizer::looseLikePattern($last10))
             ->setMaxResults(50)
             ->getQuery()
             ->getResult();

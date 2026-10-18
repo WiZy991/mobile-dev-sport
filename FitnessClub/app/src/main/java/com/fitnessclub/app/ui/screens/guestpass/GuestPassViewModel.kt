@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.guestpass
 
 import androidx.lifecycle.ViewModel
+import com.fitnessclub.app.data.api.userMessage
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.api.GuestPass
@@ -46,7 +47,7 @@ class GuestPassViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isLoading = false, error = e.message ?: "Ошибка сети")
+                    it.copy(isLoading = false, error = e.userMessage("Ошибка сети"))
                 }
             }
         }
@@ -66,7 +67,7 @@ class GuestPassViewModel @Inject constructor(
                     onError(err)
                 }
             } catch (e: Exception) {
-                val err = e.message ?: "Ошибка"
+                val err = e.userMessage("Не удалось выполнить действие")
                 _uiState.update { it.copy(error = err) }
                 onError(err)
             }

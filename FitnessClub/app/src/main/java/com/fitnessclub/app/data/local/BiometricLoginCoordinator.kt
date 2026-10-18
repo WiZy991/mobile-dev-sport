@@ -4,6 +4,7 @@ import android.security.keystore.KeyPermanentlyInvalidatedException
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.fitnessclub.app.data.api.userMessage
 
 /**
  * Показ [BiometricPrompt] с [androidx.biometric.BiometricPrompt.CryptoObject] для шифрования/расшифровки refresh-токена.
@@ -20,7 +21,7 @@ object BiometricLoginCoordinator {
         val cipher = try {
             store.prepareEncryptCipher()
         } catch (e: Exception) {
-            onDone(false, e.message ?: "Ошибка подготовки ключей")
+            onDone(false, e.userMessage("Не удалось включить вход по отпечатку"))
             return
         }
         val executor = ContextCompat.getMainExecutor(activity)
@@ -40,7 +41,7 @@ object BiometricLoginCoordinator {
                         onDone(true, null)
                     } catch (e: Exception) {
                         store.clear()
-                        onDone(false, e.message ?: "Ошибка сохранения")
+                        onDone(false, e.userMessage("Не удалось сохранить вход по отпечатку"))
                     }
                 }
 
@@ -87,13 +88,13 @@ object BiometricLoginCoordinator {
             )
             return
         } catch (e: Exception) {
-            onDone(null, e.message ?: "Нет сохранённого входа", true)
+            onDone(null, e.userMessage("Нет сохранённого входа"), true)
             return
         }
         val ct = try {
             store.loadCipherTextBytes()
         } catch (e: Exception) {
-            onDone(null, e.message, true)
+            onDone(null, e.userMessage("Нет сохранённого входа"), true)
             return
         }
         val executor = ContextCompat.getMainExecutor(activity)
@@ -111,7 +112,7 @@ object BiometricLoginCoordinator {
                         val plain = c.doFinal(ct)
                         onDone(String(plain, Charsets.UTF_8), null, false)
                     } catch (e: Exception) {
-                        onDone(null, e.message ?: "Ошибка расшифровки", true)
+                        onDone(null, e.userMessage("Не удалось войти по отпечатку. Войдите по коду из SMS."), true)
                     }
                 }
 

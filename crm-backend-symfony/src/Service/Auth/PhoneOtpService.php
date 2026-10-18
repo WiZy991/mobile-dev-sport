@@ -180,6 +180,27 @@ final class PhoneOtpService
         ];
     }
 
+    /** Телефон, подтверждённый по SMS, для ещё не использованного билета регистрации. */
+    public function peekRegistrationTicketPhone(string $ticket): ?string
+    {
+        $ticket = trim($ticket);
+        if ($ticket === '') {
+            return null;
+        }
+        $challenge = $this->em->getRepository(PhoneOtpChallenge::class)->findOneBy([
+            'registrationTicket' => $ticket,
+        ]);
+        if (!$challenge instanceof PhoneOtpChallenge) {
+            return null;
+        }
+        $expires = $challenge->getRegistrationTicketExpiresAt();
+        if ($expires === null || $expires <= new \DateTimeImmutable()) {
+            return null;
+        }
+
+        return $challenge->getPhone();
+    }
+
     public function consumeRegistrationTicket(string $ticket): PhoneOtpChallenge
     {
         $ticket = trim($ticket);
@@ -245,7 +266,7 @@ final class PhoneOtpService
             ->from(User::class, 'u')
             ->where('u.phone LIKE :tail')
             ->andWhere('u.isBlocked = false')
-            ->setParameter('tail', '%' . $national)
+            ->setParameter('tail', PhoneNormalizer::looseLikePattern($national))
             ->orderBy('u.id', 'DESC')
             ->setMaxResults(20)
             ->getQuery()

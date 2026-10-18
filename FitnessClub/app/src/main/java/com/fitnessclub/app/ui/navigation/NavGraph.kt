@@ -182,6 +182,12 @@ fun NavGraph(
                     onContinue = {
                         navController.navigate(RegisterRoutes.FORM)
                     },
+                    onLoggedIn = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
             composable(RegisterRoutes.SURVEY) {

@@ -237,13 +237,20 @@ data class OtpChannelStatus(
 
 data class CheckEmailRequest(
     @SerializedName("email") val email: String,
+    @SerializedName("otp_ticket") val otpTicket: String? = null,
 )
 
 data class CheckEmailResponse(
     @SerializedName("exists") val exists: Boolean = false,
     @SerializedName("masked_phone") val maskedPhone: String? = null,
     @SerializedName("message") val message: String? = null,
-)
+    /** Почта и подтверждённый по SMS номер принадлежат одному аккаунту — сервер сразу выдаёт вход. */
+    @SerializedName("token") val token: String? = null,
+    @SerializedName("refresh_token") val refreshToken: String? = null,
+    @SerializedName("user") val user: User? = null,
+) {
+    val loggedIn: Boolean get() = !token.isNullOrBlank() && !refreshToken.isNullOrBlank() && user != null
+}
 
 data class EmailResendResponse(
     @SerializedName("ok") val ok: Boolean = false,

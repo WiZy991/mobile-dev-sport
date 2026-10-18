@@ -270,12 +270,16 @@ class SubscriptionController extends AbstractController
 
         $freezePolicy = $this->freezePolicy;
         $quoteService = $this->quoteService;
-        $data = array_map(static function (SubscriptionPlan $p) use ($freezePolicy, $quoteService, $user) {
+        // Абонемент действует только в клубе покупки — это выбранный клиентом зал.
+        $clubName = $user?->getClub()?->getName();
+        $data = array_map(static function (SubscriptionPlan $p) use ($freezePolicy, $quoteService, $user, $clubName) {
             $quote = $quoteService->quote($p, '', false, $user);
             $row = [
                 'id' => 'plan-' . $p->getId(),
                 'name' => $p->getName(),
                 'description' => $p->getDescription(),
+                'details' => $p->getDetails(),
+                'club_name' => $clubName,
                 'price' => $quote->finalPrice,
                 'duration_days' => $p->getDurationDays(),
                 'visits_count' => $p->getVisitsCount(),

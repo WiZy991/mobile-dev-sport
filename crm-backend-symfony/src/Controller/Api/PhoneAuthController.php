@@ -106,6 +106,18 @@ class PhoneAuthController extends AbstractController
             return $this->json(['exists' => false]);
         }
 
+        // Номер подтверждён по SMS и совпадает с номером в аккаунте — это вход, а не регистрация.
+        $ticket = trim((string) ($data['otp_ticket'] ?? ''));
+        $verifiedPhone = $ticket !== '' ? $this->otp->peekRegistrationTicketPhone($ticket) : null;
+        if ($verifiedPhone !== null
+            && !$existing->isBlocked()
+            && PhoneNormalizer::national10($existing->getPhone()) === PhoneNormalizer::national10($verifiedPhone)
+        ) {
+            $this->otp->consumeRegistrationTicket($ticket);
+
+            return $this->json(['exists' => true] + $this->mobileTokens->issue($existing, true));
+        }
+
         return $this->json([
             'exists' => true,
             'masked_phone' => PhoneNormalizer::mask($existing->getPhone()),

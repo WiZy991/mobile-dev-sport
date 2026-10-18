@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.help
 
 import androidx.lifecycle.ViewModel
+import com.fitnessclub.app.data.api.userMessage
 import androidx.lifecycle.viewModelScope
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.api.SupportTicketItem
@@ -110,7 +111,7 @@ class HelpViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoadingTickets = false,
-                        ticketsError = e.message ?: "Ошибка сети",
+                        ticketsError = e.userMessage("Ошибка сети"),
                     )
                 }
             }
@@ -202,7 +203,7 @@ class HelpViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isSubmitting = false, errorMessage = e.message ?: "Ошибка сети")
+                    it.copy(isSubmitting = false, errorMessage = e.userMessage("Ошибка сети"))
                 }
             }
         }

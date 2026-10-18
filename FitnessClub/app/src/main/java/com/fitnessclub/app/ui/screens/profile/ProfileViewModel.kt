@@ -196,7 +196,7 @@ data class ProfileUiState(
     val user: User? = null,
     /** Адрес клуба без города — над ФИО. */
     val clubAddressLine: String? = null,
-    /** Выбранный зал — абонементы в профиле фильтруются по нему. */
+    /** Выбранный зал — его активный абонемент показывается первым. */
     val preferredClubId: Int? = null,
     val subscriptions: List<Subscription> = emptyList(),
     val isLoadingSubscriptions: Boolean = false,

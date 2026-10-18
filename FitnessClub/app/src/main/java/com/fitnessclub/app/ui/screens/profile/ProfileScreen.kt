@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.data.api.Achievement
@@ -49,25 +50,21 @@ fun ProfileScreen(
     var showBonusComingSoonDialog by remember { mutableStateOf(false) }
     var freezeTarget by remember { mutableStateOf<Subscription?>(null) }
     var showSubscriptionHistory by remember { mutableStateOf(false) }
+    var showAllActive by remember { mutableStateOf(false) }
 
+    // В профиле — абонементы всех клубов; первым идёт абонемент выбранного зала.
     val preferredClubId = uiState.preferredClubId ?: uiState.user?.clubId
-    val clubSubscriptions = remember(uiState.subscriptions, preferredClubId) {
-        uiState.subscriptions.filter { sub ->
-            when {
-                preferredClubId == null || preferredClubId <= 0 -> true
-                sub.clubId != null && sub.clubId > 0 -> sub.clubId == preferredClubId
-                // null club_id = legacy «любой зал»; после backfill с платежа станет привязан.
-                else -> true
-            }
-        }
-    }
     val todayIso = remember { java.time.LocalDate.now().toString() }
-    val activeSubscriptions = remember(clubSubscriptions, todayIso) {
-        clubSubscriptions.filter { it.isCurrentOn(todayIso) }
+    val activeSubscriptions = remember(uiState.subscriptions, preferredClubId, todayIso) {
+        uiState.subscriptions
+            .filter { it.isCurrentOn(todayIso) }
+            .sortedByDescending { preferredClubId != null && preferredClubId > 0 && it.clubId == preferredClubId }
     }
-    val archivedSubscriptions = remember(clubSubscriptions, todayIso) {
-        clubSubscriptions.filterNot { it.isCurrentOn(todayIso) }
+    val archivedSubscriptions = remember(uiState.subscriptions, todayIso) {
+        uiState.subscriptions.filterNot { it.isCurrentOn(todayIso) }
     }
+    val visibleActive = if (showAllActive) activeSubscriptions else activeSubscriptions.take(1)
+    val hiddenActiveCount = activeSubscriptions.size - 1
     
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -177,15 +174,12 @@ fun ProfileScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 8.dp)
                     )
-                    val hallHint = uiState.clubAddressLine
-                    if (!hallHint.isNullOrBlank()) {
-                        Text(
-                            text = "Только для: $hallHint",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
+                    Text(
+                        text = "Абонемент действует в том клубе, где куплен — он указан в карточке",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
 
                 if (uiState.isLoadingSubscriptions && activeSubscriptions.isEmpty() && archivedSubscriptions.isEmpty()) {
@@ -207,12 +201,29 @@ fun ProfileScreen(
                     }
                 } else {
                     if (activeSubscriptions.isNotEmpty()) {
-                        items(activeSubscriptions, key = { it.id }) { subscription ->
+                        items(visibleActive, key = { it.id }) { subscription ->
                             SubscriptionCard(
                                 subscription = subscription,
                                 onFreezeClick = { freezeTarget = subscription },
                                 onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
                             )
+                        }
+                        if (hiddenActiveCount > 0) {
+                            item {
+                                TextButton(
+                                    onClick = { showAllActive = !showAllActive },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        if (showAllActive) {
+                                            "Свернуть другие активные абонементы"
+                                        } else {
+                                            "У вас есть и другие активные абонементы ($hiddenActiveCount) — посмотреть все"
+                                        },
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
                         }
                     } else if (!uiState.isLoadingSubscriptions) {
                         item {

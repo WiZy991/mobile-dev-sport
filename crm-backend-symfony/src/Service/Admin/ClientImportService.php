@@ -6,6 +6,7 @@ use App\Entity\Booking;
 use App\Entity\Club;
 use App\Entity\Subscription;
 use App\Entity\SubscriptionPlan;
+use App\Service\Auth\PhoneNormalizer;
 use App\Entity\Training;
 use App\Entity\User;
 use App\Service\Api\SubscriptionFreezePolicy;
@@ -1479,7 +1480,7 @@ final class ClientImportService
             ->select('u')
             ->from(User::class, 'u')
             ->where('u.phone LIKE :tail')
-            ->setParameter('tail', '%' . $last10)
+            ->setParameter('tail', PhoneNormalizer::looseLikePattern($last10))
             ->setMaxResults(20)
             ->getQuery()
             ->getResult();

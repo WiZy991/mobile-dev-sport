@@ -22,6 +22,10 @@ class SubscriptionPlan implements TenantAware
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    /** Полные условия тарифа — в приложении под «Подробнее» перед оплатой. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $details = null;
+
     #[ORM\Column(type: 'float')]
     private float $price;
 
@@ -61,6 +65,17 @@ class SubscriptionPlan implements TenantAware
     public function setDescription(?string $description): self
     {
         $this->description = $description;
+        return $this;
+    }
+
+    public function getDetails(): ?string
+    {
+        return $this->details;
+    }
+
+    public function setDetails(?string $details): self
+    {
+        $this->details = $details;
         return $this;
     }
 

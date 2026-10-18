@@ -1,6 +1,7 @@
 package com.fitnessclub.app.ui.screens.settings
 
 import android.content.Context
+import com.fitnessclub.app.data.api.userMessage
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -183,8 +184,8 @@ class SettingsViewModel @Inject constructor(
                     onError("Ошибка отправки")
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(feedbackError = e.message) }
-                onError(e.message ?: "Ошибка сети")
+                _uiState.update { it.copy(feedbackError = e.userMessage("Ошибка сети")) }
+                onError(e.userMessage("Ошибка сети"))
             }
         }
     }

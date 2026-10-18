@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiNotification
+import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.api.FitnessApi
 import kotlinx.coroutines.flow.Flow
@@ -27,12 +28,12 @@ class NotificationRepository @Inject constructor(
                 ApiResult.Success(response.body() ?: emptyList())
             } else {
                 ApiResult.Error(
-                    message = response.message().ifBlank { "Не удалось загрузить уведомления" },
+                    message = "Не удалось загрузить уведомления",
                     code = response.code(),
                 )
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Не удалось загрузить уведомления")
+            ApiResult.Error(e.userMessage("Не удалось загрузить уведомления"))
         }
     }
 
@@ -43,12 +44,12 @@ class NotificationRepository @Inject constructor(
                 ApiResult.Success(Unit)
             } else {
                 ApiResult.Error(
-                    message = response.message().ifBlank { "Не удалось отметить уведомление" },
+                    message = "Не удалось отметить уведомление",
                     code = response.code(),
                 )
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Не удалось отметить уведомление")
+            ApiResult.Error(e.userMessage("Не удалось отметить уведомление"))
         }
     }
 
@@ -59,12 +60,12 @@ class NotificationRepository @Inject constructor(
                 ApiResult.Success(Unit)
             } else {
                 ApiResult.Error(
-                    message = response.message().ifBlank { "Не удалось отметить уведомления" },
+                    message = "Не удалось отметить уведомления",
                     code = response.code(),
                 )
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Не удалось отметить уведомления")
+            ApiResult.Error(e.userMessage("Не удалось отметить уведомления"))
         }
     }
 }

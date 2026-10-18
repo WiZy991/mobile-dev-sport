@@ -2684,10 +2684,12 @@ class AdminController extends AbstractController
         }
 
         $description = trim((string) $request->request->get('description', ''));
+        $details = trim((string) $request->request->get('details', ''));
 
         $plan
             ->setName($name)
             ->setDescription($description !== '' ? $description : null)
+            ->setDetails($details !== '' ? $details : null)
             ->setPrice((float) $request->request->get('price'))
             ->setType($type)
             ->setDurationDays($durationDays)
