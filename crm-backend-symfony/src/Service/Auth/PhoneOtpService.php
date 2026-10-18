@@ -113,7 +113,8 @@ final class PhoneOtpService
         if ($delivery->deeplink !== null) {
             $payload['deeplink'] = $delivery->deeplink;
         }
-        if ($this->debug) {
+        // Код в ответе — только при локальной разработке без SMS-провайдера: иначе вход без доступа к телефону.
+        if ($this->debug && !$configured) {
             $payload['dev_code'] = $code;
         }
 

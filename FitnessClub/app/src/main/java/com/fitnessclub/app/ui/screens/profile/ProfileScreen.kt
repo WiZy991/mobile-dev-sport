@@ -48,7 +48,6 @@ fun ProfileScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showBonusComingSoonDialog by remember { mutableStateOf(false) }
     var freezeTarget by remember { mutableStateOf<Subscription?>(null) }
-    var cancelTarget by remember { mutableStateOf<Subscription?>(null) }
     var showSubscriptionHistory by remember { mutableStateOf(false) }
 
     val preferredClubId = uiState.preferredClubId ?: uiState.user?.clubId
@@ -213,7 +212,6 @@ fun ProfileScreen(
                                 subscription = subscription,
                                 onFreezeClick = { freezeTarget = subscription },
                                 onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
-                                onCancelClick = { cancelTarget = subscription },
                             )
                         }
                     } else if (!uiState.isLoadingSubscriptions) {
@@ -258,7 +256,6 @@ fun ProfileScreen(
                                 subscription = subscription,
                                 onFreezeClick = { freezeTarget = subscription },
                                 onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
-                                onCancelClick = { cancelTarget = subscription },
                             )
                         }
                     }
@@ -343,29 +340,6 @@ fun ProfileScreen(
             onConfirm = { days ->
                 viewModel.freezeSubscription(subscription.id, days)
                 freezeTarget = null
-            }
-        )
-    }
-
-    cancelTarget?.let { subscription ->
-        AlertDialog(
-            onDismissRequest = { cancelTarget = null },
-            title = { Text("Отменить абонемент?") },
-            text = { Text("Доступ в клуб по этому абонементу будет закрыт. Отменить можно только активный или замороженный абонемент.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.cancelSubscription(subscription.id)
-                        cancelTarget = null
-                    }
-                ) {
-                    Text("Отменить", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { cancelTarget = null }) {
-                    Text("Назад")
-                }
             }
         )
     }
@@ -674,7 +648,6 @@ private fun SubscriptionCard(
     subscription: Subscription,
     onFreezeClick: () -> Unit,
     onUnfreezeClick: () -> Unit,
-    onCancelClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -815,20 +788,6 @@ private fun SubscriptionCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Разморозить")
-                }
-            }
-
-            val visitsLeft = subscription.visitsLeft
-            if (
-                (subscription.status == SubscriptionStatus.ACTIVE || subscription.status == SubscriptionStatus.FROZEN)
-                && (visitsLeft == null || visitsLeft > 0)
-            ) {
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(
-                    onClick = onCancelClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Отменить абонемент", color = MaterialTheme.colorScheme.error)
                 }
             }
         }
