@@ -21,7 +21,6 @@ struct LoginView: View {
     @State private var otpCode = ""
     @State private var otpError: String?
     @State private var otpInstruction: String?
-    @State private var otpDevCode: String?
     @State private var resendSecondsLeft = 0
     @State private var isVerifyingOtp = false
     @State private var showEmailLogin = false
@@ -204,12 +203,6 @@ struct LoginView: View {
                     .multilineTextAlignment(.center)
                     .padding(.top, 6)
             }
-            if let otpDevCode {
-                Text("Debug: \(otpDevCode)")
-                    .font(FCTypography.labelSmall())
-                    .foregroundStyle(surface.opacity(0.7))
-            }
-
             loginOtpField
                 .padding(.top, 12)
 
@@ -439,7 +432,6 @@ struct LoginView: View {
             otpPhoneE164 = phone
             otpStep = .code
             otpInstruction = res.instruction ?? "Код отправлен в SMS на ваш номер телефона"
-            otpDevCode = res.devCode
             resendSecondsLeft = max(20, res.resendAfterSec)
             otpCode = ""
             otpError = nil

@@ -24,9 +24,8 @@ struct BrandHeader: View {
                 HStack(spacing: 10) {
                     Image("BrandLogo")
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
                         .frame(width: logoSize, height: logoSize)
-                        .clipShape(Circle())
                     Text(title)
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(textColor)

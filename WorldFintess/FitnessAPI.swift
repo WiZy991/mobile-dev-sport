@@ -594,8 +594,8 @@ final class FitnessAPI: @unchecked Sendable {
         return try decoder.decode(AuthResponse.self, from: data)
     }
 
-    func checkRegisterEmail(_ email: String) async throws -> CheckEmailResponse {
-        let body = try encoder.encode(CheckEmailRequest(email: email))
+    func checkRegisterEmail(_ email: String, otpTicket: String? = nil) async throws -> CheckEmailResponse {
+        let body = try encoder.encode(CheckEmailRequest(email: email, otpTicket: otpTicket))
         let data = try await self.data(method: "POST", path: "auth/register/check-email", body: body, authenticated: false)
         return try decoder.decode(CheckEmailResponse.self, from: data)
     }

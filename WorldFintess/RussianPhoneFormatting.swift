@@ -12,26 +12,27 @@ func normalizeRussianNationalDigits(_ input: String) -> String {
     return String(d.prefix(10))
 }
 
-/// Вид номера для поля: `+7 (XXX) XXX-XX-XX` (в состоянии — только 10 национальных цифр).
+/// Вид номера для поля: `+7 900 000 00 00` (в состоянии — только 10 национальных цифр).
+/// Без скобок: на Android скобки = необязательный код города.
 func formatRussianPhoneMask(_ national10: String) -> String {
     let d = String(national10.filter(\.isNumber).prefix(10))
-    if d.isEmpty { return "+7 (" }
+    if d.isEmpty { return "+7 " }
 
-    var sb = "+7 ("
+    var sb = "+7 "
     sb += String(d.prefix(3))
     if d.count < 3 { return sb }
 
-    sb += ") "
+    sb += " "
     let rest = String(d.dropFirst(3))
     sb += String(rest.prefix(min(3, rest.count)))
 
     if d.count <= 6 { return sb }
-    sb += "-"
+    sb += " "
     let mid = String(d.dropFirst(6))
     sb += String(mid.prefix(min(2, mid.count)))
 
     if d.count <= 8 { return sb }
-    sb += "-"
+    sb += " "
     sb += String(d.dropFirst(8))
     return sb
 }
@@ -42,8 +43,8 @@ func phoneForApi(_ national10: String) -> String {
 }
 
 /**
- * Разбор текста из поля с маской `+7 (XXX) XXX-XX-XX`.
- * Backspace по скобке/пробелу снимает последнюю цифру (`PhoneRuMask.kt`).
+ * Разбор текста из поля с маской `+7 900 000 00 00`.
+ * Backspace по пробелу снимает последнюю цифру (`PhoneRuMask.kt`).
  */
 func nationalDigitsFromPhoneField(_ raw: String, previousNational: String) -> String {
     let prevFormatted = formatRussianPhoneMask(previousNational)
@@ -59,7 +60,7 @@ func nationalDigitsFromPhoneField(_ raw: String, previousNational: String) -> St
 
 // MARK: - UIKit field (SwiftUI TextField часто «съедает» маску)
 
-/// Поле телефона с маской `+7 (XXX) XXX-XX-XX`, курсор всегда в конце (как `russianPhoneFieldValue`).
+/// Поле телефона с маской `+7 900 000 00 00`, курсор всегда в конце.
 struct RussianPhoneTextField: UIViewRepresentable {
     @Binding var nationalDigits: String
     var textColor: UIColor
@@ -79,28 +80,24 @@ struct RussianPhoneTextField: UIViewRepresentable {
         tf.borderStyle = .none
         tf.delegate = context.coordinator
         tf.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged(_:)), for: .editingChanged)
-        tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        tf.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        tf.font = font
+        tf.textColor = textColor
+        tf.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: textColor.withAlphaComponent(0.45)]
+        )
+        tf.returnKeyType = .done
+        tf.text = formatRussianPhoneMask(nationalDigits)
         return tf
     }
 
     func updateUIView(_ uiView: UITextField, context: Context) {
         context.coordinator.parent = self
-        uiView.textColor = textColor
         uiView.font = font
-        uiView.attributedPlaceholder = NSAttributedString(
-            string: placeholder,
-            attributes: [.foregroundColor: textColor.withAlphaComponent(0.45)]
-        )
-
+        uiView.textColor = textColor
         let formatted = formatRussianPhoneMask(nationalDigits)
         if uiView.text != formatted {
             uiView.text = formatted
-            // Курсор в конец только когда сами обновили текст из binding.
-            if uiView.isFirstResponder {
-                let end = uiView.endOfDocument
-                uiView.selectedTextRange = uiView.textRange(from: end, to: end)
-            }
         }
     }
 
@@ -112,43 +109,19 @@ struct RussianPhoneTextField: UIViewRepresentable {
         }
 
         @objc func editingChanged(_ tf: UITextField) {
-            apply(from: tf)
-        }
-
-        func textField(
-            _ textField: UITextField,
-            shouldChangeCharactersIn range: NSRange,
-            replacementString string: String
-        ) -> Bool {
-            // Собираем итоговую строку сами — UITextField иначе может временно показать «сырые» цифры.
-            let current = textField.text ?? ""
-            guard let range = Range(range, in: current) else { return false }
-            let next = current.replacingCharacters(in: range, with: string)
-            let digits = nationalDigitsFromPhoneField(next, previousNational: parent.nationalDigits)
+            let raw = tf.text ?? ""
+            let prev = parent.nationalDigits
+            let digits = nationalDigitsFromPhoneField(raw, previousNational: prev)
             parent.nationalDigits = digits
             let formatted = formatRussianPhoneMask(digits)
-            textField.text = formatted
-            let end = textField.endOfDocument
-            textField.selectedTextRange = textField.textRange(from: end, to: end)
-            return false
+            if tf.text != formatted {
+                tf.text = formatted
+            }
         }
 
         func textFieldShouldReturn(_ textField: UITextField) -> Bool {
             parent.onSubmit?()
             return true
-        }
-
-        private func apply(from tf: UITextField) {
-            let digits = nationalDigitsFromPhoneField(tf.text ?? "", previousNational: parent.nationalDigits)
-            if digits != parent.nationalDigits {
-                parent.nationalDigits = digits
-            }
-            let formatted = formatRussianPhoneMask(digits)
-            if tf.text != formatted {
-                tf.text = formatted
-                let end = tf.endOfDocument
-                tf.selectedTextRange = tf.textRange(from: end, to: end)
-            }
         }
     }
 }

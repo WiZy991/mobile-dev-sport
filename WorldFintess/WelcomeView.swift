@@ -108,17 +108,17 @@ struct WelcomeView: View {
     }
 
     private var welcomeLegalText: some View {
-        let privacy = "legalpdf://\(LegalPdfAsset.privacyPolicy.rawValue)"
         let ua = "legalpdf://\(LegalPdfAsset.userAgreement.rawValue)"
+        // Как Android `welcomePrivacyAsset()`: для Доброзала — клубная политика, иначе общая.
+        let privacyAsset = LegalPdfAsset.dobrozalPrivacy
+        let privacy = "legalpdf://\(privacyAsset.rawValue)"
+        let consent = "legalpdf://\(LegalPdfAsset.consentUser.rawValue)"
         let custom = legalText?.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Как на Android Welcome: при custom — две ссылки; в дефолте тоже обе
-        // (пользовательское соглашение + политика), а не одна «политиками и документами».
-        let md: String = {
-            if let custom, !custom.isEmpty {
-                return "\(custom) [Пользовательское соглашение](\(ua)) · [Политика конфиденциальности](\(privacy))"
-            }
-            return "Нажимая «Продолжить», вы соглашаетесь с [пользовательским соглашением](\(ua)) и [политикой конфиденциальности](\(privacy))."
+        let prefix: String = {
+            if let custom, !custom.isEmpty { return "\(custom) " }
+            return "Нажимая «Продолжить», вы соглашаетесь с "
         }()
+        let md = "\(prefix)[пользовательским соглашением](\(ua)), [политикой конфиденциальности](\(privacy)) и [согласием на обработку персональных данных](\(consent))"
         return Text(fcHighlightedLegalLinks(markdown: md, linkColor: .white))
             .font(FCTypography.bodySmall())
             .multilineTextAlignment(.center)

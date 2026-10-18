@@ -188,6 +188,7 @@ final class RegisterFlowModel: ObservableObject {
 
     @Published var emailCheckLoading = false
     @Published var emailTakenMaskedPhone: String?
+    var loggedInFromEmailCheck: AuthResponse?
     @Published var supportEmail: String?
     @Published var supportPhone: String?
     @Published var showUnder18Dialog = false
@@ -253,9 +254,15 @@ final class RegisterFlowModel: ObservableObject {
         emailCheckLoading = true
         emailTakenMaskedPhone = nil
         emailError = nil
+        loggedInFromEmailCheck = nil
         defer { emailCheckLoading = false }
         do {
-            let res = try await api.checkRegisterEmail(trimmed)
+            let res = try await api.checkRegisterEmail(trimmed, otpTicket: AuthFlowStore.peekOtpTicket())
+            if let session = res.existingSession {
+                AuthFlowStore.clearOtpRegistration()
+                loggedInFromEmailCheck = session
+                return true
+            }
             if res.exists {
                 emailTakenMaskedPhone = res.maskedPhone ?? "••••"
                 return false
@@ -658,7 +665,13 @@ struct RegisterFlowView: View {
                     RegisterEmailCheckStepView(
                         model: model,
                         onBack: { dismiss() },
-                        onContinue: { path.append(.form) }
+                        onContinue: {
+                            if let session = model.loggedInFromEmailCheck {
+                                applyExistingLogin(session)
+                            } else {
+                                path.append(.form)
+                            }
+                        }
                     )
                 } else {
                     RegisterSurveyStepView(
@@ -678,7 +691,13 @@ struct RegisterFlowView: View {
                     RegisterEmailCheckStepView(
                         model: model,
                         onBack: { dismiss() },
-                        onContinue: { path.append(.form) }
+                        onContinue: {
+                            if let session = model.loggedInFromEmailCheck {
+                                applyExistingLogin(session)
+                            } else {
+                                path.append(.form)
+                            }
+                        }
                     )
                 case .clubPick:
                     RegisterClubPickStepView(
@@ -750,6 +769,11 @@ struct RegisterFlowView: View {
         app.applyAuth(response, markReturningCustomerOnDevice: false)
         app.markReturningCustomerOnDeviceAfterSuccessfulSignupFlow()
         app.pendingSecuritySetup = true
+        dismiss()
+    }
+
+    private func applyExistingLogin(_ response: AuthResponse) {
+        app.applyAuth(response)
         dismiss()
     }
 }
@@ -1671,7 +1695,7 @@ private struct RegisterFormView: View {
                     nationalDigits: $model.phoneNationalDigits,
                     textColor: UIColor(Theme.loginBackground),
                     font: UIFont.preferredFont(forTextStyle: .body),
-                    placeholder: "+7 (999) 123-45-67"
+                    placeholder: "+7 900 000 00 00"
                 )
                 .frame(maxWidth: .infinity)
                 .frame(height: 22)
@@ -1710,7 +1734,7 @@ private struct RegisterFormView: View {
             TextField(
                 "",
                 text: .constant(formatRussianPhoneMask(model.phoneNationalDigits)),
-                prompt: Text("+7 (999) 123-45-67").foregroundStyle(Theme.loginBackground.opacity(0.45))
+                prompt: Text("+7 900 000 00 00").foregroundStyle(Theme.loginBackground.opacity(0.45))
             )
             .disabled(true)
             .foregroundStyle(Theme.loginBackground.opacity(0.75))

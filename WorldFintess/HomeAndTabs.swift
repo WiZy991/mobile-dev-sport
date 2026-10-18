@@ -1046,7 +1046,6 @@ struct ProfileTabView: View {
     @State private var freezeTarget: Subscription?
     @State private var freezeDaysInput = ""
     @State private var showFreezeDialog = false
-    @State private var cancelTarget: Subscription?
     @State private var showErrorAlert = false
     @State private var showBonusComingSoon = false
     @State private var showSubscriptionHistory = false
@@ -1178,18 +1177,6 @@ struct ProfileTabView: View {
             } else {
                 Text("Укажите количество дней заморозки:")
             }
-        }
-        .alert("Отменить абонемент?", isPresented: Binding(
-            get: { cancelTarget != nil },
-            set: { if !$0 { cancelTarget = nil } }
-        )) {
-            Button("Отменить", role: .destructive) {
-                guard let target = cancelTarget else { return }
-                Task { await cancelSubscription(target.id) }
-            }
-            Button("Назад", role: .cancel) { cancelTarget = nil }
-        } message: {
-            Text("Доступ в клуб по этому абонементу будет закрыт. Отменить можно только активный или замороженный абонемент.")
         }
         .alert("Ошибка", isPresented: $showErrorAlert) {
             Button("OK") { profileError = nil }
@@ -1570,20 +1557,6 @@ struct ProfileTabView: View {
                 }
                 .buttonStyle(.plain)
             }
-            if (s.status == .active || s.status == .frozen) {
-                let canCancelManually = s.visitsLeft.map { $0 > 0 } ?? true
-                if canCancelManually {
-                    Button {
-                        cancelTarget = s
-                    } label: {
-                        Text("Отменить абонемент")
-                            .font(FCTypography.labelLarge())
-                            .foregroundStyle(Theme.error)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
         }
         .padding(16)
         .background(Theme.surface)
@@ -1725,18 +1698,6 @@ struct ProfileTabView: View {
             _ = try await app.api.unfreezeSubscription(id: id)
             await loadSubs(forceRefresh: true)
         } catch {
-            if Task.isCancelled || error.isBenignCancellation { return }
-            profileError = error.localizedDescription
-        }
-    }
-
-    private func cancelSubscription(_ id: String) async {
-        do {
-            _ = try await app.api.cancelSubscription(id: id)
-            cancelTarget = nil
-            await loadSubs(forceRefresh: true)
-        } catch {
-            cancelTarget = nil
             if Task.isCancelled || error.isBenignCancellation { return }
             profileError = error.localizedDescription
         }

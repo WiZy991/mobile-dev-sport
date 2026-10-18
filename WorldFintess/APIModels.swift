@@ -505,18 +505,35 @@ struct OtpChannelStatus: Codable, Sendable {
 
 struct CheckEmailRequest: Codable, Sendable {
     let email: String
+    let otpTicket: String?
 }
 
 struct CheckEmailResponse: Codable, Sendable {
     let exists: Bool
+    let samePhone: Bool
     let maskedPhone: String?
     let message: String?
+    let token: String?
+    let refreshToken: String?
+    let user: User?
+
+    var existingSession: AuthResponse? {
+        guard let user, let token, let refreshToken else { return nil }
+        let t = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        let r = refreshToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, !r.isEmpty else { return nil }
+        return AuthResponse(token: t, refreshToken: r, user: user)
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         exists = try c.decodeIfPresent(Bool.self, forKey: .exists) ?? false
+        samePhone = try c.decodeIfPresent(Bool.self, forKey: .samePhone) ?? false
         maskedPhone = try c.decodeIfPresent(String.self, forKey: .maskedPhone)
         message = try c.decodeIfPresent(String.self, forKey: .message)
+        token = try c.decodeIfPresent(String.self, forKey: .token)
+        refreshToken = try c.decodeIfPresent(String.self, forKey: .refreshToken)
+        user = try c.decodeIfPresent(User.self, forKey: .user)
     }
 }
 
