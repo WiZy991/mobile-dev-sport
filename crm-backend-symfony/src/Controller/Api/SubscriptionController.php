@@ -12,6 +12,7 @@ use App\Service\Api\SberMobileAuthService;
 use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Api\SubscriptionLifecycleService;
+use App\Service\Api\SubscriptionQueueService;
 use App\Service\CurrentUserResolver;
 use App\Service\Notification\ClientNotificationScheduler;
 use App\Service\Payment\SubscriptionPurchaseQuoteService;
@@ -36,6 +37,7 @@ class SubscriptionController extends AbstractController
         private readonly bool $requireSberVerificationBeforePurchase = false,
         private readonly bool $alfaAcquiringEnabled = false,
         private readonly ClientNotificationScheduler $notificationScheduler,
+        private readonly SubscriptionQueueService $queue,
     ) {}
 
     #[Route('', name: 'api_subscriptions_list', methods: ['GET'])]
@@ -123,6 +125,12 @@ class SubscriptionController extends AbstractController
             $this->em->flush();
         }
 
+        // Приложение показывает первым верхний абонемент — действующий важнее ожидающего.
+        usort($subs, static function (Subscription $a, Subscription $b): int {
+            return [SubscriptionQueueService::isWaiting($a), $b->getId()]
+                <=> [SubscriptionQueueService::isWaiting($b), $a->getId()];
+        });
+
         $saleBySubId = [];
         if ($subs !== []) {
             $ids = array_values(array_filter(array_map(
@@ -197,13 +205,21 @@ class SubscriptionController extends AbstractController
         $discountAmount = $quote->discountAmount;
         $promo = $quote->promo;
 
+        $issueClub = $user->getClub();
+        if ($issueClub === null) {
+            $clubRepo = $this->em->getRepository(Club::class);
+            if ((int) $clubRepo->count([]) === 1) {
+                $issueClub = $clubRepo->findOneBy([]);
+            }
+        }
+
         $sub = new Subscription();
         $sub->setUser($user)
             ->setPlan($plan)
             ->setStatus('active')
             ->setVisitsUsed(0);
 
-        $start = new \DateTimeImmutable();
+        $start = $this->queue->startDateFor($user, $issueClub, $plan);
         $sub->setStartDate($start);
 
         if ($plan->getDurationDays()) {
@@ -219,13 +235,6 @@ class SubscriptionController extends AbstractController
             $sub->setPromoCode($promo);
         }
 
-        $issueClub = $user->getClub();
-        if ($issueClub === null) {
-            $clubRepo = $this->em->getRepository(Club::class);
-            if ((int) $clubRepo->count([]) === 1) {
-                $issueClub = $clubRepo->findOneBy([]);
-            }
-        }
         $sub->setClub($issueClub);
 
         $this->em->persist($sub);
@@ -272,7 +281,8 @@ class SubscriptionController extends AbstractController
         $quoteService = $this->quoteService;
         // Абонемент действует только в клубе покупки — это выбранный клиентом зал.
         $clubName = $user?->getClub()?->getName();
-        $data = array_map(static function (SubscriptionPlan $p) use ($freezePolicy, $quoteService, $user, $clubName) {
+        $queue = $this->queue;
+        $data = array_map(static function (SubscriptionPlan $p) use ($freezePolicy, $quoteService, $user, $clubName, $queue) {
             $quote = $quoteService->quote($p, '', false, $user);
             $row = [
                 'id' => 'plan-' . $p->getId(),
@@ -287,6 +297,9 @@ class SubscriptionController extends AbstractController
                 'features' => [], // можно заполнить позже
                 'is_popular' => $p->isPopular(),
                 'freeze_days_total' => $freezePolicy->freezeDaysTotalForPlan($p),
+                'starts_on' => $user !== null
+                    ? $queue->startDateFor($user, $user->getClub(), $p)->format('Y-m-d')
+                    : null,
             ];
             if ($quote->groupDiscountPercent !== null && $quote->discountAmount > 0) {
                 $row['original_price'] = $quote->originalPrice;
@@ -460,7 +473,7 @@ class SubscriptionController extends AbstractController
             'type' => $plan->getType(),
             'start_date' => $s->getStartDate()->format('Y-m-d'),
             'end_date' => $s->getEndDate()?->format('Y-m-d'),
-            'status' => $s->getStatus(),
+            'status' => SubscriptionQueueService::isWaiting($s) ? 'pending' : $s->getStatus(),
             'visits_total' => $s->getVisitsTotal(),
             'visits_used' => $s->getVisitsUsed() ?? 0,
             'freeze_days_total' => $this->freezeService->effectiveFreezeDaysTotal($s),

@@ -68,10 +68,29 @@ fun SubscriptionPurchaseConfirmDialog(
                 plan.clubName?.takeIf { it.isNotBlank() }?.let {
                     PlanFact("Клуб", it)
                 }
+                val today = LocalDate.now()
+                val start = plan.startsOn
+                    ?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
+                    ?.takeIf { it.isAfter(today) }
+                val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy")
                 if (plan.safeDurationDays > 0) {
-                    val until = LocalDate.now().plusDays(plan.safeDurationDays.toLong())
-                        .format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                    PlanFact("Срок", "${plan.safeDurationDays} дн. — при покупке сегодня до $until")
+                    val until = (start ?: today).plusDays(plan.safeDurationDays.toLong()).format(dateFmt)
+                    PlanFact(
+                        "Срок",
+                        if (start != null) {
+                            "${plan.safeDurationDays} дн. — с ${start.format(dateFmt)} по $until"
+                        } else {
+                            "${plan.safeDurationDays} дн. — при покупке сегодня до $until"
+                        },
+                    )
+                }
+                if (start != null) {
+                    Text(
+                        text = "У вас есть действующий абонемент — новый начнёт действовать после его окончания.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    )
                 }
                 PlanFact(
                     "Посещения",

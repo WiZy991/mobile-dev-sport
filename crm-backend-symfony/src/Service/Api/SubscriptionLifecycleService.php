@@ -12,6 +12,7 @@ final class SubscriptionLifecycleService
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly SubscriptionQueueService $queue,
     ) {
     }
 
@@ -48,8 +49,12 @@ final class SubscriptionLifecycleService
             return 'Продлить можно только активный или замороженный абонемент';
         }
 
-        $base = $subscription->getEndDate() ?? new \DateTimeImmutable('today');
+        $previousEnd = $subscription->getEndDate();
+        $base = $previousEnd ?? new \DateTimeImmutable('today');
         $subscription->setEndDate($base->modify('+' . $days . ' days'));
+        if ($previousEnd !== null && !SubscriptionQueueService::isWaiting($subscription)) {
+            $this->queue->shiftAfter($subscription, $previousEnd, $days);
+        }
         if ($subscription->getStatus() === 'expired' && $subscription->isEffectiveActiveOn(new \DateTimeImmutable('today'))) {
             $subscription->setStatus('active');
         }
@@ -71,6 +76,7 @@ final class SubscriptionLifecycleService
         }
 
         $subscription->setStatus('cancelled');
+        $this->queue->pullForwardAfter($subscription);
 
         return null;
     }
@@ -97,6 +103,7 @@ final class SubscriptionLifecycleService
             $subscription->setVisitsUsed($total);
         }
         $subscription->setStatus('cancelled');
+        $this->queue->pullForwardAfter($subscription);
 
         return true;
     }

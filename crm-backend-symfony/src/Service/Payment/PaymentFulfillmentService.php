@@ -7,6 +7,7 @@ use App\Entity\Payment;
 use App\Entity\Sale;
 use App\Entity\Subscription;
 use App\Service\Api\SubscriptionFreezePolicy;
+use App\Service\Api\SubscriptionQueueService;
 use App\Service\Notification\ClientEmailNotifier;
 use App\Service\Notification\ClientNotificationScheduler;
 use App\Service\Notification\ClientNotificationService;
@@ -22,6 +23,7 @@ class PaymentFulfillmentService
         private readonly ClientNotificationService $clientNotifications,
         private readonly ClientEmailNotifier $emailNotifier,
         private readonly StaffClubRentalService $clubRentals,
+        private readonly SubscriptionQueueService $queue,
     ) {}
 
     public function fulfill(Payment $payment, ?string $paymentWay = null): ?Subscription
@@ -58,13 +60,21 @@ class PaymentFulfillmentService
             ->setPaymentWay($paymentWay);
         $this->em->flush();
 
+        $issueClub = $payment->getClub() ?? $user->getClub();
+        if ($issueClub === null) {
+            $clubRepo = $this->em->getRepository(Club::class);
+            if ((int) $clubRepo->count([]) === 1) {
+                $issueClub = $clubRepo->findOneBy([]);
+            }
+        }
+
         $sub = new Subscription();
         $sub->setUser($user)
             ->setPlan($plan)
             ->setStatus('active')
             ->setVisitsUsed(0);
 
-        $start = new \DateTimeImmutable();
+        $start = $this->queue->startDateFor($user, $issueClub, $plan);
         $sub->setStartDate($start);
 
         if ($plan->getDurationDays()) {
@@ -80,13 +90,6 @@ class PaymentFulfillmentService
             $sub->setPromoCode($promo);
         }
 
-        $issueClub = $payment->getClub() ?? $user->getClub();
-        if ($issueClub === null) {
-            $clubRepo = $this->em->getRepository(Club::class);
-            if ((int) $clubRepo->count([]) === 1) {
-                $issueClub = $clubRepo->findOneBy([]);
-            }
-        }
         $sub->setClub($issueClub);
         if ($issueClub !== null && $user->getClub() === null) {
             $user->setClub($issueClub);
@@ -140,6 +143,9 @@ class PaymentFulfillmentService
         $lines = [
             'Вы успешно оплатили тариф «' . $plan->getName() . '». Спасибо, что вы с нами!',
         ];
+        if (SubscriptionQueueService::isWaiting($sub)) {
+            $lines[] = 'Новый абонемент начнёт действовать после окончания текущего.';
+        }
         $start = $sub->getStartDate();
         $end = $sub->getEndDate();
         if ($start !== null && $end !== null) {

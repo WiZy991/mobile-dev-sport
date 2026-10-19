@@ -149,6 +149,10 @@ data class SubscriptionPlan(
     /** Клуб, в котором будет действовать абонемент (зал покупки). */
     @SerializedName("club_name")
     val clubName: String? = null,
+
+    /** Дата старта при покупке сейчас (yyyy-MM-dd): позже сегодня, если есть действующий абонемент. */
+    @SerializedName("starts_on")
+    val startsOn: String? = null,
 ) {
     val safeId: String get() = id ?: "plan-0"
     val safeName: String get() = name ?: ""

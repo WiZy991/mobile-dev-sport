@@ -40,6 +40,7 @@ use App\Service\Notification\TrainingScheduleNotifier;
 use App\Service\Api\SubscriptionFreezePolicy;
 use App\Service\Api\SubscriptionFreezeService;
 use App\Service\Api\SubscriptionLifecycleService;
+use App\Service\Api\SubscriptionQueueService;
 use App\Service\Admin\ClubModuleRegistry;
 use App\Service\Admin\ClubSettingsStore;
 use App\Service\Admin\ClubSocialLinks;
@@ -82,6 +83,7 @@ class AdminController extends AbstractController
         private readonly SubscriptionFreezePolicy $freezePolicy,
         private readonly SubscriptionFreezeService $freezeService,
         private readonly SubscriptionLifecycleService $lifecycleService,
+        private readonly SubscriptionQueueService $subscriptionQueue,
         private readonly ClubModuleRegistry $clubModules,
         private readonly ClubSettingsStore $clubSettings,
         private readonly SubscriptionPlanCatalog $planCatalog,
@@ -2583,7 +2585,9 @@ class AdminController extends AbstractController
         }
 
         $startDateRaw = $request->request->get('start_date');
-        $startDate = $startDateRaw ? new \DateTimeImmutable($startDateRaw) : new \DateTimeImmutable();
+        $startDate = $startDateRaw
+            ? new \DateTimeImmutable($startDateRaw)
+            : $this->subscriptionQueue->startDateFor($user, $issueClub, $plan);
 
         $visitsTotalRaw = $request->request->get('visits_total');
         $freezeDaysTotalRaw = $request->request->get('freeze_days_total');
@@ -2633,8 +2637,11 @@ class AdminController extends AbstractController
         $this->addFlash(
             'success',
             sprintf(
-                'Абонемент выдан (%s).',
+                'Абонемент выдан (%s).%s',
                 SalePaymentMethodCatalog::label($issueType),
+                SubscriptionQueueService::isWaiting($subscription)
+                    ? ' У клиента есть действующий абонемент — новый начнёт действовать с ' . $subscription->getStartDate()->format('d.m.Y') . '.'
+                    : '',
             ),
         );
         $redirect = $this->redirectToRoute('admin_section', ['section' => 'subscriptions']);

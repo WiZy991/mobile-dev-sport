@@ -11,6 +11,7 @@ final class SubscriptionFreezeService
 {
     public function __construct(
         private readonly SubscriptionFreezePolicy $policy,
+        private readonly SubscriptionQueueService $queue,
     ) {
     }
 
@@ -72,8 +73,10 @@ final class SubscriptionFreezeService
             return 'Недостаточно дней заморозки. Осталось: ' . $left;
         }
 
-        if ($subscription->getEndDate() !== null) {
-            $subscription->setEndDate($subscription->getEndDate()->modify('+' . $days . ' days'));
+        $previousEnd = $subscription->getEndDate();
+        if ($previousEnd !== null) {
+            $subscription->setEndDate($previousEnd->modify('+' . $days . ' days'));
+            $this->queue->shiftAfter($subscription, $previousEnd, $days);
         }
 
         $subscription->setFreezeDaysUsed(($subscription->getFreezeDaysUsed() ?? 0) + $days);
