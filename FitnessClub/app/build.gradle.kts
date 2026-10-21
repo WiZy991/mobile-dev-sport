@@ -61,6 +61,10 @@ android {
             // Пусто = DEFAULT_ORGANIZATION_SLUG на сервере (организация Доброзал).
             buildConfigField("String", "ORGANIZATION_SLUG", "\"\"")
             buildConfigField("String", "CLUB_SITE_URL", "\"https://dobrozal.ru\"")
+            buildConfigField("boolean", "PHONE_LOGIN_ENABLED", "true")
+            buildConfigField("boolean", "SBER_LOGIN_ENABLED", "true")
+            buildConfigField("boolean", "ONLINE_PAYMENT_ENABLED", "true")
+            buildConfigField("String", "LEGAL_ENTITY_LINE", "\"ИП Мацкова Александра Сергеевна, ИНН 254009880989\"")
             buildConfigField(
                 "String",
                 "RUSTORE_CATALOG_URL",
@@ -78,6 +82,11 @@ android {
             // Slug организации из CRM (платформа → организации).
             buildConfigField("String", "ORGANIZATION_SLUG", "\"akademiy-borbi\"")
             buildConfigField("String", "CLUB_SITE_URL", "\"https://worldcashfit.ru\"")
+            // Вход только email + пароль; онлайн-оплата отключена до подключения своего эквайринга.
+            buildConfigField("boolean", "PHONE_LOGIN_ENABLED", "false")
+            buildConfigField("boolean", "SBER_LOGIN_ENABLED", "false")
+            buildConfigField("boolean", "ONLINE_PAYMENT_ENABLED", "false")
+            buildConfigField("String", "LEGAL_ENTITY_LINE", "\"\"")
             buildConfigField(
                 "String",
                 "RUSTORE_CATALOG_URL",

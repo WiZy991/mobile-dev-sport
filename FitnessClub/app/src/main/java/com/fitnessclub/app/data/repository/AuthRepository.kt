@@ -636,7 +636,9 @@ class AuthRepository @Inject constructor(
         "Email is required", "Укажите email" -> "Укажите email"
         "Неверный текущий пароль" -> "Неверный текущий пароль"
         "Новый пароль должен отличаться от текущего" -> "Новый пароль должен отличаться от текущего"
-        "User not found" -> "Неверный email или пароль"
+        "User not found",
+        "Неверный email или пароль" ->
+            "Неверный логин или пароль"
         "Access denied" -> "Доступ запрещён"
         else -> {
             if (text.contains("Method Not Allowed", ignoreCase = true)) {

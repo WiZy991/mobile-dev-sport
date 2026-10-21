@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.fitnessclub.app.data.api.Achievement
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.model.Subscription
 import com.fitnessclub.app.data.model.SubscriptionStatus
 import com.fitnessclub.app.ui.components.PrimaryButton
@@ -444,7 +445,7 @@ private fun QuickActionsRow(
         )
         QuickActionButton(
             icon = Icons.Default.ShoppingCart,
-            label = "Купить",
+            label = if (Brand.onlinePaymentEnabled) "Купить" else "Абонементы",
             onClick = onBuySubscriptionClick
         )
         QuickActionButton(
@@ -879,7 +880,7 @@ private fun EmptySubscriptionsCard(onBuyClick: () -> Unit = {}) {
             )
             Spacer(modifier = Modifier.height(12.dp))
             PrimaryButton(onClick = onBuyClick) {
-                Text("Купить абонемент")
+                Text(if (Brand.onlinePaymentEnabled) "Купить абонемент" else "Смотреть абонементы")
             }
         }
     }

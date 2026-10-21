@@ -9,6 +9,7 @@ import com.fitnessclub.app.data.model.User
 import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.PurchaseSubscriptionOutcome
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.repository.SubscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -274,6 +275,10 @@ class SubscriptionPlansViewModel @Inject constructor(
         onEmailUnverified: (String) -> Unit = {},
         onError: (String) -> Unit,
     ) {
+        if (!Brand.onlinePaymentEnabled) {
+            onError("Онлайн-оплата в этом приложении пока недоступна. Оформить абонемент можно у администратора клуба.")
+            return
+        }
         if (_uiState.value.isLoading) {
             return
         }

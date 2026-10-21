@@ -28,6 +28,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fitnessclub.app.BuildConfig
 import com.fitnessclub.app.R
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.LegalLinks
 import com.fitnessclub.app.data.config.LegalPdfAsset
@@ -207,11 +208,13 @@ fun SettingsScreen(
             
             // Legal section
             SettingsSection(title = "Правовая информация") {
-                ClickableSettingItem(
-                    icon = Icons.Default.AccountBalance,
-                    title = "Реквизиты",
-                    onClick = { openLegal(LegalDocumentType.REQUISITES) }
-                )
+                if (Brand.legalEntityLine.isNotBlank()) {
+                    ClickableSettingItem(
+                        icon = Icons.Default.AccountBalance,
+                        title = "Реквизиты",
+                        onClick = { openLegal(LegalDocumentType.REQUISITES) }
+                    )
+                }
 
                 ClickableSettingItem(
                     icon = Icons.Default.Description,

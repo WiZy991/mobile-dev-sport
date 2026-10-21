@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalUriHandler
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.LegalLinks
 import com.fitnessclub.app.data.config.LegalPdfAsset
@@ -174,6 +175,12 @@ fun ShopScreen(
                                 if (plan != null) {
                                     purchaseError = null
                                     showPurchasePlan = plan
+                                } else if (!Brand.onlinePaymentEnabled) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            "Онлайн-оплата в этом приложении пока недоступна. Оформить покупку можно у администратора клуба.",
+                                        )
+                                    }
                                 } else {
                                     viewModel.buyItem(item)
                                 }
@@ -458,7 +465,7 @@ private fun ShopItemCard(
                                 containerColor = if (item.isPromo) Primary else MaterialTheme.colorScheme.primary,
                             ),
                         ) {
-                            Text("Купить")
+                            Text(if (Brand.onlinePaymentEnabled) "Купить" else "Подробнее")
                         }
                     } else {
                         OutlinedButton(

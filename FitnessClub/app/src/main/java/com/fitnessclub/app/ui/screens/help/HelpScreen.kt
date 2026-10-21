@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.ui.theme.Primary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,12 +83,18 @@ fun HelpScreen(
             )
             HelpFaqCard(
                 question = "Как купить абонемент?",
-                answer = "Откройте «Магазин» или «Профиль» → «Купить абонемент», выберите тариф и подтвердите оплату."
+                answer = if (Brand.onlinePaymentEnabled) {
+                    "Откройте «Магазин» или «Профиль» → «Купить абонемент», выберите тариф и подтвердите оплату."
+                } else {
+                    "Тарифы можно посмотреть в разделе «Абонементы». Оформить и оплатить абонемент пока можно у администратора клуба."
+                }
             )
-            HelpFaqCard(
-                question = "Оплата прошла, но экран долго грузится",
-                answer = "Подождите до 1-2 минут и откройте «Профиль». Если списание было успешным, абонемент уже активирован."
-            )
+            if (Brand.onlinePaymentEnabled) {
+                HelpFaqCard(
+                    question = "Оплата прошла, но экран долго грузится",
+                    answer = "Подождите до 1-2 минут и откройте «Профиль». Если списание было успешным, абонемент уже активирован."
+                )
+            }
             HelpFaqCard(
                 question = "Как отменить запись на тренировку?",
                 answer = "Откройте «Мои записи», выберите тренировку и нажмите «Отменить»."

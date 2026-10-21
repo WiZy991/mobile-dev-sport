@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalUriHandler
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.LegalLinks
 import com.fitnessclub.app.data.config.LegalPdfAsset
@@ -69,17 +70,19 @@ fun SubscriptionPlansScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Купить абонемент") },
+                title = { Text(if (Brand.onlinePaymentEnabled) "Купить абонемент" else "Абонементы") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 actions = {
-                    TextButton(onClick = { showPromoDialog = true }) {
-                        Icon(Icons.Default.LocalOffer, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Промокод")
+                    if (Brand.onlinePaymentEnabled) {
+                        TextButton(onClick = { showPromoDialog = true }) {
+                            Icon(Icons.Default.LocalOffer, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Промокод")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -194,45 +197,48 @@ fun SubscriptionPlansScreen(
                         )
                     }
                     
-                    // Info
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Info,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        "Информация",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    "• Оплата онлайн или в клубе\n" +
-                                    "• ИП Мацкова Александра Сергеевна — реквизиты в приложении\n" +
-                                    "• Если клуб включил проверку — подтверждение через Сбер ID перед оплатой\n" +
-                                    "• Заморозка: 1 мес — нет; 3 мес — 14 дн.; 6 мес — 20 дн.; 12 мес — 30 дн.\n" +
-                                    "• Возврат в течение 14 дней",
-                                    style = MaterialTheme.typography.bodyMedium
+                    if (Brand.onlinePaymentEnabled) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                TextButton(
-                                    onClick = {
-                                        LegalLinks.open(LegalDocumentType.REQUISITES, onOpenLegalPdf, onOpenLegalDocument)
-                                    },
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text("Реквизиты")
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Информация",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "• Оплата онлайн или в клубе\n" +
+                                        "• ${Brand.legalEntityLine.substringBefore(',')} — реквизиты в приложении\n" +
+                                        "• Если клуб включил проверку — подтверждение через Сбер ID перед оплатой\n" +
+                                        "• Заморозка: 1 мес — нет; 3 мес — 14 дн.; 6 мес — 20 дн.; 12 мес — 30 дн.\n" +
+                                        "• Возврат в течение 14 дней",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    if (Brand.legalEntityLine.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        TextButton(
+                                            onClick = {
+                                                LegalLinks.open(LegalDocumentType.REQUISITES, onOpenLegalPdf, onOpenLegalDocument)
+                                            },
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Text("Реквизиты")
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -592,7 +598,7 @@ private fun SubscriptionPlanCard(
                             containerColor = if (isPopular) Primary else MaterialTheme.colorScheme.primary,
                         ),
                     ) {
-                        Text("Купить")
+                        Text(if (Brand.onlinePaymentEnabled) "Купить" else "Подробнее")
                     }
                 }
             }

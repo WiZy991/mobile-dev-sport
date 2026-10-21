@@ -15,6 +15,13 @@ object Brand {
     val isWhiteLabel: Boolean
         get() = BuildConfig.APPLICATION_ID != "ru.worldcashfit.app"
 
+    val phoneLoginEnabled: Boolean get() = BuildConfig.PHONE_LOGIN_ENABLED
+    val sberLoginEnabled: Boolean get() = BuildConfig.SBER_LOGIN_ENABLED
+    val onlinePaymentEnabled: Boolean get() = BuildConfig.ONLINE_PAYMENT_ENABLED
+
+    /** Продавец для покупок в приложении; пусто — не показывать. */
+    val legalEntityLine: String get() = BuildConfig.LEGAL_ENTITY_LINE
+
     fun orFallback(fromApi: String?): String {
         if (isWhiteLabel) {
             return BuildConfig.BRAND_NAME

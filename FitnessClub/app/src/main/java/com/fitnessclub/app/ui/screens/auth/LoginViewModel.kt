@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val INVALID_CREDENTIALS_MESSAGE = "Неверный логин или пароль"
+
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
@@ -241,17 +243,22 @@ class LoginViewModel @Inject constructor(
                         _events.emit(LoginEvent.Success(result.data))
                     }
                     is ApiResult.Error -> {
-                        val hint = when (result.authCode) {
-                            "password_not_set" -> LoginHintResult(
+                        val hint = when {
+                            result.authCode == "password_not_set" -> LoginHintResult(
                                 passwordNotSetHintMessage(),
                                 "password_not_set",
                             )
-                            else -> LoginHintResult(
-                                loginPasswordRequiredMessage(),
-                                "password_required",
+                            result.authCode == "invalid_credentials" || result.code == 401 -> LoginHintResult(
+                                INVALID_CREDENTIALS_MESSAGE,
+                                "invalid_credentials",
                             )
+                            else -> null
                         }
-                        applyLoginHint(hint)
+                        if (hint != null) {
+                            applyLoginHint(hint)
+                        } else {
+                            _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
+                        }
                     }
                 }
             }
@@ -323,10 +330,25 @@ class LoginViewModel @Inject constructor(
                     error = null,
                 )
             }
+            "invalid_credentials" -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    validationSummary = hint.message,
+                    loginHintCode = "invalid_credentials",
+                    emailError = hint.message,
+                    passwordError = hint.message,
+                    showValidationAttempted = true,
+                    error = null,
+                )
+            }
             "email_unknown" -> {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    validationSummary = "Аккаунт не найден. Войдите по номеру телефона.",
+                    validationSummary = if (Brand.phoneLoginEnabled) {
+                        "Аккаунт не найден. Войдите по номеру телефона."
+                    } else {
+                        "Аккаунт с таким email не найден. Проверьте email или зарегистрируйтесь."
+                    },
                     loginHintCode = "email_unknown",
                     passwordError = null,
                     showValidationAttempted = true,
@@ -571,7 +593,7 @@ data class LoginUiState(
     val otpDevCode: String? = null,
     val otpSendCount: Int = 0,
     val resendSecondsLeft: Int = 0,
-    val showEmailLogin: Boolean = false,
+    val showEmailLogin: Boolean = !Brand.phoneLoginEnabled,
     val email: String = "",
     val password: String = "",
     val emailError: String? = null,

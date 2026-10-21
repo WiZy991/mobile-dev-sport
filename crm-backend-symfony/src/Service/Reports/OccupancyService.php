@@ -9,6 +9,7 @@ use App\Entity\Club;
 use App\Entity\StaffUser;
 use App\Entity\User;
 use App\Service\ClubTimezone;
+use App\Service\Tenant\TenantContext;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -43,10 +44,14 @@ final class OccupancyService
     /** Есть ли access_logs.staff_user_id (после миграции). */
     private ?bool $hasStaffUserColumn = null;
 
+    /** Есть ли access_logs.organization_id — иначе сырой SQL не фильтруем по тенанту. */
+    private ?bool $hasOrganizationColumn = null;
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         #[Autowire(service: 'cache.app')]
         private readonly CacheInterface $cache,
+        private readonly TenantContext $tenantContext,
     ) {
     }
 
@@ -63,6 +68,72 @@ final class OccupancyService
         }
 
         return $this->hasStaffUserColumn;
+    }
+
+    private function accessLogsHaveOrganization(): bool
+    {
+        if ($this->hasOrganizationColumn !== null) {
+            return $this->hasOrganizationColumn;
+        }
+        try {
+            $cols = $this->connection()->createSchemaManager()->listTableColumns('access_logs');
+            $this->hasOrganizationColumn = isset($cols['organization_id']) || isset($cols['ORGANIZATION_ID']);
+        } catch (\Throwable) {
+            $this->hasOrganizationColumn = false;
+        }
+
+        return $this->hasOrganizationColumn;
+    }
+
+    /**
+     * Сырой SQL не видит Doctrine OrganizationFilter — без этого Академия считает проходы Доброзала.
+     * Фильтр только если он включён в ORM (в CRM тенанта / в приложении с X-Organization-Slug).
+     * CLI-cron фильтр не включает — обрабатывает все организации.
+     *
+     * @return array{sql: string, params: array<string, mixed>}
+     */
+    private function organizationScopeSql(): array
+    {
+        if (!$this->accessLogsHaveOrganization()) {
+            return ['sql' => '', 'params' => []];
+        }
+        try {
+            if (!$this->em->getFilters()->isEnabled('organization')) {
+                return ['sql' => '', 'params' => []];
+            }
+        } catch (\Throwable) {
+            return ['sql' => '', 'params' => []];
+        }
+        $orgId = $this->tenantContext->getOrganizationId();
+        if ($orgId === null) {
+            return ['sql' => '', 'params' => []];
+        }
+
+        return [
+            'sql' => ' AND organization_id = :org_id',
+            'params' => ['org_id' => $orgId],
+        ];
+    }
+
+    /**
+     * @return array{sql: string, params: array<string, mixed>}
+     */
+    private function presenceScopeSql(?Club $club): array
+    {
+        $clubScope = $this->clubScopeSql($club);
+        $orgScope = $this->organizationScopeSql();
+
+        return [
+            'sql' => $clubScope['sql'] . $orgScope['sql'],
+            'params' => $clubScope['params'] + $orgScope['params'],
+        ];
+    }
+
+    private function occupancyCacheKey(?Club $club): string
+    {
+        $org = $this->organizationScopeSql()['params']['org_id'] ?? 'all-orgs';
+
+        return 'occupancy.count.' . $org . '.' . ($club?->getId() ?? 'all');
     }
 
     /**
@@ -145,7 +216,7 @@ final class OccupancyService
     /** Сколько человек сейчас в зале (клиенты + тренеры; без клуба — по всей сети). */
     public function countCurrentlyInside(?Club $club = null): int
     {
-        $cacheKey = 'occupancy.count.' . ($club?->getId() ?? 'all');
+        $cacheKey = $this->occupancyCacheKey($club);
 
         return (int) $this->cache->get($cacheKey, function (ItemInterface $item) use ($club): int {
             $item->expiresAfter(self::COUNT_CACHE_TTL_SECONDS);
@@ -413,6 +484,9 @@ final class OccupancyService
     private function invalidateCountCache(?Club $club = null): void
     {
         try {
+            $this->cache->delete($this->occupancyCacheKey(null));
+            $this->cache->delete($this->occupancyCacheKey($club));
+            // Старые ключи без организации — чтобы Доброзал не «прилипал» к Академии.
             $this->cache->delete('occupancy.count.all');
             if ($club?->getId() !== null) {
                 $this->cache->delete('occupancy.count.' . $club->getId());
@@ -440,7 +514,7 @@ final class OccupancyService
         string $stayFilter = 'fresh',
     ): array {
         $window = $this->presenceWindow();
-        $scope = $this->clubScopeSql($club);
+        $scope = $this->presenceScopeSql($club);
         $params = [
             'from' => $window['from'],
             'to' => $window['to'],
@@ -551,16 +625,17 @@ final class OccupancyService
         $from = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
             ->modify('-' . $withinSeconds . ' seconds')
             ->format('Y-m-d H:i:s');
+        $orgScope = $this->organizationScopeSql();
 
         $row = $this->connection()->executeQuery(
             'SELECT id, event_type
              FROM access_logs
              WHERE result = \'granted\'
                AND raw_data = :qr
-               AND created_at >= :from
+               AND created_at >= :from' . $orgScope['sql'] . '
              ORDER BY id DESC
              LIMIT 1',
-            ['qr' => $qr, 'from' => $from],
+            ['qr' => $qr, 'from' => $from] + $orgScope['params'],
         )->fetchAssociative();
 
         if ($row === false) {
@@ -597,7 +672,7 @@ final class OccupancyService
         }
 
         $window = $this->presenceWindow();
-        $scope = $this->clubScopeSql($club);
+        $scope = $this->presenceScopeSql($club);
         $params = [
             'pid' => $id,
             'from' => $window['from'],
@@ -653,7 +728,7 @@ final class OccupancyService
         }
 
         $window = $this->presenceWindow();
-        $scope = $this->clubScopeSql($club);
+        $scope = $this->presenceScopeSql($club);
         $params = [
             'pid' => $id,
             'from' => $window['from'],
@@ -687,7 +762,7 @@ final class OccupancyService
     public function getUserAccessSnapshot(User $user, ?Club $club = null): array
     {
         $window = $this->presenceWindow();
-        $scope = $this->clubScopeSql($club);
+        $scope = $this->presenceScopeSql($club);
         $params = [
             'user_id' => $user->getId(),
             'from' => $window['from'],

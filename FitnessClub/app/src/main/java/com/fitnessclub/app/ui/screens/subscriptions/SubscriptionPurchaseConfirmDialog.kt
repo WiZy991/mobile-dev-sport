@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.model.SubscriptionPlan
 import com.fitnessclub.app.data.model.SubscriptionType
 import com.fitnessclub.app.ui.theme.Error
@@ -49,6 +50,7 @@ fun SubscriptionPurchaseConfirmDialog(
     onDismiss: () -> Unit,
     onOpenRequisites: () -> Unit,
     onConfirm: () -> Unit,
+    paymentAvailable: Boolean = Brand.onlinePaymentEnabled,
 ) {
     var showDetails by remember { mutableStateOf(false) }
     val details = plan.details?.trim().orEmpty()
@@ -150,41 +152,55 @@ fun SubscriptionPurchaseConfirmDialog(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Оплата производится на защищённой странице банка.",
+                    text = if (paymentAvailable) {
+                        "Оплата производится на защищённой странице банка."
+                    } else {
+                        "Онлайн-оплата скоро появится в приложении. Оформить абонемент можно у администратора клуба."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "ИП Мацкова Александра Сергеевна, ИНН 254009880989",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(
-                    onClick = onOpenRequisites,
-                    contentPadding = PaddingValues(0.dp),
-                ) {
+                if (Brand.legalEntityLine.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Реквизиты",
+                        text = Brand.legalEntityLine,
                         style = MaterialTheme.typography.bodySmall,
-                        textDecoration = TextDecoration.Underline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    TextButton(
+                        onClick = onOpenRequisites,
+                        contentPadding = PaddingValues(0.dp),
+                    ) {
+                        Text(
+                            text = "Реквизиты",
+                            style = MaterialTheme.typography.bodySmall,
+                            textDecoration = TextDecoration.Underline,
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm, enabled = !isLoading) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Далее")
+            if (paymentAvailable) {
+                Button(onClick = onConfirm, enabled = !isLoading) {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Далее")
+                    }
                 }
+            } else {
+                Button(onClick = onDismiss) { Text("Понятно") }
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Отмена")
+        dismissButton = if (paymentAvailable) {
+            {
+                TextButton(onClick = onDismiss) {
+                    Text("Отмена")
+                }
             }
+        } else {
+            null
         },
     )
 }

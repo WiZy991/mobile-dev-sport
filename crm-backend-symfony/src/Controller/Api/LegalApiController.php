@@ -6,6 +6,7 @@ namespace App\Controller\Api;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -13,6 +14,11 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/api/v1/legal')]
 final class LegalApiController extends AbstractController
 {
+    public function __construct(
+        private readonly RequestStack $requestStack,
+    ) {
+    }
+
     /** @var array<string, string> slug → имя .txt в templates/legal/content/ */
     private const TEXT_FILES = [
         'license_agreement' => 'offer.txt',
@@ -35,6 +41,15 @@ final class LegalApiController extends AbstractController
     public function document(string $slug): JsonResponse
     {
         if ($slug === 'requisites') {
+            $orgSlug = trim((string) $this->requestStack->getCurrentRequest()?->headers->get('X-Organization-Slug', ''));
+            if ($orgSlug !== '') {
+                // White-label (Академия борьбы и др.) — реквизиты Доброзала не отдаём.
+                return $this->json([
+                    'title' => self::TITLES['requisites'],
+                    'fields' => [],
+                ]);
+            }
+
             return $this->json([
                 'title' => self::TITLES['requisites'],
                 'fields' => [

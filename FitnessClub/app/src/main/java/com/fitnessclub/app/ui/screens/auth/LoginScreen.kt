@@ -89,9 +89,12 @@ fun LoginScreen(
     viewModel: LoginViewModel,
     startWithSber: Boolean = false,
     onNavigateToPhoneRegister: () -> Unit = {},
+    onNavigateToRegister: () -> Unit = {},
     onLoginSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val phoneLogin = Brand.phoneLoginEnabled
+    val sberLogin = Brand.sberLoginEnabled
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     val focusManager = LocalFocusManager.current
@@ -137,7 +140,7 @@ fun LoginScreen(
     }
 
     LaunchedEffect(startWithSber) {
-        if (startWithSber && !sberLaunchConsumed) {
+        if (sberLogin && startWithSber && !sberLaunchConsumed) {
             sberLaunchConsumed = true
             viewModel.setWelcomeAfterSberLogin(true)
             viewModel.loginWithSberId()
@@ -176,7 +179,17 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(24.dp))
 
-            if (uiState.otpStep == LoginOtpStep.PHONE) {
+            if (!phoneLogin) {
+                Text(
+                    text = "Вход в аккаунт",
+                    color = LoginSurfaceWhite,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+            } else if (uiState.otpStep == LoginOtpStep.PHONE) {
                 Text(
                     text = "Войти или создать аккаунт",
                     color = LoginSurfaceWhite,
@@ -296,14 +309,16 @@ fun LoginScreen(
                 }
             }
 
-            uiState.error?.let { err ->
-                Spacer(Modifier.height(8.dp))
-                Text(err, color = LoginSurfaceWhite, textAlign = TextAlign.Center)
+            if (phoneLogin) {
+                uiState.error?.let { err ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(err, color = LoginSurfaceWhite, textAlign = TextAlign.Center)
+                }
             }
 
-            if (uiState.otpStep == LoginOtpStep.PHONE) {
+            if (!phoneLogin || uiState.otpStep == LoginOtpStep.PHONE) {
             AnimatedVisibility(
-                visible = uiState.showEmailLogin,
+                visible = uiState.showEmailLogin || !phoneLogin,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically(),
             ) {
@@ -313,7 +328,7 @@ fun LoginScreen(
             LoginCredentialField(
                 value = uiState.email,
                 onValueChange = viewModel::onEmailChange,
-                label = "Email",
+                label = if (phoneLogin) "Email" else "Логин",
                 error = uiState.emailError,
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next,
@@ -370,16 +385,30 @@ fun LoginScreen(
                                 color = LoginBackground,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            Button(
-                                onClick = { viewModel.loginWithSberId() },
-                                enabled = !uiState.isLoading,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = SberButtonGreen,
-                                    contentColor = LoginSurfaceWhite,
-                                ),
-                            ) {
-                                Text("Войти через Сбер ID", fontWeight = FontWeight.Bold)
+                            if (sberLogin) {
+                                Button(
+                                    onClick = { viewModel.loginWithSberId() },
+                                    enabled = !uiState.isLoading,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = SberButtonGreen,
+                                        contentColor = LoginSurfaceWhite,
+                                    ),
+                                ) {
+                                    Text("Войти через Сбер ID", fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                Button(
+                                    onClick = onNavigateToRegister,
+                                    enabled = !uiState.isLoading,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = LoginBackground,
+                                        contentColor = LoginSurfaceWhite,
+                                    ),
+                                ) {
+                                    Text("Зарегистрироваться", fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
@@ -428,12 +457,14 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "или",
-                color = LoginSurfaceWhite.copy(0.85f),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            if (sberLogin) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "или",
+                    color = LoginSurfaceWhite.copy(0.85f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             Spacer(Modifier.height(16.dp))
 
             uiState.error?.let { err ->
@@ -448,28 +479,54 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = { viewModel.loginWithSberId() },
-                enabled = !uiState.isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SberButtonGreen,
-                    contentColor = LoginSurfaceWhite,
-                    disabledContainerColor = SberButtonGreen.copy(0.5f),
-                ),
-            ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        Modifier.size(24.dp),
-                        color = LoginSurfaceWhite,
-                        strokeWidth = 2.dp
+            if (sberLogin) {
+                Spacer(Modifier.height(20.dp))
+                Button(
+                    onClick = { viewModel.loginWithSberId() },
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SberButtonGreen,
+                        contentColor = LoginSurfaceWhite,
+                        disabledContainerColor = SberButtonGreen.copy(0.5f),
+                    ),
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            Modifier.size(24.dp),
+                            color = LoginSurfaceWhite,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Войти через Сбер ID", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            if (!phoneLogin) {
+                OutlinedButton(
+                    onClick = onNavigateToRegister,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.5.dp, LoginSurfaceWhite),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LoginSurfaceWhite),
+                ) {
+                    Text("Зарегистрироваться", fontWeight = FontWeight.Bold)
+                }
+                TextButton(
+                    onClick = { openSupportContact(context, uiState.supportEmail, uiState.supportPhone) },
+                ) {
+                    Text(
+                        "Связаться с поддержкой",
+                        color = LoginSurfaceWhite.copy(0.92f),
+                        textDecoration = TextDecoration.Underline,
                     )
-                } else {
-                    Text("Войти через Сбер ID", fontWeight = FontWeight.Bold)
                 }
             }
 

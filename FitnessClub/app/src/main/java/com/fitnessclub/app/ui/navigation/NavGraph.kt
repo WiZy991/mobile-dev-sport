@@ -46,6 +46,7 @@ import com.fitnessclub.app.ui.screens.about.AboutScreen
 import com.fitnessclub.app.ui.screens.networkinfo.NetworkInfoScreen
 import com.fitnessclub.app.ui.screens.legal.LegalDocumentScreen
 import com.fitnessclub.app.ui.screens.legal.LegalPdfScreen
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.ui.screens.shop.ShopScreen
@@ -134,6 +135,11 @@ fun NavGraph(
                 onNavigateToPhoneRegister = {
                     navController.navigate(Screen.Register.route)
                 },
+                onNavigateToRegister = {
+                    navController.navigate(Screen.Register.route) {
+                        launchSingleTop = true
+                    }
+                },
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(navController.graph.id) { inclusive = true }
@@ -157,6 +163,11 @@ fun NavGraph(
                     val phone = registerState.phoneRegistration
                     if (phone == true) {
                         navController.navigate(RegisterRoutes.EMAIL) {
+                            popUpTo(RegisterRoutes.START) { inclusive = true }
+                        }
+                    } else if (phone == false && !Brand.phoneLoginEnabled) {
+                        // Регистрация по email и паролю: клуб → анкета → пароль.
+                        navController.navigate(RegisterRoutes.CLUB_PICK) {
                             popUpTo(RegisterRoutes.START) { inclusive = true }
                         }
                     } else if (phone == false) {
@@ -242,6 +253,8 @@ fun NavGraph(
                     onContinueToRegister = {
                         if (registerState.phoneRegistration == true) {
                             viewModel.register()
+                        } else if (!Brand.phoneLoginEnabled) {
+                            navController.navigate(RegisterRoutes.FORM) { launchSingleTop = true }
                         } else {
                             navController.popBackStack(Screen.Login.route, inclusive = false)
                         }

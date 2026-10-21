@@ -6,6 +6,7 @@ import com.fitnessclub.app.data.api.ApiResult
 import com.fitnessclub.app.data.model.ClubShopConfig
 import com.fitnessclub.app.data.model.ClubShopCounts
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.repository.AuthRepository
 import com.fitnessclub.app.data.repository.ClubRepository
 import com.fitnessclub.app.data.repository.ProductRepository
@@ -274,6 +275,10 @@ class ShopViewModel @Inject constructor(
         onEmailUnverified: (String) -> Unit = {},
         onError: (String) -> Unit,
     ) {
+        if (!Brand.onlinePaymentEnabled) {
+            onError("Онлайн-оплата в этом приложении пока недоступна. Оформить абонемент можно у администратора клуба.")
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isPurchasing = true, error = null) }
             when (
@@ -315,6 +320,12 @@ class ShopViewModel @Inject constructor(
     }
 
     fun buyItem(item: ShopItem) {
+        if (!Brand.onlinePaymentEnabled && item.price > 0.0) {
+            _uiState.update {
+                it.copy(error = "Онлайн-оплата в этом приложении пока недоступна. Оформить покупку можно у администратора клуба.")
+            }
+            return
+        }
         viewModelScope.launch {
             when {
                 item.id.startsWith("product-") -> {

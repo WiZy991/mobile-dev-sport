@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.model.LegalDocumentField
 import com.fitnessclub.app.ui.theme.Primary
@@ -142,13 +143,16 @@ private fun RequisitesContent(fields: List<LegalDocumentField>) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            Text(
-                "Индивидуальный предприниматель Мацкова Александра Сергеевна",
-                style = MaterialTheme.typography.bodyMedium,
-                color = LegalDocumentMutedColor,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
+        val seller = Brand.legalEntityLine.substringBefore(',').trim()
+        if (seller.isNotEmpty()) {
+            item {
+                Text(
+                    seller,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = LegalDocumentMutedColor,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
         }
         items(fields) { field ->
             RequisiteRow(field = field)
