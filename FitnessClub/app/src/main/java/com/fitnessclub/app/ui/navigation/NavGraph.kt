@@ -17,6 +17,8 @@ import com.fitnessclub.app.ui.theme.Primary
 import com.fitnessclub.app.ui.navigation.NavArgs
 import androidx.navigation.navArgument
 import com.fitnessclub.app.data.auth.PaymentDeepLinkBus
+import com.fitnessclub.app.ui.screens.auth.ForgotPasswordScreen
+import com.fitnessclub.app.ui.screens.auth.ForgotPasswordViewModel
 import com.fitnessclub.app.ui.screens.auth.LoginScreen
 import com.fitnessclub.app.ui.screens.auth.LoginViewModel
 import com.fitnessclub.app.ui.screens.auth.PostRegisterSetupScreen
@@ -46,7 +48,6 @@ import com.fitnessclub.app.ui.screens.about.AboutScreen
 import com.fitnessclub.app.ui.screens.networkinfo.NetworkInfoScreen
 import com.fitnessclub.app.ui.screens.legal.LegalDocumentScreen
 import com.fitnessclub.app.ui.screens.legal.LegalPdfScreen
-import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.ui.screens.shop.ShopScreen
@@ -140,12 +141,33 @@ fun NavGraph(
                         launchSingleTop = true
                     }
                 },
+                onNavigateToForgotPassword = {
+                    navController.navigate(Screen.ForgotPassword.route) {
+                        launchSingleTop = true
+                    }
+                },
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(navController.graph.id) { inclusive = true }
                         launchSingleTop = true
                     }
                 }
+            )
+        }
+
+        composable(Screen.ForgotPassword.route) {
+            val viewModel: ForgotPasswordViewModel = hiltViewModel()
+            ForgotPasswordScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onDone = {
+                    if (!navController.popBackStack(Screen.Login.route, inclusive = false)) {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.ForgotPassword.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                },
             )
         }
         
@@ -165,17 +187,9 @@ fun NavGraph(
                         navController.navigate(RegisterRoutes.EMAIL) {
                             popUpTo(RegisterRoutes.START) { inclusive = true }
                         }
-                    } else if (phone == false && !Brand.phoneLoginEnabled) {
-                        // Регистрация по email и паролю: клуб → анкета → пароль.
+                    } else if (phone == false) {
                         navController.navigate(RegisterRoutes.CLUB_PICK) {
                             popUpTo(RegisterRoutes.START) { inclusive = true }
-                        }
-                    } else if (phone == false) {
-                        if (!navController.popBackStack(Screen.Login.route, inclusive = false)) {
-                            navController.navigate(Screen.Login.route) {
-                                popUpTo(Screen.Register.route) { inclusive = true }
-                                launchSingleTop = true
-                            }
                         }
                     }
                 }
@@ -253,10 +267,8 @@ fun NavGraph(
                     onContinueToRegister = {
                         if (registerState.phoneRegistration == true) {
                             viewModel.register()
-                        } else if (!Brand.phoneLoginEnabled) {
-                            navController.navigate(RegisterRoutes.FORM) { launchSingleTop = true }
                         } else {
-                            navController.popBackStack(Screen.Login.route, inclusive = false)
+                            navController.navigate(RegisterRoutes.FORM) { launchSingleTop = true }
                         }
                     },
                 )

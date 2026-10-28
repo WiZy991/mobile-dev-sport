@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\StaffNotification;
 use App\Entity\User;
 use App\Service\Api\MobileAuthTokenIssuer;
+use App\Service\Auth\AuthAbuseGuard;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
 use App\Service\MobileClientPayloadApplier;
@@ -25,11 +26,17 @@ class AuthController extends AbstractController
         private readonly LeadIngestionService $leadIngestion,
         private readonly StaffEventNotifier $staffEventNotifier,
         private readonly \App\Service\Auth\EmailVerificationService $emailVerification,
+        private readonly AuthAbuseGuard $abuse,
     ) {}
 
     #[Route('/login', name: 'api_auth_login', methods: ['POST'])]
     public function login(Request $request): JsonResponse
     {
+        $blocked = $this->abuse->enforceFromRequest($request, 'login');
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         $password = (string) ($data['password'] ?? '');
@@ -68,7 +75,7 @@ class AuthController extends AbstractController
         }
 
         if ($user->isBlocked()) {
-            return $this->json(['error' => 'Access denied', 'code' => 'user_blocked'], 403);
+            return $this->json(['error' => 'Аккаунт заблокирован. Обратитесь в клуб.', 'code' => 'user_blocked'], 403);
         }
 
         return $this->json($this->mobileTokens->issue($user, true));
@@ -81,6 +88,11 @@ class AuthController extends AbstractController
     #[Route('/login-hint', name: 'api_auth_login_hint', methods: ['POST'])]
     public function loginHint(Request $request): JsonResponse
     {
+        $blocked = $this->abuse->enforceFromRequest($request, 'login');
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
 
@@ -122,6 +134,11 @@ class AuthController extends AbstractController
     #[Route('/register', name: 'api_auth_register', methods: ['POST'])]
     public function register(Request $request): JsonResponse
     {
+        $blocked = $this->abuse->enforceFromRequest($request, 'register');
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         $name = trim((string) ($data['name'] ?? 'Новый пользователь'));
@@ -141,7 +158,7 @@ class AuthController extends AbstractController
         $existing = $this->findUserByEmail($email);
         if ($existing !== null) {
             if ($existing->isBlocked()) {
-                return $this->json(['error' => 'Access denied', 'code' => 'user_blocked'], 403);
+                return $this->json(['error' => 'Аккаунт заблокирован. Обратитесь в клуб.', 'code' => 'user_blocked'], 403);
             }
 
             // Клиент уже в CRM (импорт / Сбер / прошлый вход): принимаем регистрацию как

@@ -18,11 +18,22 @@
     {% if error %}
         <div class="alert alert-danger py-2 small">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
     {% endif %}
+    {% for message in app.flashes('danger') %}
+        <div class="alert alert-danger py-2 small">{{ message }}</div>
+    {% endfor %}
+    {% for message in app.flashes('success') %}
+        <div class="alert alert-success py-2 small">{{ message }}</div>
+    {% endfor %}
     <form method="post" action="{{ path('admin_login_check') }}">
         <label class="form-label small text-secondary">Email</label>
         <input type="email" class="form-control form-control-sm mb-2" name="_username" value="{{ last_username }}" required autofocus autocomplete="username">
         <label class="form-label small text-secondary">Пароль</label>
         <input type="password" class="form-control form-control-sm mb-3" name="_password" required autocomplete="current-password">
+        {% if captcha %}
+            <input type="hidden" name="captcha_id" value="{{ captcha.id }}">
+            <label class="form-label small text-secondary">{{ captcha.question }}</label>
+            <input type="text" class="form-control form-control-sm mb-3" name="captcha_answer" inputmode="numeric" autocomplete="off" required>
+        {% endif %}
         <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
         <p class="legal-note">
             Нажимая кнопку «Войти» Вы подтверждаете, что ознакомлены с
@@ -32,6 +43,7 @@
         </p>
         <button type="submit" class="btn btn-warning w-100">Войти</button>
     </form>
+    <p class="small mt-3 mb-0 text-center"><a href="{{ path('admin_forgot_password') }}" style="color:#ffcb45;">Забыли пароль?</a></p>
 </div>
 </body>
 </html>

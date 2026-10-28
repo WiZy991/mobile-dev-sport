@@ -92,7 +92,13 @@ data class LoginRequest(
     val email: String,
     
     @SerializedName("password")
-    val password: String
+    val password: String,
+
+    @SerializedName("captcha_id")
+    val captchaId: String? = null,
+
+    @SerializedName("captcha_answer")
+    val captchaAnswer: String? = null,
 )
 
 data class LoginHintRequest(
@@ -193,11 +199,19 @@ data class RegisterRequest(
 
     @SerializedName("otp_ticket")
     val otpTicket: String? = null,
+
+    @SerializedName("captcha_id")
+    val captchaId: String? = null,
+
+    @SerializedName("captcha_answer")
+    val captchaAnswer: String? = null,
 )
 
 data class OtpRequestBody(
     @SerializedName("phone") val phone: String,
     @SerializedName("channel") val channel: String,
+    @SerializedName("captcha_id") val captchaId: String? = null,
+    @SerializedName("captcha_answer") val captchaAnswer: String? = null,
 )
 
 data class OtpRequestResponse(
@@ -238,6 +252,27 @@ data class OtpChannelStatus(
 data class CheckEmailRequest(
     @SerializedName("email") val email: String,
     @SerializedName("otp_ticket") val otpTicket: String? = null,
+    @SerializedName("captcha_id") val captchaId: String? = null,
+    @SerializedName("captcha_answer") val captchaAnswer: String? = null,
+)
+
+data class PasswordForgotRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("captcha_id") val captchaId: String? = null,
+    @SerializedName("captcha_answer") val captchaAnswer: String? = null,
+)
+
+data class PasswordResetRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("code") val code: String,
+    @SerializedName("password") val password: String,
+    @SerializedName("captcha_id") val captchaId: String? = null,
+    @SerializedName("captcha_answer") val captchaAnswer: String? = null,
+)
+
+data class PasswordResetResponse(
+    @SerializedName("ok") val ok: Boolean = false,
+    @SerializedName("message") val message: String? = null,
 )
 
 data class CheckEmailResponse(

@@ -2,7 +2,10 @@
 
 namespace App\Controller;
 
+use App\Entity\PasswordResetToken;
 use App\Service\Admin\ClubSettingsStore;
+use App\Service\Auth\AuthAbuseGuard;
+use App\Service\Auth\PasswordResetService;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
 use Doctrine\ORM\EntityManagerInterface;
@@ -17,6 +20,8 @@ class LandingController extends AbstractController
         private readonly LeadIngestionService $leadIngestion,
         private readonly EntityManagerInterface $em,
         private readonly ClubSettingsStore $clubSettings,
+        private readonly PasswordResetService $passwordReset,
+        private readonly AuthAbuseGuard $abuse,
     ) {
     }
 
@@ -61,8 +66,8 @@ class LandingController extends AbstractController
         ]);
     }
 
-    #[Route('/forgot-password', name: 'forgot_password', methods: ['GET'])]
-    public function forgotPassword(): Response
+    #[Route('/forgot-password', name: 'forgot_password', methods: ['GET', 'POST'])]
+    public function forgotPassword(Request $request): Response
     {
         $get = function (string $key, string $default): string {
             return $this->clubSettings->get($key) ?? $default;
@@ -73,10 +78,67 @@ class LandingController extends AbstractController
             $clubName = 'Доброзал';
         }
 
+        $linkToken = trim((string) $request->query->get('token', $request->request->get('token', '')));
+        $captcha = $this->abuse->challengeIfNeeded($request, 'password_forgot');
+
+        if ($request->isMethod('POST') && $request->request->get('action') === 'request') {
+            $webError = $this->abuse->enforceWeb(
+                $request,
+                'password_forgot',
+                trim((string) $request->request->get('captcha_id', '')) ?: null,
+                trim((string) $request->request->get('captcha_answer', '')) ?: null,
+            );
+            if ($webError !== null) {
+                $this->addFlash('danger', $webError);
+            } else {
+                $email = mb_strtolower(trim((string) $request->request->get('email', '')));
+                if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $this->addFlash('danger', 'Укажите корректный email.');
+                } else {
+                    $this->passwordReset->requestReset(
+                        $email,
+                        PasswordResetToken::AUDIENCE_CLIENT,
+                        $request->getSchemeAndHttpHost(),
+                        $request->getClientIp(),
+                    );
+                    $this->addFlash('success', PasswordResetService::GENERIC_OK);
+                }
+            }
+
+            return $this->redirectToRoute('forgot_password');
+        }
+
+        if ($request->isMethod('POST') && $request->request->get('action') === 'reset') {
+            $password = (string) $request->request->get('password', '');
+            $confirm = (string) $request->request->get('password_confirm', '');
+            if ($password !== $confirm) {
+                $this->addFlash('danger', 'Пароли не совпадают.');
+            } else {
+                $error = $this->passwordReset->resetByLinkToken(
+                    $linkToken,
+                    $password,
+                    PasswordResetToken::AUDIENCE_CLIENT,
+                );
+                if ($error !== null) {
+                    $this->addFlash('danger', $error);
+                } else {
+                    $this->addFlash('success', 'Пароль обновлён. Войдите в приложении с новым паролем.');
+
+                    return $this->redirectToRoute('forgot_password');
+                }
+            }
+        }
+
         return $this->render('landing/forgot_password.html.twig', [
             'club_name' => $clubName,
             'phone' => $get('phone', '+7 (495) 123-45-67'),
             'email' => $get('email', 'info@fitnessclub.ru'),
+            'captcha' => $captcha,
+            'link_token' => $linkToken,
+            'link_valid' => $linkToken !== '' && $this->passwordReset->validateLinkToken(
+                $linkToken,
+                PasswordResetToken::AUDIENCE_CLIENT,
+            ),
         ]);
     }
 

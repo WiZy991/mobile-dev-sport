@@ -108,7 +108,7 @@ data class RegisterUiState(
     /** После первого нажатия «Зарегистрироваться» показываем ошибки полей (до этого — спокойный вид) */
     val submitAttempted: Boolean = false,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 ) {
     val passportSummary: String
         get() = when {

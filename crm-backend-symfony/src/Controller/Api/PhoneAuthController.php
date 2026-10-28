@@ -7,6 +7,7 @@ namespace App\Controller\Api;
 use App\Entity\StaffNotification;
 use App\Entity\User;
 use App\Service\Api\MobileAuthTokenIssuer;
+use App\Service\Auth\AuthAbuseGuard;
 use App\Service\Auth\EmailVerificationService;
 use App\Service\Auth\PhoneNormalizer;
 use App\Service\Auth\PhoneOtpService;
@@ -31,6 +32,7 @@ class PhoneAuthController extends AbstractController
         private readonly LeadIngestionService $leadIngestion,
         private readonly StaffEventNotifier $staffEventNotifier,
         private readonly EmailVerificationService $emailVerification,
+        private readonly AuthAbuseGuard $abuse,
     ) {
     }
 
@@ -43,6 +45,11 @@ class PhoneAuthController extends AbstractController
     #[Route('/otp/request', name: 'api_auth_otp_request', methods: ['POST'])]
     public function requestOtp(Request $request): JsonResponse
     {
+        $blocked = $this->abuse->enforceFromRequest($request, 'otp');
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         try {
             $payload = $this->otp->request(
@@ -59,6 +66,11 @@ class PhoneAuthController extends AbstractController
     #[Route('/otp/verify', name: 'api_auth_otp_verify', methods: ['POST'])]
     public function verifyOtp(Request $request): JsonResponse
     {
+        $blocked = $this->abuse->enforceFromRequest($request, 'otp');
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         try {
             $result = $this->otp->verify(
@@ -95,6 +107,11 @@ class PhoneAuthController extends AbstractController
     #[Route('/register/check-email', name: 'api_auth_register_check_email', methods: ['POST'])]
     public function checkEmail(Request $request): JsonResponse
     {
+        $blocked = $this->abuse->enforceFromRequest($request, 'register');
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -128,6 +145,11 @@ class PhoneAuthController extends AbstractController
     #[Route('/register/phone', name: 'api_auth_register_phone', methods: ['POST'])]
     public function registerPhone(Request $request): JsonResponse
     {
+        $blocked = $this->abuse->enforceFromRequest($request, 'register');
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $ticket = trim((string) ($data['otp_ticket'] ?? ''));
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
@@ -228,7 +250,7 @@ class PhoneAuthController extends AbstractController
             'invalid_channel' => [400, 'Не удалось выбрать способ отправки кода'],
             'channel_unavailable' => [503, 'Отправка SMS сейчас недоступна. Войдите по почте или попробуйте позже.'],
             'channel_undeliverable' => [422, 'Не удалось доставить SMS на этот номер. Проверьте номер или войдите по почте.'],
-            'channel_failed' => [502, 'Не удалось отправить SMS с кодом. Попробуйте позже или войдите по почте.'],
+            'channel_failed' => [503, 'Не удалось отправить SMS с кодом. Попробуйте позже или войдите по почте.'],
             'otp_rate_limited' => [429, 'Слишком много запросов кода. Подождите час.'],
             'otp_too_soon' => [429, 'Повторная отправка будет доступна через несколько секунд'],
             'otp_not_found' => [400, 'Сначала запросите код'],
@@ -237,7 +259,7 @@ class PhoneAuthController extends AbstractController
             'invalid_code' => [400, 'Неверный код'],
             'invalid_ticket' => [400, 'Сессия регистрации устарела, подтвердите номер снова'],
             'ticket_expired' => [400, 'Сессия регистрации истекла, подтвердите номер снова'],
-            'user_blocked' => [403, 'Access denied'],
+            'user_blocked' => [403, 'Аккаунт заблокирован. Обратитесь в клуб.'],
         ];
         [$status, $message] = $map[$code] ?? [400, 'Не удалось обработать код'];
 

@@ -48,7 +48,7 @@ class SubscriptionController extends AbstractController
         if (!$user instanceof User) {
             // Раньше отдавали [] при протухшем токене — приложение думало, что абонементов нет.
             return $this->json([
-                'error' => $auth['message'] ?? 'Unauthorized',
+                'error' => $auth['message'] ?? 'Нужно войти в аккаунт ещё раз',
                 'code' => $auth['code'] ?? 'unauthorized',
             ], 401);
         }
@@ -183,7 +183,7 @@ class SubscriptionController extends AbstractController
 
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $data = json_decode($request->getContent(), true) ?? [];
@@ -317,7 +317,7 @@ class SubscriptionController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $sub = $this->findSubscriptionByApiId($id);
@@ -344,7 +344,7 @@ class SubscriptionController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $sub = $this->findSubscriptionByApiId($id);
@@ -370,7 +370,7 @@ class SubscriptionController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $sub = $this->findSubscriptionByApiId($id);
@@ -398,7 +398,7 @@ class SubscriptionController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $sub = $this->findSubscriptionByApiId($id);

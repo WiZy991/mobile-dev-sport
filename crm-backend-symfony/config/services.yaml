@@ -42,11 +42,14 @@ parameters:
     mail_from_default: 'noreply@worldcashfit.ru'
     mail_from_name_default: 'WorldCashFit'
     mail_enabled_default: '1'
-    smtp_host_default: ''
-    smtp_port_default: '587'
+    smtp_host_default: 'mail'
+    smtp_port_default: '25'
     smtp_user_default: ''
     smtp_password_default: ''
-    smtp_encryption_default: 'tls'
+    smtp_encryption_default: 'none'
+    redis_host_default: 'redis'
+    redis_port_default: '6379'
+    celery_queue_default: 'celery'
     yandex_metrika_id_default: 0
     sber_id_redirect_uri_default: ''
     access_gate_token_default: ''
@@ -217,6 +220,14 @@ services:
         arguments:
             $defaultOrganizationSlug: '%env(default:default_organization_slug_default:DEFAULT_ORGANIZATION_SLUG)%'
 
+    App\Service\Auth\CaptchaChallengeService:
+        arguments:
+            $cache: '@cache.app'
+
+    App\Service\Auth\AuthAbuseGuard:
+        arguments:
+            $cache: '@cache.app'
+
     App\Service\Notification\ClientEmailNotifier:
         arguments:
             $mailFrom: '%env(default:mail_from_default:MAIL_FROM)%'
@@ -226,6 +237,15 @@ services:
             $smtpUser: '%env(default:smtp_user_default:SMTP_USER)%'
             $smtpPassword: '%env(default:smtp_password_default:SMTP_PASSWORD)%'
             $smtpEncryption: '%env(default:smtp_encryption_default:SMTP_ENCRYPTION)%'
+            $enabled: '%env(bool:default:mail_enabled_default:MAIL_ENABLED)%'
+
+    App\Service\Mail\CeleryMailPublisher:
+        arguments:
+            $redisHost: '%env(default:redis_host_default:REDIS_HOST)%'
+            $redisPort: '%env(int:default:redis_port_default:REDIS_PORT)%'
+            $queue: '%env(default:celery_queue_default:CELERY_QUEUE)%'
+            $mailFrom: '%env(default:mail_from_default:MAIL_FROM)%'
+            $mailFromName: '%env(default:mail_from_name_default:MAIL_FROM_NAME)%'
             $enabled: '%env(bool:default:mail_enabled_default:MAIL_ENABLED)%'
 
     # add more service definitions when explicit configuration is needed

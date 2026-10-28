@@ -1,6 +1,7 @@
 package com.fitnessclub.app.data.repository
 
 import com.fitnessclub.app.data.api.ApiResult
+import com.fitnessclub.app.data.api.clientFacingMessage
 import com.fitnessclub.app.data.api.userMessage
 import com.fitnessclub.app.data.api.FitnessApi
 import com.fitnessclub.app.data.local.AuthFlowStore
@@ -19,6 +20,8 @@ import com.fitnessclub.app.data.model.OtpRequestBody
 import com.fitnessclub.app.data.model.OtpRequestResponse
 import com.fitnessclub.app.data.model.OtpVerifyBody
 import com.fitnessclub.app.data.model.OtpVerifyResponse
+import com.fitnessclub.app.data.model.PasswordForgotRequest
+import com.fitnessclub.app.data.model.PasswordResetRequest
 import com.fitnessclub.app.data.model.ProfilePatchRequest
 import com.fitnessclub.app.data.model.RegisterRequest
 import com.fitnessclub.app.data.model.SberCallbackRequest
@@ -37,6 +40,12 @@ private data class ApiJsonError(
     val error: String? = null,
     val message: String? = null,
     val code: String? = null,
+    val captcha: CaptchaPayload? = null,
+)
+
+private data class CaptchaPayload(
+    val id: String? = null,
+    val question: String? = null,
 )
 
 @Singleton
@@ -118,10 +127,22 @@ class AuthRepository @Inject constructor(
         }
     }
     
-    fun login(email: String, password: String): Flow<ApiResult<User>> = flow {
+    fun login(
+        email: String,
+        password: String,
+        captchaId: String? = null,
+        captchaAnswer: String? = null,
+    ): Flow<ApiResult<User>> = flow {
         emit(ApiResult.Loading)
         try {
-            val response = api.login(LoginRequest(email, password))
+            val response = api.login(
+                LoginRequest(
+                    email = email,
+                    password = password,
+                    captchaId = captchaId,
+                    captchaAnswer = captchaAnswer,
+                )
+            )
             if (response.isSuccessful && response.body() != null) {
                 val authResponse = response.body()!!
                 tokenManager.saveTokens(authResponse.token, authResponse.refreshToken)
@@ -129,11 +150,10 @@ class AuthRepository @Inject constructor(
                 onAuthenticated()
                 emit(ApiResult.Success(authResponse.user))
             } else {
-                val auth = parseAuthError(response, "Ошибка входа")
-                emit(ApiResult.Error(auth.message, response.code(), auth.authCode))
+                emit(errorFrom(response, "Не удалось войти. Проверьте данные и попробуйте снова."))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
+            emit(ApiResult.Error(e.userMessage("Не удалось войти. Проверьте интернет и попробуйте снова.")))
         }
     }
 
@@ -160,7 +180,7 @@ class AuthRepository @Inject constructor(
                         ),
                     )
                 } else {
-                    emit(ApiResult.Error(auth.message, response.code(), auth.authCode))
+                    emit(errorFrom(response, "Не удалось проверить email."))
                 }
             }
         } catch (e: Exception) {
@@ -184,10 +204,10 @@ class AuthRepository @Inject constructor(
                 authFlowStore.clearOtpRegistration()
                 emit(ApiResult.Success(authResponse.user))
             } else {
-                emit(ApiResult.Error(authErrorMessage(response, "Ошибка регистрации"), response.code()))
+                emit(errorFrom(response, "Не удалось зарегистрироваться. Попробуйте ещё раз."))
             }
         } catch (e: Exception) {
-            emit(ApiResult.Error(e.userMessage("Неизвестная ошибка")))
+            emit(ApiResult.Error(e.userMessage("Не удалось зарегистрироваться. Проверьте интернет.")))
         }
     }
 
@@ -205,15 +225,20 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun requestOtp(phone: String, channel: String): ApiResult<OtpRequestResponse> {
-        val first = requestOtpOnce(phone, channel)
+    suspend fun requestOtp(
+        phone: String,
+        channel: String,
+        captchaId: String? = null,
+        captchaAnswer: String? = null,
+    ): ApiResult<OtpRequestResponse> {
+        val first = requestOtpOnce(phone, channel, captchaId, captchaAnswer)
         if (channel != "auto" && channel.isNotBlank()) {
             return first
         }
         // Старый CRM отклоняет channel=auto — тот же порядок, что autoPriority на сервере.
         if (first is ApiResult.Error && first.authCode == "invalid_channel") {
             for (fallback in listOf("telegram", "whatsapp", "max")) {
-                val retry = requestOtpOnce(phone, fallback)
+                val retry = requestOtpOnce(phone, fallback, captchaId, captchaAnswer)
                 if (retry is ApiResult.Success) {
                     return retry
                 }
@@ -232,9 +257,16 @@ class AuthRepository @Inject constructor(
         return first
     }
 
-    private suspend fun requestOtpOnce(phone: String, channel: String): ApiResult<OtpRequestResponse> {
+    private suspend fun requestOtpOnce(
+        phone: String,
+        channel: String,
+        captchaId: String? = null,
+        captchaAnswer: String? = null,
+    ): ApiResult<OtpRequestResponse> {
         return try {
-            val response = api.requestOtp(OtpRequestBody(phone, channel))
+            val response = api.requestOtp(
+                OtpRequestBody(phone, channel, captchaId, captchaAnswer),
+            )
             val body = response.body()
             if (response.isSuccessful && body != null) {
                 ApiResult.Success(body)
@@ -244,6 +276,8 @@ class AuthRepository @Inject constructor(
                     otpSendFailureMessage(response.code(), parsed),
                     response.code(),
                     parsed.authCode,
+                    parsed.captchaId,
+                    parsed.captchaQuestion,
                 )
             }
         } catch (e: Exception) {
@@ -263,16 +297,23 @@ class AuthRepository @Inject constructor(
                 }
                 ApiResult.Success(body)
             } else {
-                ApiResult.Error(authErrorMessage(response, "Неверный код"), response.code())
+                errorFrom(response, "Неверный код")
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
+            ApiResult.Error(e.userMessage("Не удалось проверить код. Проверьте интернет."))
         }
     }
 
-    suspend fun checkRegisterEmail(email: String, otpTicket: String?): ApiResult<CheckEmailResponse> {
+    suspend fun checkRegisterEmail(
+        email: String,
+        otpTicket: String?,
+        captchaId: String? = null,
+        captchaAnswer: String? = null,
+    ): ApiResult<CheckEmailResponse> {
         return try {
-            val response = api.checkRegisterEmail(CheckEmailRequest(email, otpTicket))
+            val response = api.checkRegisterEmail(
+                CheckEmailRequest(email, otpTicket, captchaId, captchaAnswer),
+            )
             val body = response.body()
             if (response.isSuccessful && body != null) {
                 if (body.loggedIn) {
@@ -282,10 +323,53 @@ class AuthRepository @Inject constructor(
                 }
                 ApiResult.Success(body)
             } else {
-                ApiResult.Error(authErrorMessage(response, "Не удалось проверить email"), response.code())
+                errorFrom(response, "Не удалось проверить email")
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
+            ApiResult.Error(e.userMessage("Не удалось проверить email. Проверьте интернет."))
+        }
+    }
+
+    suspend fun forgotPassword(
+        email: String,
+        captchaId: String? = null,
+        captchaAnswer: String? = null,
+    ): ApiResult<String> {
+        return try {
+            val response = api.passwordForgot(PasswordForgotRequest(email, captchaId, captchaAnswer))
+            val body = response.body()
+            if (response.isSuccessful) {
+                ApiResult.Success(
+                    body?.message?.takeIf { it.isNotBlank() }
+                        ?: "Если такой email есть в системе, мы отправили письмо. Проверьте почту, включая папку «Спам».",
+                )
+            } else {
+                errorFrom(response, "Не удалось отправить письмо. Попробуйте позже.")
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.userMessage("Не удалось отправить письмо. Проверьте интернет."))
+        }
+    }
+
+    suspend fun resetPassword(
+        email: String,
+        code: String,
+        password: String,
+        captchaId: String? = null,
+        captchaAnswer: String? = null,
+    ): ApiResult<String> {
+        return try {
+            val response = api.passwordReset(
+                PasswordResetRequest(email, code, password, captchaId, captchaAnswer),
+            )
+            val body = response.body()
+            if (response.isSuccessful) {
+                ApiResult.Success(body?.message?.takeIf { it.isNotBlank() } ?: "Пароль обновлён. Войдите с новым паролем.")
+            } else {
+                errorFrom(response, "Не удалось сменить пароль. Проверьте код из письма.")
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.userMessage("Не удалось сменить пароль. Проверьте интернет."))
         }
     }
 
@@ -555,7 +639,20 @@ class AuthRepository @Inject constructor(
     private data class ParsedAuthError(
         val message: String,
         val authCode: String?,
+        val captchaId: String? = null,
+        val captchaQuestion: String? = null,
     )
+
+    private fun errorFrom(response: Response<*>, fallback: String): ApiResult.Error {
+        val parsed = parseAuthError(response, fallback)
+        return ApiResult.Error(
+            parsed.message,
+            response.code(),
+            parsed.authCode,
+            parsed.captchaId,
+            parsed.captchaQuestion,
+        )
+    }
 
     private fun parseApiJsonError(response: Response<*>): ApiJsonError? {
         val raw = runCatching { response.errorBody()?.string() }.getOrNull().orEmpty()
@@ -573,9 +670,12 @@ class AuthRepository @Inject constructor(
         }
         val base = server ?: plain ?: fallback
         val authCode = parsed?.code?.trim()?.takeIf { it.isNotEmpty() }
+        val human = humanizeKnownAuthMessages(base, authCode)
         return ParsedAuthError(
-            message = humanizeKnownAuthMessages(base, authCode),
+            message = clientFacingMessage(human, response.code(), fallback),
             authCode = authCode,
+            captchaId = parsed?.captcha?.id?.trim()?.takeIf { it.isNotEmpty() },
+            captchaQuestion = parsed?.captcha?.question?.trim()?.takeIf { it.isNotEmpty() },
         )
     }
 
@@ -594,18 +694,16 @@ class AuthRepository @Inject constructor(
             "otp_too_soon" -> "Повторная отправка будет доступна через несколько секунд"
             "invalid_phone" -> "Укажите номер телефона полностью"
             "invalid_channel" -> "Не удалось отправить код. Попробуйте позже или войдите по почте."
+            "captcha_required" -> parsed.message.ifBlank { "Подтвердите, что вы не робот — ответьте на простой пример." }
+            "rate_limited" -> "Слишком много попыток. Подождите несколько минут и попробуйте снова."
             else -> null
         }
         if (fromCode != null) return fromCode
-        if (http == 404 || http == 405) {
-            return "На сервере нет ручки отправки кода (HTTP $http). Залейте CRM с OTP и перезапустите PHP. Пока войдите по почте или Сбер ID."
-        }
-        if (parsed.message.contains("<html", ignoreCase = true) || parsed.message.isBlank()) {
-            return "Сервер вернул ошибку ${if (http > 0) "HTTP $http" else ""} без JSON. Проверьте логи PHP и cache:clear. Пока войдите по почте или Сбер ID."
-                .replace("  ", " ")
-                .trim()
-        }
-        return parsed.message.ifBlank { "Не удалось отправить код. Войдите по почте или Сбер ID." }
+        return clientFacingMessage(
+            parsed.message,
+            http,
+            "Не удалось отправить код подтверждения. Попробуйте позже или войдите по почте.",
+        )
     }
 
     private fun humanizeKnownAuthMessages(text: String, code: String?): String {
@@ -619,6 +717,12 @@ class AuthRepository @Inject constructor(
                 return text.ifBlank { "Не удалось доставить код. Запросите повторно или войдите по почте." }
             "channel_failed" ->
                 return text.ifBlank { "Не удалось отправить код. Попробуйте позже или войдите по почте." }
+            "captcha_required" ->
+                return text.ifBlank { "Подтвердите, что вы не робот — ответьте на простой пример." }
+            "rate_limited" ->
+                return "Слишком много попыток. Подождите несколько минут и попробуйте снова."
+            "user_blocked" ->
+                return "Аккаунт заблокирован. Обратитесь в клуб."
         }
         return when (text.trim()) {
         "Укажите email и password", "Введите пароль" -> loginPasswordRequiredMessage()
@@ -639,7 +743,8 @@ class AuthRepository @Inject constructor(
         "User not found",
         "Неверный email или пароль" ->
             "Неверный логин или пароль"
-        "Access denied" -> "Доступ запрещён"
+        "Access denied" -> "Аккаунт заблокирован. Обратитесь в клуб."
+        "Unauthorized" -> "Нужно войти в аккаунт ещё раз"
         else -> {
             if (text.contains("Method Not Allowed", ignoreCase = true)) {
                 "Ошибка соединения с сервером. Обновите приложение или проверьте интернет."

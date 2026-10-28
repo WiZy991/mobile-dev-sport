@@ -44,7 +44,7 @@ final class AppleAuthController extends AbstractController
             );
         } catch (\RuntimeException $e) {
             if ($e->getMessage() === 'user_blocked') {
-                return $this->json(['error' => 'Access denied', 'code' => 'user_blocked'], 403);
+                return $this->json(['error' => 'Аккаунт заблокирован. Обратитесь в клуб.', 'code' => 'user_blocked'], 403);
             }
             throw $e;
         }

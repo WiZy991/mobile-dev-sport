@@ -12,6 +12,7 @@ sealed class Screen(val route: String) {
         fun createRoute(startSber: Boolean) = "login?startSber=$startSber"
     }
     data object Register : Screen("register")
+    data object ForgotPassword : Screen("forgot_password")
     
     // Main
     data object Home : Screen("home")

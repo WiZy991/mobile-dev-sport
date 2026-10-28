@@ -33,6 +33,16 @@ api_auth_logout:
   controller: App\Controller\Api\AuthController::logout
   methods: [POST]
 
+api_auth_password_forgot:
+  path: /api/v1/auth/password/forgot
+  controller: App\Controller\Api\PasswordResetController::forgot
+  methods: [POST]
+
+api_auth_password_reset:
+  path: /api/v1/auth/password/reset
+  controller: App\Controller\Api\PasswordResetController::reset
+  methods: [POST]
+
 api_auth_otp_channels:
   path: /api/v1/auth/otp/channels
   controller: App\Controller\Api\PhoneAuthController::channels

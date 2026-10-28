@@ -141,6 +141,7 @@ fun RegisterScreen(
         )
     }
 
+
     if (birthPickerOpen) {
         val dateState = rememberDatePickerState()
         DatePickerDialog(

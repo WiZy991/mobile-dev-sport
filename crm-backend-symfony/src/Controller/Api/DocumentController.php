@@ -57,7 +57,7 @@ class DocumentController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $file = $request->files->get('file');
@@ -116,7 +116,7 @@ class DocumentController extends AbstractController
 
         // Only owner or club doc (user_id null)
         if ($doc->getUser() !== null && (!$user || $doc->getUser()->getId() !== $user->getId())) {
-            return $this->json(['error' => 'Access denied'], 403);
+            return $this->json(['error' => 'Недостаточно прав для этого действия.'], 403);
         }
 
         $path = $this->getParameter('kernel.project_dir') . '/var/uploads/documents/' . $doc->getFilename();

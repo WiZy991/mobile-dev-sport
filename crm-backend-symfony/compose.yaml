@@ -10,17 +10,28 @@ services:
     environment:
       TZ: UTC
       APP_TIMEZONE: UTC
+      SMTP_HOST: mail
+      SMTP_PORT: "25"
+      SMTP_ENCRYPTION: none
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_QUEUE: celery
     # HTTP :8000 (nginx+FPM внутри контейнера). Снаружи — только через TLS nginx.
     expose:
       - "8000"
     depends_on:
       database:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_started
     # ENTRYPOINT сам делает migrate + supervisord; CMD пустой.
     # Секреты / uploads с хоста (иначе фото тренеров пропадают при recreate контейнера).
     volumes:
       - ./.env:/app/.env:ro
       - ./var/secrets:/app/var/secrets:ro
+      - ./var/mail-dkim:/app/var/mail-dkim:ro
       - ./etc/Apns:/app/etc/Apns:ro
       - ./public/uploads/promotions:/app/public/uploads/promotions
       - ./public/uploads/clubs:/app/public/uploads/clubs
@@ -39,17 +50,78 @@ services:
     environment:
       TZ: UTC
       APP_TIMEZONE: UTC
+      SMTP_HOST: mail
+      SMTP_PORT: "25"
+      SMTP_ENCRYPTION: none
     depends_on:
       database:
         condition: service_healthy
       app:
+        condition: service_started
+      mail:
         condition: service_started
     # ENTRYPOINT выполнит migrate, затем этот CMD вместо supervisord.
     command: ["sh", "-c", "while true; do php bin/console app:process-scheduled-notifications --no-interaction || true; php bin/console app:occupancy-auto-exit --no-interaction || true; sleep 20; done"]
     volumes:
       - ./.env:/app/.env:ro
       - ./var/secrets:/app/var/secrets:ro
+      - ./var/mail-dkim:/app/var/mail-dkim:ro
       - ./etc/Apns:/app/etc/Apns:ro
+    networks:
+      - crm_backend_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: crm_backend_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
+    networks:
+      - crm_backend_net
+
+  celery_mail:
+    build:
+      context: .
+      dockerfile: docker/celery/Dockerfile
+    container_name: crm_backend_celery_mail
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: UTC
+      CELERY_BROKER_URL: redis://redis:6379/0
+      SMTP_HOST: mail
+      SMTP_PORT: "25"
+      MAIL_FROM: ${MAIL_FROM:-noreply@worldcashfit.ru}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-WorldCashFit}
+    depends_on:
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    networks:
+      - crm_backend_net
+
+  mail:
+    build:
+      context: .
+      dockerfile: docker/mail/Dockerfile
+    container_name: crm_backend_mail
+    restart: unless-stopped
+    hostname: mail.worldcashfit.ru
+    environment:
+      MAIL_DOMAIN: ${MAIL_DOMAIN:-worldcashfit.ru}
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-mail.worldcashfit.ru}
+      DKIM_SELECTOR: default
+    volumes:
+      - mail_dkim_keys:/etc/opendkim/keys
+      - ./var/mail-dkim:/out
     networks:
       - crm_backend_net
 
@@ -80,3 +152,5 @@ networks:
 
 volumes:
   database_data:
+  mail_dkim_keys:
+  redis_data:

@@ -31,7 +31,7 @@ class PaymentController extends AbstractController
             $status = ($auth['code'] ?? '') === 'user_blocked' ? 403 : 401;
 
             return $this->json([
-                'error' => ($auth['code'] ?? '') === 'user_blocked' ? 'Access denied' : 'Unauthorized',
+                'error' => ($auth['code'] ?? '') === 'user_blocked' ? 'Аккаунт заблокирован. Обратитесь в клуб.' : 'Нужно войти в аккаунт ещё раз',
                 'code' => $auth['code'] ?? 'unauthorized',
                 'message' => $auth['message'] ?? 'Войдите в приложение, чтобы продолжить.',
             ], $status);

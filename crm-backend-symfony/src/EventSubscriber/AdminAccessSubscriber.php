@@ -32,7 +32,7 @@ final class AdminAccessSubscriber
         }
 
         $route = $request->attributes->get('_route');
-        if (in_array($route, ['admin_login', 'admin_login_check'], true)) {
+        if (in_array($route, ['admin_login', 'admin_login_check', 'admin_forgot_password', 'admin_reset_password'], true)) {
             return;
         }
 

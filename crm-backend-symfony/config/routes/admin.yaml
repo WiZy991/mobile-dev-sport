@@ -3,6 +3,16 @@ admin_login:
   controller: App\Controller\Admin\AdminSecurityController::login
   methods: [GET]
 
+admin_forgot_password:
+  path: /admin/forgot-password
+  controller: App\Controller\Admin\AdminSecurityController::forgotPassword
+  methods: [GET, POST]
+
+admin_reset_password:
+  path: /admin/reset-password
+  controller: App\Controller\Admin\AdminSecurityController::resetPassword
+  methods: [GET, POST]
+
 admin_login_check:
   path: /admin/login_check
   controller: App\Controller\Admin\AdminSecurityController::loginCheck

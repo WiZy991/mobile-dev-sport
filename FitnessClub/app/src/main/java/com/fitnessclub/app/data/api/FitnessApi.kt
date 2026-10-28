@@ -41,6 +41,12 @@ interface FitnessApi {
     @POST("auth/logout")
     suspend fun logout(): Response<Unit>
 
+    @POST("auth/password/forgot")
+    suspend fun passwordForgot(@Body request: PasswordForgotRequest): Response<PasswordResetResponse>
+
+    @POST("auth/password/reset")
+    suspend fun passwordReset(@Body request: PasswordResetRequest): Response<PasswordResetResponse>
+
     @POST("auth/sber/login")
     suspend fun sberLogin(@Body request: SberLoginRequest): Response<SberLoginUrlResponse>
 

@@ -7,7 +7,8 @@ namespace App\Service\Notification;
 use Psr\Log\LoggerInterface;
 
 /**
- * Отправка email: SMTP (если задан SMTP_HOST) или fallback через mail().
+ * Исходящая почта клуба: свой SMTP (в Docker — контейнер mail/Postfix),
+ * без Gmail/Yandex и без SMSC.
  */
 final class ClientEmailNotifier
 {
@@ -15,10 +16,10 @@ final class ClientEmailNotifier
         private readonly ?string $mailFrom = null,
         private readonly ?string $mailFromName = null,
         private readonly ?string $smtpHost = null,
-        private readonly int $smtpPort = 587,
+        private readonly int $smtpPort = 25,
         private readonly ?string $smtpUser = null,
         private readonly ?string $smtpPassword = null,
-        private readonly string $smtpEncryption = 'tls',
+        private readonly string $smtpEncryption = 'none',
         private readonly bool $enabled = true,
         private readonly ?LoggerInterface $logger = null,
     ) {
@@ -39,49 +40,39 @@ final class ClientEmailNotifier
         $fromName = $this->mailFromName ?: 'WorldCashFit';
 
         $host = trim((string) $this->smtpHost);
-        if ($host !== '') {
-            $this->sendViaSmtp($host, $from, $fromName, $to, $subject, $body);
+        $port = $this->smtpPort > 0 ? $this->smtpPort : 25;
+        $enc = strtolower(trim($this->smtpEncryption));
 
+        if ($host !== '' && $this->sendViaSmtp($host, $port, $enc, $from, $fromName, $to, $subject, $body)) {
             return;
         }
 
-        $this->sendViaMailFunction($from, $fromName, $to, $subject, $body);
-    }
-
-    private function sendViaMailFunction(
-        string $from,
-        string $fromName,
-        string $to,
-        string $subject,
-        string $body,
-    ): void {
-        $headers = implode("\r\n", [
-            'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset=UTF-8',
-            'From: ' . $this->formatAddress($fromName, $from),
-        ]);
-
-        $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
-        $sent = @mail($to, $encodedSubject, $body, $headers);
-        if (!$sent) {
-            $this->logger?->warning('Email via mail() failed; configure SMTP_HOST in .env', [
-                'to' => $to,
-                'subject' => $subject,
-            ]);
+        // Свой Postfix в Docker (сервис mail). SMSC и PHP mail() не используем.
+        if ($host !== 'mail' && $this->sendViaSmtp('mail', 25, 'none', $from, $fromName, $to, $subject, $body)) {
+            return;
         }
+
+        $this->logger?->error('Outgoing mail failed: check the mail container and DNS (SPF/DKIM)', [
+            'to' => $to,
+            'subject' => $subject,
+            'smtp_host' => $host !== '' ? $host : 'mail',
+        ]);
     }
 
     private function sendViaSmtp(
         string $host,
+        int $port,
+        string $encryption,
         string $from,
         string $fromName,
         string $to,
         string $subject,
         string $body,
-    ): void {
-        $encryption = strtolower(trim($this->smtpEncryption));
-        $remote = $host . ':' . ($this->smtpPort > 0 ? $this->smtpPort : 587);
-        $transport = $encryption === 'ssl' ? 'ssl://' . $remote : $remote;
+    ): bool {
+        $useSsl = in_array($encryption, ['ssl', 'smtps'], true);
+        $useTls = in_array($encryption, ['tls', 'starttls'], true);
+        $remote = $host . ':' . $port;
+        $transport = $useSsl ? 'ssl://' . $remote : $remote;
 
         $socket = @stream_socket_client(
             $transport,
@@ -91,20 +82,20 @@ final class ClientEmailNotifier
             STREAM_CLIENT_CONNECT,
         );
         if (!\is_resource($socket)) {
-            $this->logger?->error('SMTP connection failed', [
+            $this->logger?->warning('SMTP connection failed', [
                 'host' => $host,
-                'port' => $this->smtpPort,
+                'port' => $port,
                 'error' => $errstr ?: (string) $errno,
             ]);
 
-            return;
+            return false;
         }
 
         try {
             $this->smtpExpect($socket, [220]);
             $this->smtpCommand($socket, 'EHLO worldcashfit.ru', [250]);
 
-            if ($encryption === 'tls') {
+            if ($useTls) {
                 $this->smtpCommand($socket, 'STARTTLS', [220]);
                 if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
                     throw new \RuntimeException('STARTTLS failed');
@@ -124,13 +115,18 @@ final class ClientEmailNotifier
             $this->smtpCommand($socket, 'RCPT TO:<' . $to . '>', [250, 251]);
             $this->smtpCommand($socket, 'DATA', [354]);
 
+            $domain = substr(strrchr($from, '@') ?: '@worldcashfit.ru', 1) ?: 'worldcashfit.ru';
+            $messageId = sprintf('<%s@%s>', bin2hex(random_bytes(12)), $domain);
             $message = implode("\r\n", [
                 'From: ' . $this->formatAddress($fromName, $from),
                 'To: <' . $to . '>',
                 'Subject: =?UTF-8?B?' . base64_encode($subject) . '?=',
+                'Date: ' . gmdate('D, d M Y H:i:s') . ' +0000',
+                'Message-ID: ' . $messageId,
                 'MIME-Version: 1.0',
                 'Content-Type: text/plain; charset=UTF-8',
                 'Content-Transfer-Encoding: 8bit',
+                'Auto-Submitted: auto-generated',
                 '',
                 $body,
                 '',
@@ -138,12 +134,17 @@ final class ClientEmailNotifier
             fwrite($socket, $message . "\r\n.\r\n");
             $this->smtpExpect($socket, [250]);
             $this->smtpCommand($socket, 'QUIT', [221]);
+
+            return true;
         } catch (\Throwable $e) {
             $this->logger?->error('SMTP send failed', [
                 'to' => $to,
                 'subject' => $subject,
+                'host' => $host,
                 'error' => $e->getMessage(),
             ]);
+
+            return false;
         } finally {
             fclose($socket);
         }

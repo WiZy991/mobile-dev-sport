@@ -39,7 +39,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $snapshot = $this->occupancyService->getUserAccessSnapshot($user, null);
@@ -52,7 +52,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $visitCount = (int) $this->em->createQueryBuilder()
@@ -101,7 +101,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $sales = $this->em->getRepository(Sale::class)->findBy(
@@ -132,7 +132,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         return $this->json($this->serializeUserProfile($user));
@@ -145,7 +145,7 @@ class UserController extends AbstractController
 
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         if (isset($data['email'])) {
@@ -215,7 +215,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
         if ($user->isEmailVerified()) {
             return $this->json(['ok' => true, 'already_verified' => true, 'email' => $user->getEmail()]);
@@ -232,7 +232,7 @@ class UserController extends AbstractController
 
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $currentPassword = (string) ($data['current_password'] ?? '');
@@ -274,7 +274,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $this->accountDeletion->deleteAccount($user);
@@ -287,7 +287,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         return $this->json(ClientNotificationService::serializeSettings($user));
@@ -298,7 +298,7 @@ class UserController extends AbstractController
     {
         $user = $this->userResolver->resolve($request);
         if (!$user) {
-            return $this->json(['error' => 'Unauthorized'], 401);
+            return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
         $data = json_decode($request->getContent(), true) ?? [];

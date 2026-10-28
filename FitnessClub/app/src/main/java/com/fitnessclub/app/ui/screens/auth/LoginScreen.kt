@@ -90,6 +90,7 @@ fun LoginScreen(
     startWithSber: Boolean = false,
     onNavigateToPhoneRegister: () -> Unit = {},
     onNavigateToRegister: () -> Unit = {},
+    onNavigateToForgotPassword: () -> Unit = {},
     onLoginSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -241,6 +242,19 @@ fun LoginScreen(
                         textDecoration = TextDecoration.Underline,
                     )
                 }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onNavigateToRegister,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.5.dp, LoginSurfaceWhite),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LoginSurfaceWhite),
+                ) {
+                    Text("Зарегистрироваться", fontWeight = FontWeight.Bold)
+                }
                 TextButton(onClick = { viewModel.toggleEmailLogin() }) {
                     Text(
                         if (uiState.showEmailLogin) "Скрыть другие варианты входа" else "Другие варианты входа",
@@ -371,6 +385,13 @@ fun LoginScreen(
                     }
                 },
             )
+            TextButton(onClick = onNavigateToForgotPassword) {
+                Text(
+                    "Забыли пароль?",
+                    color = LoginSurfaceWhite.copy(0.92f),
+                    textDecoration = TextDecoration.Underline,
+                )
+            }
             uiState.validationSummary?.let { summary ->
                 Spacer(Modifier.height(12.dp))
                 if (uiState.loginHintCode == "password_not_set") {
