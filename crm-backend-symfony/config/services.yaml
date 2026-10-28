@@ -40,6 +40,7 @@ parameters:
     apple_sign_in_client_id_default: 'co.worldcashbox.WorldFintess'
     default_organization_slug_default: 'demo'
     mail_from_default: 'noreply@worldcashfit.ru'
+    mail_public_origin_default: 'https://worldcashfit.ru'
     mail_from_name_default: 'WorldCashFit'
     mail_enabled_default: '1'
     smtp_host_default: 'mail'

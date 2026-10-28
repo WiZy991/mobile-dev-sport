@@ -25,12 +25,13 @@ final class CeleryMailPublisher
     ) {
     }
 
-    public function enqueuePasswordReset(string $to, string $subject, string $text): void
+    public function enqueuePasswordReset(string $to, string $subject, string $text, ?string $html = null): void
     {
         $this->enqueue(self::TASK_PASSWORD_RESET, [
             'to' => $to,
             'subject' => $subject,
             'text' => $text,
+            'html' => $html,
             'mail_from' => $this->mailFrom ?: 'noreply@worldcashfit.ru',
             'mail_from_name' => $this->mailFromName ?: 'WorldCashFit',
         ]);

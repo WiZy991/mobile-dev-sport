@@ -10,21 +10,24 @@ use App\Entity\User;
 use App\Service\Mail\CeleryMailPublisher;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Восстановление пароля: 6-значный код в письме + ссылка для веба.
+ * Восстановление пароля: ссылка в письме (сайт / админка).
  * Не раскрывает, есть ли аккаунт с таким email.
  */
 final class PasswordResetService
 {
-    public const GENERIC_OK = 'Если такой email есть в системе, мы отправили письмо с кодом. Проверьте почту, включая папку «Спам».';
+    public const GENERIC_OK = 'Если такой email есть в системе, мы отправили письмо со ссылкой. Новый пароль задаёте по ссылке из письма. Проверьте и папку «Спам».';
 
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly CeleryMailPublisher $mailPublisher,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly LoggerInterface $logger,
+        #[Autowire('%env(default:mail_public_origin_default:DEFAULT_URI)%')]
+        private readonly string $publicSiteOrigin = 'https://worldcashfit.ru',
     ) {
     }
 
@@ -63,10 +66,7 @@ final class PasswordResetService
         $this->em->persist($row);
         $this->em->flush();
 
-        $origin = rtrim($publicOrigin, '/');
-        if ($origin === '') {
-            $origin = 'https://worldcashfit.ru';
-        }
+        $origin = $this->resolvePublicOrigin($publicOrigin);
         $link = $audience === PasswordResetToken::AUDIENCE_STAFF
             ? $origin . '/admin/reset-password?token=' . urlencode($linkToken)
             : $origin . '/forgot-password?token=' . urlencode($linkToken);
@@ -74,12 +74,18 @@ final class PasswordResetService
         $name = $found['name'] !== '' ? $found['name'] : 'Здравствуйте';
         $subject = 'Восстановление пароля';
         $body = $name . "!\n\n"
-            . "Код для смены пароля: {$code}\n\n"
-            . "Или откройте ссылку (действует 30 минут):\n{$link}\n\n"
+            . "Чтобы задать новый пароль, откройте ссылку (действует 30 минут):\n{$link}\n\n"
             . "Если вы не просили восстановить пароль, просто проигнорируйте это письмо.\n";
+        $safeName = htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $safeLink = htmlspecialchars($link, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $html = '<p>' . $safeName . '!</p>'
+            . '<p>Чтобы задать новый пароль, нажмите кнопку. Ссылка действует 30 минут.</p>'
+            . '<p><a href="' . $safeLink . '" style="display:inline-block;padding:12px 20px;background:#D35400;color:#fff;text-decoration:none;border-radius:999px;font-weight:700;">Задать новый пароль</a></p>'
+            . '<p>Если кнопка не открывается, скопируйте ссылку:<br>' . $safeLink . '</p>'
+            . '<p>Если вы не просили восстановить пароль, просто проигнорируйте это письмо.</p>';
 
         try {
-            $this->mailPublisher->enqueuePasswordReset($email, $subject, $body);
+            $this->mailPublisher->enqueuePasswordReset($email, $subject, $body, $html);
         } catch (\Throwable $e) {
             $this->logger->error('Password reset email enqueue failed (redis/celery)', [
                 'email' => $email,
@@ -278,6 +284,27 @@ final class PasswordResetService
         if ($open !== []) {
             $this->em->flush();
         }
+    }
+
+    private function resolvePublicOrigin(string $fallback): string
+    {
+        foreach ([$this->publicSiteOrigin, $fallback, 'https://worldcashfit.ru'] as $candidate) {
+            $origin = rtrim(trim($candidate), '/');
+            if ($origin === '') {
+                continue;
+            }
+            if (!preg_match('#^https?://#i', $origin)) {
+                $origin = 'https://' . $origin;
+            }
+            $host = (string) parse_url($origin, PHP_URL_HOST);
+            if ($host === '' || in_array($host, ['localhost', '127.0.0.1', '::1'], true)) {
+                continue;
+            }
+
+            return $origin;
+        }
+
+        return 'https://worldcashfit.ru';
     }
 
     private function hashSecret(string $value): string

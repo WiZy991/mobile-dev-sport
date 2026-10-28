@@ -341,7 +341,7 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful) {
                 ApiResult.Success(
                     body?.message?.takeIf { it.isNotBlank() }
-                        ?: "Если такой email есть в системе, мы отправили письмо. Проверьте почту, включая папку «Спам».",
+                        ?: "Если такой email есть в системе, мы отправили письмо со ссылкой. Проверьте почту, включая папку «Спам».",
                 )
             } else {
                 errorFrom(response, "Не удалось отправить письмо. Попробуйте позже.")

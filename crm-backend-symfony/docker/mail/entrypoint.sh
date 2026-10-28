@@ -17,12 +17,12 @@ chmod 600 "${KEYS_DIR}/${SELECTOR}.private"
 
 # DNS-запись для копирования в панель домена.
 if [ -f "${KEYS_DIR}/${SELECTOR}.txt" ]; then
+    DKIM_VALUE=$(grep -o '"[^"]*"' "${KEYS_DIR}/${SELECTOR}.txt" | tr -d '"' | tr -d '\n' | tr -s ' ')
     {
         echo "# Добавьте в DNS домена ${DOMAIN}:"
         echo "# 1) SPF  TXT  @  =  v=spf1 ip4:ВАШ_IP_СЕРВЕРА mx -all"
         echo "# 2) DKIM TXT  ${SELECTOR}._domainkey  ="
-        tr -d '\n' < "${KEYS_DIR}/${SELECTOR}.txt" | sed 's/.*"\(v=DKIM1[^"]*\)".*/\1/'
-        echo
+        echo "${DKIM_VALUE}"
         echo "# 3) DMARC TXT  _dmarc  =  v=DMARC1; p=quarantine; rua=mailto:noreply@${DOMAIN}"
         echo "# PTR (обратная DNS) сервера должен указывать на ${HOSTNAME}"
     } > "${OUT_DIR}/dkim-dns.txt"
