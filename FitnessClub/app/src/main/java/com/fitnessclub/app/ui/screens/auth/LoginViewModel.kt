@@ -333,10 +333,11 @@ class LoginViewModel @Inject constructor(
             "invalid_credentials" -> {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    // Одно сообщение на форму, без дублей под Email и Пароль.
                     validationSummary = hint.message,
                     loginHintCode = "invalid_credentials",
-                    emailError = hint.message,
-                    passwordError = hint.message,
+                    emailError = null,
+                    passwordError = null,
                     showValidationAttempted = true,
                     error = null,
                 )
