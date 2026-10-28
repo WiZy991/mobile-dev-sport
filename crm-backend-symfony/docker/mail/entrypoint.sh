@@ -7,24 +7,30 @@ SELECTOR="${DKIM_SELECTOR:-default}"
 KEYS_DIR="/etc/opendkim/keys/${DOMAIN}"
 OUT_DIR="${DKIM_OUT_DIR:-/out}"
 
-mkdir -p "$KEYS_DIR" /etc/opendkim "$OUT_DIR" /var/spool/postfix /var/lib/postfix
+mkdir -p "$KEYS_DIR" /etc/opendkim "$OUT_DIR" /var/spool/postfix /var/lib/postfix /run/opendkim /var/log
 
 if [ ! -f "${KEYS_DIR}/${SELECTOR}.private" ]; then
     opendkim-genkey -D "$KEYS_DIR" -d "$DOMAIN" -s "$SELECTOR"
 fi
-chown -R opendkim:opendkim /etc/opendkim/keys
+chown -R opendkim:opendkim /etc/opendkim /etc/opendkim/keys /run/opendkim
 chmod 600 "${KEYS_DIR}/${SELECTOR}.private"
+chmod 644 "${KEYS_DIR}/${SELECTOR}.txt" 2>/dev/null || true
 
-# DNS-запись для копирования в панель домена.
+# DNS-запись для копирования в панель домена (BeGet). MX не трогать.
 if [ -f "${KEYS_DIR}/${SELECTOR}.txt" ]; then
     DKIM_VALUE=$(grep -o '"[^"]*"' "${KEYS_DIR}/${SELECTOR}.txt" | tr -d '"' | tr -d '\n' | tr -s ' ')
     {
-        echo "# Добавьте в DNS домена ${DOMAIN}:"
-        echo "# 1) SPF  TXT  @  =  v=spf1 ip4:ВАШ_IP_СЕРВЕРА mx -all"
-        echo "# 2) DKIM TXT  ${SELECTOR}._domainkey  ="
+        echo "# DNS worldcashfit.ru (панель BeGet). MX mx1/mx2.beget.com НЕ менять."
+        echo "# Публичный IPv4 этого VPS: curl -4 ifconfig.me"
+        echo "#"
+        echo "# 1) SPF  TXT  @   заменить redirect=beget.com на:"
+        echo "#    v=spf1 include:beget.com ip4:IPv4_VPS -all"
+        echo "# 2) A    mail     = IPv4_VPS"
+        echo "# 3) DKIM TXT  ${SELECTOR}._domainkey  ="
         echo "${DKIM_VALUE}"
-        echo "# 3) DMARC TXT  _dmarc  =  v=DMARC1; p=quarantine; rua=mailto:noreply@${DOMAIN}"
-        echo "# PTR (обратная DNS) сервера должен указывать на ${HOSTNAME}"
+        echo "# 4) DMARC TXT  _dmarc  ="
+        echo "#    v=DMARC1; p=none; rua=mailto:noreply@${DOMAIN}"
+        echo "# 5) PTR у хостера VPS: IPv4_VPS -> ${HOSTNAME}"
     } > "${OUT_DIR}/dkim-dns.txt"
     echo "==== DKIM / DNS ===="
     cat "${OUT_DIR}/dkim-dns.txt"
@@ -32,9 +38,10 @@ if [ -f "${KEYS_DIR}/${SELECTOR}.txt" ]; then
 fi
 
 cat > /etc/opendkim.conf <<EOF
-Syslog                  no
+Syslog                  yes
+SyslogSuccess           yes
 LogWhy                  yes
-Canonicalization        relaxed/simple
+Canonicalization        relaxed/relaxed
 Mode                    s
 SubDomains              yes
 AutoRestart             yes
@@ -49,6 +56,8 @@ InternalHosts           /etc/opendkim/TrustedHosts
 ExternalIgnoreList      /etc/opendkim/TrustedHosts
 UserID                  opendkim
 UMask                   007
+OversignHeaders         From
+AlwaysAddARHeader       yes
 EOF
 
 echo "${SELECTOR}._domainkey.${DOMAIN} ${DOMAIN}:${SELECTOR}:${KEYS_DIR}/${SELECTOR}.private" > /etc/opendkim/KeyTable
@@ -63,9 +72,8 @@ ${HOSTNAME}
 10.0.0.0/8
 192.168.0.0/16
 EOF
-
-mkdir -p /run/opendkim
-chown opendkim:opendkim /run/opendkim
+chown opendkim:opendkim /etc/opendkim/KeyTable /etc/opendkim/SigningTable /etc/opendkim/TrustedHosts
+chmod 644 /etc/opendkim/KeyTable /etc/opendkim/SigningTable /etc/opendkim/TrustedHosts
 
 postconf -e "myhostname = ${HOSTNAME}"
 postconf -e "mydomain = ${DOMAIN}"
@@ -80,12 +88,15 @@ postconf -e "smtpd_relay_restrictions = permit_mynetworks, reject"
 postconf -e "smtpd_sender_restrictions = permit_mynetworks, reject"
 postconf -e "smtpd_client_restrictions = permit_mynetworks, reject"
 postconf -e "relayhost ="
+postconf -e "smtp_helo_name = ${HOSTNAME}"
 postconf -e "smtp_tls_security_level = may"
+postconf -e "smtp_tls_loglevel = 1"
 postconf -e "smtpd_tls_security_level = none"
 postconf -e "smtpd_banner = \$myhostname ESMTP"
 postconf -e "maillog_file = /dev/stdout"
 postconf -e "compatibility_level = 3.6"
-postconf -e "milter_default_action = accept"
+# Без подписи DKIM письмо не отправляем (иначе Mail.ru сразу режет как спам).
+postconf -e "milter_default_action = tempfail"
 postconf -e "milter_protocol = 6"
 postconf -e "smtpd_milters = inet:127.0.0.1:8891"
 postconf -e "non_smtpd_milters = inet:127.0.0.1:8891"
@@ -98,5 +109,21 @@ postconf -e "alias_database ="
 postconf -F '*/*/chroot = n' || true
 
 opendkim -x /etc/opendkim.conf
-sleep 1
+ready=0
+i=0
+while [ "$i" -lt 20 ]; do
+    if nc -z 127.0.0.1 8891 2>/dev/null; then
+        ready=1
+        break
+    fi
+    i=$((i + 1))
+    sleep 0.3
+done
+if [ "$ready" != 1 ]; then
+    echo "OpenDKIM did not start on 127.0.0.1:8891" >&2
+    opendkim -n -x /etc/opendkim.conf || true
+    exit 1
+fi
+echo "OpenDKIM listening on 127.0.0.1:8891"
+
 exec /usr/sbin/postfix start-fg

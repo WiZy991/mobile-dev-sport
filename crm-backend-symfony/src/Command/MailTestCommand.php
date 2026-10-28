@@ -40,10 +40,15 @@ final class MailTestCommand extends Command
             return Command::FAILURE;
         }
 
-        $subject = 'Проверка почты клуба';
-        $body = "Это тестовое письмо с вашего сервера (worldcashfit.ru).\nЕсли оно дошло — восстановление пароля будет приходить так же.\n";
+        $subject = 'Восстановление пароля';
+        $body = "Здравствуйте!\n\n"
+            . "Это проверка исходящей почты клуба. Если письмо дошло — восстановление пароля будет приходить так же.\n\n"
+            . "Если вы не просили это письмо, просто проигнорируйте его.\n";
+        $html = '<p>Здравствуйте!</p>'
+            . '<p>Это проверка исходящей почты клуба. Если письмо дошло — восстановление пароля будет приходить так же.</p>'
+            . '<p>Если вы не просили это письмо, просто проигнорируйте его.</p>';
         if ($input->getOption('celery')) {
-            $this->mailPublisher->enqueuePasswordReset($email, $subject, $body);
+            $this->mailPublisher->enqueuePasswordReset($email, $subject, $body, $html);
             $io->success('Письмо поставлено в очередь Redis/Celery на ' . $email . '. Проверьте входящие и «Спам».');
         } else {
             $this->emailNotifier->send($email, $subject, $body);

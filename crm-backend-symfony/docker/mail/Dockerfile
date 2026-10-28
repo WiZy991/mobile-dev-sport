@@ -9,6 +9,7 @@ RUN apt-get update \
         opendkim-tools \
         ca-certificates \
         openssl \
+        netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/mail/entrypoint.sh /entrypoint.sh

@@ -47,6 +47,8 @@ def _smtp_send(
     msg["Date"] = formatdate(localtime=False)
     msg["Message-ID"] = msgid
     msg["Auto-Submitted"] = "auto-generated"
+    msg["List-Unsubscribe"] = "<https://worldcashfit.ru/>"
+    msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     msg.attach(MIMEText(text, "plain", "utf-8"))
     if html:
         msg.attach(MIMEText(html, "html", "utf-8"))
