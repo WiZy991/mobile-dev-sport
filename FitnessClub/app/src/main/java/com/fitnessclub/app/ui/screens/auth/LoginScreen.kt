@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -231,29 +232,9 @@ fun LoginScreen(
                         Text("Продолжить", fontWeight = FontWeight.Bold)
                     }
                 }
-                TextButton(
-                    onClick = {
-                        openSupportContact(context, uiState.supportEmail, uiState.supportPhone)
-                    },
-                ) {
-                    Text(
-                        "Связаться с поддержкой",
-                        color = LoginSurfaceWhite.copy(0.92f),
-                        textDecoration = TextDecoration.Underline,
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = onNavigateToRegister,
-                    enabled = !uiState.isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.5.dp, LoginSurfaceWhite),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LoginSurfaceWhite),
-                ) {
-                    Text("Зарегистрироваться", fontWeight = FontWeight.Bold)
+                uiState.error?.let { err ->
+                    Spacer(Modifier.height(12.dp))
+                    LoginNoticeBanner(message = err)
                 }
                 TextButton(onClick = { viewModel.toggleEmailLogin() }) {
                     Text(
@@ -323,10 +304,10 @@ fun LoginScreen(
                 }
             }
 
-            if (phoneLogin) {
+            if (phoneLogin && uiState.otpStep != LoginOtpStep.PHONE) {
                 uiState.error?.let { err ->
-                    Spacer(Modifier.height(8.dp))
-                    Text(err, color = LoginSurfaceWhite, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(12.dp))
+                    LoginNoticeBanner(message = err)
                 }
             }
 
@@ -392,9 +373,9 @@ fun LoginScreen(
                     textDecoration = TextDecoration.Underline,
                 )
             }
-            uiState.validationSummary?.let { summary ->
-                Spacer(Modifier.height(12.dp))
-                if (uiState.loginHintCode == "password_not_set") {
+            if (uiState.loginHintCode == "password_not_set") {
+                uiState.validationSummary?.let { summary ->
+                    Spacer(Modifier.height(12.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = LoginSurfaceWhite),
@@ -433,19 +414,6 @@ fun LoginScreen(
                             }
                         }
                     }
-                } else {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF5D2E00).copy(0.55f)),
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        Text(
-                            text = summary,
-                            color = Color(0xFFFFE0B2),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(14.dp),
-                        )
-                    }
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -477,6 +445,20 @@ fun LoginScreen(
                     Text("Войти", fontWeight = FontWeight.Bold)
                 }
             }
+            // Ошибки email-входа — сразу под «Войти». OTP-ошибку не дублируем (она под «Продолжить»).
+            when {
+                uiState.loginHintCode != "password_not_set" &&
+                    !uiState.validationSummary.isNullOrBlank() -> {
+                    Spacer(Modifier.height(10.dp))
+                    LoginNoticeBanner(message = uiState.validationSummary!!)
+                }
+                !phoneLogin &&
+                    uiState.error != null &&
+                    uiState.validationSummary == null -> {
+                    Spacer(Modifier.height(10.dp))
+                    LoginNoticeBanner(message = uiState.error!!)
+                }
+            }
 
             if (sberLogin) {
                 Spacer(Modifier.height(12.dp))
@@ -487,18 +469,6 @@ fun LoginScreen(
                 )
             }
             Spacer(Modifier.height(16.dp))
-
-            uiState.error?.let { err ->
-                if (uiState.validationSummary == null) {
-                    Text(
-                        text = err,
-                        color = LoginSurfaceWhite,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
 
             if (sberLogin) {
                 Spacer(Modifier.height(20.dp))
@@ -527,30 +497,6 @@ fun LoginScreen(
                 }
             }
 
-            if (!phoneLogin) {
-                OutlinedButton(
-                    onClick = onNavigateToRegister,
-                    enabled = !uiState.isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.5.dp, LoginSurfaceWhite),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LoginSurfaceWhite),
-                ) {
-                    Text("Зарегистрироваться", fontWeight = FontWeight.Bold)
-                }
-                TextButton(
-                    onClick = { openSupportContact(context, uiState.supportEmail, uiState.supportPhone) },
-                ) {
-                    Text(
-                        "Связаться с поддержкой",
-                        color = LoginSurfaceWhite.copy(0.92f),
-                        textDecoration = TextDecoration.Underline,
-                    )
-                }
-            }
-
             Spacer(Modifier.height(14.dp))
             LoginBiometricButton(
                 configured = uiState.biometricLoginConfigured,
@@ -563,6 +509,41 @@ fun LoginScreen(
             }
             }
 
+            if (!phoneLogin || uiState.otpStep == LoginOtpStep.PHONE) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Вы у нас впервые?",
+                    color = LoginSurfaceWhite.copy(0.92f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onNavigateToRegister,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.5.dp, LoginSurfaceWhite),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LoginSurfaceWhite),
+                ) {
+                    Text("Регистрация", fontWeight = FontWeight.Bold)
+                }
+                TextButton(
+                    onClick = {
+                        openSupportContact(context, uiState.supportEmail, uiState.supportPhone)
+                    },
+                ) {
+                    Text(
+                        "Связаться с поддержкой",
+                        color = LoginSurfaceWhite.copy(0.92f),
+                        textDecoration = TextDecoration.Underline,
+                    )
+                }
+            }
+
             Spacer(Modifier.height(24.dp))
         }
         SnackbarHost(
@@ -571,6 +552,36 @@ fun LoginScreen(
                 .align(Alignment.BottomCenter)
                 .padding(16.dp),
         )
+    }
+}
+
+@Composable
+private fun LoginNoticeBanner(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF5D2E00).copy(alpha = 0.72f)),
+        border = BorderStroke(1.5.dp, Color(0xFFFFE0B2).copy(alpha = 0.85f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = Color(0xFFFFE0B2),
+                modifier = Modifier.size(22.dp),
+            )
+            Text(
+                text = message,
+                color = Color(0xFFFFF3E0),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
@@ -660,8 +671,9 @@ private fun LoginCredentialField(
                 focusedContainerColor = LoginSurfaceWhite,
                 unfocusedContainerColor = LoginSurfaceWhite,
                 disabledContainerColor = LoginSurfaceWhite.copy(0.7f),
-                focusedTextColor = LoginBackground,
-                unfocusedTextColor = LoginBackground,
+                focusedTextColor = Color(0xFF1C1C1C),
+                unfocusedTextColor = Color(0xFF1C1C1C),
+                disabledTextColor = Color(0xFF1C1C1C),
                 focusedLabelColor = LoginBackground.copy(0.75f),
                 unfocusedLabelColor = LoginBackground.copy(0.6f),
                 cursorColor = LoginBackground,
@@ -710,8 +722,9 @@ private fun LoginCredentialField(
                 focusedContainerColor = LoginSurfaceWhite,
                 unfocusedContainerColor = LoginSurfaceWhite,
                 disabledContainerColor = LoginSurfaceWhite.copy(0.7f),
-                focusedTextColor = LoginBackground,
-                unfocusedTextColor = LoginBackground,
+                focusedTextColor = Color(0xFF1C1C1C),
+                unfocusedTextColor = Color(0xFF1C1C1C),
+                disabledTextColor = Color(0xFF1C1C1C),
                 focusedLabelColor = LoginBackground.copy(0.75f),
                 unfocusedLabelColor = LoginBackground.copy(0.6f),
                 cursorColor = LoginBackground,

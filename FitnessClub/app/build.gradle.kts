@@ -21,11 +21,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "ru.worldcashfit.app"
+        applicationId = "ru.worldcashfit"
         minSdk = 26
         targetSdk = 36
-        versionCode = 44
-        versionName = "1.3.5"
+        versionCode = 46
+        versionName = "1.3.7"
 
         multiDexEnabled = true
         multiDexKeepProguard = file("multidex-config.pro")

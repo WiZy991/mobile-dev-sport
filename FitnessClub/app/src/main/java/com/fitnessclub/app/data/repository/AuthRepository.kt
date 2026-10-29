@@ -271,7 +271,10 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful && body != null) {
                 ApiResult.Success(body)
             } else {
-                val parsed = parseAuthError(response, "")
+                val parsed = parseAuthError(
+                    response,
+                    "Не удалось отправить код. Используйте другие варианты входа.",
+                )
                 ApiResult.Error(
                     otpSendFailureMessage(response.code(), parsed),
                     response.code(),
@@ -683,27 +686,28 @@ class AuthRepository @Inject constructor(
         parseAuthError(response, fallback).message
 
     private fun otpSendFailureMessage(http: Int, parsed: ParsedAuthError): String {
+        val sendFailed = "Не удалось отправить код. Используйте другие варианты входа."
         val fromCode = when (parsed.authCode?.trim()) {
-            "channel_unavailable" ->
-                parsed.message.ifBlank { "Сейчас не удалось отправить код. Попробуйте позже или войдите по почте." }
-            "channel_undeliverable" ->
-                parsed.message.ifBlank { "Не удалось доставить код. Запросите повторно или войдите по почте." }
-            "channel_failed" ->
-                parsed.message.ifBlank { "Не удалось отправить код. Попробуйте позже или войдите по почте." }
+            "channel_unavailable",
+            "channel_undeliverable",
+            "channel_failed",
+            "invalid_channel",
+            "server_error" -> sendFailed
             "otp_rate_limited" -> "Слишком много запросов кода. Подождите час."
             "otp_too_soon" -> "Повторная отправка будет доступна через несколько секунд"
             "invalid_phone" -> "Укажите номер телефона полностью"
-            "invalid_channel" -> "Не удалось отправить код. Попробуйте позже или войдите по почте."
             "captcha_required" -> parsed.message.ifBlank { "Подтвердите, что вы не робот — ответьте на простой пример." }
             "rate_limited" -> "Слишком много попыток. Подождите несколько минут и попробуйте снова."
             else -> null
         }
         if (fromCode != null) return fromCode
-        return clientFacingMessage(
-            parsed.message,
-            http,
-            "Не удалось отправить код подтверждения. Попробуйте позже или войдите по почте.",
-        )
+        // 5xx / пустой JSON без кода — не «сервис недоступен», а понятный текст про код.
+        if (http >= 500 || parsed.message.isBlank() ||
+            parsed.message.contains("временно недоступен", ignoreCase = true)
+        ) {
+            return sendFailed
+        }
+        return clientFacingMessage(parsed.message, http, sendFailed)
     }
 
     private fun humanizeKnownAuthMessages(text: String, code: String?): String {
@@ -711,12 +715,12 @@ class AuthRepository @Inject constructor(
             "password_not_set" -> return passwordNotSetHintMessage()
             "passport_locked", "profile_locked" ->
                 return "На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки."
-            "channel_unavailable" ->
-                return text.ifBlank { "Сейчас не удалось отправить код. Попробуйте позже или войдите по почте." }
-            "channel_undeliverable" ->
-                return text.ifBlank { "Не удалось доставить код. Запросите повторно или войдите по почте." }
-            "channel_failed" ->
-                return text.ifBlank { "Не удалось отправить код. Попробуйте позже или войдите по почте." }
+            "channel_unavailable",
+            "channel_undeliverable",
+            "channel_failed",
+            "invalid_channel",
+            "server_error" ->
+                return "Не удалось отправить код. Используйте другие варианты входа."
             "captcha_required" ->
                 return text.ifBlank { "Подтвердите, что вы не робот — ответьте на простой пример." }
             "rate_limited" ->
