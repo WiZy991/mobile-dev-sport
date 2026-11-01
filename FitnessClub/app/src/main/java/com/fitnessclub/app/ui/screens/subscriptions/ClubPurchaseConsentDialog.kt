@@ -1,10 +1,14 @@
 package com.fitnessclub.app.ui.screens.subscriptions
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -54,34 +59,39 @@ fun ClubPurchaseConsentDialog(
 ) {
     var safetyBriefed by remember { mutableStateOf(false) }
     var dataAccurate by remember { mutableStateOf(false) }
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    // Карточка не выше ~88% экрана — иначе при крупном шрифте уезжает под системную панель.
+    val maxCardHeight = screenHeight * 0.88f
 
     Dialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = true,
+        ),
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp)
+                .heightIn(max = maxCardHeight)
+                .navigationBarsPadding(),
             shape = RoundedCornerShape(16.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-            ) {
-                Text(
-                    text = "Подтвердите согласие перед покупкой",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(max = maxHeight)
                         .verticalScroll(rememberScrollState())
-                        .padding(top = 12.dp),
+                        .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    Text(
+                        text = "Подтвердите согласие перед покупкой",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
                     Text(
                         text = "Вы покупаете абонемент у клуба «${context.clubName}».",
                         style = MaterialTheme.typography.bodyMedium,
@@ -150,13 +160,7 @@ fun ClubPurchaseConsentDialog(
                             modifier = Modifier.weight(1f),
                         )
                     }
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
+                    Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = onConfirm,
                         enabled = safetyBriefed && dataAccurate && !isLoading,
@@ -179,6 +183,7 @@ fun ClubPurchaseConsentDialog(
                     ) {
                         Text("Назад")
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }

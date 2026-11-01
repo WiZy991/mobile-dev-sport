@@ -1,7 +1,10 @@
 package com.fitnessclub.app.ui.screens.profile
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -146,13 +149,19 @@ fun ProfileScreen(
                     )
                 }
                 
-                // Gamification (streak & achievements)
                 if (uiState.stats != null) {
                     item {
                         GamificationCard(
                             totalVisits = uiState.stats!!.totalVisits,
                             streakDays = uiState.stats!!.streakDays,
-                            achievements = uiState.stats!!.achievements
+                            achievements = uiState.stats!!.unlockedAchievements,
+                        )
+                    }
+                    item {
+                        HallVisitsCard(
+                            lastVisitAt = uiState.stats!!.lastVisitAt,
+                            recentVisitDates = uiState.stats!!.visitDates,
+                            totalVisits = uiState.stats!!.totalVisits,
                         )
                     }
                 }
@@ -374,20 +383,20 @@ fun ProfileScreen(
 private fun GamificationCard(
     totalVisits: Int,
     streakDays: Int,
-    achievements: List<Achievement>
+    achievements: List<Achievement>,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
-            containerColor = AccentOrange.copy(alpha = 0.12f)
-        )
+            containerColor = AccentOrange.copy(alpha = 0.12f),
+        ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("$totalVisits", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -407,13 +416,13 @@ private fun GamificationCard(
                 achievements.take(4).forEach { ach ->
                     Row(
                         modifier = Modifier.padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             Icons.Default.Star,
                             contentDescription = null,
                             tint = AccentOrange,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
@@ -425,6 +434,144 @@ private fun GamificationCard(
             }
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HallVisitsCard(
+    lastVisitAt: String?,
+    recentVisitDates: List<String>,
+    totalVisits: Int,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val dates = if (expanded) recentVisitDates else recentVisitDates.take(8)
+    val moreCount = (recentVisitDates.size - dates.size).coerceAtLeast(0)
+    val lastLabel = formatLastVisitLabel(lastVisitAt)
+        ?: recentVisitDates.firstOrNull()?.let { formatVisitDateChip(it, compact = false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        border = BorderStroke(
+            1.dp,
+            AccentOrange.copy(alpha = 0.28f),
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AccentOrange.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FitnessCenter,
+                        contentDescription = null,
+                        tint = AccentOrange,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Визиты в зал",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = when {
+                            lastLabel != null -> "Последний раз — $lastLabel"
+                            totalVisits > 0 -> "Даты визитов подтянутся при следующем входе"
+                            else -> "После входа по QR здесь появятся даты"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            if (recentVisitDates.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    dates.forEach { iso ->
+                        VisitDateChip(label = formatVisitDateChip(iso, compact = true))
+                    }
+                }
+                if (moreCount > 0 || expanded) {
+                    TextButton(
+                        onClick = { expanded = !expanded },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            if (expanded) "Свернуть"
+                            else "Показать ещё $moreCount",
+                            color = AccentOrange,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VisitDateChip(label: String) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = AccentOrange.copy(alpha = 0.12f),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
+}
+
+/** null — нет данных о последнем визите */
+private fun formatLastVisitLabel(iso: String?): String? {
+    if (iso.isNullOrBlank()) return null
+    return runCatching {
+        val instant = java.time.OffsetDateTime.parse(iso)
+        val local = instant.toLocalDateTime()
+        val today = java.time.LocalDate.now()
+        val date = local.toLocalDate()
+        val time = local.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+        when (date) {
+            today -> "сегодня, $time"
+            today.minusDays(1) -> "вчера, $time"
+            else -> date.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM", java.util.Locale("ru"))) + ", $time"
+        }
+    }.getOrNull()
+}
+
+private fun formatVisitDateChip(isoDate: String, compact: Boolean): String {
+    return runCatching {
+        val date = java.time.LocalDate.parse(isoDate)
+        val today = java.time.LocalDate.now()
+        when {
+            date == today -> "Сегодня"
+            date == today.minusDays(1) -> "Вчера"
+            compact && date.year == today.year ->
+                date.format(java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale("ru")))
+            else ->
+                date.format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale("ru")))
+        }
+    }.getOrElse { isoDate }
 }
 
 @Composable

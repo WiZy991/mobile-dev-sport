@@ -127,10 +127,26 @@ data class ChangePasswordRequest(
     val newPassword: String,
 )
 
-/** Частичный PUT /user/profile — только переданные поля (без паспорта). */
+/** Частичный PUT /user/profile — только ненулевые поля (Gson не шлёт null). */
 data class ProfilePatchRequest(
     @SerializedName("club_id")
     val clubId: Int? = null,
+    @SerializedName("name")
+    val name: String? = null,
+    @SerializedName("email")
+    val email: String? = null,
+    @SerializedName("date_of_birth")
+    val dateOfBirth: String? = null,
+    @SerializedName("passport_series")
+    val passportSeries: String? = null,
+    @SerializedName("passport_number")
+    val passportNumber: String? = null,
+    @SerializedName("passport_issued_by")
+    val passportIssuedBy: String? = null,
+    @SerializedName("passport_issue_date")
+    val passportIssueDate: String? = null,
+    @SerializedName("registration_address")
+    val registrationAddress: String? = null,
 )
 
 data class RegisterRequest(

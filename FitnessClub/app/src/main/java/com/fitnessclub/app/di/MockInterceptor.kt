@@ -172,6 +172,8 @@ class MockInterceptor : Interceptor {
     {
         "total_visits": 12,
         "streak_days": 3,
+        "last_visit_at": "2026-10-28T18:40:00+10:00",
+        "recent_visit_dates": ["2026-10-28", "2026-10-26", "2026-10-24", "2026-10-21", "2026-10-18", "2026-10-15"],
         "achievements": [
             {"id": "first_visit", "name": "Первое посещение", "description": "Добро пожаловать в зал!", "unlocked": true},
             {"id": "regular", "name": "Регулярный посетитель", "description": "5 посещений", "unlocked": true},

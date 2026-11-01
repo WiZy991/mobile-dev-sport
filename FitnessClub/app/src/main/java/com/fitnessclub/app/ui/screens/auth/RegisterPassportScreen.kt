@@ -89,22 +89,46 @@ fun RegisterPassportScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Primary,
                     titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
+                    navigationIconContentColor = Color.White,
+                ),
             )
-        }
+        },
+        bottomBar = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            ) {
+                uiState.passportError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp))
+                }
+                Button(
+                    onClick = {
+                        if (viewModel.validatePassportDraft()) onBack()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White),
+                ) {
+                    Text("СОХРАНИТЬ", fontWeight = FontWeight.Bold)
+                }
+            }
+        },
     ) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .padding(padding),
         ) {
-            uiState.passportError?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp))
-            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            ) {
             Row(Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f)) {
                     TextField(
@@ -197,17 +221,7 @@ fun RegisterPassportScreen(
                 singleLine = true,
                 colors = lightFieldColors()
             )
-            Spacer(Modifier.height(32.dp))
-            Button(
-                onClick = {
-                    if (viewModel.validatePassportDraft()) onBack()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
-            ) {
-                Text("СОХРАНИТЬ", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
             }
         }
     }

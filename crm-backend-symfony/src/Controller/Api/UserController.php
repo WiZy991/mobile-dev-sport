@@ -12,6 +12,7 @@ use App\Service\CurrentUserResolver;
 use App\Service\Auth\EmailVerificationService;
 use App\Service\Auth\ProfileLegalLock;
 use App\Service\MobileClientPayloadApplier;
+use App\Service\ClubTimezone;
 use App\Service\Reports\OccupancyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -55,19 +56,9 @@ class UserController extends AbstractController
             return $this->json(['error' => 'Нужно войти в аккаунт ещё раз'], 401);
         }
 
-        $visitCount = (int) $this->em->createQueryBuilder()
-            ->select('COUNT(a.id)')
-            ->from(AccessLog::class, 'a')
-            ->where('a.user = :user')
-            ->andWhere('a.eventType = :entry')
-            ->andWhere('a.result = :granted')
-            ->setParameter('user', $user)
-            ->setParameter('entry', 'entry')
-            ->setParameter('granted', 'granted')
-            ->getQuery()
-            ->getSingleScalarResult();
-
-        $streakDays = $this->computeStreak($user);
+        $history = $this->buildVisitHistory($user);
+        $visitCount = $history['total_visits'];
+        $streakDays = $history['streak_days'];
 
         $achievements = [];
         if ($visitCount >= 1) {
@@ -92,6 +83,8 @@ class UserController extends AbstractController
         return $this->json([
             'total_visits' => $visitCount,
             'streak_days' => $streakDays,
+            'last_visit_at' => $history['last_visit_at'],
+            'recent_visit_dates' => $history['recent_visit_dates'],
             'achievements' => $achievements,
         ]);
     }
@@ -155,11 +148,14 @@ class UserController extends AbstractController
                 $user->setEmailVerifiedAt(null);
             }
         }
-        if (isset($data['name'])) {
+        if (\array_key_exists('name', $data)) {
             $incoming = trim((string) $data['name']);
             $current = trim($user->getName());
-            if ($incoming !== '' && $incoming !== $current) {
-                if ($this->profileLegalLock->isLocked($user) && $this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
+            // Сравнение без лишних пробелов — иначе полный PUT с тем же ФИО даёт ложный profile_locked.
+            $incomingNorm = preg_replace('/\s+/u', ' ', $incoming) ?? $incoming;
+            $currentNorm = preg_replace('/\s+/u', ' ', $current) ?? $current;
+            if ($incoming !== '' && mb_strtolower($incomingNorm) !== mb_strtolower($currentNorm)) {
+                if ($this->profileLegalLock->isLocked($user) && $this->profileLegalLock->blocksFilledIdentityChange($currentNorm, $incomingNorm)) {
                     return $this->json([
                         'error' => 'На ваши данные приобретён активный абонемент. Если данные изменились, свяжитесь со службой поддержки.',
                         'code' => 'profile_locked',
@@ -323,26 +319,81 @@ class UserController extends AbstractController
         ]);
     }
 
-    private function computeStreak(User $user): int
+    /**
+     * История успешных входов: всего, серия, последняя дата/время, недавние календарные дни (часовой пояс клуба).
+     *
+     * @return array{
+     *   total_visits: int,
+     *   streak_days: int,
+     *   last_visit_at: ?string,
+     *   recent_visit_dates: list<string>
+     * }
+     */
+    private function buildVisitHistory(User $user): array
     {
-        $dates = $this->em->getConnection()->fetchFirstColumn(
-            'SELECT DISTINCT DATE(created_at) AS d
-             FROM access_logs
-             WHERE user_id = :uid
-               AND event_type = \'entry\'
-               AND result = \'granted\'
-             ORDER BY d DESC
-             LIMIT 60',
-            ['uid' => $user->getId()],
-        );
-        $dates = array_values(array_map('strval', $dates));
+        $visitCount = (int) $this->em->createQueryBuilder()
+            ->select('COUNT(a.id)')
+            ->from(AccessLog::class, 'a')
+            ->where('a.user = :user')
+            ->andWhere('a.eventType = :entry')
+            ->andWhere('a.result = :granted')
+            ->setParameter('user', $user)
+            ->setParameter('entry', 'entry')
+            ->setParameter('granted', 'granted')
+            ->getQuery()
+            ->getSingleScalarResult();
 
+        /** @var list<AccessLog> $logs */
+        $logs = $this->em->createQueryBuilder()
+            ->select('a')
+            ->from(AccessLog::class, 'a')
+            ->where('a.user = :user')
+            ->andWhere('a.eventType = :entry')
+            ->andWhere('a.result = :granted')
+            ->setParameter('user', $user)
+            ->setParameter('entry', 'entry')
+            ->setParameter('granted', 'granted')
+            ->orderBy('a.createdAt', 'DESC')
+            ->setMaxResults(400)
+            ->getQuery()
+            ->getResult();
+
+        $tz = ClubTimezone::zone();
+        $uniqueDates = [];
+        $lastVisitAt = null;
+        foreach ($logs as $log) {
+            $local = $log->getCreatedAt()->setTimezone($tz);
+            if ($lastVisitAt === null) {
+                $lastVisitAt = $local;
+            }
+            $day = $local->format('Y-m-d');
+            if (!isset($uniqueDates[$day])) {
+                $uniqueDates[$day] = true;
+            }
+            if (\count($uniqueDates) >= 60) {
+                break;
+            }
+        }
+
+        $dates = array_keys($uniqueDates);
+
+        return [
+            'total_visits' => $visitCount,
+            'streak_days' => $this->computeStreakFromDates($dates),
+            'last_visit_at' => $lastVisitAt?->format('Y-m-d\TH:i:sP'),
+            'recent_visit_dates' => \array_slice($dates, 0, 30),
+        ];
+    }
+
+    /** @param list<string> $dates Y-m-d по убыванию */
+    private function computeStreakFromDates(array $dates): int
+    {
         if ($dates === []) {
             return 0;
         }
 
-        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
-        $yesterday = (new \DateTimeImmutable('yesterday'))->format('Y-m-d');
+        $today = ClubTimezone::now()->format('Y-m-d');
+        $yesterday = ClubTimezone::now()->modify('-1 day')->format('Y-m-d');
 
         $firstDate = $dates[0];
         if ($firstDate !== $today && $firstDate !== $yesterday) {
@@ -356,7 +407,9 @@ class UserController extends AbstractController
                 break;
             }
             ++$streak;
-            $expected = (new \DateTimeImmutable($d . ' -1 day'))->format('Y-m-d');
+            $expected = (new \DateTimeImmutable($d . ' 12:00:00', ClubTimezone::zone()))
+                ->modify('-1 day')
+                ->format('Y-m-d');
         }
 
         return $streak;

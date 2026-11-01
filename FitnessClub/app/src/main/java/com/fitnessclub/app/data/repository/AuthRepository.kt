@@ -569,7 +569,11 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    /** Сохранить паспорт перед покупкой абонемента. */
+    /**
+     * Сохранить паспорт перед покупкой.
+     * Шлём только нужные поля (не весь User) — иначе при активном абонементе
+     * сервер видит «смену ФИО» в полном PUT и отвечает profile_locked.
+     */
     suspend fun savePassportForPurchase(
         series: String,
         number: String,
@@ -580,19 +584,67 @@ class AuthRepository @Inject constructor(
         name: String? = null,
         email: String? = null,
     ): ApiResult<User> {
-        val current = tokenManager.getUser().first()
+        val current = refreshCurrentUser()
+            ?: tokenManager.getUser().first()
             ?: return ApiResult.Error("Профиль не загружен")
-        return updateProfile(
-            name = name?.trim()?.takeIf { it.isNotEmpty() } ?: current.name,
-            email = email?.trim()?.takeIf { it.isNotEmpty() } ?: current.email,
-            phone = current.phone,
-            dateOfBirth = dateOfBirthIso ?: current.dateOfBirth,
-            passportSeries = series,
-            passportNumber = number,
-            passportIssuedBy = issuedBy,
-            passportIssueDate = issueDateIso,
-            registrationAddress = registrationAddress,
+
+        val nextName = name?.trim()?.takeIf { it.isNotEmpty() } ?: current.name
+        val nextEmail = email?.trim()?.takeIf { it.isNotEmpty() } ?: current.email
+        val nextDob = (dateOfBirthIso ?: current.dateOfBirth)?.take(10)
+        val seriesDigits = series.filter { it.isDigit() }.take(4)
+        val numberDigits = number.filter { it.isDigit() }.take(6)
+        val issueIso = issueDateIso.take(10)
+        val addr = registrationAddress.trim()
+
+        val sameAsStored =
+            nextName.trim() == current.name.trim() &&
+                nextEmail.trim().equals(current.email.trim(), ignoreCase = true) &&
+                (nextDob ?: "") == (current.dateOfBirth?.take(10) ?: "") &&
+                seriesDigits == current.passportSeries.orEmpty().filter { it.isDigit() } &&
+                numberDigits == current.passportNumber.orEmpty().filter { it.isDigit() } &&
+                issuedBy.trim() == current.passportIssuedBy.orEmpty().trim() &&
+                issueIso == (current.passportIssueDate?.take(10) ?: "") &&
+                addr == current.registrationAddress.orEmpty().trim()
+
+        if (sameAsStored) {
+            return ApiResult.Success(current)
+        }
+
+        // При lock не трогаем ФИО/ДР — только паспорт/адрес/email (полный User PUT ломался на «смене имени»).
+        val locked = current.profileLocked
+        val body = ProfilePatchRequest(
+            name = nextName.takeIf { !locked && it.trim() != current.name.trim() },
+            email = nextEmail.takeIf { !it.equals(current.email.trim(), ignoreCase = true) },
+            dateOfBirth = nextDob.takeIf {
+                !locked && !it.isNullOrBlank() && it != current.dateOfBirth?.take(10)
+            },
+            passportSeries = seriesDigits.takeIf { it.length == 4 },
+            passportNumber = numberDigits.takeIf { it.length == 6 },
+            passportIssuedBy = issuedBy.trim().takeIf { it.isNotEmpty() },
+            passportIssueDate = issueIso.takeIf { it.length == 10 },
+            registrationAddress = addr.takeIf { it.isNotEmpty() },
         )
+
+        return try {
+            val response = api.patchProfile(body)
+            if (response.isSuccessful && response.body() != null) {
+                val updated = response.body()!!
+                tokenManager.saveUser(updated)
+                ApiResult.Success(updated)
+            } else {
+                val parsed = parseAuthError(response, "Не удалось сохранить профиль")
+                // Покупку не стопорим: паспорт мог не сохраниться, но «Продолжить» должен работать.
+                if (parsed.authCode in setOf("profile_locked", "passport_locked") &&
+                    current.isPassportCompleteForPurchase()
+                ) {
+                    ApiResult.Success(current)
+                } else {
+                    ApiResult.Error(parsed.message, response.code(), parsed.authCode)
+                }
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.userMessage("Неизвестная ошибка"))
+        }
     }
 
     /** Привязать зал клиента (выбор при регистрации / смене клуба). */

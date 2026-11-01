@@ -11,10 +11,10 @@ class FitnessClubApp : Application() {
     override fun onCreate() {
         super.onCreate()
         PushChannels.ensureCreated(this)
-        // osmdroid: кэш в sandbox приложения + обязательный User-Agent
+        // osmdroid: кэш в sandbox + User-Agent (тайл-серверам нужен идентифицируемый UA)
         val base = File(cacheDir, "osmdroid")
         Configuration.getInstance().apply {
-            userAgentValue = packageName
+            userAgentValue = "${packageName}/${BuildConfig.VERSION_NAME}"
             osmdroidBasePath = base
             osmdroidTileCache = File(base, "tiles")
             load(this@FitnessClubApp, getSharedPreferences("osmdroid", MODE_PRIVATE))

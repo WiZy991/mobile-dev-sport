@@ -349,12 +349,21 @@ data class PurchaseItem(
 
 data class UserStats(
     @com.google.gson.annotations.SerializedName("total_visits")
-    val totalVisits: Int,
+    val totalVisits: Int = 0,
     @com.google.gson.annotations.SerializedName("streak_days")
-    val streakDays: Int,
+    val streakDays: Int = 0,
+    /** ISO-8601 с таймзоной клуба, например 2026-10-28T18:40:00+10:00 */
+    @com.google.gson.annotations.SerializedName("last_visit_at")
+    val lastVisitAt: String? = null,
+    /** Календарные дни посещений Y-m-d, от новых к старым. Gson без поля → null. */
+    @com.google.gson.annotations.SerializedName("recent_visit_dates")
+    val recentVisitDates: List<String>? = null,
     @com.google.gson.annotations.SerializedName("achievements")
-    val achievements: List<Achievement>
-)
+    val achievements: List<Achievement>? = null,
+) {
+    val visitDates: List<String> get() = recentVisitDates.orEmpty()
+    val unlockedAchievements: List<Achievement> get() = achievements.orEmpty()
+}
 
 data class AccessStatus(
     @com.google.gson.annotations.SerializedName("is_inside")

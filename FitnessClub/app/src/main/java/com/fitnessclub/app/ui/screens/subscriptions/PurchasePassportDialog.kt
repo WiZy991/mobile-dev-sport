@@ -3,6 +3,8 @@ package com.fitnessclub.app.ui.screens.subscriptions
 import android.view.WindowManager
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -55,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import com.fitnessclub.app.ui.components.calmTextFieldColors
 import com.fitnessclub.app.ui.screens.auth.formatRussianPhoneMask
 import com.fitnessclub.app.ui.screens.auth.normalizeRussianNationalDigits
@@ -262,191 +267,206 @@ fun PurchasePassportDialog(
 
     Dialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = true,
+        ),
     ) {
         val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
         SideEffect {
-            @Suppress("DEPRECATION")
-            dialogWindow?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            dialogWindow?.let { w ->
+                // Иначе Dialog даёт безлимитную высоту → verticalScroll «думает», что скроллить нечего.
+                WindowCompat.setDecorFitsSystemWindows(w, true)
+                @Suppress("DEPRECATION")
+                w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            }
         }
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            if (review) "Проверьте данные профиля" else "Данные профиля",
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss, enabled = !isLoading) {
-                            Icon(Icons.Default.Close, contentDescription = "Отмена")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                )
-            },
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = "Эти данные попадут в договор с клубом. Проверьте ФИО, дату рождения, паспорт, адрес и email. Телефон менять здесь нельзя.",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(bottom = 4.dp),
+        // Box fillMaxSize фиксирует размер окна; без этого скролл в Dialog не работает.
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                if (review) "Проверьте данные профиля" else "Данные профиля",
+                                fontWeight = FontWeight.Bold,
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onDismiss, enabled = !isLoading) {
+                                Icon(Icons.Default.Close, contentDescription = "Отмена")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Primary,
+                            titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
                     )
-                    ProfileReviewField(
-                        value = name,
-                        onValueChange = { name = it; clearError(F_NAME) },
-                        label = "ФИО",
-                        enabled = !isLoading && editable(F_NAME, gate.name.isNotBlank()),
-                        onUnlock = { unlocked = unlocked + F_NAME },
-                        showPencil = review,
-                        error = fieldErrors[F_NAME],
-                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requesters.getValue(F_NAME)),
-                    )
-                    TextField(
-                        value = phoneDisplay,
-                        onValueChange = {},
-                        label = { Text("Телефон") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = false,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = calmTextFieldColors(),
-                    )
-                    ProfileReviewField(
-                        value = email,
-                        onValueChange = { email = it.trim(); clearError(F_EMAIL) },
-                        label = "Email",
-                        enabled = !isLoading && editable(F_EMAIL, gate.email.isNotBlank()),
-                        onUnlock = { unlocked = unlocked + F_EMAIL },
-                        showPencil = review,
-                        keyboardType = KeyboardType.Email,
-                        error = fieldErrors[F_EMAIL],
-                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requesters.getValue(F_EMAIL)),
-                    )
-                    DateField(
-                        digits = birthDigits,
-                        onDigitsChange = { birthDigits = it; clearError(F_DOB) },
-                        label = "Дата рождения",
-                        enabled = !isLoading && editable(F_DOB, gate.initialDobDisplay.isNotBlank()),
-                        locked = review && gate.initialDobDisplay.isNotBlank() && F_DOB !in unlocked && F_DOB !in fieldErrors,
-                        onUnlock = { unlocked = unlocked + F_DOB },
-                        onOpenPicker = { birthPickerOpen = true },
-                        isLoading = isLoading,
-                        error = fieldErrors[F_DOB],
-                        visualTransformation = dateMask,
-                        modifier = Modifier.bringIntoViewRequester(requesters.getValue(F_DOB)),
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        ProfileReviewField(
-                            value = series,
-                            onValueChange = {
-                                series = it.filter { c -> c.isDigit() }.take(4)
-                                clearError(F_SERIES)
-                            },
-                            label = "Серия",
-                            enabled = !isLoading && editable(F_SERIES, gate.series.filter { it.isDigit() }.length == 4),
-                            onUnlock = { unlocked = unlocked + F_SERIES },
-                            showPencil = review,
-                            modifier = Modifier.weight(1f).bringIntoViewRequester(requesters.getValue(F_SERIES)),
-                            keyboardType = KeyboardType.Number,
-                            error = fieldErrors[F_SERIES],
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        ProfileReviewField(
-                            value = number,
-                            onValueChange = {
-                                number = it.filter { c -> c.isDigit() }.take(6)
-                                clearError(F_NUMBER)
-                            },
-                            label = "Номер",
-                            enabled = !isLoading && editable(F_NUMBER, gate.number.filter { it.isDigit() }.length == 6),
-                            onUnlock = { unlocked = unlocked + F_NUMBER },
-                            showPencil = review,
-                            modifier = Modifier.weight(1f).bringIntoViewRequester(requesters.getValue(F_NUMBER)),
-                            keyboardType = KeyboardType.Number,
-                            error = fieldErrors[F_NUMBER],
-                        )
-                    }
-                    ProfileReviewField(
-                        value = issuedBy,
-                        onValueChange = { issuedBy = it.take(300); clearError(F_ISSUED_BY) },
-                        label = "Кем выдан",
-                        enabled = !isLoading && editable(F_ISSUED_BY, gate.issuedBy.isNotBlank()),
-                        onUnlock = { unlocked = unlocked + F_ISSUED_BY },
-                        showPencil = review,
-                        minLines = 2,
-                        error = fieldErrors[F_ISSUED_BY],
-                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requesters.getValue(F_ISSUED_BY)),
-                    )
-                    DateField(
-                        digits = issueDigits,
-                        onDigitsChange = { issueDigits = it; clearError(F_ISSUE_DATE) },
-                        label = "Дата выдачи",
-                        enabled = !isLoading && editable(F_ISSUE_DATE, gate.issueDateDisplay.isNotBlank()),
-                        locked = review && gate.issueDateDisplay.isNotBlank() && F_ISSUE_DATE !in unlocked && F_ISSUE_DATE !in fieldErrors,
-                        onUnlock = { unlocked = unlocked + F_ISSUE_DATE },
-                        onOpenPicker = { issuePickerOpen = true },
-                        isLoading = isLoading,
-                        error = fieldErrors[F_ISSUE_DATE],
-                        visualTransformation = dateMask,
-                        modifier = Modifier.bringIntoViewRequester(requesters.getValue(F_ISSUE_DATE)),
-                    )
-                    ProfileReviewField(
-                        value = address,
-                        onValueChange = { address = it; clearError(F_ADDRESS) },
-                        label = "Адрес прописки",
-                        enabled = !isLoading && editable(F_ADDRESS, gate.registrationAddress.isNotBlank()),
-                        onUnlock = { unlocked = unlocked + F_ADDRESS },
-                        showPencil = review,
-                        minLines = 2,
-                        error = fieldErrors[F_ADDRESS],
-                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requesters.getValue(F_ADDRESS)),
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                val bottomMessage = when {
-                    fieldErrors.isNotEmpty() -> "Исправьте поля, отмеченные красным"
-                    else -> error
-                }
-                bottomMessage?.let {
-                    Text(
-                        it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(bottom = 6.dp),
-                    )
-                }
-                Button(
-                    onClick = { submit() },
-                    enabled = !isLoading,
+                },
+            ) { padding ->
+                BoxWithConstraints(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                    shape = RoundedCornerShape(12.dp),
+                        .fillMaxSize()
+                        .padding(padding)
+                        .imePadding(),
                 ) {
-                    Text(
-                        if (isLoading) "Сохраняем…" else "Продолжить",
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    val scroll = rememberScrollState()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(maxHeight)
+                            .verticalScroll(scroll)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Эти данные попадут в договор с клубом. Проверьте ФИО, дату рождения, паспорт, адрес и email. Телефон менять здесь нельзя.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                        ProfileReviewField(
+                            value = name,
+                            onValueChange = { name = it; clearError(F_NAME) },
+                            label = "ФИО",
+                            enabled = !isLoading && editable(F_NAME, gate.name.isNotBlank()),
+                            onUnlock = { unlocked = unlocked + F_NAME },
+                            showPencil = review,
+                            error = fieldErrors[F_NAME],
+                            modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requesters.getValue(F_NAME)),
+                        )
+                        TextField(
+                            value = phoneDisplay,
+                            onValueChange = {},
+                            label = { Text("Телефон") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = false,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = calmTextFieldColors(),
+                        )
+                        ProfileReviewField(
+                            value = email,
+                            onValueChange = { email = it.trim(); clearError(F_EMAIL) },
+                            label = "Email",
+                            enabled = !isLoading && editable(F_EMAIL, gate.email.isNotBlank()),
+                            onUnlock = { unlocked = unlocked + F_EMAIL },
+                            showPencil = review,
+                            keyboardType = KeyboardType.Email,
+                            error = fieldErrors[F_EMAIL],
+                            modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requesters.getValue(F_EMAIL)),
+                        )
+                        DateField(
+                            digits = birthDigits,
+                            onDigitsChange = { birthDigits = it; clearError(F_DOB) },
+                            label = "Дата рождения",
+                            enabled = !isLoading && editable(F_DOB, gate.initialDobDisplay.isNotBlank()),
+                            locked = review && gate.initialDobDisplay.isNotBlank() && F_DOB !in unlocked && F_DOB !in fieldErrors,
+                            onUnlock = { unlocked = unlocked + F_DOB },
+                            onOpenPicker = { birthPickerOpen = true },
+                            isLoading = isLoading,
+                            error = fieldErrors[F_DOB],
+                            visualTransformation = dateMask,
+                            modifier = Modifier.bringIntoViewRequester(requesters.getValue(F_DOB)),
+                        )
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                            ProfileReviewField(
+                                value = series,
+                                onValueChange = {
+                                    series = it.filter { c -> c.isDigit() }.take(4)
+                                    clearError(F_SERIES)
+                                },
+                                label = "Серия",
+                                enabled = !isLoading && editable(F_SERIES, gate.series.filter { it.isDigit() }.length == 4),
+                                onUnlock = { unlocked = unlocked + F_SERIES },
+                                showPencil = review,
+                                modifier = Modifier.weight(1f).bringIntoViewRequester(requesters.getValue(F_SERIES)),
+                                keyboardType = KeyboardType.Number,
+                                error = fieldErrors[F_SERIES],
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            ProfileReviewField(
+                                value = number,
+                                onValueChange = {
+                                    number = it.filter { c -> c.isDigit() }.take(6)
+                                    clearError(F_NUMBER)
+                                },
+                                label = "Номер",
+                                enabled = !isLoading && editable(F_NUMBER, gate.number.filter { it.isDigit() }.length == 6),
+                                onUnlock = { unlocked = unlocked + F_NUMBER },
+                                showPencil = review,
+                                modifier = Modifier.weight(1f).bringIntoViewRequester(requesters.getValue(F_NUMBER)),
+                                keyboardType = KeyboardType.Number,
+                                error = fieldErrors[F_NUMBER],
+                            )
+                        }
+                        ProfileReviewField(
+                            value = issuedBy,
+                            onValueChange = { issuedBy = it.take(300); clearError(F_ISSUED_BY) },
+                            label = "Кем выдан",
+                            enabled = !isLoading && editable(F_ISSUED_BY, gate.issuedBy.isNotBlank()),
+                            onUnlock = { unlocked = unlocked + F_ISSUED_BY },
+                            showPencil = review,
+                            minLines = 2,
+                            error = fieldErrors[F_ISSUED_BY],
+                            modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requesters.getValue(F_ISSUED_BY)),
+                        )
+                        DateField(
+                            digits = issueDigits,
+                            onDigitsChange = { issueDigits = it; clearError(F_ISSUE_DATE) },
+                            label = "Дата выдачи",
+                            enabled = !isLoading && editable(F_ISSUE_DATE, gate.issueDateDisplay.isNotBlank()),
+                            locked = review && gate.issueDateDisplay.isNotBlank() && F_ISSUE_DATE !in unlocked && F_ISSUE_DATE !in fieldErrors,
+                            onUnlock = { unlocked = unlocked + F_ISSUE_DATE },
+                            onOpenPicker = { issuePickerOpen = true },
+                            isLoading = isLoading,
+                            error = fieldErrors[F_ISSUE_DATE],
+                            visualTransformation = dateMask,
+                            modifier = Modifier.bringIntoViewRequester(requesters.getValue(F_ISSUE_DATE)),
+                        )
+                        ProfileReviewField(
+                            value = address,
+                            onValueChange = { address = it; clearError(F_ADDRESS) },
+                            label = "Адрес прописки",
+                            enabled = !isLoading && editable(F_ADDRESS, gate.registrationAddress.isNotBlank()),
+                            onUnlock = { unlocked = unlocked + F_ADDRESS },
+                            showPencil = review,
+                            minLines = 2,
+                            error = fieldErrors[F_ADDRESS],
+                            modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requesters.getValue(F_ADDRESS)),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        val bottomMessage = when {
+                            fieldErrors.isNotEmpty() -> "Исправьте поля, отмеченные красным"
+                            else -> error
+                        }
+                        bottomMessage?.let {
+                            Text(
+                                it,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Button(
+                            onClick = { submit() },
+                            enabled = !isLoading,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Text(
+                                if (isLoading) "Сохраняем…" else "Продолжить",
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        // Запас, чтобы кнопка целиком была выше системной навигации.
+                        Spacer(Modifier.height(16.dp))
+                    }
                 }
-                Spacer(Modifier.height(24.dp))
             }
         }
     }

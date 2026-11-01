@@ -222,20 +222,9 @@ final class MobileClientPayloadApplier
         }
     }
 
-    /** @param array<string, mixed> $data */
-    private function hasPassportPatchKeys(array $data): bool
-    {
-        foreach (['passport_series', 'passport_number', 'passport_issued_by', 'passport_issue_date'] as $key) {
-            if (\array_key_exists($key, $data)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     /**
-     * Блокируем смену ФИО, даты рождения, паспорта и адреса прописки после договора.
+     * После договора блокируем только смену «личности»: ФИО и дата рождения.
+     * Паспорт и адрес можно править (опечатки вроде года 1010, продление абонемента).
      *
      * @param array<string, mixed> $data
      */
@@ -259,65 +248,6 @@ final class MobileClientPayloadApplier
                 }
             }
             $current = (string) ($user->getDateOfBirth()?->format('Y-m-d') ?? '');
-            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
-                return true;
-            }
-        }
-        if (\array_key_exists('registration_address', $data)) {
-            $v = trim((string) ($data['registration_address'] ?? ''));
-            $current = trim((string) ($user->getRegistrationAddress() ?? ''));
-            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $v)) {
-                return true;
-            }
-        }
-
-        return $this->hasPassportChangingPatch($user, $data);
-    }
-
-    /**
-     * Блокируем только реальную смену паспорта. Полный PUT профиля с теми же полями
-     * (например, смена клуба) не должен давать passport_locked.
-     *
-     * @param array<string, mixed> $data
-     */
-    private function hasPassportChangingPatch(User $user, array $data): bool
-    {
-        if (!$this->hasPassportPatchKeys($data)) {
-            return false;
-        }
-
-        if (\array_key_exists('passport_series', $data)) {
-            $v = preg_replace('/\D+/', '', (string) ($data['passport_series'] ?? '')) ?? '';
-            $current = preg_replace('/\D+/', '', (string) ($user->getPassportSeries() ?? '')) ?? '';
-            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $v)) {
-                return true;
-            }
-        }
-        if (\array_key_exists('passport_number', $data)) {
-            $v = preg_replace('/\D+/', '', (string) ($data['passport_number'] ?? '')) ?? '';
-            $current = preg_replace('/\D+/', '', (string) ($user->getPassportNumber() ?? '')) ?? '';
-            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $v)) {
-                return true;
-            }
-        }
-        if (\array_key_exists('passport_issued_by', $data)) {
-            $v = trim((string) ($data['passport_issued_by'] ?? ''));
-            $current = trim((string) ($user->getPassportIssuedBy() ?? ''));
-            if ($this->profileLegalLock->blocksFilledIdentityChange($current, $v)) {
-                return true;
-            }
-        }
-        if (\array_key_exists('passport_issue_date', $data)) {
-            $pid = $data['passport_issue_date'];
-            $incoming = '';
-            if ($pid !== null && $pid !== '') {
-                try {
-                    $incoming = (new \DateTimeImmutable(trim((string) $pid)))->format('Y-m-d');
-                } catch (\Throwable) {
-                    return trim((string) ($user->getPassportIssueDate()?->format('Y-m-d') ?? '')) !== '';
-                }
-            }
-            $current = (string) ($user->getPassportIssueDate()?->format('Y-m-d') ?? '');
             if ($this->profileLegalLock->blocksFilledIdentityChange($current, $incoming)) {
                 return true;
             }

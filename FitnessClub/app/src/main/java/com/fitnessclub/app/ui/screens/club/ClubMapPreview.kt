@@ -78,9 +78,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
-import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
@@ -108,19 +108,27 @@ private const val MOSCOW_DEFAULT_LON = 37.6173
 /** Маршрут дальше этого — почти наверняка чужой город / дефолт эмулятора. */
 private const val MAX_ROUTE_KM = 250.0
 
-/** CartoCDN — стабильнее OSM.org (часто 403 в WebView/эмуляторе). */
-private val cartoTiles: OnlineTileSourceBase = XYTileSource(
-    "CartoVoyager",
+/**
+ * Растровые тайлы без API-ключа (Carto с сент. 2026 требует key → watermark «KEY REQUIRED»).
+ * Esri: URL z/y/x; имя источника новое — старый кэш Carto не подмешивается.
+ */
+private val streetTiles: OnlineTileSourceBase = object : OnlineTileSourceBase(
+    "EsriWorldStreet",
     1,
     19,
     256,
-    ".png",
+    "",
     arrayOf(
-        "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
-        "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
-        "https://c.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/",
     ),
-)
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        val z = MapTileIndex.getZoom(pMapTileIndex)
+        val x = MapTileIndex.getX(pMapTileIndex)
+        val y = MapTileIndex.getY(pMapTileIndex)
+        return "${getBaseUrl()}$z/$y/$x"
+    }
+}
 
 /**
  * Нативная карта (osmdroid) с точкой клуба.
@@ -291,7 +299,7 @@ fun ClubMapPreview(
                             return super.dispatchTouchEvent(ev)
                         }
                     }.apply {
-                        setTileSource(cartoTiles)
+                        setTileSource(streetTiles)
                         setMultiTouchControls(true)
                         isTilesScaledToDpi = true
                         isClickable = true
@@ -374,6 +382,12 @@ fun ClubMapPreview(
                 }
             }
         }
+        Text(
+            text = "Esri · OpenStreetMap",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+        )
 
         statusText?.let { msg ->
             Text(
