@@ -347,6 +347,13 @@ data class PurchaseItem(
     val clubName: String? = null
 )
 
+data class VisitSessionDto(
+    @com.google.gson.annotations.SerializedName("entry_at")
+    val entryAt: String? = null,
+    @com.google.gson.annotations.SerializedName("exit_at")
+    val exitAt: String? = null,
+)
+
 data class UserStats(
     @com.google.gson.annotations.SerializedName("total_visits")
     val totalVisits: Int = 0,
@@ -355,12 +362,19 @@ data class UserStats(
     /** ISO-8601 с таймзоной клуба, например 2026-10-28T18:40:00+10:00 */
     @com.google.gson.annotations.SerializedName("last_visit_at")
     val lastVisitAt: String? = null,
+    /** Успешные входы ISO-8601, от новых к старым. Gson без поля → null. */
+    @com.google.gson.annotations.SerializedName("recent_visits")
+    val recentVisits: List<String>? = null,
+    /** Пары вход/выход. Gson без поля → null. */
+    @com.google.gson.annotations.SerializedName("recent_visit_sessions")
+    val recentVisitSessions: List<VisitSessionDto>? = null,
     /** Календарные дни посещений Y-m-d, от новых к старым. Gson без поля → null. */
     @com.google.gson.annotations.SerializedName("recent_visit_dates")
     val recentVisitDates: List<String>? = null,
     @com.google.gson.annotations.SerializedName("achievements")
     val achievements: List<Achievement>? = null,
 ) {
+    val visits: List<String> get() = recentVisits.orEmpty()
     val visitDates: List<String> get() = recentVisitDates.orEmpty()
     val unlockedAchievements: List<Achievement> get() = achievements.orEmpty()
 }

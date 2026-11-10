@@ -21,7 +21,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "ru.worldcashfit"
+        applicationId = "ru.worldcashfit.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 46

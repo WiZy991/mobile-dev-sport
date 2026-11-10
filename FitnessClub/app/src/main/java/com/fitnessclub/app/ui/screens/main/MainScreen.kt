@@ -267,6 +267,9 @@ fun MainScreen(
                     onNavigateToSelectClub = {
                         navController.navigate(Screen.SelectPreferredClub.route)
                     },
+                    onNavigateToHallVisits = {
+                        navController.navigate(Screen.HallVisits.route)
+                    },
                 )
             }
         }

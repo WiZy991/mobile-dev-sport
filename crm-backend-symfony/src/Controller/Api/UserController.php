@@ -14,6 +14,7 @@ use App\Service\Auth\ProfileLegalLock;
 use App\Service\MobileClientPayloadApplier;
 use App\Service\ClubTimezone;
 use App\Service\Reports\OccupancyService;
+use App\Service\Reports\VisitSessionResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,6 +34,7 @@ class UserController extends AbstractController
         private readonly ClientNotificationService $clientNotifications,
         private readonly EmailVerificationService $emailVerification,
         private readonly ProfileLegalLock $profileLegalLock,
+        private readonly VisitSessionResolver $visitSessions,
     ) {}
 
     #[Route('/access-status', name: 'api_user_access_status', methods: ['GET'])]
@@ -84,6 +86,8 @@ class UserController extends AbstractController
             'total_visits' => $visitCount,
             'streak_days' => $streakDays,
             'last_visit_at' => $history['last_visit_at'],
+            'recent_visits' => $history['recent_visits'],
+            'recent_visit_sessions' => $history['recent_visit_sessions'],
             'recent_visit_dates' => $history['recent_visit_dates'],
             'achievements' => $achievements,
         ]);
@@ -320,12 +324,15 @@ class UserController extends AbstractController
     }
 
     /**
-     * История успешных входов: всего, серия, последняя дата/время, недавние календарные дни (часовой пояс клуба).
+     * История успешных входов: всего, серия, последняя дата/время,
+     * недавние входы с временем и календарные дни (часовой пояс клуба).
      *
      * @return array{
      *   total_visits: int,
      *   streak_days: int,
      *   last_visit_at: ?string,
+     *   recent_visits: list<string>,
+     *   recent_visit_sessions: list<array{entry_at: string, exit_at: ?string}>,
      *   recent_visit_dates: list<string>
      * }
      */
@@ -360,11 +367,15 @@ class UserController extends AbstractController
 
         $tz = ClubTimezone::zone();
         $uniqueDates = [];
+        $recentVisits = [];
         $lastVisitAt = null;
         foreach ($logs as $log) {
             $local = $log->getCreatedAt()->setTimezone($tz);
             if ($lastVisitAt === null) {
                 $lastVisitAt = $local;
+            }
+            if (\count($recentVisits) < 200) {
+                $recentVisits[] = $local->format('Y-m-d\TH:i:sP');
             }
             $day = $local->format('Y-m-d');
             if (!isset($uniqueDates[$day])) {
@@ -381,8 +392,59 @@ class UserController extends AbstractController
             'total_visits' => $visitCount,
             'streak_days' => $this->computeStreakFromDates($dates),
             'last_visit_at' => $lastVisitAt?->format('Y-m-d\TH:i:sP'),
+            'recent_visits' => $recentVisits,
+            'recent_visit_sessions' => $this->recentVisitSessions($user),
             'recent_visit_dates' => \array_slice($dates, 0, 30),
         ];
+    }
+
+    /**
+     * Пары вход → выход в часовом поясе клуба, от новых к старым.
+     *
+     * @return list<array{entry_at: string, exit_at: ?string}>
+     */
+    private function recentVisitSessions(User $user): array
+    {
+        /** @var list<AccessLog> $events */
+        $events = $this->em->createQueryBuilder()
+            ->select('a')
+            ->from(AccessLog::class, 'a')
+            ->where('a.user = :user')
+            ->andWhere('a.eventType IN (:types)')
+            ->andWhere('a.result = :granted')
+            ->setParameter('user', $user)
+            ->setParameter('types', ['entry', 'exit'])
+            ->setParameter('granted', 'granted')
+            ->orderBy('a.createdAt', 'DESC')
+            ->setMaxResults(800)
+            ->getQuery()
+            ->getResult();
+
+        if ($events === []) {
+            return [];
+        }
+
+        $tz = ClubTimezone::zone();
+        $paired = $this->visitSessions->sessionsFromLogs(array_reverse($events));
+        $sessions = [];
+        foreach (array_reverse($paired) as $session) {
+            $entry = $session['entry'] ?? null;
+            if (!$entry instanceof AccessLog) {
+                continue;
+            }
+            $exit = $session['exit'] ?? null;
+            $sessions[] = [
+                'entry_at' => $entry->getCreatedAt()->setTimezone($tz)->format('Y-m-d\TH:i:sP'),
+                'exit_at' => $exit instanceof AccessLog
+                    ? $exit->getCreatedAt()->setTimezone($tz)->format('Y-m-d\TH:i:sP')
+                    : null,
+            ];
+            if (\count($sessions) >= 200) {
+                break;
+            }
+        }
+
+        return $sessions;
     }
 
     /** @param list<string> $dates Y-m-d по убыванию */

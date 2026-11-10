@@ -1,10 +1,7 @@
 package com.fitnessclub.app.ui.screens.profile
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.fitnessclub.app.data.api.Achievement
 import com.fitnessclub.app.data.config.Brand
 import com.fitnessclub.app.data.model.Subscription
@@ -48,6 +46,7 @@ fun ProfileScreen(
     onNavigateToHelp: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
     onNavigateToSelectClub: () -> Unit = {},
+    onNavigateToHallVisits: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -160,8 +159,10 @@ fun ProfileScreen(
                     item {
                         HallVisitsCard(
                             lastVisitAt = uiState.stats!!.lastVisitAt,
+                            recentVisits = uiState.stats!!.visits,
                             recentVisitDates = uiState.stats!!.visitDates,
                             totalVisits = uiState.stats!!.totalVisits,
+                            onOpenHistory = onNavigateToHallVisits,
                         )
                     }
                 }
@@ -436,90 +437,90 @@ private fun GamificationCard(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+private val VisitRuLocale: java.util.Locale = java.util.Locale("ru")
+private val VisitShortDateFormatter: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("dd.MM.yy")
+private val VisitMonthStandaloneFormatter: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("LLLL", VisitRuLocale)
+private val VisitWeekdayFormatter: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("EEEE", VisitRuLocale)
+private val VisitTimeFormatter: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+private val VisitShortMonths = arrayOf(
+    "янв", "фев", "мар", "апр", "май", "июн",
+    "июл", "авг", "сен", "окт", "ноя", "дек",
+)
+
+data class HallVisit(
+    val date: java.time.LocalDate,
+    val time: java.time.LocalTime?,
+)
+
 @Composable
 private fun HallVisitsCard(
     lastVisitAt: String?,
+    recentVisits: List<String>,
     recentVisitDates: List<String>,
     totalVisits: Int,
+    onOpenHistory: () -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val dates = if (expanded) recentVisitDates else recentVisitDates.take(8)
-    val moreCount = (recentVisitDates.size - dates.size).coerceAtLeast(0)
-    val lastLabel = formatLastVisitLabel(lastVisitAt)
-        ?: recentVisitDates.firstOrNull()?.let { formatVisitDateChip(it, compact = false) }
+    val today = remember { java.time.LocalDate.now() }
+    val entries = remember(recentVisits, recentVisitDates, lastVisitAt) {
+        hallVisitEntries(recentVisits, recentVisitDates, lastVisitAt)
+    }
+    val latest = entries.firstOrNull()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
-        border = BorderStroke(
-            1.dp,
-            AccentOrange.copy(alpha = 0.28f),
-        ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
+        Column(modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) {
+            Text(
+                text = "Визиты в зал",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+
+            if (latest == null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (totalVisits > 0) {
+                        "История подтянется при следующем входе"
+                    } else {
+                        "После входа по QR здесь появится история"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                )
+            } else {
+                Spacer(modifier = Modifier.height(12.dp))
+                VisitHistoryRow(visit = latest, today = today, emphasized = true)
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                Row(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AccentOrange.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center,
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenHistory)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(
+                        text = "Все посещения",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AccentOrange,
+                        modifier = Modifier.weight(1f),
+                    )
                     Icon(
-                        imageVector = Icons.Default.FitnessCenter,
+                        imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
                         tint = AccentOrange,
-                        modifier = Modifier.size(22.dp),
                     )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Визиты в зал",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = when {
-                            lastLabel != null -> "Последний раз — $lastLabel"
-                            totalVisits > 0 -> "Даты визитов подтянутся при следующем входе"
-                            else -> "После входа по QR здесь появятся даты"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            if (recentVisitDates.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(14.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    dates.forEach { iso ->
-                        VisitDateChip(label = formatVisitDateChip(iso, compact = true))
-                    }
-                }
-                if (moreCount > 0 || expanded) {
-                    TextButton(
-                        onClick = { expanded = !expanded },
-                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
-                    ) {
-                        Text(
-                            if (expanded) "Свернуть"
-                            else "Показать ещё $moreCount",
-                            color = AccentOrange,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
                 }
             }
         }
@@ -527,51 +528,182 @@ private fun HallVisitsCard(
 }
 
 @Composable
-private fun VisitDateChip(label: String) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = AccentOrange.copy(alpha = 0.12f),
+internal fun VisitHistoryRow(
+    visit: HallVisit,
+    today: java.time.LocalDate,
+    emphasized: Boolean,
+) {
+    val weekday = visitWeekdayLabel(visit.date, today)
+    val dateLine = visitDateLine(visit.date)
+    val timeLabel = visit.time?.format(VisitTimeFormatter)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (emphasized) {
+                    Modifier
+                        .padding(horizontal = 8.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(AccentOrange.copy(alpha = 0.10f))
+                        .padding(horizontal = 8.dp, vertical = 12.dp)
+                } else {
+                    Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                },
+            ),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        VisitDateTile(
+            dayOfMonth = visit.date.dayOfMonth,
+            monthShort = VisitShortMonths[visit.date.monthValue - 1],
+            emphasized = emphasized,
         )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            if (emphasized) {
+                Text(
+                    text = "Последний вход",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AccentOrange,
+                )
+            }
+            Text(
+                text = weekday,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = dateLine,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (timeLabel != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = timeLabel,
+                style = (if (emphasized) {
+                    MaterialTheme.typography.headlineSmall
+                } else {
+                    MaterialTheme.typography.titleMedium
+                }).copy(fontFeatureSettings = "tnum"),
+                fontWeight = FontWeight.Bold,
+                color = if (emphasized) AccentOrange else MaterialTheme.colorScheme.onSurface,
+            )
+        }
     }
 }
 
-/** null — нет данных о последнем визите */
-private fun formatLastVisitLabel(iso: String?): String? {
-    if (iso.isNullOrBlank()) return null
-    return runCatching {
-        val instant = java.time.OffsetDateTime.parse(iso)
-        val local = instant.toLocalDateTime()
-        val today = java.time.LocalDate.now()
-        val date = local.toLocalDate()
-        val time = local.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-        when (date) {
-            today -> "сегодня, $time"
-            today.minusDays(1) -> "вчера, $time"
-            else -> date.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM", java.util.Locale("ru"))) + ", $time"
+@Composable
+internal fun VisitDateTile(
+    dayOfMonth: Int,
+    monthShort: String,
+    emphasized: Boolean,
+) {
+    val numberColor = if (emphasized) Color.White else AccentOrange
+    val monthColor = if (emphasized) Color.White.copy(alpha = 0.88f) else AccentOrange.copy(alpha = 0.78f)
+    Box(
+        modifier = Modifier
+            .size(if (emphasized) 56.dp else 44.dp)
+            .clip(RoundedCornerShape(if (emphasized) 18.dp else 14.dp))
+            .background(if (emphasized) AccentOrange else AccentOrange.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = dayOfMonth.toString(),
+                color = numberColor,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = if (emphasized) 22.sp else 16.sp,
+                    lineHeight = if (emphasized) 24.sp else 18.sp,
+                    fontFeatureSettings = "tnum",
+                ),
+            )
+            Text(
+                text = monthShort,
+                color = monthColor,
+                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = if (emphasized) 11.sp else 10.sp,
+                    lineHeight = 12.sp,
+                    letterSpacing = 0.sp,
+                ),
+            )
         }
-    }.getOrNull()
+    }
 }
 
-private fun formatVisitDateChip(isoDate: String, compact: Boolean): String {
-    return runCatching {
-        val date = java.time.LocalDate.parse(isoDate)
-        val today = java.time.LocalDate.now()
-        when {
-            date == today -> "Сегодня"
-            date == today.minusDays(1) -> "Вчера"
-            compact && date.year == today.year ->
-                date.format(java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale("ru")))
-            else ->
-                date.format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale("ru")))
+internal fun hallVisitEntries(
+    recentVisits: List<String>,
+    recentVisitDates: List<String>,
+    lastVisitAt: String?,
+): List<HallVisit> {
+    val parsed = recentVisits.mapNotNull { parseHallVisit(it) }.map { it.normalized() }
+    val base = when {
+        parsed.isNotEmpty() -> parsed
+        else -> {
+            val dates = recentVisitDates.mapNotNull { iso ->
+                runCatching { HallVisit(java.time.LocalDate.parse(iso), null) }.getOrNull()
+            }
+            if (dates.isNotEmpty()) dates else listOfNotNull(parseHallVisit(lastVisitAt)?.normalized())
         }
-    }.getOrElse { isoDate }
+    }
+    return applyLastVisitTime(base, lastVisitAt)
+        .sortedWith(compareByDescending<HallVisit> { it.date }.thenByDescending { it.time })
+}
+
+private fun HallVisit.normalized(): HallVisit {
+    val minute = time?.withSecond(0)?.withNano(0)
+    return if (minute == time) this else copy(time = minute)
+}
+
+private fun applyLastVisitTime(entries: List<HallVisit>, lastVisitAt: String?): List<HallVisit> {
+    val last = parseHallVisit(lastVisitAt)?.normalized() ?: return entries
+    val minute = last.time ?: return entries
+    if (entries.any { it.date == last.date && it.time == minute }) return entries
+    val missingTime = entries.indexOfFirst { it.date == last.date && it.time == null }
+    if (missingTime >= 0) {
+        return entries.toMutableList().also { it[missingTime] = HallVisit(last.date, minute) }
+    }
+    return listOf(HallVisit(last.date, minute)) + entries
+}
+
+private fun parseHallVisit(iso: String?): HallVisit? {
+    if (iso.isNullOrBlank()) return null
+    runCatching {
+        val local = java.time.OffsetDateTime.parse(iso).toLocalDateTime()
+        return HallVisit(local.toLocalDate(), local.toLocalTime())
+    }
+    runCatching {
+        val local = java.time.LocalDateTime.parse(iso)
+        return HallVisit(local.toLocalDate(), local.toLocalTime())
+    }
+    return runCatching { HallVisit(java.time.LocalDate.parse(iso.take(10)), null) }.getOrNull()
+}
+
+internal fun visitDateLine(date: java.time.LocalDate): String = date.format(VisitShortDateFormatter)
+
+internal fun visitMonthHeading(date: java.time.LocalDate, today: java.time.LocalDate): String {
+    val month = date.format(VisitMonthStandaloneFormatter).replaceFirstChar { ch ->
+        if (ch.isLowerCase()) ch.titlecase(VisitRuLocale) else ch.toString()
+    }
+    return if (date.year == today.year) month else "$month ${date.year}"
+}
+
+internal fun visitWeekdayLabel(date: java.time.LocalDate, today: java.time.LocalDate): String {
+    return when (date) {
+        today -> "Сегодня"
+        today.minusDays(1) -> "Вчера"
+        else -> date.format(VisitWeekdayFormatter).replaceFirstChar { ch ->
+            if (ch.isLowerCase()) ch.titlecase(VisitRuLocale) else ch.toString()
+        }
+    }
 }
 
 @Composable

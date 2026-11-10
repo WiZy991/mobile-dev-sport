@@ -27,6 +27,18 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  */
 final class ClientImportService
 {
+    /** @var array<string, true> email уже занятые в текущем импорте (ещё не flush) */
+    private array $reservedEmails = [];
+
+    /** @var array<string, User> телефон (last10) → пользователь в текущем импорте */
+    private array $usersByPhoneTail = [];
+
+    /** @var array<string, User> email → пользователь в текущем импорте */
+    private array $usersByEmail = [];
+
+    /** @var array<int, User> ID из файла экспорта → созданный/найденный User */
+    private array $usersByExternalId = [];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SubscriptionFreezePolicy $freezePolicy,
@@ -35,6 +47,11 @@ final class ClientImportService
 
     public function import(UploadedFile $file, bool $updateExisting, bool $datesOnly = false): ClientImportResult
     {
+        $this->reservedEmails = [];
+        $this->usersByPhoneTail = [];
+        $this->usersByEmail = [];
+        $this->usersByExternalId = [];
+
         $ext = strtolower($file->getClientOriginalExtension() ?: '');
         $mime = (string) $file->getMimeType();
         if ($ext === '' && str_contains($mime, 'spreadsheet')) {
@@ -109,13 +126,16 @@ final class ClientImportService
         // Режим «только даты»: не создаём/не правим клиентов и записи — только даты у уже существующих абонементов
         // по строкам из файла (телефон / email / ФИО).
         if (!$datesOnly) {
+            $pendingSinceFlush = 0;
             foreach ($clientJobs as $job) {
                 try {
                     $r = $this->importOneClientRow($job['data'], $updateExisting);
                     if ($r === 'created') {
                         ++$clientsCreated;
+                        ++$pendingSinceFlush;
                     } elseif ($r === 'updated') {
                         ++$clientsUpdated;
+                        ++$pendingSinceFlush;
                     } else {
                         ++$skipped;
                     }
@@ -123,9 +143,15 @@ final class ClientImportService
                     $errors[] = $job['ref'] . ': ' . $e->getMessage();
                     ++$skipped;
                 }
+
+                // Периодический flush: иначе findOneBy не видит уже persist-нутых в этом же запросе.
+                if ($pendingSinceFlush >= 100) {
+                    $this->flushClientsSafely($errors);
+                    $pendingSinceFlush = 0;
+                }
             }
 
-            $this->em->flush();
+            $this->flushClientsSafely($errors);
         }
 
         // Fitness365-style: абонемент в той же строке, что клиент (колонки «Абонемент» + даты).
@@ -206,7 +232,7 @@ final class ClientImportService
             return false;
         }
         $clientKeys = ['name', 'email', 'phone', 'id', 'record_type'];
-        $subKeys = ['plan_id', 'plan_name', 'subscription_start', 'client_id', 'client_email', 'client_phone', 'record_type'];
+        $subKeys = ['plan_id', 'plan_name', 'subscription_start', 'subscription_end', 'available_visits', 'client_id', 'client_email', 'client_phone', 'record_type'];
         $bookKeys = ['training_id', 'training_start', 'client_id', 'client_email', 'client_phone', 'record_type'];
 
         $hasClient = array_intersect($fields, $clientKeys) !== [];
@@ -363,8 +389,14 @@ final class ClientImportService
             'контакт для экстренной связи' => 'emergency_contact',
             'emergency_contact' => 'emergency_contact',
             'создан' => '_ignore',
+            'создано' => '_ignore',
             'created' => '_ignore',
             'created_at' => '_ignore',
+            'клуб' => '_ignore',
+            'адрес клуба' => '_ignore',
+            'теги' => '_ignore',
+            'верификация паспорта' => '_ignore',
+            'passport_verification' => '_ignore',
 
             'id клиента' => 'client_id',
             'client_id' => 'client_id',
@@ -493,43 +525,75 @@ final class ClientImportService
      */
     private function importOneClientRow(array $data, bool $updateExisting): string
     {
-        $name = trim((string) ($data['name'] ?? ''));
-        $email = trim((string) ($data['email'] ?? ''));
-        $phoneRaw = trim((string) ($data['phone'] ?? ''));
+        $name = $this->cellString($data['name'] ?? null);
+        $email = $this->cellString($data['email'] ?? null);
+        $phoneRaw = $this->cellString($data['phone'] ?? null);
         $phone = $this->formatPhoneForDb($phoneRaw);
 
         if ($name === '' && $email === '' && $phone === '') {
             return 'skip';
         }
 
-        $user = null;
+        $externalId = null;
         $idRaw = $data['id'] ?? null;
         if ($idRaw !== null && $idRaw !== '' && is_numeric($idRaw)) {
-            $user = $this->em->getRepository(User::class)->find((int) $idRaw);
+            $externalId = (int) $idRaw;
+        }
+
+        $user = null;
+        // ID из файла экспорта — НЕ primary key новой БД (на пустом сервере 1,2,3… совпадут с чужими людьми).
+        if ($externalId !== null && isset($this->usersByExternalId[$externalId])) {
+            $user = $this->usersByExternalId[$externalId];
         }
         if (!$user && $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $user = $this->em->getRepository(User::class)->findOneBy(['email' => mb_strtolower($email)]);
+            $low = mb_strtolower($email);
+            $user = $this->usersByEmail[$low]
+                ?? $this->em->getRepository(User::class)->findOneBy(['email' => $low]);
         }
         if (!$user && $phone !== '') {
-            $user = $this->findUserByLoosePhone($phoneRaw);
+            $tail = $this->phoneTail($phoneRaw);
+            $user = ($tail !== '' ? ($this->usersByPhoneTail[$tail] ?? null) : null)
+                ?? $this->findUserByLoosePhone($phoneRaw);
         }
 
         if ($user) {
+            if ($externalId !== null) {
+                $this->usersByExternalId[$externalId] = $user;
+            }
+            $this->rememberUserIndexes($user);
             if (!$updateExisting) {
                 return 'skip';
             }
             $this->applyDataToUser($user, $data, $phone ?: $user->getPhone(), false);
             $this->em->persist($user);
+            $this->rememberUserIndexes($user);
 
             return 'updated';
         }
 
         $finalEmail = $this->allocateUniqueEmail($email, $phoneRaw);
         if ($finalEmail === null) {
-            throw new \RuntimeException('Email уже занят другим клиентом; укажите другой или обновите существующую запись.');
+            // Email из файла уже есть — обновляем/пропускаем этого клиента, а не валим весь импорт.
+            $existing = $this->usersByEmail[mb_strtolower($email)]
+                ?? $this->em->getRepository(User::class)->findOneBy(['email' => mb_strtolower($email)]);
+            if ($existing instanceof User) {
+                if ($externalId !== null) {
+                    $this->usersByExternalId[$externalId] = $existing;
+                }
+                $this->rememberUserIndexes($existing);
+                if (!$updateExisting) {
+                    return 'skip';
+                }
+                $this->applyDataToUser($existing, $data, $phone ?: $existing->getPhone(), false);
+                $this->em->persist($existing);
+                $this->rememberUserIndexes($existing);
+
+                return 'updated';
+            }
+            throw new \RuntimeException('Email уже занят другим клиентом; укажите другой или включите «обновлять существующих».');
         }
         if ($phone === '') {
-            throw new \RuntimeException('Для нового клиента нужен телефон или существующий ID/email.');
+            throw new \RuntimeException('Для нового клиента нужен телефон или существующий email.');
         }
         if ($name === '') {
             $name = $this->nameFromEmail($finalEmail);
@@ -542,6 +606,11 @@ final class ClientImportService
 
         $this->applyDataToUser($new, $data, $phone, true);
         $this->em->persist($new);
+        $this->reservedEmails[mb_strtolower($finalEmail)] = true;
+        $this->rememberUserIndexes($new);
+        if ($externalId !== null) {
+            $this->usersByExternalId[$externalId] = $new;
+        }
 
         return 'created';
     }
@@ -558,23 +627,22 @@ final class ClientImportService
 
         $start = $this->parseDateField($data['subscription_start'] ?? null);
         $end = $this->parseDateField($data['subscription_end'] ?? null);
-        $status = $this->normalizeSubscriptionStatus($data['subscription_status'] ?? 'active');
+        $statusRaw = $this->cellString($data['subscription_status'] ?? null);
+        $status = $this->normalizeSubscriptionStatus($statusRaw !== '' ? $statusRaw : 'active');
+        // Fitness365 часто без статуса: если срок уже прошёл — expired.
+        if ($statusRaw === '' && $end !== null && $end < new \DateTimeImmutable('today')) {
+            $status = 'expired';
+        }
         $plan = $this->resolvePlan($data);
 
-        // Режим «только даты» или строка без тарифа: даты + тариф по длительности периода.
-        if ($datesOnly || !$plan) {
+        // Режим «только даты»: не создаём абонементы, только правим уже существующие.
+        if ($datesOnly) {
             if ($start === null && $end === null) {
                 throw new \RuntimeException('Нет дат абонемента (нужны «Дата продажи» / «Дата окончания»).');
             }
-            if (!$updateExisting && !$datesOnly) {
-                return 'skip';
-            }
             $sub = $this->findActiveSubscriptionForDatesUpdate($user);
             if (!$sub) {
-                if ($datesOnly) {
-                    throw new \RuntimeException('Нет активного/замороженного абонемента у клиента — даты некуда записать.');
-                }
-                throw new \RuntimeException('Тариф не найден и нет активного абонемента — укажите «Название тарифа» / «Следующая карта».');
+                throw new \RuntimeException('Нет активного/замороженного абонемента у клиента — даты некуда записать.');
             }
             if ($this->subscriptionDatesProtectedFromImport($sub)) {
                 return 'skip';
@@ -589,14 +657,31 @@ final class ClientImportService
                 $sub->getStartDate(),
                 $sub->getEndDate(),
                 $data,
-                preferDuration: $datesOnly,
+                preferDuration: true,
             );
             if ($inferred !== null) {
                 $this->applyInferredPlanToSubscription($sub, $inferred);
             }
+            if ($statusRaw !== '' || ($end !== null && $end < new \DateTimeImmutable('today'))) {
+                $sub->setStatus($status);
+            }
             $this->em->persist($sub);
 
             return 'updated';
+        }
+
+        // Fitness365: у большинства строк пустая «Следующая карта» — тариф по длительности периода.
+        if (!$plan) {
+            if ($start === null) {
+                throw new \RuntimeException('Нет даты начала абонемента («Дата продажи»).');
+            }
+            $plan = $this->resolvePlanByDurationOrHints($start, $end, $data, preferDuration: true);
+        }
+
+        if (!$plan) {
+            throw new \RuntimeException(
+                'Тариф не найден. Создайте в CRM тарифы (1/3/6/12 месяцев, разовое) или укажите «Следующая карта».'
+            );
         }
 
         if ($start === null) {
@@ -743,43 +828,51 @@ final class ClientImportService
     {
         $cid = trim((string) ($data['client_id'] ?? ''));
         if ($cid !== '' && ctype_digit($cid)) {
-            $u = $this->em->getRepository(User::class)->find((int) $cid);
+            $u = $this->usersByExternalId[(int) $cid] ?? null;
             if ($u) {
                 return $u;
             }
         }
-        $em = trim((string) ($data['client_email'] ?? ''));
+        $em = $this->cellString($data['client_email'] ?? null);
         if ($em !== '' && filter_var($em, FILTER_VALIDATE_EMAIL)) {
-            $u = $this->em->getRepository(User::class)->findOneBy(['email' => mb_strtolower($em)]);
+            $low = mb_strtolower($em);
+            $u = $this->usersByEmail[$low]
+                ?? $this->em->getRepository(User::class)->findOneBy(['email' => $low]);
             if ($u) {
                 return $u;
             }
         }
-        $ph = trim((string) ($data['client_phone'] ?? ''));
+        $ph = $this->cellString($data['client_phone'] ?? null);
         if ($ph !== '') {
-            $u = $this->findUserByLoosePhone($ph);
+            $tail = $this->phoneTail($ph);
+            $u = ($tail !== '' ? ($this->usersByPhoneTail[$tail] ?? null) : null)
+                ?? $this->findUserByLoosePhone($ph);
             if ($u) {
                 return $u;
             }
         }
 
-        $em2 = trim((string) ($data['email'] ?? ''));
+        $em2 = $this->cellString($data['email'] ?? null);
         if ($em2 !== '' && filter_var($em2, FILTER_VALIDATE_EMAIL)) {
-            $u = $this->em->getRepository(User::class)->findOneBy(['email' => mb_strtolower($em2)]);
+            $low = mb_strtolower($em2);
+            $u = $this->usersByEmail[$low]
+                ?? $this->em->getRepository(User::class)->findOneBy(['email' => $low]);
             if ($u) {
                 return $u;
             }
         }
-        $ph2 = trim((string) ($data['phone'] ?? ''));
+        $ph2 = $this->cellString($data['phone'] ?? null);
         if ($ph2 !== '') {
-            $u = $this->findUserByLoosePhone($ph2);
+            $tail = $this->phoneTail($ph2);
+            $u = ($tail !== '' ? ($this->usersByPhoneTail[$tail] ?? null) : null)
+                ?? $this->findUserByLoosePhone($ph2);
             if ($u) {
                 return $u;
             }
         }
         $id2 = trim((string) ($data['id'] ?? ''));
         if ($id2 !== '' && ctype_digit($id2)) {
-            $u = $this->em->getRepository(User::class)->find((int) $id2);
+            $u = $this->usersByExternalId[(int) $id2] ?? null;
             if ($u) {
                 return $u;
             }
@@ -1249,6 +1342,9 @@ final class ClientImportService
     {
         if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $low = mb_strtolower($email);
+            if (isset($this->reservedEmails[$low]) || isset($this->usersByEmail[$low])) {
+                return null;
+            }
             $exists = $this->em->getRepository(User::class)->findOneBy(['email' => $low]);
 
             return $exists ? null : $low;
@@ -1258,7 +1354,11 @@ final class ClientImportService
         $tail = mb_substr($digits, -10);
         $candidate = 'import.p' . $tail . '@clients.import.local';
         $n = 0;
-        while ($this->em->getRepository(User::class)->findOneBy(['email' => $candidate])) {
+        while (
+            isset($this->reservedEmails[$candidate])
+            || isset($this->usersByEmail[$candidate])
+            || $this->em->getRepository(User::class)->findOneBy(['email' => $candidate])
+        ) {
             $candidate = 'import.p' . $tail . '.' . (++$n) . '@clients.import.local';
             if ($n > 5000) {
                 return null;
@@ -1467,6 +1567,70 @@ final class ClientImportService
         }
 
         return '+' . $d;
+    }
+
+    private function cellString(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        $s = trim((string) $value);
+        if ($s === '' || $s === '—' || $s === '–' || $s === '-' || mb_strtolower($s) === 'null') {
+            return '';
+        }
+
+        return $s;
+    }
+
+    private function phoneTail(string $raw): string
+    {
+        $digits = preg_replace('/\D+/', '', $raw) ?: '';
+
+        return strlen($digits) >= 10 ? substr($digits, -10) : '';
+    }
+
+    private function rememberUserIndexes(User $user): void
+    {
+        $email = mb_strtolower(trim($user->getEmail()));
+        if ($email !== '') {
+            $this->usersByEmail[$email] = $user;
+            $this->reservedEmails[$email] = true;
+        }
+        $tail = $this->phoneTail($user->getPhone());
+        if ($tail !== '') {
+            $this->usersByPhoneTail[$tail] = $user;
+        }
+    }
+
+    /** @param list<string> $errors */
+    private function flushClientsSafely(array &$errors): void
+    {
+        try {
+            $this->em->flush();
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'uniq_user_org_email') || str_contains($msg, 'Duplicate entry')) {
+                $errors[] = 'Часть строк не сохранена из‑за повтора email. Включите «Обновлять существующих» и повторите импорт.';
+                // После UniqueConstraint EntityManager закрывается — откатываем UoW и продолжаем следующие батчи нельзя без reset.
+                // Сбрасываем только clear после rollback connection через закрытие/reopen невозможно здесь надёжно.
+                // Пробрасываем понятную ошибку наверх только если не смогли восстановиться.
+                if (!$this->em->isOpen()) {
+                    throw new \RuntimeException(
+                        'Импорт остановлен: повтор email в базе. Отметьте «Обновлять существующих клиентов» и загрузите файл снова. ' . $msg,
+                        0,
+                        $e
+                    );
+                }
+                $this->em->clear();
+                $this->usersByEmail = [];
+                $this->usersByPhoneTail = [];
+                $this->usersByExternalId = [];
+                $this->reservedEmails = [];
+
+                return;
+            }
+            throw $e;
+        }
     }
 
     private function findUserByLoosePhone(string $raw): ?User

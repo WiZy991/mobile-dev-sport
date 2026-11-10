@@ -33,6 +33,7 @@ import com.fitnessclub.app.ui.screens.club.SelectPreferredClubScreen
 import com.fitnessclub.app.ui.screens.clubs.ClubsScreen
 import com.fitnessclub.app.ui.screens.documents.DocumentsScreen
 import com.fitnessclub.app.ui.screens.diary.TrainingDiaryScreen
+import com.fitnessclub.app.ui.screens.profile.HallVisitsScreen
 import com.fitnessclub.app.ui.screens.purchases.PurchaseHistoryScreen
 import com.fitnessclub.app.ui.screens.guestpass.GuestPassScreen
 import com.fitnessclub.app.ui.screens.main.MainScreen
@@ -588,6 +589,12 @@ fun NavGraph(
         // Purchase history
         composable(Screen.PurchaseHistory.route) {
             PurchaseHistoryScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.HallVisits.route) {
+            HallVisitsScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
