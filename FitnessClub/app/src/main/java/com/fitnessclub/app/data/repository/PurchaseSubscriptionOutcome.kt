@@ -7,8 +7,12 @@ sealed class PurchaseSubscriptionOutcome {
 
     data class PaymentRequired(
         val paymentId: Int,
-        val paymentUrl: String,
+        val paymentUrl: String?,
         val amount: Double,
+        val provider: String = "alfa",
+        val title: String = "Абонемент",
+        val paymentMethodType: String? = null,
+        val userPhone: String? = null,
     ) : PurchaseSubscriptionOutcome()
 
     /** Сервер вернул 403 — нужно пройти Сбер ID, затем повторить покупку. */

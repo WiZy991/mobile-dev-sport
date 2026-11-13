@@ -19,6 +19,19 @@ object Brand {
     val sberLoginEnabled: Boolean get() = BuildConfig.SBER_LOGIN_ENABLED
     val onlinePaymentEnabled: Boolean get() = BuildConfig.ONLINE_PAYMENT_ENABLED
 
+    /** alfa — Доброзал (браузер), yookassa — Академия борьбы (мобильный SDK). */
+    val paymentProvider: String get() = BuildConfig.PAYMENT_PROVIDER
+
+    val usesYooKassa: Boolean get() = paymentProvider == "yookassa"
+
+    fun yooKassaSetupError(): String? {
+        if (!usesYooKassa) return null
+        if (BuildConfig.YOOKASSA_SHOP_ID.isBlank() || BuildConfig.YOOKASSA_CLIENT_KEY.isBlank()) {
+            return "Оплата ЮKassa не настроена. Добавьте YOOKASSA_SHOP_ID и YOOKASSA_CLIENT_KEY в local.properties и пересоберите приложение."
+        }
+        return null
+    }
+
     /** Продавец для покупок в приложении; пусто — не показывать. */
     val legalEntityLine: String get() = BuildConfig.LEGAL_ENTITY_LINE
 

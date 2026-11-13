@@ -7,6 +7,7 @@ use App\Service\CurrentUserResolver;
 use App\Service\Payment\PaymentStatusSyncService;
 use App\Service\Payment\SubscriptionPaymentInitService;
 use App\Service\Payment\SubscriptionPurchaseQuoteService;
+use App\Service\Payment\YooKassaChargeService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,6 +23,7 @@ class PaymentController extends AbstractController
         private readonly SubscriptionPurchaseQuoteService $quoteService,
         private readonly SubscriptionPaymentInitService $initService,
         private readonly PaymentStatusSyncService $statusSyncService,
+        private readonly YooKassaChargeService $yooKassaChargeService,
     ) {}
 
     private function requireUser(Request $request): JsonResponse|array
@@ -173,7 +175,7 @@ class PaymentController extends AbstractController
             return $this->json(['error' => 'Forbidden'], 403);
         }
 
-        if ($payment->isPending() && $payment->getAlfaOrderId() !== null) {
+        if ($payment->isPending() && ($payment->getAlfaOrderId() !== null || $payment->getGateway() === Payment::GATEWAY_YOOKASSA)) {
             try {
                 $this->statusSyncService->syncFromGateway($payment);
                 $this->em->refresh($payment);
@@ -185,6 +187,43 @@ class PaymentController extends AbstractController
         return $this->json($this->serializePayment($payment, includeSubscription: true));
     }
 
+    #[Route('/{id}/yookassa/token', name: 'api_payments_yookassa_token', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function submitYooKassaToken(int $id, Request $request): JsonResponse
+    {
+        $auth = $this->requireUser($request);
+        if ($auth instanceof JsonResponse) {
+            return $auth;
+        }
+        $user = $auth['user'];
+
+        $payment = $this->em->getRepository(Payment::class)->find($id);
+        if (!$payment) {
+            return $this->json(['error' => 'Payment not found'], 404);
+        }
+        if ($payment->getUser()?->getId() !== $user->getId()) {
+            return $this->json(['error' => 'Forbidden'], 403);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $token = trim((string) ($data['payment_token'] ?? $data['paymentToken'] ?? ''));
+        if ($token === '' || strlen($token) > 16000) {
+            return $this->json([
+                'error' => 'Нет платёжного токена',
+                'code' => 'payment_token_required',
+            ], 400);
+        }
+
+        $result = $this->yooKassaChargeService->charge($payment, $token);
+        if (isset($result['error'])) {
+            return $this->json($result['error'], $result['status']);
+        }
+
+        /** @var Payment $charged */
+        $charged = $result['payment'];
+
+        return $this->json($this->serializePayment($charged, includeSubscription: true));
+    }
+
     private function serializePayment(Payment $payment, bool $includeSubscription = false): array
     {
         $plan = $payment->getSubscriptionPlan();
@@ -192,6 +231,9 @@ class PaymentController extends AbstractController
             'payment_id' => $payment->getId(),
             'status' => $payment->getStatus(),
             'payment_url' => $payment->getPaymentUrl(),
+            'provider' => $payment->getGateway(),
+            'confirmation_url' => $payment->getGateway() === Payment::GATEWAY_YOOKASSA ? $payment->getPaymentUrl() : null,
+            'payment_method_type' => $payment->getGateway() === Payment::GATEWAY_YOOKASSA ? $payment->getPaymentWay() : null,
             'amount' => $payment->getAmountKopecks() / 100,
             'amount_kopecks' => $payment->getAmountKopecks(),
             'currency' => $payment->getCurrency(),

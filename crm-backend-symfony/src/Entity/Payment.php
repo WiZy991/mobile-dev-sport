@@ -8,6 +8,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'payments')]
 #[ORM\UniqueConstraint(name: 'uniq_payment_order_number', columns: ['order_number'])]
 #[ORM\UniqueConstraint(name: 'uniq_payment_alfa_order_id', columns: ['alfa_order_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_payment_yookassa_id', columns: ['yookassa_payment_id'])]
 #[ORM\Index(name: 'idx_payment_user_status', columns: ['user_id', 'status'])]
 class Payment
 {
@@ -19,6 +20,9 @@ class Payment
     public const STATUS_FAILED = 'failed';
     public const STATUS_EXPIRED = 'expired';
     public const STATUS_CANCELLED = 'cancelled';
+
+    public const GATEWAY_ALFA = 'alfa';
+    public const GATEWAY_YOOKASSA = 'yookassa';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -71,7 +75,14 @@ class Payment
     #[ORM\Column(type: 'string', length: 64, nullable: true)]
     private ?string $alfaOrderId = null;
 
-    #[ORM\Column(type: 'string', length: 512, nullable: true)]
+    /** alfa — интернет-эквайринг Альфы; yookassa — мобильный SDK ЮKassa (Академия борьбы). */
+    #[ORM\Column(type: 'string', length: 20, options: ['default' => 'alfa'])]
+    private string $gateway = self::GATEWAY_ALFA;
+
+    #[ORM\Column(type: 'string', length: 64, nullable: true)]
+    private ?string $yookassaPaymentId = null;
+
+    #[ORM\Column(type: 'string', length: 2048, nullable: true)]
     private ?string $paymentUrl = null;
 
     #[ORM\Column(type: 'string', length: 30, nullable: true)]
@@ -263,6 +274,30 @@ class Payment
     public function setAlfaOrderId(?string $alfaOrderId): self
     {
         $this->alfaOrderId = $alfaOrderId;
+
+        return $this;
+    }
+
+    public function getGateway(): string
+    {
+        return $this->gateway;
+    }
+
+    public function setGateway(string $gateway): self
+    {
+        $this->gateway = $gateway;
+
+        return $this;
+    }
+
+    public function getYookassaPaymentId(): ?string
+    {
+        return $this->yookassaPaymentId;
+    }
+
+    public function setYookassaPaymentId(?string $yookassaPaymentId): self
+    {
+        $this->yookassaPaymentId = $yookassaPaymentId;
 
         return $this;
     }

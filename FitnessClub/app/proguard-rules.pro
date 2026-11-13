@@ -65,6 +65,12 @@
 -keep class org.osmdroid.** { *; }
 -dontwarn org.osmdroid.**
 
+# ——— YooKassa Android SDK (Академия борьбы) ———
+-keep class ru.yoomoney.sdk.kassa.payments.Checkout { *; }
+-keep class ru.yoomoney.sdk.kassa.payments.TokenizationResult { *; }
+-keep class ru.yoomoney.sdk.kassa.payments.checkoutParameters.** { *; }
+-dontwarn ru.yoomoney.sdk.**
+
 # ——— ZXing ———
 -keep class com.google.zxing.** { *; }
 

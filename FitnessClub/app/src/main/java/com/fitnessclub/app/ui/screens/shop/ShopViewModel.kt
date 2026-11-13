@@ -269,7 +269,7 @@ class ShopViewModel @Inject constructor(
 
     fun purchaseSubscriptionPlan(
         plan: SubscriptionPlan,
-        onPaymentRequired: (paymentId: Int, paymentUrl: String) -> Unit,
+        onPaymentRequired: (PurchaseSubscriptionOutcome.PaymentRequired) -> Unit,
         onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
         onPassportRequired: (String) -> Unit = {},
         onEmailUnverified: (String) -> Unit = {},
@@ -277,6 +277,10 @@ class ShopViewModel @Inject constructor(
     ) {
         if (!Brand.onlinePaymentEnabled) {
             onError("Онлайн-оплата в этом приложении пока недоступна. Оформить абонемент можно у администратора клуба.")
+            return
+        }
+        Brand.yooKassaSetupError()?.let {
+            onError(it)
             return
         }
         viewModelScope.launch {
@@ -289,7 +293,8 @@ class ShopViewModel @Inject constructor(
             ) {
                 is PurchaseSubscriptionOutcome.PaymentRequired -> {
                     _uiState.update { it.copy(isPurchasing = false) }
-                    onPaymentRequired(result.paymentId, result.paymentUrl)
+                    val phone = authRepository.getCurrentUser().first()?.phone
+                    onPaymentRequired(result.copy(userPhone = phone))
                 }
                 is PurchaseSubscriptionOutcome.Success -> {
                     _uiState.update {

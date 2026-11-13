@@ -136,12 +136,22 @@ class SubscriptionRepository @Inject constructor(
             )
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
-                val paymentUrl = body.paymentUrl
-                if (!paymentUrl.isNullOrBlank()) {
+                val amount = body.finalPrice.takeIf { it > 0 } ?: body.amount
+                if (body.provider == "yookassa") {
                     PurchaseSubscriptionOutcome.PaymentRequired(
                         paymentId = body.paymentId,
-                        paymentUrl = paymentUrl,
-                        amount = body.finalPrice.takeIf { it > 0 } ?: body.amount,
+                        paymentUrl = body.confirmationUrl?.takeIf { it.isNotBlank() }
+                            ?: body.paymentUrl?.takeIf { it.isNotBlank() },
+                        amount = amount,
+                        provider = "yookassa",
+                        title = body.planName?.takeIf { it.isNotBlank() } ?: "Абонемент",
+                        paymentMethodType = body.paymentMethodType,
+                    )
+                } else if (!body.paymentUrl.isNullOrBlank()) {
+                    PurchaseSubscriptionOutcome.PaymentRequired(
+                        paymentId = body.paymentId,
+                        paymentUrl = body.paymentUrl,
+                        amount = amount,
                     )
                 } else {
                     PurchaseSubscriptionOutcome.Error("Не получен URL оплаты")
@@ -190,6 +200,36 @@ class SubscriptionRepository @Inject constructor(
             }
         } catch (e: Exception) {
             PurchaseSubscriptionOutcome.Error(e.userMessage("Неизвестная ошибка"), null)
+        }
+    }
+
+    suspend fun submitYooKassaToken(
+        paymentId: Int,
+        paymentToken: String,
+    ): ApiResult<SubscriptionPaymentInitResponse> {
+        return try {
+            val response = api.submitYooKassaToken(paymentId, com.fitnessclub.app.data.api.YooKassaTokenRequest(paymentToken))
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                val raw = response.errorBody()?.string().orEmpty()
+                val parsed = runCatching {
+                    gson.fromJson(raw, SubscriptionPurchaseErrorBody::class.java)
+                }.getOrNull()
+                ApiResult.Error(
+                    message = humanizeApiError(
+                        httpCode = response.code(),
+                        raw = raw,
+                        parsedCode = parsed?.code,
+                        parsedMessage = parsed?.message,
+                        parsedError = parsed?.error,
+                        fallback = "Не удалось провести оплату",
+                    ),
+                    code = response.code(),
+                )
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.userMessage("Не удалось провести оплату"))
         }
     }
 

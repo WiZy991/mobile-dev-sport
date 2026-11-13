@@ -255,10 +255,22 @@ api_payments_status:
   requirements:
     id: '\d+'
 
+api_payments_yookassa_token:
+  path: /api/v1/payments/{id}/yookassa/token
+  controller: App\Controller\Api\PaymentController::submitYooKassaToken
+  methods: [POST]
+  requirements:
+    id: '\d+'
+
 api_payments_alfa_callback:
   path: /api/v1/payments/alfa/callback
   controller: App\Controller\Api\PaymentCallbackController::callback
   methods: [GET, POST]
+
+api_payments_yookassa_webhook:
+  path: /api/v1/payments/yookassa/webhook
+  controller: App\Controller\Api\YooKassaWebhookController::webhook
+  methods: [POST]
 
 api_support_tickets_list:
   path: /api/v1/support/tickets

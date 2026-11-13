@@ -128,6 +128,12 @@ interface FitnessApi {
 
     @GET("payments/{id}/status")
     suspend fun getPaymentStatus(@Path("id") paymentId: Int): Response<SubscriptionPaymentInitResponse>
+
+    @POST("payments/{id}/yookassa/token")
+    suspend fun submitYooKassaToken(
+        @Path("id") paymentId: Int,
+        @Body request: YooKassaTokenRequest,
+    ): Response<SubscriptionPaymentInitResponse>
     
     @POST("subscriptions/{id}/freeze")
     suspend fun freezeSubscription(
@@ -303,6 +309,14 @@ data class SubscriptionPaymentInitResponse(
     val status: String = "pending",
     @com.google.gson.annotations.SerializedName("payment_url")
     val paymentUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("provider")
+    val provider: String = "alfa",
+    @com.google.gson.annotations.SerializedName("confirmation_url")
+    val confirmationUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("payment_method_type")
+    val paymentMethodType: String? = null,
+    @com.google.gson.annotations.SerializedName("plan_name")
+    val planName: String? = null,
     @com.google.gson.annotations.SerializedName("amount")
     val amount: Double = 0.0,
     @com.google.gson.annotations.SerializedName("final_price")
@@ -317,6 +331,11 @@ data class SubscriptionPaymentInitResponse(
     val failureReason: String? = null,
     @com.google.gson.annotations.SerializedName("subscription")
     val subscription: PaymentSubscriptionSummary? = null,
+)
+
+data class YooKassaTokenRequest(
+    @com.google.gson.annotations.SerializedName("payment_token")
+    val paymentToken: String,
 )
 
 data class PaymentSubscriptionSummary(

@@ -16,6 +16,18 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localFile.inputStream().use { load(it) }
+    }
+}
+
+fun Properties.buildConfigString(key: String): String {
+    val raw = getProperty(key).orEmpty().trim()
+    return "\"" + raw.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+}
+
 android {
     namespace = "com.fitnessclub.app"
     compileSdk = 36
@@ -64,6 +76,9 @@ android {
             buildConfigField("boolean", "PHONE_LOGIN_ENABLED", "true")
             buildConfigField("boolean", "SBER_LOGIN_ENABLED", "true")
             buildConfigField("boolean", "ONLINE_PAYMENT_ENABLED", "true")
+            buildConfigField("String", "PAYMENT_PROVIDER", "\"alfa\"")
+            buildConfigField("String", "YOOKASSA_SHOP_ID", "\"\"")
+            buildConfigField("String", "YOOKASSA_CLIENT_KEY", "\"\"")
             buildConfigField("String", "LEGAL_ENTITY_LINE", "\"ИП Мацкова Александра Сергеевна, ИНН 254009880989\"")
             buildConfigField(
                 "String",
@@ -82,10 +97,14 @@ android {
             // Slug организации из CRM (платформа → организации).
             buildConfigField("String", "ORGANIZATION_SLUG", "\"akademiy-borbi\"")
             buildConfigField("String", "CLUB_SITE_URL", "\"https://worldcashfit.ru\"")
-            // Вход только email + пароль; онлайн-оплата отключена до подключения своего эквайринга.
+            // Вход только email + пароль. Оплата — мобильный SDK ЮKassa.
+            // Ключи: YOOKASSA_SHOP_ID и YOOKASSA_CLIENT_KEY в local.properties (ключ для клиентских приложений).
             buildConfigField("boolean", "PHONE_LOGIN_ENABLED", "false")
             buildConfigField("boolean", "SBER_LOGIN_ENABLED", "false")
-            buildConfigField("boolean", "ONLINE_PAYMENT_ENABLED", "false")
+            buildConfigField("boolean", "ONLINE_PAYMENT_ENABLED", "true")
+            buildConfigField("String", "PAYMENT_PROVIDER", "\"yookassa\"")
+            buildConfigField("String", "YOOKASSA_SHOP_ID", localProperties.buildConfigString("YOOKASSA_SHOP_ID"))
+            buildConfigField("String", "YOOKASSA_CLIENT_KEY", localProperties.buildConfigString("YOOKASSA_CLIENT_KEY"))
             buildConfigField("String", "LEGAL_ENTITY_LINE", "\"\"")
             buildConfigField(
                 "String",
@@ -199,8 +218,11 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.6.2")
 
-    // Custom Tabs (Сбер ID и будущая оплата в браузере)
+    // Custom Tabs (Сбер ID и оплата Альфой в браузере)
     implementation("androidx.browser:browser:1.8.0")
+
+    // ЮKassa только в Академии борьбы. Доброзал остаётся на Альфе.
+    add("academyWrestlingImplementation", "ru.yoomoney.sdk.kassa.payments:yookassa-android-sdk:8.4.0")
 
     // Coil for images
     implementation("io.coil-kt:coil-compose:2.5.0")

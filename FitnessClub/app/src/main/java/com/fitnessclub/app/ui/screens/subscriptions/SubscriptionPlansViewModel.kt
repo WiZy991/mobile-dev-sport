@@ -269,7 +269,7 @@ class SubscriptionPlansViewModel @Inject constructor(
 
     fun purchasePlan(
         plan: SubscriptionPlan,
-        onPaymentRequired: (paymentId: Int, paymentUrl: String) -> Unit,
+        onPaymentRequired: (PurchaseSubscriptionOutcome.PaymentRequired) -> Unit,
         onVerificationRequired: (authorizeUrl: String, message: String) -> Unit,
         onPassportRequired: (String) -> Unit = {},
         onEmailUnverified: (String) -> Unit = {},
@@ -277,6 +277,10 @@ class SubscriptionPlansViewModel @Inject constructor(
     ) {
         if (!Brand.onlinePaymentEnabled) {
             onError("Онлайн-оплата в этом приложении пока недоступна. Оформить абонемент можно у администратора клуба.")
+            return
+        }
+        Brand.yooKassaSetupError()?.let {
+            onError(it)
             return
         }
         if (_uiState.value.isLoading) {
@@ -299,7 +303,8 @@ class SubscriptionPlansViewModel @Inject constructor(
             ) {
                 is PurchaseSubscriptionOutcome.PaymentRequired -> {
                     _uiState.update { it.copy(isLoading = false) }
-                    onPaymentRequired(result.paymentId, result.paymentUrl)
+                    val phone = authRepository.getCurrentUser().first()?.phone
+                    onPaymentRequired(result.copy(userPhone = phone))
                 }
                 is PurchaseSubscriptionOutcome.Success -> {
                     _uiState.update {

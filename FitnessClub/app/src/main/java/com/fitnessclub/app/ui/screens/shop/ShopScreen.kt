@@ -29,6 +29,8 @@ import com.fitnessclub.app.data.config.LegalDocumentType
 import com.fitnessclub.app.data.config.LegalLinks
 import com.fitnessclub.app.data.config.LegalPdfAsset
 import com.fitnessclub.app.data.model.SubscriptionPlan
+import com.fitnessclub.app.payment.rememberYooKassaPaymentLauncher
+import com.fitnessclub.app.payment.startOnlinePayment
 import com.fitnessclub.app.ui.screens.legal.LegalPdfScreen
 import com.fitnessclub.app.ui.screens.subscriptions.ClubPurchaseConsentDialog
 import com.fitnessclub.app.ui.screens.subscriptions.PurchasePassportDialog
@@ -77,6 +79,10 @@ fun ShopScreen(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
+    val yooKassaLauncher = rememberYooKassaPaymentLauncher(
+        onFinished = onNavigateToPayment,
+        onError = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
+    )
     
     LaunchedEffect(uiState.purchaseMessage, uiState.error) {
         uiState.purchaseMessage?.let { msg ->
@@ -275,12 +281,20 @@ fun ShopScreen(
                     purchaseError = null
                     viewModel.purchaseSubscriptionPlan(
                         plan = plan,
-                        onPaymentRequired = { paymentId, paymentUrl ->
+                        onPaymentRequired = { payment ->
                             showLegalConsentForPlan = null
                             showPassportGate = null
                             showPurchasePlan = null
-                            onNavigateToPayment(paymentId)
-                            openPaymentUrl(context, paymentUrl)
+                            startOnlinePayment(
+                                context = context,
+                                payment = payment,
+                                yooKassaLauncher = yooKassaLauncher,
+                                onAlfaOpened = { onNavigateToPayment(payment.paymentId) },
+                                onError = { msg ->
+                                    purchaseError = msg
+                                    scope.launch { snackbarHostState.showSnackbar(msg) }
+                                },
+                            )
                         },
                         onVerificationRequired = { url, message ->
                             showLegalConsentForPlan = null
@@ -480,8 +494,6 @@ private fun ShopItemCard(
         }
     }
 }
-
-private fun openPaymentUrl(context: Context, url: String) = openExternalUrl(context, url)
 
 private fun openExternalUrl(context: Context, url: String) {
     val activity = context.findActivity() ?: return

@@ -23,6 +23,7 @@ class SubscriptionPaymentInitService
         private readonly int $sessionTimeoutSecs,
         private readonly bool $fiscalizationEnabled,
         private readonly int $taxType,
+        private readonly YooKassaClient $yooKassaClient,
     ) {}
 
     /**
@@ -35,9 +36,12 @@ class SubscriptionPaymentInitService
         string $deepLinkScheme = 'dobrozal',
         mixed $clubIdRaw = null,
     ): array {
-        $sberGate = $this->checkSberGate($user);
-        if ($sberGate !== null) {
-            return $sberGate;
+        $yooKassa = $this->usesYooKassa($deepLinkScheme);
+        if (!$yooKassa) {
+            $sberGate = $this->checkSberGate($user);
+            if ($sberGate !== null) {
+                return $sberGate;
+            }
         }
 
         if (!$user->hasRequiredDataForSubscription()) {
@@ -75,7 +79,20 @@ class SubscriptionPaymentInitService
             ];
         }
 
-        $reusable = $this->findReusablePendingPayment($user, $plan, $quote->amountKopecks, $issueClub);
+        if ($yooKassa && !$this->yooKassaClient->isConfigured()) {
+            return [
+                'error' => [
+                    'error' => 'ЮKassa не настроена на сервере',
+                    'message' => 'Онлайн-оплата временно недоступна. Обратитесь к администратору клуба.',
+                    'code' => 'yookassa_not_configured',
+                ],
+                'status' => 503,
+            ];
+        }
+
+        $reusable = $yooKassa
+            ? $this->findReusableYooKassaPayment($user, $plan, $quote->amountKopecks, $issueClub)
+            : $this->findReusablePendingPayment($user, $plan, $quote->amountKopecks, $issueClub);
         if ($reusable !== null) {
             return ['payment' => $reusable];
         }
@@ -96,6 +113,14 @@ class SubscriptionPaymentInitService
 
         $orderNumber = sprintf('sub-%d-%s', $payment->getId(), bin2hex(random_bytes(4)));
         $payment->setOrderNumber($orderNumber);
+        if ($yooKassa) {
+            $payment->setGateway(Payment::GATEWAY_YOOKASSA);
+            $this->em->flush();
+
+            return ['payment' => $payment];
+        }
+
+        $payment->setGateway(Payment::GATEWAY_ALFA);
         $this->em->flush();
 
         $returnUrl = $this->appendPaymentId($this->returnUrlBase, $payment->getId(), 'success', $deepLinkScheme);
@@ -187,6 +212,7 @@ class SubscriptionPaymentInitService
             ->andWhere('p.type = :type')
             ->andWhere('p.status = :pending')
             ->andWhere('p.amountKopecks = :amount')
+            ->andWhere('p.gateway = :gateway')
             ->andWhere('p.paymentUrl IS NOT NULL')
             ->andWhere('p.expiresAt IS NULL OR p.expiresAt > :now')
             ->setParameter('user', $user)
@@ -195,6 +221,7 @@ class SubscriptionPaymentInitService
             ->setParameter('type', Payment::TYPE_SUBSCRIPTION)
             ->setParameter('pending', Payment::STATUS_PENDING)
             ->setParameter('amount', $amountKopecks)
+            ->setParameter('gateway', Payment::GATEWAY_ALFA)
             ->setParameter('now', new \DateTimeImmutable())
             ->orderBy('p.id', 'DESC')
             ->setMaxResults(1)
@@ -202,6 +229,45 @@ class SubscriptionPaymentInitService
             ->getOneOrNullResult();
 
         return $existing;
+    }
+
+    private function findReusableYooKassaPayment(
+        User $user,
+        SubscriptionPlan $plan,
+        int $amountKopecks,
+        Club $club,
+    ): ?Payment {
+        /** @var Payment|null $existing */
+        $existing = $this->em->createQueryBuilder()
+            ->select('p')
+            ->from(Payment::class, 'p')
+            ->where('p.user = :user')
+            ->andWhere('p.subscriptionPlan = :plan')
+            ->andWhere('p.club = :club')
+            ->andWhere('p.type = :type')
+            ->andWhere('p.status = :pending')
+            ->andWhere('p.amountKopecks = :amount')
+            ->andWhere('p.gateway = :gateway')
+            ->andWhere('p.expiresAt IS NULL OR p.expiresAt > :now')
+            ->setParameter('user', $user)
+            ->setParameter('plan', $plan)
+            ->setParameter('club', $club)
+            ->setParameter('type', Payment::TYPE_SUBSCRIPTION)
+            ->setParameter('pending', Payment::STATUS_PENDING)
+            ->setParameter('amount', $amountKopecks)
+            ->setParameter('gateway', Payment::GATEWAY_YOOKASSA)
+            ->setParameter('now', new \DateTimeImmutable())
+            ->orderBy('p.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $existing;
+    }
+
+    private function usesYooKassa(string $deepLinkScheme): bool
+    {
+        return $deepLinkScheme === 'academywrestling';
     }
 
     /**

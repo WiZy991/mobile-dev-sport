@@ -37,6 +37,11 @@ parameters:
     alfa_acquiring_username_default: ''
     alfa_acquiring_password_default: ''
     alfa_acquiring_currency_default: 643
+    yookassa_shop_id_default: ''
+    yookassa_secret_key_default: ''
+    yookassa_api_url_default: 'https://api.yookassa.ru/v3'
+    yookassa_send_receipt_default: false
+    yookassa_vat_code_default: 1
     apple_sign_in_client_id_default: 'co.worldcashbox.WorldFintess'
     default_organization_slug_default: 'demo'
     mail_from_default: 'noreply@worldcashfit.ru'
@@ -77,6 +82,7 @@ services:
             - '../src/Service/Payment/AlfaRegisterOrderRequest.php'
             - '../src/Service/Payment/AlfaRegisterOrderResponse.php'
             - '../src/Service/Payment/AlfaOrderStatus.php'
+            - '../src/Service/Payment/YooKassaApiResult.php'
 
     App\Service\Admin\SberIdOAuthService:
         arguments:
@@ -133,6 +139,14 @@ services:
         bind:
             $requireSberVerificationBeforePurchase: '%env(bool:SUBSCRIPTION_REQUIRE_SBER)%'
             $alfaAcquiringEnabled: '%env(bool:ALFA_ACQUIRING_ENABLED)%'
+
+    App\Service\Payment\YooKassaClient:
+        arguments:
+            $shopId: '%env(default:yookassa_shop_id_default:YOOKASSA_SHOP_ID)%'
+            $secretKey: '%env(default:yookassa_secret_key_default:YOOKASSA_SECRET_KEY)%'
+            $apiUrl: '%env(default:yookassa_api_url_default:YOOKASSA_API_URL)%'
+            $sendReceipt: '%env(bool:default:yookassa_send_receipt_default:YOOKASSA_SEND_RECEIPT)%'
+            $vatCode: '%env(int:default:yookassa_vat_code_default:YOOKASSA_VAT_CODE)%'
 
     App\Service\Payment\AlfaAcquiringClient:
         arguments:
