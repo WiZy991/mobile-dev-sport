@@ -202,7 +202,16 @@ class AuthRepository @Inject constructor(
                 tokenManager.saveUser(authResponse.user)
                 onAuthenticated()
                 authFlowStore.clearOtpRegistration()
-                emit(ApiResult.Success(authResponse.user))
+                val wantedClub = request.clubId?.trim()?.toIntOrNull()
+                val savedClub = authResponse.user.clubId
+                if (wantedClub != null && wantedClub > 0 && savedClub != wantedClub) {
+                    when (val patched = setPreferredClub(wantedClub)) {
+                        is ApiResult.Success -> emit(ApiResult.Success(patched.data))
+                        else -> emit(ApiResult.Success(authResponse.user))
+                    }
+                } else {
+                    emit(ApiResult.Success(authResponse.user))
+                }
             } else {
                 emit(errorFrom(response, "Не удалось зарегистрироваться. Попробуйте ещё раз."))
             }

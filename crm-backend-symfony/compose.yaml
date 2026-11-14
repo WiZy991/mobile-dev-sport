@@ -1,3 +1,6 @@
+# Фиксируем имя проекта → volumes (БД) не сменятся, если каталог/symlink другой.
+name: crm-backend-symfony
+
 services:
   app:
     build:

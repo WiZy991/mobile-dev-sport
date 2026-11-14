@@ -574,6 +574,7 @@ class ClubController extends AbstractController
             'button_text' => $p->getButtonText(),
             'action_type' => $p->getActionType(),
             'action_value' => $p->getActionValue(),
+            'buttons' => $p->getExtraButtons(),
             'bg_from' => $p->getBgFrom(),
             'bg_to' => $p->getBgTo(),
             'sort_order' => $p->getSortOrder(),

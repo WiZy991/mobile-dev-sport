@@ -671,6 +671,13 @@ data class ClubInfo(
     val welcomeLegalText: String? = null,
 )
 
+data class PromoLinkButton(
+    @com.google.gson.annotations.SerializedName("text")
+    val text: String = "",
+    @com.google.gson.annotations.SerializedName("url")
+    val url: String = "",
+)
+
 data class ClubPromotion(
     @com.google.gson.annotations.SerializedName("id")
     val id: String,
@@ -686,6 +693,8 @@ data class ClubPromotion(
     val actionType: String = "shop",
     @com.google.gson.annotations.SerializedName("action_value")
     val actionValue: String? = null,
+    @com.google.gson.annotations.SerializedName("buttons")
+    val buttons: List<PromoLinkButton>? = emptyList(),
     @com.google.gson.annotations.SerializedName("bg_from")
     val bgFrom: String = "#F97316",
     @com.google.gson.annotations.SerializedName("bg_to")

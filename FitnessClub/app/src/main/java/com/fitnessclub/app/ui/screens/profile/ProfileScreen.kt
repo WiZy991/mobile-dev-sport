@@ -55,19 +55,24 @@ fun ProfileScreen(
     var showSubscriptionHistory by remember { mutableStateOf(false) }
     var showAllActive by remember { mutableStateOf(false) }
 
-    // В профиле — абонементы всех клубов; первым идёт абонемент выбранного зала.
+    // В «Моих» — только абонемент выбранного клуба. Остальные активные — отдельным списком.
     val preferredClubId = uiState.preferredClubId ?: uiState.user?.clubId
     val todayIso = remember { java.time.LocalDate.now().toString() }
-    val activeSubscriptions = remember(uiState.subscriptions, preferredClubId, todayIso) {
-        uiState.subscriptions
-            .filter { it.isCurrentOn(todayIso) }
-            .sortedByDescending { preferredClubId != null && preferredClubId > 0 && it.clubId == preferredClubId }
+    val activeSubscriptions = remember(uiState.subscriptions, todayIso) {
+        uiState.subscriptions.filter { it.isCurrentOn(todayIso) }
+    }
+    val hasPreferredClub = preferredClubId != null && preferredClubId > 0
+    val subscriptionsHere = remember(activeSubscriptions, preferredClubId) {
+        if (!hasPreferredClub) activeSubscriptions
+        else activeSubscriptions.filter { it.clubId == preferredClubId }
+    }
+    val subscriptionsElsewhere = remember(activeSubscriptions, preferredClubId) {
+        if (!hasPreferredClub) emptyList()
+        else activeSubscriptions.filter { it.clubId != preferredClubId }
     }
     val archivedSubscriptions = remember(uiState.subscriptions, todayIso) {
         uiState.subscriptions.filterNot { it.isCurrentOn(todayIso) }
     }
-    val visibleActive = if (showAllActive) activeSubscriptions else activeSubscriptions.take(1)
-    val hiddenActiveCount = activeSubscriptions.size - 1
     
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -193,7 +198,7 @@ fun ProfileScreen(
                     )
                 }
 
-                if (uiState.isLoadingSubscriptions && activeSubscriptions.isEmpty() && archivedSubscriptions.isEmpty()) {
+                if (uiState.isLoadingSubscriptions && subscriptionsHere.isEmpty() && subscriptionsElsewhere.isEmpty() && archivedSubscriptions.isEmpty()) {
                     item {
                         Box(
                             modifier = Modifier
@@ -206,37 +211,20 @@ fun ProfileScreen(
                     }
                 }
                 
-                if (activeSubscriptions.isEmpty() && archivedSubscriptions.isEmpty() && !uiState.isLoadingSubscriptions) {
+                if (subscriptionsHere.isEmpty() && subscriptionsElsewhere.isEmpty() && archivedSubscriptions.isEmpty() && !uiState.isLoadingSubscriptions) {
                     item {
                         EmptySubscriptionsCard(onBuyClick = onNavigateToSubscriptionPlans)
                     }
                 } else {
-                    if (activeSubscriptions.isNotEmpty()) {
-                        items(visibleActive, key = { it.id }) { subscription ->
+                    if (subscriptionsHere.isNotEmpty()) {
+                        items(subscriptionsHere, key = { it.id }) { subscription ->
                             SubscriptionCard(
                                 subscription = subscription,
                                 onFreezeClick = { freezeTarget = subscription },
                                 onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
                             )
                         }
-                        if (hiddenActiveCount > 0) {
-                            item {
-                                TextButton(
-                                    onClick = { showAllActive = !showAllActive },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        if (showAllActive) {
-                                            "Свернуть другие активные абонементы"
-                                        } else {
-                                            "У вас есть и другие активные абонементы ($hiddenActiveCount) — посмотреть все"
-                                        },
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
-                            }
-                        }
-                    } else if (!uiState.isLoadingSubscriptions) {
+                    } else if (!uiState.isLoadingSubscriptions && (subscriptionsElsewhere.isNotEmpty() || archivedSubscriptions.isNotEmpty())) {
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -250,6 +238,33 @@ fun ProfileScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (subscriptionsElsewhere.isNotEmpty()) {
+                        item {
+                            TextButton(
+                                onClick = { showAllActive = !showAllActive },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (showAllActive) {
+                                        "Скрыть активные абонементы в других клубах"
+                                    } else {
+                                        "Активные абонементы в других клубах (${subscriptionsElsewhere.size})"
+                                    },
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                        if (showAllActive) {
+                            items(subscriptionsElsewhere, key = { "other-${it.id}" }) { subscription ->
+                                SubscriptionCard(
+                                    subscription = subscription,
+                                    onFreezeClick = { freezeTarget = subscription },
+                                    onUnfreezeClick = { viewModel.unfreezeSubscription(subscription.id) },
                                 )
                             }
                         }

@@ -34,7 +34,6 @@ import com.fitnessclub.app.ui.theme.Primary
 @Composable
 fun TrainerDetailsScreen(
     onNavigateBack: () -> Unit,
-    onBookPersonalTraining: () -> Unit,
     viewModel: TrainerDetailsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -252,20 +251,10 @@ fun TrainerDetailsScreen(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "Расписание персональных слотов можно посмотреть в календаре. Записать на занятие может тренер.",
+                                text = "Для записи к этому тренеру вы можете позвонить или написать ему в мессенджер.",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = onBookPersonalTraining,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text("Смотреть слоты")
                     }
                 }
             }

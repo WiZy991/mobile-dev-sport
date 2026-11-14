@@ -1,5 +1,7 @@
 package com.fitnessclub.app.ui.screens.home
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,6 +18,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -135,13 +139,8 @@ fun HomeScreen(
                 if (uiState.promotionsReady) {
                     PromoBanner(
                         promotions = uiState.promotions,
-                        onClick = { promo ->
-                            when (promo.actionType.lowercase()) {
-                                "subscriptions" -> onNavigateToSubscriptionPlans()
-                                "none" -> Unit
-                                else -> onNavigateToShop()
-                            }
-                        }
+                        onOpenShop = onNavigateToShop,
+                        onOpenSubscriptions = onNavigateToSubscriptionPlans,
                     )
                 }
             }
@@ -192,11 +191,16 @@ fun HomeScreen(
 @Composable
 private fun PromoBanner(
     promotions: List<ClubPromotion>,
-    onClick: (ClubPromotion) -> Unit
+    onOpenShop: () -> Unit,
+    onOpenSubscriptions: () -> Unit,
 ) {
     if (promotions.isEmpty()) return
     var current by remember(promotions) { mutableStateOf(0) }
     val currentPromotion = promotions[current.coerceIn(0, promotions.lastIndex)]
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    // Системный шрифт телефона не раздувает баннер и не обрезает текст.
+    val fixedType = Density(density = density.density, fontScale = 1f)
 
     LaunchedEffect(promotions, current) {
         if (promotions.size <= 1) return@LaunchedEffect
@@ -204,93 +208,132 @@ private fun PromoBanner(
         current = (current + 1) % promotions.size
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .clickable { onClick(currentPromotion) },
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Box(
+    fun openPromo(promo: ClubPromotion) {
+        when (promo.actionType.lowercase()) {
+            "subscriptions" -> onOpenSubscriptions()
+            "url" -> openExternalUrl(context, promo.actionValue)
+            "none" -> Unit
+            else -> onOpenShop()
+        }
+    }
+
+    CompositionLocalProvider(LocalDensity provides fixedType) {
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp)
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            parsePromoColor(currentPromotion.bgFrom, Primary),
-                            parsePromoColor(currentPromotion.bgTo, AccentBlue)
+                .padding(16.dp)
+                .clickable { openPromo(currentPromotion) },
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 160.dp)
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                parsePromoColor(currentPromotion.bgFrom, Primary),
+                                parsePromoColor(currentPromotion.bgTo, AccentBlue)
+                            )
                         )
                     )
-                )
-        ) {
-            if (!currentPromotion.imageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = currentPromotion.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.25f))
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(24.dp)
             ) {
-                Text(
-                    text = currentPromotion.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = currentPromotion.subtitle.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = { onClick(currentPromotion) },
-                    modifier = Modifier.height(48.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 2.dp
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onPrimary,
-                        contentColor = Primary
+                if (!currentPromotion.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = currentPromotion.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
                     )
-                ) {
-                    Text(currentPromotion.buttonText.ifBlank { "Подробнее" }, style = MaterialTheme.typography.labelLarge)
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(Color.Black.copy(alpha = 0.25f))
+                    )
                 }
-                if (promotions.size > 1) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        promotions.forEachIndexed { index, _ ->
-                            Box(
-                                modifier = Modifier
-                                    .size(if (index == current) 8.dp else 6.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (index == current) MaterialTheme.colorScheme.onPrimary
-                                        else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f)
-                                    )
-                            )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        text = currentPromotion.title,
+                        fontSize = 22.sp,
+                        lineHeight = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    val subtitle = currentPromotion.subtitle.orEmpty()
+                    if (subtitle.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = subtitle,
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.95f),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    PromoActionButton(
+                        label = currentPromotion.buttonText.ifBlank { "Подробнее" },
+                        onClick = { openPromo(currentPromotion) },
+                    )
+                    currentPromotion.buttons.orEmpty().forEach { link ->
+                        if (link.text.isBlank() || link.url.isBlank()) return@forEach
+                        Spacer(modifier = Modifier.height(8.dp))
+                        PromoActionButton(
+                            label = link.text,
+                            onClick = { openExternalUrl(context, link.url) },
+                        )
+                    }
+                    if (promotions.size > 1) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            promotions.forEachIndexed { index, _ ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (index == current) 8.dp else 6.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (index == current) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f)
+                                        )
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PromoActionButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.height(44.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 2.dp
+        ),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.onPrimary,
+            contentColor = Primary
+        )
+    ) {
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+private fun openExternalUrl(context: android.content.Context, url: String?) {
+    val target = url?.trim().orEmpty()
+    if (target.isEmpty()) return
+    val uri = Uri.parse(if (target.startsWith("http://") || target.startsWith("https://")) target else "https://$target")
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
 }
 
 private fun parsePromoColor(hex: String?, fallback: Color): Color {

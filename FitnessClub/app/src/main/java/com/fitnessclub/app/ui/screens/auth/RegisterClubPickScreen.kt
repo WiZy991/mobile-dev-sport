@@ -102,24 +102,9 @@ fun RegisterClubPickScreen(
             )
         }
     }
-    // Резерв, если список не пришёл: залы Доброзала зашиты в приложении.
-    val fallback: List<VenueOption> = remember {
-        if (Brand.isWhiteLabel) {
-            emptyList()
-        } else {
-            RegistrationVenues.orderedCards.map { card ->
-                VenueOption(
-                    club = RegistrationVenues.toClubItem(card),
-                    imageRes = card.imageRes,
-                )
-            }
-        }
-    }
-    val venues: List<VenueOption> = when {
-        fromCrm.isNotEmpty() -> fromCrm
-        clubsLoading -> emptyList()
-        else -> fallback
-    }
+    // Только залы из CRM. Старые id из приложения после переноса базы не существуют,
+    // и клуб в профиле оставался пустым.
+    val venues: List<VenueOption> = fromCrm
 
     fun toggleExpand(clubId: String) {
         expandedIds = if (expandedIds.contains(clubId)) {

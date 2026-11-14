@@ -482,6 +482,7 @@ class LoginViewModel @Inject constructor(
             return
         }
         if (Brand.smartCaptchaEnabled) {
+            captchaTokenSent = null
             _uiState.value = _uiState.value.copy(
                 showSmartCaptcha = true,
                 error = null,
@@ -496,9 +497,12 @@ class LoginViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showSmartCaptcha = false, isLoading = false)
     }
 
+    private var captchaTokenSent: String? = null
+
     fun onSmartCaptchaToken(token: String) {
         val t = token.trim()
-        if (t.isEmpty()) return
+        if (t.isEmpty() || t == captchaTokenSent) return
+        captchaTokenSent = t
         _uiState.value = _uiState.value.copy(showSmartCaptcha = false)
         sendOtp(smartCaptchaToken = t)
     }

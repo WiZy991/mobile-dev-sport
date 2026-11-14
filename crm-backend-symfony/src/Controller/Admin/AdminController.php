@@ -3166,6 +3166,7 @@ class AdminController extends AbstractController
             ->setButtonText(trim((string) $request->request->get('button_text', 'Подробнее')) ?: 'Подробнее')
             ->setActionType((string) $request->request->get('action_type', 'shop'))
             ->setActionValue(($request->request->get('action_value') !== null && trim((string) $request->request->get('action_value')) !== '') ? trim((string) $request->request->get('action_value')) : null)
+            ->setButtonsJson($this->promotionButtonsJson($request))
             ->setBgFrom($this->normalizeHexColor((string) $request->request->get('bg_from', $promotion->getBgFrom())))
             ->setBgTo($this->normalizeHexColor((string) $request->request->get('bg_to', $promotion->getBgTo())))
             ->setSortOrder((int) $request->request->get('sort_order', 100))
@@ -3177,6 +3178,29 @@ class AdminController extends AbstractController
         $this->addFlash('success', 'Акция обновлена.');
 
         return $this->redirectToRoute('admin_section', ['section' => 'promotions']);
+    }
+
+    /** Строки «Текст | https://...» → JSON кнопок акции. */
+    private function promotionButtonsJson(Request $request): ?string
+    {
+        $raw = (string) $request->request->get('extra_buttons', '');
+        $buttons = [];
+        foreach (preg_split('/\r\n|\r|\n/', $raw) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || !str_contains($line, '|')) {
+                continue;
+            }
+            [$text, $url] = array_map('trim', explode('|', $line, 2));
+            if ($text === '' || $url === '') {
+                continue;
+            }
+            $buttons[] = [
+                'text' => mb_substr($text, 0, 40),
+                'url' => mb_substr($url, 0, 500),
+            ];
+        }
+
+        return $buttons === [] ? null : json_encode($buttons, JSON_UNESCAPED_UNICODE);
     }
 
     #[Route('/promotions/{id}/toggle', name: 'admin_promotion_toggle', methods: ['POST'])]
@@ -4781,6 +4805,7 @@ class AdminController extends AbstractController
                         ->setButtonText(trim((string) $request->request->get('button_text', 'Подробнее')) ?: 'Подробнее')
                         ->setActionType((string) $request->request->get('action_type', 'shop'))
                         ->setActionValue(($request->request->get('action_value') !== null && trim((string) $request->request->get('action_value')) !== '') ? trim((string) $request->request->get('action_value')) : null)
+                        ->setButtonsJson($this->promotionButtonsJson($request))
                         ->setBgFrom($this->normalizeHexColor((string) $request->request->get('bg_from', '#F97316')))
                         ->setBgTo($this->normalizeHexColor((string) $request->request->get('bg_to', '#3B82F6')))
                         ->setSortOrder((int) $request->request->get('sort_order', 100))

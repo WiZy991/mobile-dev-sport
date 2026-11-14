@@ -32,6 +32,10 @@ class Promotion implements TenantAware
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $actionValue = null;
 
+    /** Дополнительные кнопки: [{"text":"...","url":"https://..."}] */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $buttonsJson = null;
+
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $imagePath = null;
 
@@ -70,6 +74,44 @@ class Promotion implements TenantAware
 
     public function getActionValue(): ?string { return $this->actionValue; }
     public function setActionValue(?string $actionValue): self { $this->actionValue = $actionValue; return $this; }
+
+    public function getButtonsJson(): ?string { return $this->buttonsJson; }
+    public function setButtonsJson(?string $buttonsJson): self { $this->buttonsJson = $buttonsJson; return $this; }
+
+    /** @return list<array{text: string, url: string}> */
+    public function getExtraButtons(): array
+    {
+        if ($this->buttonsJson === null || trim($this->buttonsJson) === '') {
+            return [];
+        }
+        $decoded = json_decode($this->buttonsJson, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $buttons = [];
+        foreach ($decoded as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $text = trim((string) ($row['text'] ?? ''));
+            $url = trim((string) ($row['url'] ?? ''));
+            if ($text !== '' && $url !== '') {
+                $buttons[] = ['text' => $text, 'url' => $url];
+            }
+        }
+
+        return $buttons;
+    }
+
+    public function getExtraButtonsText(): string
+    {
+        $lines = [];
+        foreach ($this->getExtraButtons() as $button) {
+            $lines[] = $button['text'] . ' | ' . $button['url'];
+        }
+
+        return implode("\n", $lines);
+    }
 
     public function getImagePath(): ?string { return $this->imagePath; }
     public function setImagePath(?string $imagePath): self { $this->imagePath = $imagePath; return $this; }

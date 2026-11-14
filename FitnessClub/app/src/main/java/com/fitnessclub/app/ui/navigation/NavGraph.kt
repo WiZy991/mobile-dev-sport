@@ -559,9 +559,6 @@ fun NavGraph(
         ) {
             TrainerDetailsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onBookPersonalTraining = {
-                    navController.navigate(Screen.PersonalTraining.route)
-                }
             )
         }
 

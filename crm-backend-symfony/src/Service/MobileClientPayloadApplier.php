@@ -65,12 +65,31 @@ final class MobileClientPayloadApplier
         $cid = (int) ($data['club_id'] ?? 0);
         $byId = $cid > 0 ? $repo->find($cid) : null;
         $byId = $byId instanceof Club ? $byId : null;
+        // Id из CRM (список залов в приложении) — это и есть выбранный клуб.
+        if ($byId !== null) {
+            return $byId;
+        }
+
+        $shownName = trim((string) ($data['club_name'] ?? ''));
+        if ($shownName !== '') {
+            /** @var list<Club> $all */
+            $all = $repo->findAll();
+            foreach ($all as $candidate) {
+                $clubName = trim($candidate->getName());
+                if ($clubName === '') {
+                    continue;
+                }
+                if (mb_stripos($clubName, $shownName) !== false || mb_stripos($shownName, $clubName) !== false) {
+                    return $candidate;
+                }
+            }
+        }
 
         $shownTokens = $this->clubLabelTokens(
             (string) ($data['club_name'] ?? '') . ' ' . (string) ($data['club_address'] ?? '')
         );
         if ($shownTokens === []) {
-            return $byId;
+            return null;
         }
 
         if ($byId !== null && $this->clubMatchesTokens($byId, $shownTokens)) {
