@@ -77,6 +77,12 @@ android {
             buildConfigField("boolean", "SBER_LOGIN_ENABLED", "true")
             buildConfigField("boolean", "ONLINE_PAYMENT_ENABLED", "true")
             buildConfigField("String", "PAYMENT_PROVIDER", "\"alfa\"")
+            // Публичный client key SmartCaptcha (ysc1_…); server key только на CRM.
+            buildConfigField(
+                "String",
+                "YANDEX_SMARTCAPTCHA_SITE_KEY",
+                "\"ysc1_rPS2dKpPxK6i4hsNj8TYztjjKlJg6k9otAO9Iqzsf7ab5fde\"",
+            )
             buildConfigField("String", "YOOKASSA_SHOP_ID", "\"\"")
             buildConfigField("String", "YOOKASSA_CLIENT_KEY", "\"\"")
             buildConfigField("String", "LEGAL_ENTITY_LINE", "\"ИП Мацкова Александра Сергеевна, ИНН 254009880989\"")
@@ -103,6 +109,7 @@ android {
             buildConfigField("boolean", "SBER_LOGIN_ENABLED", "false")
             buildConfigField("boolean", "ONLINE_PAYMENT_ENABLED", "true")
             buildConfigField("String", "PAYMENT_PROVIDER", "\"yookassa\"")
+            buildConfigField("String", "YANDEX_SMARTCAPTCHA_SITE_KEY", "\"\"")
             buildConfigField("String", "YOOKASSA_SHOP_ID", localProperties.buildConfigString("YOOKASSA_SHOP_ID"))
             buildConfigField("String", "YOOKASSA_CLIENT_KEY", localProperties.buildConfigString("YOOKASSA_CLIENT_KEY"))
             buildConfigField("String", "LEGAL_ENTITY_LINE", "\"\"")

@@ -481,9 +481,37 @@ class LoginViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(phoneError = "Введите полный номер телефона")
             return
         }
+        if (Brand.smartCaptchaEnabled) {
+            _uiState.value = _uiState.value.copy(
+                showSmartCaptcha = true,
+                error = null,
+                phoneError = null,
+            )
+            return
+        }
+        sendOtp(smartCaptchaToken = null)
+    }
+
+    fun dismissSmartCaptcha() {
+        _uiState.value = _uiState.value.copy(showSmartCaptcha = false, isLoading = false)
+    }
+
+    fun onSmartCaptchaToken(token: String) {
+        val t = token.trim()
+        if (t.isEmpty()) return
+        _uiState.value = _uiState.value.copy(showSmartCaptcha = false)
+        sendOtp(smartCaptchaToken = t)
+    }
+
+    private fun sendOtp(smartCaptchaToken: String?) {
+        val phone = phoneForApi(_uiState.value.phoneNationalDigits)
+        if (phone.isEmpty()) {
+            _uiState.value = _uiState.value.copy(phoneError = "Введите полный номер телефона")
+            return
+        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, phoneError = null)
-            when (val r = authRepository.requestOtp(phone, "auto")) {
+            when (val r = authRepository.requestOtp(phone, "auto", smartCaptchaToken = smartCaptchaToken)) {
                 is ApiResult.Success -> {
                     if (BuildConfig.DEBUG && !r.data.devCode.isNullOrBlank()) {
                         android.util.Log.d("LoginOtp", "dev_code=${r.data.devCode}")
@@ -510,7 +538,13 @@ class LoginViewModel @Inject constructor(
                     tickResend()
                 }
                 is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = r.message)
+                    val needCaptcha = r.authCode == "smart_captcha_required" ||
+                        r.authCode == "smart_captcha_failed"
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = r.message,
+                        showSmartCaptcha = needCaptcha && Brand.smartCaptchaEnabled,
+                    )
                 }
                 is ApiResult.Loading -> Unit
             }
@@ -594,6 +628,7 @@ data class LoginUiState(
     val otpDevCode: String? = null,
     val otpSendCount: Int = 0,
     val resendSecondsLeft: Int = 0,
+    val showSmartCaptcha: Boolean = false,
     val showEmailLogin: Boolean = !Brand.phoneLoginEnabled,
     val email: String = "",
     val password: String = "",

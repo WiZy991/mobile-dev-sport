@@ -37,6 +37,10 @@
 -keepclassmembers class com.fitnessclub.app.ui.** {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+# SmartCaptcha WebView → NativeClient.onGetToken
+-keepclassmembers class com.fitnessclub.app.ui.screens.auth.SmartCaptchaJsBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
 
 # Gson TypeToken (R8 full mode срезает generic-сигнатуру анонимного подкласса)
 -keep class com.google.gson.reflect.TypeToken { *; }

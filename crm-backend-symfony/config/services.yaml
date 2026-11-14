@@ -48,6 +48,8 @@ parameters:
     mail_public_origin_default: 'https://worldcashfit.ru'
     mail_from_name_default: 'WorldCashFit'
     mail_enabled_default: '1'
+    yandex_smartcaptcha_server_key_default: ''
+    yandex_smartcaptcha_enabled_default: '0'
     smtp_host_default: 'mail'
     smtp_port_default: '25'
     smtp_user_default: ''
@@ -238,6 +240,11 @@ services:
     App\Service\Auth\CaptchaChallengeService:
         arguments:
             $cache: '@cache.app'
+
+    App\Service\Auth\YandexSmartCaptchaVerifier:
+        arguments:
+            $serverKey: '%env(default:yandex_smartcaptcha_server_key_default:YANDEX_SMARTCAPTCHA_SERVER_KEY)%'
+            $enabled: '%env(bool:default:yandex_smartcaptcha_enabled_default:YANDEX_SMARTCAPTCHA_ENABLED)%'
 
     App\Service\Auth\AuthAbuseGuard:
         arguments:

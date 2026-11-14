@@ -160,6 +160,14 @@ fun LoginScreen(
         )
     }
 
+    if (uiState.showSmartCaptcha && Brand.smartCaptchaEnabled) {
+        SmartCaptchaDialog(
+            siteKey = Brand.smartCaptchaSiteKey,
+            onToken = { viewModel.onSmartCaptchaToken(it) },
+            onDismiss = { viewModel.dismissSmartCaptcha() },
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()

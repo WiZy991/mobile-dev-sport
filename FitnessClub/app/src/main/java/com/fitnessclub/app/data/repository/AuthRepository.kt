@@ -230,15 +230,16 @@ class AuthRepository @Inject constructor(
         channel: String,
         captchaId: String? = null,
         captchaAnswer: String? = null,
+        smartCaptchaToken: String? = null,
     ): ApiResult<OtpRequestResponse> {
-        val first = requestOtpOnce(phone, channel, captchaId, captchaAnswer)
+        val first = requestOtpOnce(phone, channel, captchaId, captchaAnswer, smartCaptchaToken)
         if (channel != "auto" && channel.isNotBlank()) {
             return first
         }
         // Старый CRM отклоняет channel=auto — тот же порядок, что autoPriority на сервере.
         if (first is ApiResult.Error && first.authCode == "invalid_channel") {
             for (fallback in listOf("telegram", "whatsapp", "max")) {
-                val retry = requestOtpOnce(phone, fallback, captchaId, captchaAnswer)
+                val retry = requestOtpOnce(phone, fallback, captchaId, captchaAnswer, smartCaptchaToken)
                 if (retry is ApiResult.Success) {
                     return retry
                 }
@@ -262,10 +263,11 @@ class AuthRepository @Inject constructor(
         channel: String,
         captchaId: String? = null,
         captchaAnswer: String? = null,
+        smartCaptchaToken: String? = null,
     ): ApiResult<OtpRequestResponse> {
         return try {
             val response = api.requestOtp(
-                OtpRequestBody(phone, channel, captchaId, captchaAnswer),
+                OtpRequestBody(phone, channel, captchaId, captchaAnswer, smartCaptchaToken),
             )
             val body = response.body()
             if (response.isSuccessful && body != null) {
@@ -749,6 +751,10 @@ class AuthRepository @Inject constructor(
             "otp_too_soon" -> "Повторная отправка будет доступна через несколько секунд"
             "invalid_phone" -> "Укажите номер телефона полностью"
             "captcha_required" -> parsed.message.ifBlank { "Подтвердите, что вы не робот — ответьте на простой пример." }
+            "smart_captcha_required" ->
+                parsed.message.ifBlank { "Пройдите проверку «я не робот», затем запросите код снова." }
+            "smart_captcha_failed" ->
+                parsed.message.ifBlank { "Проверка капчи не пройдена. Попробуйте ещё раз." }
             "rate_limited" -> "Слишком много попыток. Подождите несколько минут и попробуйте снова."
             else -> null
         }

@@ -228,6 +228,8 @@ data class OtpRequestBody(
     @SerializedName("channel") val channel: String,
     @SerializedName("captcha_id") val captchaId: String? = null,
     @SerializedName("captcha_answer") val captchaAnswer: String? = null,
+    /** Токен Яндекс SmartCaptcha (после WebView). */
+    @SerializedName("smart_captcha_token") val smartCaptchaToken: String? = null,
 )
 
 data class OtpRequestResponse(

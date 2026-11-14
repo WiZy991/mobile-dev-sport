@@ -19,6 +19,11 @@ object Brand {
     val sberLoginEnabled: Boolean get() = BuildConfig.SBER_LOGIN_ENABLED
     val onlinePaymentEnabled: Boolean get() = BuildConfig.ONLINE_PAYMENT_ENABLED
 
+    /** Публичный site key Яндекс SmartCaptcha (ysc1_…). Пусто — капча в APK не показывается. */
+    val smartCaptchaSiteKey: String get() = BuildConfig.YANDEX_SMARTCAPTCHA_SITE_KEY.trim()
+
+    val smartCaptchaEnabled: Boolean get() = phoneLoginEnabled && smartCaptchaSiteKey.isNotEmpty()
+
     /** alfa — Доброзал (браузер), yookassa — Академия борьбы (мобильный SDK). */
     val paymentProvider: String get() = BuildConfig.PAYMENT_PROVIDER
 

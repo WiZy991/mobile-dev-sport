@@ -8,9 +8,11 @@ use App\Entity\StaffNotification;
 use App\Entity\User;
 use App\Service\Api\MobileAuthTokenIssuer;
 use App\Service\Auth\AuthAbuseGuard;
+use App\Service\Auth\ClientIp;
 use App\Service\Auth\EmailVerificationService;
 use App\Service\Auth\PhoneNormalizer;
 use App\Service\Auth\PhoneOtpService;
+use App\Service\Auth\YandexSmartCaptchaVerifier;
 use App\Service\Lead\LeadIngestionService;
 use App\Service\Lead\LeadSource;
 use App\Service\MobileClientPayloadApplier;
@@ -33,6 +35,7 @@ class PhoneAuthController extends AbstractController
         private readonly StaffEventNotifier $staffEventNotifier,
         private readonly EmailVerificationService $emailVerification,
         private readonly AuthAbuseGuard $abuse,
+        private readonly YandexSmartCaptchaVerifier $smartCaptcha,
     ) {
     }
 
@@ -51,6 +54,22 @@ class PhoneAuthController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true) ?? [];
+        if ($this->smartCaptcha->isEnabled()) {
+            $token = trim((string) ($data['smart_captcha_token'] ?? $data['smart-token'] ?? ''));
+            if ($token === '') {
+                return $this->json([
+                    'error' => 'Пройдите проверку «я не робот», затем запросите код снова.',
+                    'code' => 'smart_captcha_required',
+                ], 400);
+            }
+            if (!$this->smartCaptcha->verify($token, ClientIp::from($request))) {
+                return $this->json([
+                    'error' => 'Проверка капчи не пройдена. Попробуйте ещё раз.',
+                    'code' => 'smart_captcha_failed',
+                ], 400);
+            }
+        }
+
         try {
             $payload = $this->otp->request(
                 (string) ($data['phone'] ?? ''),
